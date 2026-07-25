@@ -1,0 +1,18 @@
+meta {
+  name: Browse Studies
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/participant/studies
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.length > 0) {
+    bru.setVar("studyId", body[0].id);
+  }
+}

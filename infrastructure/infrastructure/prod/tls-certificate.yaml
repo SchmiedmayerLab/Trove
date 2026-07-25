@@ -1,0 +1,21 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: studyplatform-main-tls-cert
+  namespace: studyplatform
+spec:
+  commonName: platform.spezi.stanford.edu
+  secretName: studyplatform-main-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - platform.spezi.stanford.edu

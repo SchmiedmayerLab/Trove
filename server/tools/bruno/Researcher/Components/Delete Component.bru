@@ -1,0 +1,16 @@
+meta {
+  name: Delete Component
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}

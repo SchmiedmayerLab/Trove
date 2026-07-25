@@ -1,0 +1,115 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/infrastructure.yml"
+  pull_request:
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/infrastructure.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: infrastructure-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  manifests:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin
+      - name: Build and validate all overlays
+        run: |
+          for overlay in infrastructure/dev infrastructure/prod apps/dev apps/prod bootstrap/dev bootstrap/prod argocd-apps/dev argocd-apps/prod; do
+            echo "=== $overlay ==="
+            kubectl kustomize "$overlay" | kubeconform \
+              -strict \
+              -summary \
+              -output text \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -skip CustomResourceDefinition
+          done
+
+  tofu-validate:
+    name: Tofu Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v2
+      - name: Check formatting
+        run: tofu fmt -check -diff
+      - name: Initialize
+        run: tofu init -backend=false
+      - name: Validate
+        run: tofu validate
+
+  kind-smoke-test:
+    name: KIND Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install KIND
+        run: |
+          curl -sSLo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+      - name: Create KIND cluster
+        run: kind create cluster --name study-platform --config tools/kind-config.yaml
+      - name: Bootstrap ArgoCD and applications
+        run: python3 tools/setup.py
+      - name: Wait for ArgoCD Applications
+        run: bash tools/smoke-test.sh
+        env:
+          SMOKE_TEST_TIMEOUT: "600"
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== ArgoCD Applications ==="
+          kubectl get applications -n argocd -o wide
+          echo ""
+          echo "=== All Pods ==="
+          kubectl get pods -A
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -40
+          echo ""
+          echo "=== Crashing Pod Logs ==="
+          for pod in $(kubectl get pods -n studyplatform --no-headers | grep -E 'CrashLoop|Error' | awk '{print $1}'); do
+            for flag in "" "--previous"; do
+              echo "--- $pod $flag ---"
+              kubectl logs -n studyplatform "$pod" --all-containers $flag --tail=40 2>&1 || true
+            done
+          done

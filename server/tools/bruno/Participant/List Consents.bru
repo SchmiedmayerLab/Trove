@@ -1,0 +1,22 @@
+meta {
+  name: List Consents
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/participant/enrollments/:enrollmentId/consents
+  body: none
+  auth: inherit
+}
+
+params:path {
+  enrollmentId: {{enrollmentId}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.length > 0) {
+    bru.setVar("consentId", body[0].id);
+  }
+}

@@ -1,0 +1,25 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-db
+  namespace: studyplatform
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.2-2-bullseye
+  instances: 1
+  storage:
+    size: 1Gi
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: keycloak
+      owner: keycloak
+      secret:
+        name: keycloak-postgres-credentials

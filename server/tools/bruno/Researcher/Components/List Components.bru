@@ -1,0 +1,22 @@
+meta {
+  name: List Components
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/studies/:studyId/components
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.length > 0) {
+    bru.setVar("componentId", body[0].id);
+  }
+}

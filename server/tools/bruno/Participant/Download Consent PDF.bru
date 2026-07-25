@@ -1,0 +1,16 @@
+meta {
+  name: Download Consent PDF
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/participant/enrollments/:enrollmentId/consents/:consentId/pdf
+  body: none
+  auth: inherit
+}
+
+params:path {
+  enrollmentId: {{enrollmentId}}
+  consentId: {{consentId}}
+}

@@ -1,0 +1,26 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/SchmiedmayerLab/StudyPlatform.git
+    path: argocd-apps/prod
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

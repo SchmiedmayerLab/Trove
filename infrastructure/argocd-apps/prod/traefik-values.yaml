@@ -1,0 +1,42 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+service:
+  enabled: true
+  type: LoadBalancer
+  spec:
+    loadBalancerIP: "34.182.76.103"
+logs:
+  general:
+    level: WARN
+  access:
+    enabled: true
+    fields:
+      headers:
+        defaultmode: keep
+persistence:
+  enabled: true
+  name: traefik-data
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: standard-rwo
+  path: /data
+  annotations: {}
+deployment:
+  hostNetwork: false
+podSecurityContext:
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+ports: {}
+ingressRoute:
+  dashboard:
+    enabled: false
+additionalArguments: []

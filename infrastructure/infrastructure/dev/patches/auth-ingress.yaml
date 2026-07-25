@@ -1,0 +1,25 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: auth-ingress
+  namespace: studyplatform
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-issuer
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`localhost`) && PathPrefix(`/auth`)
+      priority: 99
+      services:
+        - name: keycloak
+          port: 80
+      middlewares:
+        - name: keycloak-headers

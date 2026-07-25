@@ -1,0 +1,16 @@
+meta {
+  name: Get Health Data Component
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/studies/:studyId/components/health-data/:componentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}

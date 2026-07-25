@@ -1,0 +1,117 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studyplatform-server
+  namespace: studyplatform
+  labels:
+    app: studyplatform-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: studyplatform-server
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: studyplatform-server
+    spec:
+      serviceAccountName: studyplatform-server
+      initContainers:
+        - name: studyplatform-server-migrate
+          image: ghcr.io/schmiedmayerlab/studyplatform-server:latest
+          imagePullPolicy: Always
+          command: ["./StudyPlatformServer", "migrate", "--yes"]
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - configMapRef:
+                name: studyplatform-server-config
+          env:
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: studyplatform-postgres-credentials
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: studyplatform-postgres-credentials
+                  key: password
+      containers:
+        - name: studyplatform-server-container
+          image: ghcr.io/schmiedmayerlab/studyplatform-server:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - configMapRef:
+                name: studyplatform-server-config
+          env:
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: studyplatform-postgres-credentials
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: studyplatform-postgres-credentials
+                  key: password
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: studyplatform-server-secret
+                  key: KEYCLOAK_CLIENT_SECRET
+          startupProbe:
+            httpGet:
+              path: /api/v0/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v0/health
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v0/health
+              port: 8080
+            periodSeconds: 15

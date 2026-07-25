@@ -1,0 +1,325 @@
+{
+  "uuid": "a1b2c3d4-5678-4abc-9def-0123456789ab",
+  "lastMigration": 33,
+  "name": "Keycloak Mock",
+  "endpointPrefix": "",
+  "latency": 0,
+  "port": 8180,
+  "hostname": "",
+  "folders": [],
+  "routes": [
+    {
+      "uuid": "aaaa1111-1111-4111-8111-111111111111",
+      "type": "http",
+      "documentation": "JWKS - Returns public keys for JWT verification",
+      "method": "get",
+      "endpoint": "realms/studyplatform/protocol/openid-connect/certs",
+      "responses": [
+        {
+          "uuid": "bbbb1111-1111-4111-8111-111111111111",
+          "body": "{\n  \"keys\": [\n    {\n      \"kid\": \"PfQjrgBPfBZBhoIH3lmwFgYkhGE95FkrCqy1KSEc1Is\",\n      \"kty\": \"RSA\",\n      \"alg\": \"RSA-OAEP\",\n      \"use\": \"enc\",\n      \"n\": \"k-DReZ4xmOWu-qWBlCM7g0s4Ek6_8R_AoQqDk5AvmWVx6tjSPhj30r2Hfwiq_6IJjoBkUbT5GmKBdBx0G0cq8NW5GmFV0d4wMfRvu2GfA88XG3sYrLSqHVI7kT0RgcLoVa3mw891nZQ0I8AFKVrXU8gF-DgJblSOSQ236IxC8bn7I3jKVp__P4OlWCXTcdInsn5La8B_7VWzHFkVwq63GJ-he6_s__iYR_92gh_-7G4uAEDjcWbJhQbwPSP1EmF7rG8EmCOjY4r8jsuWC5C3ZIMFnGzTn-9vkJUSrWhddZ7Aywyo8yqljqyPzu4_k_WreKugrAVXRmRsOVIetpmwow\",\n      \"e\": \"AQAB\"\n    },\n    {\n      \"kid\": \"6DZchA_Xtz-mJYW366qsvsvLfT1Ja6gZPRXAdjfCdCQ\",\n      \"kty\": \"RSA\",\n      \"alg\": \"RS256\",\n      \"use\": \"sig\",\n      \"n\": \"7u5UoERm4xU_2pwMsNhTxmkABPrWALzRYa5gsBZfXyFx0dg1xO74QKx2ZUYw-3Z3oyTlk2y20Z5mAIvLu-c4xePduFcJSbvQB3CgFtAllaSLXM1ctZ1LPRH25FioceMrcNX7Crzpq0AVJBI6tWy_6cnwwP6VXyUIJrvicwIjVNxPfAfamjfvTYONKuHeGcY8QrQMsWp4Y7zvklGUla02xGklqwIM0ObvUH8j-R0Wy2daPpS76TH-2QPOSBU9TNWWxd4PV0wrhI7vDDzsjbJ1ACdDWtrDnNL3k-wV4R1bazI8DahLkuNhRg2u5G6f5UHlFSQhBazT_Emn8BM733ol4w\",\n      \"e\": \"AQAB\"\n    }\n  ]\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "JWKS Response",
+          "headers": [],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "aaaa2222-2222-4222-8222-222222222222",
+      "type": "http",
+      "documentation": "Token endpoint - Returns JWT for all grant types",
+      "method": "post",
+      "endpoint": "realms/studyplatform/protocol/openid-connect/token",
+      "responses": [
+        {
+          "uuid": "bbbb2222-2222-4222-8222-222222222222",
+          "body": "{\n  \"access_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI2RFpjaEFfWHR6LW1KWVczNjZxc3ZzdkxmVDFKYTZnWlBSWEFkamZDZENRIn0.eyJleHAiOjE4MDMxNzQ2MjMsImlhdCI6MTc3MTYzODYyMywianRpIjoiNTJhODc1MmYtOGE4MS00N2EzLTkyMzUtNTk5OWYzZmJkYzdkIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MTgwL3JlYWxtcy9zcGV6aS1zdHVkeSIsInR5cCI6IkJlYXJlciIsImF6cCI6InNwZXppLXN0dWR5LXNlcnZlciIsInNpZCI6ImJhNmVmZWQ1LTEwMjctNGM5OS04ZmViLWVjZjQ4ZmRlNTI5MiIsInNjb3BlIjoiZ3JvdXBzIiwicm9sZXMiOlsic3BlemlzdHVkeXBsYXRmb3JtLWF1dGhvcml6ZWQtdXNlcnMiXSwiZ3JvdXBzIjpbIi9TdGFuZm9yZCBCaW9kZXNpZ24gRGlnaXRhbCBIZWFsdGgvYWRtaW4iXX0.K2RYAwEWPcg8BpolrceqegYK9_v7rqPzcA_782jit4jz3vofXsSqEIG-1rVcEKCdRSmMfTVLKESCB_GpxVPo3iWdy6NUIRLhTjhY-iNVOowydvt7dyCozRs4Bt_dSlrLZp499tSH6O92MmQMnmA9HhSIzam6dOgvEMeuGLIvVcKc9WepuRUANdnY6V03fDKKehpNladOFMe5Xcm2-Zpa75JPWLB4_8Rdd8uapUwXW4QqVEj4w-EmkqQIo2NZXSEbfT5hwlrr_6on5Jie0jVVIc2wz0QjZ3dqK7TNqg9ntAOEqnV4-INN31HLdVMSAnwbktbzDilOWe_OAgjajkDy4g\",\n  \"expires_in\": 31536000,\n  \"refresh_expires_in\": 31536000,\n  \"refresh_token\": \"eyJhbGciOiJIUzUxMiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI1YjJjYzQ1OS01ZjI5LTRkZTAtOGIwNS1iZmVjZDNjNTgxODgifQ.eyJleHAiOjE4MDMxNzQ2MjMsImlhdCI6MTc3MTYzODYyMywianRpIjoiOGI0MWUxNmUtZGFiYS00Nzk1LWE5YjQtZmI0Y2FmMTMzODczIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MTgwL3JlYWxtcy9zcGV6aS1zdHVkeSIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODE4MC9yZWFsbXMvc3Blemktc3R1ZHkiLCJ0eXAiOiJSZWZyZXNoIiwiYXpwIjoic3Blemktc3R1ZHktc2VydmVyIiwic2lkIjoiYmE2ZWZlZDUtMTAyNy00Yzk5LThmZWItZWNmNDhmZGU1MjkyIiwic2NvcGUiOiJncm91cHMifQ.wWr3RYx8600Fj6DrOeYy9M4DTyEQB0Sp8ZaGyg7XymR6EoCzmFRKOjc1KhuyAg0K3fx1_--cEdT7EKzM6FknIg\",\n  \"token_type\": \"Bearer\",\n  \"not-before-policy\": 0,\n  \"session_state\": \"ba6efed5-1027-4c99-8feb-ecf48fde5292\",\n  \"scope\": \"groups\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Token Response",
+          "headers": [
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "http://localhost:3000"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Access-Control-Allow-Methods"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Strict-Transport-Security",
+              "value": "max-age=31536000; includeSubDomains"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "SAMEORIGIN"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "1; mode=block"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-store"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "aaaa3333-3333-4333-8333-333333333333",
+      "type": "http",
+      "documentation": "Admin Groups - Returns Keycloak groups for sync",
+      "method": "get",
+      "endpoint": "admin/realms/studyplatform/groups",
+      "responses": [
+        {
+          "uuid": "bbbb3333-3333-4333-8333-333333333333",
+          "body": "[\n  {\n    \"id\": \"b067bc4e-75bf-4d7c-a4a9-71be1a4b11be\",\n    \"name\": \"Stanford Biodesign Digital Health\",\n    \"subGroups\": []\n  }\n]",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Groups Response",
+          "headers": [],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "aaaa4444-4444-4444-8444-444444444444",
+      "type": "http",
+      "documentation": "3P Cookies Step 1 - Sets cookie and loads step2 iframe",
+      "method": "get",
+      "endpoint": "realms/studyplatform/protocol/openid-connect/3p-cookies/step1.html",
+      "responses": [
+        {
+          "uuid": "bbbb4444-4444-4444-8444-444444444444",
+          "body": "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n  </head>\n  <body>\n    <script type=\"module\">\n      checkStorageAccess();\n      \n      async function checkStorageAccess() {\n        // Check if the browser has granted us access to 3rd-party storage (such as cookies).\n        const hasAccess = await hasStorageAccess();\n\n        if (hasAccess) {\n          // If so, attempt to place a cookie to test this assumption.\n          attemptWithTestCookie();\n        } else {\n          // Otherwise, signal that 3rd-party access is not supported.\n          signalSupport(false);\n        }\n      }\n\n      // See https://developer.mozilla.org/en-US/docs/Web/API/Storage_Access_API/Using#checking_and_requesting_storage_access\n      async function hasStorageAccess() {\n        // Check if the Storage Access API is supported, if not, pretend we have access.\n        // This is for older browsers, where support can be determined using the test cookie.\n        if (!(\"hasStorageAccess\" in document)) {\n          return true;\n        }\n\n        // Check if we already have been granted storage access, if so, signal access.\n        if (await document.hasStorageAccess()) {\n          return true;\n        }\n\n        try {\n          // Attempt to request storage access without a user interaction.\n          // This might fail, and if it does an exception will be thrown.\n          await document.requestStorageAccess();\n\n          // If no exceptions are thrown, then signal access.\n          return true;\n        } catch (error) {\n          // If an exception is thrown, then signal no access.\n          return false;\n        }\n      }\n\n      function attemptWithTestCookie() {\n        // Place a cookie to test whether we can access cookies from 3rd-party storage.\n        document.cookie = \"KEYCLOAK_3P_COOKIE_SAMESITE=supported; Max-Age=60; SameSite=None; Secure\";\n        document.cookie = \"KEYCLOAK_3P_COOKIE=supported; Max-Age=60\";\n\n        // Then redirect to the page where we will read these cookies to confirm this.\n        window.location = \"step2.html\";\n      }\n\n      function signalSupport(isSupported) {\n        // Signal 3rd-party access support to the page embedding this iframe.\n        window.parent.postMessage(isSupported ? \"supported\" : \"unsupported\", \"*\");\n      }\n    </script>\n  </body>\n</html>\n",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "3P Cookies Step 1",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "text/html"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "aaaa5555-5555-4555-8555-555555555555",
+      "type": "http",
+      "documentation": "3P Cookies Step 2 - Checks cookie and posts message to parent",
+      "method": "get",
+      "endpoint": "realms/studyplatform/protocol/openid-connect/3p-cookies/step2.html",
+      "responses": [
+        {
+          "uuid": "bbbb5555-5555-4555-8555-555555555555",
+          "body": "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n  </head>\n  <body>\n    <script type=\"module\">\n      const hasAccess = document.cookie.includes(\"KEYCLOAK_3P_COOKIE\");\n      window.parent.postMessage(hasAccess ? \"supported\" : \"unsupported\", \"*\");\n    </script>\n  </body>\n</html>\n",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "3P Cookies Step 2",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "text/html"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "120e13a1-5535-4ac3-b363-175fd18b4016",
+      "type": "http",
+      "documentation": "",
+      "method": "get",
+      "endpoint": "realms/studyplatform/protocol/openid-connect/auth",
+      "responses": [
+        {
+          "uuid": "8336a1aa-a402-465a-8cf2-f473f7042301",
+          "body": "{}",
+          "latency": 0,
+          "statusCode": 302,
+          "label": "",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-store, must-revalidate, max-age=0"
+            },
+            {
+              "key": "Location",
+              "value": "{{{queryParam 'redirect_uri'}}}#state={{queryParam     'state'}}&session_state=44caa360-09d6-4ed1-8541-121c7f5fe8e4&iss=http%3A%2F%2Flocalhost%3A8180%2Frealms%2Fstudyplatform&code=mock-auth-code"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "1; mode=block"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    }
+  ],
+  "rootChildren": [
+    {
+      "type": "route",
+      "uuid": "aaaa1111-1111-4111-8111-111111111111"
+    },
+    {
+      "type": "route",
+      "uuid": "aaaa2222-2222-4222-8222-222222222222"
+    },
+    {
+      "type": "route",
+      "uuid": "aaaa3333-3333-4333-8333-333333333333"
+    },
+    {
+      "type": "route",
+      "uuid": "aaaa4444-4444-4444-8444-444444444444"
+    },
+    {
+      "type": "route",
+      "uuid": "aaaa5555-5555-4555-8555-555555555555"
+    },
+    {
+      "type": "route",
+      "uuid": "120e13a1-5535-4ac3-b363-175fd18b4016"
+    }
+  ],
+  "proxyMode": false,
+  "proxyHost": "",
+  "proxyRemovePrefix": false,
+  "tlsOptions": {
+    "enabled": false,
+    "type": "CERT",
+    "pfxPath": "",
+    "certPath": "",
+    "keyPath": "",
+    "caPath": "",
+    "passphrase": ""
+  },
+  "cors": true,
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    },
+    {
+      "key": "Access-Control-Allow-Origin",
+      "value": "*"
+    },
+    {
+      "key": "Access-Control-Allow-Methods",
+      "value": "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+    },
+    {
+      "key": "Access-Control-Allow-Headers",
+      "value": "Content-Type, Origin, Accept, Authorization, Content-Length, X-Requested-With"
+    }
+  ],
+  "proxyReqHeaders": [
+    {
+      "key": "",
+      "value": ""
+    }
+  ],
+  "proxyResHeaders": [
+    {
+      "key": "",
+      "value": ""
+    }
+  ],
+  "data": [],
+  "callbacks": []
+}

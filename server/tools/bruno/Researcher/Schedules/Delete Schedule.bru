@@ -1,0 +1,17 @@
+meta {
+  name: Delete Schedule
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules/:scheduleId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+  scheduleId: {{scheduleId}}
+}

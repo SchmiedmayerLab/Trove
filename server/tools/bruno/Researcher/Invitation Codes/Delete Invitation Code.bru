@@ -1,0 +1,16 @@
+meta {
+  name: Delete Invitation Code
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/studies/:studyId/invitation-codes/:invitationCodeId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  invitationCodeId: {{invitationCodeId}}
+}

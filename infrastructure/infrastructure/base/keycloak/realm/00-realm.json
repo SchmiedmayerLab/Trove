@@ -1,0 +1,213 @@
+{
+  "realm": "studyplatform",
+  "enabled": true,
+  "ssoSessionIdleTimeout": 86400,
+  "ssoSessionMaxLifespan": 86400,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 300,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "rememberMe": true,
+  "verifyEmail": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "groups": [
+    { "name": "ArgoCDAdmins", "subGroups": [] }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "default-roles-studyplatform",
+        "description": "Composite role for default realm roles",
+        "composite": true,
+        "composites": { "realm": ["studyplatform-participant"] },
+        "clientRole": false
+      },
+      {
+        "name": "studyplatform-researcher",
+        "description": "Researchers authorized to manage studies",
+        "clientRole": false
+      },
+      {
+        "name": "studyplatform-participant",
+        "description": "Participants in Spezi studies via mobile app",
+        "clientRole": false
+      },
+      {
+        "name": "ArgoCDAdmins",
+        "description": "ArgoCD Administrators",
+        "clientRole": false
+      }
+    ]
+  },
+  "defaultRole": {
+    "name": "default-roles-studyplatform",
+    "description": "Composite role for default realm roles",
+    "composite": true,
+    "composites": { "realm": ["studyplatform-participant"] },
+    "clientRole": false
+  },
+  "clientScopes": [
+    {
+      "name": "groups",
+      "description": "Groups membership with full path",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "argocd",
+      "name": "ArgoCD",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "redirectUris": [
+        "$(env:WEB_URL)/argo/auth/callback",
+        "$(env:WEB_URL)/argo/auth/login"
+      ],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"]
+    },
+    {
+      "clientId": "studyplatform-web",
+      "name": "Study Platform Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "redirectUris": ["$(env:WEB_URL)/*"],
+      "webOrigins": ["$(env:WEB_URL)"],
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"],
+      "protocolMappers": [
+        {
+          "name": "realm roles -> roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "studyplatform-server",
+      "name": "Study Platform Server",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "$(env:SERVER_CLIENT_SECRET)",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"]
+    },
+    {
+      "clientId": "studyplatform-app",
+      "name": "Study Platform Mobile App",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["studyplatform://callback"],
+      "webOrigins": [],
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": true,
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"]
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}}],\"unmanagedAttributePolicy\":\"ADMIN_VIEW\"}"
+          ]
+        }
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-studyplatform-server",
+      "enabled": true,
+      "serviceAccountClientId": "studyplatform-server",
+      "clientRoles": {
+        "realm-management": ["query-groups", "view-users"]
+      }
+    }
+  ]
+}

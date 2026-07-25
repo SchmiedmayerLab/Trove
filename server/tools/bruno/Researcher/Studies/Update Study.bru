@@ -1,0 +1,67 @@
+meta {
+  name: Update Study
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/studies/:studyId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "details": {
+      "en-US": {
+        "title": "Study Title",
+        "shortTitle": "UST",
+        "explanationText": "Updated explanation text for the study",
+        "shortExplanationText": "Updated short explanation"
+      }
+    },
+    "participationCriterion": {
+      "type": "all",
+      "criteria": [
+        {
+          "type": "ageAtLeast",
+          "age": 18
+        },
+        {
+          "type": "any",
+          "criteria": [
+            {
+              "type": "isFromRegion",
+              "region": "US"
+            },
+            {
+              "type": "isFromRegion",
+              "region": "DE"
+            }
+          ]
+        },
+        {
+          "type": "not",
+          "criterion": {
+            "type": "ageAtLeast",
+            "age": 65
+          }
+        }
+      ]
+    },
+    "consent": {
+      "en-US": {
+        "title": "Informed Consent",
+        "content": "# Informed Consent\n\nBy participating in this study, you agree to the data collection and use described below.\n\n## Data Collection\n\nWe will collect health, questionnaire, and device usage data for research purposes.\n\n<toggle id=\"agree_data_use\" expected-value=\"true\">\nI agree that my data may be used for the purposes of this research study.\n</toggle>\n\n<toggle id=\"contact_for_followup\" initial-value=\"false\">\nYou may contact me about future studies (optional).\n</toggle>\n\n<select id=\"data_sharing\" expected-value=\"*\">\nHow may we share your de-identified data?\n<option id=\"academic_only\">Academic researchers only</option>\n<option id=\"academic_and_industry\">Academic and industry researchers</option>\n<option id=\"none\">Do not share</option>\n</select>\n\n## Signature\n\nBy signing below, you acknowledge that you have read and understood this consent form.\n\n<signature id=\"participant_signature\" />\n"
+      }
+    }
+  }
+}

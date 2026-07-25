@@ -1,0 +1,33 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studyplatform-web
+  namespace: studyplatform
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  template:
+    spec:
+      containers:
+        - name: studyplatform-web-container
+          image: ghcr.io/schmiedmayerlab/studyplatform-web:main
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 50m
+            limits:
+              memory: 1Gi
+              cpu: 100m

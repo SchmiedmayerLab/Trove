@@ -1,0 +1,71 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "api/openapi.yaml"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "api/openapi.yaml"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # --ignore-scripts skips the postinstall `openapi-ts`, which we run
+      # explicitly below once the inlined spec (../api/openapi.yaml) is present.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Generate API client
+        run: npm run generate:api
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  publish:
+    name: Docker Build and Push
+    needs: build-and-test
+    if: github.event_name == 'push'
+    # Built from the monorepo root so the inlined API spec (api/openapi.yaml)
+    # is available to `generate:api` during the image build.
+    uses: StanfordBDHG/.github/.github/workflows/docker-build-and-push.yml@v2
+    with:
+      imageName: schmiedmayerlab/studyplatform-web
+      dockerFile: web/Dockerfile
+      workingDirectory: .
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit

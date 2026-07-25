@@ -1,0 +1,37 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: studyplatform-ingress
+  namespace: studyplatform
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`DOMAIN_PLACEHOLDER`)
+      priority: 1
+      services:
+        - name: studyplatform-web-service
+          port: 80
+      middlewares:
+        - name: security-headers
+    - kind: Rule
+      match: Host(`DOMAIN_PLACEHOLDER`) && PathPrefix(`/api`)
+      priority: 2
+      services:
+        - name: studyplatform-server-service
+          port: 8080
+      middlewares:
+        - name: security-headers
+  tls:
+    secretName: studyplatform-main-tls-secret

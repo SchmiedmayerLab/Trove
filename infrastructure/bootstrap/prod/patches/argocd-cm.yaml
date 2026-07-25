@@ -1,0 +1,27 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  url: https://platform.spezi.stanford.edu/argo
+  oidc.config: |
+    name: Keycloak
+    issuer: https://platform.spezi.stanford.edu/auth/realms/studyplatform
+    clientId: argocd
+    redirectURI: https://platform.spezi.stanford.edu/argo/auth/callback
+    enablePKCEAuthentication: true
+    insecure: false
+    requestedScopes: ["openid", "profile", "email", "groups"]
+    requestedIDTokenClaims:
+      groups:
+        essential: true
+    cliClientId: argocd

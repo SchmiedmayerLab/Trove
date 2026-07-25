@@ -1,0 +1,30 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`platform.spezi.stanford.edu`) && PathPrefix(`/argo`)
+      priority: 10
+      services:
+        - name: argocd-server
+          port: 80
+    - kind: Rule
+      match: Host(`platform.spezi.stanford.edu`) && PathPrefix(`/argo`) && Header(`Content-Type`, `application/grpc`)
+      priority: 10
+      services:
+        - name: argocd-server
+          port: 80
+          scheme: h2c

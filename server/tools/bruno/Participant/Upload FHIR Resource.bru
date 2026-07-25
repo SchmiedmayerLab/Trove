@@ -1,0 +1,35 @@
+meta {
+  name: Upload Observation
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/participant/fhir/resource
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "resourceType": "Observation",
+    "id": "{{$randomUUID}}",
+    "status": "final",
+    "code": {
+      "coding": [
+        {
+          "system": "http://loinc.org",
+          "code": "8867-4",
+          "display": "Heart rate"
+        }
+      ]
+    },
+    "effectiveDateTime": "{{$isoTimestamp}}",
+    "valueQuantity": {
+      "value": 72,
+      "unit": "beats/minute",
+      "system": "http://unitsofmeasure.org",
+      "code": "/min"
+    }
+  }
+}

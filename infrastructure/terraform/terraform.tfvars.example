@@ -1,0 +1,20 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+project_id   = "studyplatform-dev"
+region       = "us-west1"
+cluster_name = "studyplatform-dev"
+domain       = "platform.spezi.stanford.edu"
+
+# Restrict kubectl access to specific CIDRs (recommended for production)
+# authorized_networks = [
+#   {
+#     display_name = "stanford-vpn"
+#     cidr_block   = "171.64.0.0/14"
+#   }
+# ]

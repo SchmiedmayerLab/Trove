@@ -1,0 +1,59 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "api/**"
+      - ".github/workflows/server.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - "api/**"
+      - ".github/workflows/server.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & Test (Linux)
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build --package-path server
+      - name: Test
+        run: swift test --package-path server
+
+  publish:
+    name: Docker Build and Push
+    needs: build-and-test
+    if: github.event_name == 'push'
+    # Built from the monorepo root so the inlined `api/` package (referenced as
+    # ../api) is available in the build context.
+    uses: StanfordBDHG/.github/.github/workflows/docker-build-and-push.yml@v2
+    with:
+      imageName: schmiedmayerlab/studyplatform-server
+      dockerFile: server/Dockerfile
+      workingDirectory: .
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit

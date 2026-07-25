@@ -1,0 +1,22 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studyplatform-server-config
+  namespace: studyplatform
+data:
+  DATABASE_HOST: studyplatform-db-rw
+  DATABASE_NAME: studyplatform
+  KEYCLOAK_URL: http://keycloak.studyplatform.svc.cluster.local/auth
+  KEYCLOAK_REALM: studyplatform
+  KEYCLOAK_CLIENT_ID: studyplatform-server
+  KEYCLOAK_RESEARCHER_ROLE: studyplatform-researcher
+  KEYCLOAK_PARTICIPANT_ROLE: studyplatform-participant
+  APP_ENVIRONMENT: development

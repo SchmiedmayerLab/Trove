@@ -1,0 +1,27 @@
+meta {
+  name: Participant
+}
+
+auth {
+  mode: oauth2
+}
+
+auth:oauth2 {
+  grant_type: authorization_code
+  callback_url: http://localhost:3000/callback
+  authorization_url: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/auth?prompt=login
+  access_token_url: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token
+  refresh_token_url: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token
+  client_id: {{keycloakClientId}}
+  client_secret: 
+  scope: groups
+  state: 
+  pkce: true
+  credentials_placement: body
+  credentials_id: participant
+  token_source: access_token
+  token_placement: header
+  token_header_prefix: Bearer
+  auto_fetch_token: true
+  auto_refresh_token: true
+}

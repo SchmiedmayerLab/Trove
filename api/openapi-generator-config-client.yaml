@@ -1,0 +1,32 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+generate:
+  - client
+accessModifier: public
+namingStrategy: idiomatic
+additionalImports:
+  - StudyPlatformAPITypes
+  - SpeziLocalization
+  - SpeziHealthKit
+  - SpeziStudyDefinition
+typeOverrides:
+  schemas:
+    InformationalContent: StudyPlatformAPITypes.InformationalContent
+    InformationalComponentData: SpeziLocalization.LocalizationsDictionary<StudyPlatformAPITypes.InformationalContent>
+    QuestionnaireContent: StudyPlatformAPITypes.QuestionnaireContent
+    QuestionnaireComponentData: SpeziLocalization.LocalizationsDictionary<StudyPlatformAPITypes.QuestionnaireContent>
+    LocalizedString: "SpeziLocalization.LocalizationsDictionary<Swift.String>"
+    StudyDetailContent: StudyPlatformAPITypes.StudyDetailContent
+    StudyDetailData: "SpeziLocalization.LocalizationsDictionary<StudyPlatformAPITypes.StudyDetailContent>"
+    SampleTypesCollection: "[SpeziHealthKit.SampleTypeProxy]"
+    LocalizationKey: SpeziLocalization.LocalizationKey
+    StudyConsent: "SpeziLocalization.LocalizationsDictionary<StudyPlatformAPITypes.ConsentContent>"
+    StudyMetadataCodable: SpeziStudyDefinition.StudyDefinition.Metadata
+    StudyVisibility: StudyPlatformAPITypes.StudyVisibility
+    EnrollmentConditions: StudyPlatformAPITypes.EnrollmentConditions

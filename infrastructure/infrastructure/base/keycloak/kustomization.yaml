@@ -1,0 +1,23 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - admin-secret-es.yaml
+  - db-secret-es.yaml
+  - keycloak.yaml
+  - service-account.yaml
+  - keycloak-config-cli-job.yaml
+configMapGenerator:
+  - name: keycloak-realm-config
+    namespace: studyplatform
+    files:
+      - 00-realm.json=realm/00-realm.json
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,19 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-main-tls-cert
+  namespace: argocd
+spec:
+  commonName: platform.spezi.stanford.edu
+  issuerRef:
+    name: letsencrypt-prod
+  dnsNames:
+    - platform.spezi.stanford.edu

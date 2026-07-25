@@ -1,0 +1,20 @@
+meta {
+  name: Publish Study
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("revision", body.revision);
+}

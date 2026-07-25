@@ -1,0 +1,44 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  # - cert-issuer.yaml          # TODO: re-enable after DNS is configured
+  # - tls-certificate.yaml      # TODO: re-enable after DNS is configured
+  - cluster-secret-store.yaml
+  - external-secrets-sa.yaml
+patches:
+  - path: patches/db-cluster.yaml
+  - path: patches/keycloak-db-cluster.yaml
+  - path: patches/keycloak.yaml
+  - path: patches/keycloak-config-cli-job.yaml
+  - target:
+      kind: IngressRoute
+      name: studyplatform-ingress
+    patch: |
+      - op: replace
+        path: /spec/routes/0/match
+        value: "Host(`platform.spezi.stanford.edu`)"
+      - op: replace
+        path: /spec/routes/1/match
+        value: "Host(`platform.spezi.stanford.edu`) && PathPrefix(`/api`)"
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod
+  - target:
+      kind: IngressRoute
+      name: auth-ingress
+    patch: |
+      - op: replace
+        path: /spec/routes/0/match
+        value: "Host(`platform.spezi.stanford.edu`) && PathPrefix(`/auth`)"
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod

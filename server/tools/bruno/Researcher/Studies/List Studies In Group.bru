@@ -1,0 +1,22 @@
+meta {
+  name: List Studies In Group
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/groups/:groupId/studies
+  body: none
+  auth: inherit
+}
+
+params:path {
+  groupId: {{groupId}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.length > 0) {
+    bru.setVar("studyId", body[0].id);
+  }
+}

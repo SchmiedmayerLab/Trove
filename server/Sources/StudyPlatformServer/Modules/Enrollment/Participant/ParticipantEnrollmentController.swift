@@ -1,0 +1,71 @@
+//
+// This source file is part of the StudyPlatform open-source project
+//
+// SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+//
+// SPDX-License-Identifier: MIT
+//
+
+import Foundation
+import OpenAPIRuntime
+import StudyPlatformAPIServer
+
+
+extension Controller {
+    func postParticipantStudiesStudyIdEnrollments(
+        _ input: Operations.PostParticipantStudiesStudyIdEnrollments.Input
+    ) async throws -> Operations.PostParticipantStudiesStudyIdEnrollments.Output {
+        let studyId = try input.path.studyId.requireId()
+        let invitationCode: String?
+        if case .json(let body) = input.body {
+            invitationCode = body.invitationCode
+        } else {
+            invitationCode = nil
+        }
+        let enrollment = try await participantEnrollmentService.enroll(studyId: studyId, invitationCode: invitationCode)
+        return .created(.init(body: .json(try .init(enrollment))))
+    }
+
+    func getParticipantEnrollments(
+        _ input: Operations.GetParticipantEnrollments.Input
+    ) async throws -> Operations.GetParticipantEnrollments.Output {
+        let enrollments = try await participantEnrollmentService.listParticipantEnrollments()
+        return .ok(.init(body: .json(try enrollments.map { try .init($0) })))
+    }
+
+    func patchParticipantEnrollmentsEnrollmentId(
+        _ input: Operations.PatchParticipantEnrollmentsEnrollmentId.Input
+    ) async throws -> Operations.PatchParticipantEnrollmentsEnrollmentId.Output {
+        guard case .json(let body) = input.body else {
+            throw ServerError.jsonBodyRequired
+        }
+        let enrollmentId = try input.path.enrollmentId.requireId()
+        let enrollment = try await participantEnrollmentService.upgradeToRevision(
+            enrollmentId: enrollmentId,
+            targetRevision: body.revision
+        )
+        return .ok(.init(body: .json(try .init(enrollment))))
+    }
+
+    func postParticipantEnrollmentsEnrollmentIdWithdraw(
+        _ input: Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Input
+    ) async throws -> Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Output {
+        let enrollmentId = try input.path.enrollmentId.requireId()
+        let enrollment = try await participantEnrollmentService.withdraw(enrollmentId: enrollmentId)
+        return .ok(.init(body: .json(try .init(enrollment))))
+    }
+
+    func getParticipantStudiesStudyIdRevisionBundle(
+        _ input: Operations.GetParticipantStudiesStudyIdRevisionBundle.Input
+    ) async throws -> Operations.GetParticipantStudiesStudyIdRevisionBundle.Output {
+        let studyId = try input.path.studyId.requireId()
+        let revision = input.path.revision
+        _ = try await authorizationService.checkParticipantHasEnrollmentAccess(studyId: studyId)
+        let key = "studies/\(studyId)/\(revision).zip"
+        let data = try await objectStorageService.download(key: key)
+        return .ok(.init(
+            headers: .init(contentDisposition: "attachment; filename=\"\(studyId)-\(revision).spezistudybundle.zip\""),
+            body: .applicationZip(HTTPBody(data))
+        ))
+    }
+}

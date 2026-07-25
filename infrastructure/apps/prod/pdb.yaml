@@ -1,0 +1,29 @@
+#
+# This source file is part of the StudyPlatform open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: studyplatform-server-pdb
+  namespace: studyplatform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: studyplatform-server
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: studyplatform-web-pdb
+  namespace: studyplatform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: studyplatform-web

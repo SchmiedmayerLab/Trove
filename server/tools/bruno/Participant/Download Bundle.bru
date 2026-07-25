@@ -1,0 +1,16 @@
+meta {
+  name: Download Bundle
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/participant/studies/:studyId/:revision/bundle
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  revision: {{revision}}
+}

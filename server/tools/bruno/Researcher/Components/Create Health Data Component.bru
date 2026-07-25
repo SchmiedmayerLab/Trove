@@ -1,0 +1,43 @@
+meta {
+  name: Create Health Data Component
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/health-data
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Heart Rate Collection",
+    "data": {
+      "sampleTypes": ["HKQuantityType;HKQuantityTypeIdentifierHeartRate", "HKQuantityType;HKQuantityTypeIdentifierStepCount"],
+      "historicalDataCollection": {
+        "enabled": true,
+        "startDate": {
+          "type": "last",
+          "components": {
+            "day": 30
+          }
+        }
+      }
+    }
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("componentId", body.id);
+  console.log("Component created with id: " + body.id);
+}
