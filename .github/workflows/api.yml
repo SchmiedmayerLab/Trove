@@ -30,9 +30,9 @@ permissions:
 jobs:
   build-and-test:
     name: Build & Test (Linux)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
     container:
-      image: swift:6.2-noble
+      image: swift:6.3-noble
     steps:
       - uses: actions/checkout@v4
       - name: Build

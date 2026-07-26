@@ -30,7 +30,7 @@ permissions:
 jobs:
   manifests:
     name: Validate Manifests
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
     defaults:
       run:
         working-directory: infrastructure
@@ -55,7 +55,7 @@ jobs:
 
   tofu-validate:
     name: Tofu Validate
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
     defaults:
       run:
         working-directory: infrastructure/terraform
@@ -72,7 +72,7 @@ jobs:
 
   kind-smoke-test:
     name: KIND Smoke Test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
     timeout-minutes: 20
     defaults:
       run:

@@ -14,7 +14,6 @@ additionalImports:
   - SpeziLocalization
   - SpeziHealthKit
   - SpeziStudyDefinition
-  - SpeziAccount
 typeOverrides:
   schemas:
     InformationalContent: StudyPlatformAPITypes.InformationalContent
@@ -30,4 +29,3 @@ typeOverrides:
     StudyMetadataCodable: SpeziStudyDefinition.StudyDefinition.Metadata
     StudyVisibility: StudyPlatformAPITypes.StudyVisibility
     EnrollmentConditions: StudyPlatformAPITypes.EnrollmentConditions
-    GenderIdentity: SpeziAccount.GenderIdentity

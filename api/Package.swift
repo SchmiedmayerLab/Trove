@@ -39,8 +39,7 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "SpeziLocalization", package: "Spezi"),
                 .product(name: "SpeziHealthKit", package: "Spezi"),
-                .product(name: "SpeziStudyDefinition", package: "Spezi"),
-                .product(name: "SpeziAccount", package: "Spezi")
+                .product(name: "SpeziStudyDefinition", package: "Spezi")
             ],
             plugins: [] + swiftLintPlugin()
         ),

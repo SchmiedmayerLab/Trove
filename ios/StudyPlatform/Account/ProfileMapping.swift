@@ -18,7 +18,7 @@ enum ProfileMapping {
         name.givenName = profile.firstName
         name.familyName = profile.lastName
         details.name = name
-        details.genderIdentity = profile.gender
+        details.genderIdentity = SpeziAccount.GenderIdentity(rawValue: profile.gender.rawValue)
         if let dob = Date(iso8601DateString: profile.dateOfBirth) { details.dateOfBirth = dob }
         details.region = profile.region
         details.language = profile.language
@@ -30,7 +30,7 @@ enum ProfileMapping {
         StudyPlatform.ProfileInput(
             firstName: details.name?.givenName ?? "",
             lastName: details.name?.familyName ?? "",
-            gender: details.genderIdentity ?? .preferNotToState,
+            gender: details.genderIdentity.flatMap { StudyPlatform.GenderIdentity(rawValue: $0.rawValue) } ?? .preferNotToState,
             dateOfBirth: details.dateOfBirth?.iso8601DateString ?? "",
             region: details.region ?? "",
             language: details.language ?? "",

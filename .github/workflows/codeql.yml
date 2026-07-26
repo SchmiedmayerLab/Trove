@@ -19,7 +19,7 @@ on:
 jobs:
   analyze:
     name: Analyze (JavaScript/TypeScript)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
     permissions:
       security-events: write
       packages: read

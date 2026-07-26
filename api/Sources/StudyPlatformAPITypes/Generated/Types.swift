@@ -12,7 +12,6 @@ import struct Foundation.Date
 import SpeziLocalization
 import SpeziHealthKit
 import SpeziStudyDefinition
-import SpeziAccount
 /// A type that performs HTTP operations defined by the OpenAPI document.
 public protocol APIProtocol: Sendable {
     /// List all groups (synced from Keycloak)
@@ -3418,7 +3417,13 @@ public enum Components {
         /// Self-identified gender identity
         ///
         /// - Remark: Generated from `#/components/schemas/GenderIdentity`.
-        public typealias GenderIdentity = SpeziAccount.GenderIdentity
+        @frozen public enum GenderIdentity: String, Codable, Hashable, Sendable, CaseIterable {
+            case female = "female"
+            case male = "male"
+            case transgender = "transgender"
+            case nonBinary = "nonBinary"
+            case preferNotToState = "preferNotToState"
+        }
         /// The authenticated participant's profile
         ///
         /// - Remark: Generated from `#/components/schemas/ParticipantProfile`.
