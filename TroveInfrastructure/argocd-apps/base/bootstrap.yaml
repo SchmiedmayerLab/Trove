@@ -11,6 +11,8 @@ kind: Application
 metadata:
   name: bootstrap
   namespace: argocd
+  labels:
+    troveplatform.org/revision-source: single
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:

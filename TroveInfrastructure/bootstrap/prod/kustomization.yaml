@@ -12,7 +12,5 @@ resources:
   - ../base
   # - certificate.yaml  # TODO: re-enable after DNS is configured
 patches:
-  - path: patches/argocd-cm.yaml
   # - path: patches/argocd-certificate.yaml  # TODO: re-enable after DNS is configured
-  - path: patches/server-config-cm.yaml
   - path: patches/ingress-route.yaml

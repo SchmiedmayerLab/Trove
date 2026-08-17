@@ -1,0 +1,23 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+configs:
+  cm:
+    url: https://localhost/argo
+    oidc.config: |
+      name: Keycloak
+      issuer: https://localhost/auth/realms/trove
+      clientId: argocd
+      redirectURI: https://localhost/argo/auth/callback
+      enablePKCEAuthentication: true
+      insecure: true
+      requestedScopes: ["openid", "profile", "email", "groups"]
+      requestedIDTokenClaims:
+        groups:
+          essential: true
+      cliClientId: argocd

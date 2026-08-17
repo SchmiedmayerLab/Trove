@@ -11,6 +11,4 @@ kind: Kustomization
 resources:
   - ../base
 patches:
-  - path: patches/argocd-cm.yaml
-  - path: patches/server-config-cm.yaml
   - path: patches/ingress-route.yaml

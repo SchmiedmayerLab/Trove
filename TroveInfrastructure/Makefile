@@ -87,6 +87,7 @@ argocd-password: ## Print ArgoCD admin password
 
 OVERLAYS := infrastructure/dev infrastructure/prod apps/dev apps/prod \
             bootstrap/dev bootstrap/prod argocd-apps/dev argocd-apps/prod
+ROOT_APPLICATIONS := argocd-apps/dev/root-app.yaml argocd-apps/prod/root-app.yaml
 
 validate: ## Validate all Kustomize overlays build cleanly
 	@failed=0; \
@@ -106,6 +107,16 @@ lint: ## Run kubeconform schema validation (with CRD schemas) on all overlays
 			-schema-location default \
 			-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
 			-skip CustomResourceDefinition || failed=1; \
+	done; \
+	if [ $$failed -ne 0 ]; then exit 1; fi
+	@failed=0; \
+	for manifest in $(ROOT_APPLICATIONS); do \
+		echo "Validating $$manifest..."; \
+		kubeconform \
+			-strict -summary -output text \
+			-schema-location default \
+			-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+			$$manifest || failed=1; \
 	done; \
 	if [ $$failed -ne 0 ]; then exit 1; fi
 

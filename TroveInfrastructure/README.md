@@ -47,6 +47,13 @@ To start fresh:
 make dev-down && make dev
 ```
 
+The setup script owns only the bootstrap boundary: it installs and configures
+ArgoCD, supplies private-repository credentials when needed, and creates one
+root Application. ArgoCD then reconciles the child Applications in sync-wave
+order and owns all infrastructure and application resources. For development,
+the root propagates `BRANCH` to each child that reads manifests from this
+repository without changing the pinned versions of third-party Helm charts.
+
 Run `make help` to list all available targets, including production commands for OpenTofu and GKE.
 
 ### Dev Test Users
@@ -62,4 +69,3 @@ All dev users share the password `password123`:
 ## Docker Development
 
 For running backing services (PostgreSQL, Keycloak) without Kubernetes, see the [Docker setup guide](docker/README.md). This is the recommended approach when developing the [TroveServer](../TroveServer) or [TroveWeb](../TroveWeb) applications locally.
-

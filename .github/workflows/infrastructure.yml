@@ -42,6 +42,16 @@ jobs:
               -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
               -skip CustomResourceDefinition
           done
+          for manifest in argocd-apps/dev/root-app.yaml argocd-apps/prod/root-app.yaml; do
+            echo "=== $manifest ==="
+            kubeconform \
+              -strict \
+              -summary \
+              -output text \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              "$manifest"
+          done
 
   tofu-validate:
     name: Tofu Validate
