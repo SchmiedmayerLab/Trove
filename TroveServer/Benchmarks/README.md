@@ -33,6 +33,12 @@ This makes the compression state deterministic and confirms that the aggregate
 numbers include compressed chunks rather than waiting for the asynchronous
 seven-day policy.
 
+Dataset generation is measured separately from ingestion. The generator writes
+one compressed CSV fixture, and both targets consume that identical fixture.
+The reported throughput therefore times database COPY plus the same gzip
+decompression and Docker transport for each target, without counting Python's
+FHIR construction cost.
+
 ## Run it
 
 Start the Timescale service, then run the benchmark from the repository root:
