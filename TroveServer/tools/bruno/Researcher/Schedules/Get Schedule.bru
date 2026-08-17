@@ -1,0 +1,17 @@
+meta {
+  name: Get Schedule
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules/:scheduleId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+  scheduleId: {{scheduleId}}
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Update Informational Component
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/studies/:studyId/components/informational/:componentId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Welcome Information Updated",
+    "data": {
+      "en-US": {
+        "title": "Welcome Updated",
+        "lede": "Updated introduction to the study",
+        "content": "Welcome to the study - updated content"
+      }
+    }
+  }
+}

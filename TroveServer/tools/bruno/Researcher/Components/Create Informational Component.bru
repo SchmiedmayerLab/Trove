@@ -1,0 +1,38 @@
+meta {
+  name: Create Informational Component
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/informational
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Welcome Information",
+    "data": {
+      "en-US": {
+        "title": "Welcome",
+        "lede": "Introduction to the study",
+        "content": "Welcome to the study"
+      }
+    }
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("componentId", body.id);
+  console.log("Component created with id: " + body.id);
+}

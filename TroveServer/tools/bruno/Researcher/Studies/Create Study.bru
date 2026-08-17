@@ -1,0 +1,31 @@
+meta {
+  name: Create Study
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/groups/:groupId/studies
+  body: json
+  auth: inherit
+}
+
+params:path {
+  groupId: {{groupId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "Simple Test Study",
+    "icon": "tree-pine"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("studyId", body.id);
+}

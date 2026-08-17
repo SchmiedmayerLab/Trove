@@ -1,0 +1,22 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+**/dist
+node_modules
+
+# Playwright output.
+test-results
+playwright-report
+blob-report
+coverage
+coverage-e2e
+.nyc_output
+
+# Generated output: owned by openapi-ts and the TanStack Router plugin.
+src/lib/api/generated
+src/routeTree.gen.ts

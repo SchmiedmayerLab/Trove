@@ -1,0 +1,15 @@
+meta {
+  name: Delete Study
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/studies/:studyId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}

@@ -1,0 +1,199 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Changed Components
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      server: ${{ steps.filter.outputs.server }}
+      web: ${{ steps.filter.outputs.web }}
+      ios: ${{ steps.filter.outputs.ios }}
+      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+      devstack: ${{ steps.filter.outputs.devstack }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - "TroveAPI/**"
+              - ".github/workflows/build-and-test.yml"
+            server:
+              - "TroveServer/**"
+              - "TroveAPI/**"
+              - ".github/workflows/build-and-test.yml"
+            web:
+              - "TroveWeb/**"
+              - "TroveAPI/openapi.yaml"
+              - ".github/workflows/web.yml"
+              - ".github/workflows/build-and-test.yml"
+            ios:
+              - "TroveiOS/**"
+              - "TroveAPI/**"
+              - ".github/workflows/build-and-test.yml"
+            infrastructure:
+              - "TroveInfrastructure/**"
+              - ".github/workflows/infrastructure.yml"
+              - ".github/workflows/build-and-test.yml"
+            devstack:
+              - ".github/workflows/dev-stack.yml"
+
+  api:
+    name: API
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    uses: SchmiedmayerLab/.github/.github/workflows/swift-test.yml@v0.5
+    permissions:
+      contents: read
+    with:
+      path: TroveAPI
+      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
+      artifact_name: Trove-API-Tests.lcov
+
+  server:
+    name: Server
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    uses: SchmiedmayerLab/.github/.github/workflows/swift-test.yml@v0.5
+    permissions:
+      contents: read
+    with:
+      path: TroveServer
+      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
+      artifact_name: Trove-Server-Tests.lcov
+      # The integration suites share one in-memory database per suite.
+      test_flags: --no-parallel
+
+  ios:
+    name: iOS
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
+    permissions:
+      contents: read
+    with:
+      path: TroveiOS
+      runsonlabels: '["self-hosted", "macOS"]'
+      scheme: Trove
+      resultBundle: Trove-iOS-Tests.xcresult
+      artifactname: Trove-iOS-Tests.xcresult
+
+  web:
+    name: Web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    uses: ./.github/workflows/web.yml
+    permissions:
+      contents: read
+
+  infrastructure:
+    name: Infrastructure
+    needs: changes
+    if: needs.changes.outputs.infrastructure == 'true'
+    uses: ./.github/workflows/infrastructure.yml
+    permissions:
+      contents: read
+
+  dev-stack:
+    name: Dev Stack
+    needs: changes
+    if: >-
+      needs.changes.outputs.server == 'true' ||
+      needs.changes.outputs.web == 'true' ||
+      needs.changes.outputs.infrastructure == 'true' ||
+      needs.changes.outputs.devstack == 'true'
+    uses: ./.github/workflows/dev-stack.yml
+    permissions:
+      contents: read
+
+  publish-server:
+    name: Publish Server Image
+    needs: server
+    if: github.event_name == 'push'
+    # Built from the repository root so the inlined TroveAPI package is in the build context.
+    uses: SchmiedmayerLab/.github/.github/workflows/docker-build-and-push.yml@v0.5
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    with:
+      imageName: schmiedmayerlab/trove-server
+      dockerFile: TroveServer/Dockerfile
+      workingDirectory: .
+      runs_on_labels_amd64: '["blacksmith-4vcpu-ubuntu-2404"]'
+      runs_on_labels_arm64: '["blacksmith-4vcpu-ubuntu-2404-arm"]'
+    secrets: inherit
+
+  publish-web:
+    name: Publish Web Image
+    needs: web
+    if: github.event_name == 'push'
+    uses: SchmiedmayerLab/.github/.github/workflows/docker-build-and-push.yml@v0.5
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    with:
+      imageName: schmiedmayerlab/trove-web
+      dockerFile: TroveWeb/Dockerfile
+      workingDirectory: .
+      runs_on_labels_amd64: '["blacksmith-4vcpu-ubuntu-2404"]'
+      runs_on_labels_arm64: '["blacksmith-4vcpu-ubuntu-2404-arm"]'
+    secrets: inherit
+
+  coverage:
+    name: Upload Coverage Report
+    needs: [api, server, ios, web, dev-stack]
+    # Path filtering can skip every component, and the shared workflow fails when it finds
+    # no reports, so only collect once at least one of them has produced something.
+    if: >-
+      always() && (
+        needs.api.result == 'success' ||
+        needs.server.result == 'success' ||
+        needs.ios.result == 'success' ||
+        needs.web.result == 'success' ||
+        needs.dev-stack.result == 'success'
+      )
+    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@v0.5
+    permissions:
+      actions: read
+      contents: read
+    with:
+      # Merging xcresult bundles needs macOS.
+      runs_on_labels: '["self-hosted", "macOS"]'
+      xcodeversion: latest-stable
+      coveragereports: Trove-*.xcresult
+      # The shared Swift jobs name the report after the artifact, while the local web jobs
+      # upload their native lcov.info files inside named artifact directories.
+      coveragereports_lcov: >-
+        Trove-API-Tests.lcov
+        Trove-Server-Tests.lcov
+        Trove-Web-*.lcov/lcov.info
+    secrets:
+      token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,21 @@
+meta {
+  name: Seed
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  await bru.runRequest("Researcher/Studies/List Groups")
+  await bru.runRequest("Researcher/Studies/Create Study")
+  await bru.runRequest("Researcher/Components/Create Questionnaire Component")
+  await bru.runRequest("Researcher/Components/Create Informational Component")
+  await bru.runRequest("Researcher/Schedules/Create Schedule (Once)")
+  
+  await bru.runRequest("Researcher/Components/Create Health Data Component")
+}

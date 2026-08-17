@@ -1,0 +1,33 @@
+meta {
+  name: Create Invitation Codes
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/invitation-codes
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "count": 1
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (Array.isArray(body) && body.length > 0) {
+    bru.setVar("invitationCodeId", body[0].id);
+    bru.setVar("invitationCode", body[0].code);
+  }
+}

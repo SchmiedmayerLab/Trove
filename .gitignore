@@ -1,0 +1,82 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.pem
+
+# Swift
+Package.resolved
+*/Package.resolved
+.build/
+.swiftpm/
+.xcodebuild
+.derivedData
+DerivedData/
+xcuserdata/
+*.xcresult
+*.xcarchive
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.doccarchive
+coverage.lcov
+.docs
+
+# Xcode projects are generated for the Swift packages, but TroveiOS/Trove.xcodeproj is checked in.
+/TroveAPI/*.xcodeproj
+/TroveServer/*.xcodeproj
+/TroveiOS/build/
+
+# Web
+/TroveWeb/node_modules/
+/TroveWeb/dist/
+/TroveWeb/build/
+/TroveWeb/coverage/
+/TroveWeb/coverage-e2e/
+/TroveWeb/.nyc_output/
+/TroveWeb/test-results/
+/TroveWeb/playwright-report/
+/TroveWeb/blob-report/
+/TroveWeb/playwright/.cache/
+/TroveWeb/src/lib/api/generated/
+*.tsbuildinfo
+eslint_report.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Infrastructure
+/TroveInfrastructure/terraform/.terraform/
+/TroveInfrastructure/terraform/.terraform.lock.hcl
+/TroveInfrastructure/terraform/*.tfstate
+/TroveInfrastructure/terraform/*.tfstate.*
+/TroveInfrastructure/terraform/terraform.tfvars
+.kind-kubeconfig
+
+# Python tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.python-version
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage

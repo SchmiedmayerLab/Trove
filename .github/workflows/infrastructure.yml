@@ -1,0 +1,132 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Infrastructure
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifests:
+    name: Validate Manifests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    defaults:
+      run:
+        working-directory: TroveInfrastructure
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin
+      - name: Build and validate all overlays
+        run: |
+          overlays="infrastructure/dev infrastructure/prod apps/dev apps/prod"
+          overlays="$overlays bootstrap/dev bootstrap/prod argocd-apps/dev argocd-apps/prod"
+          for overlay in $overlays; do
+            echo "=== $overlay ==="
+            kubectl kustomize "$overlay" | kubeconform \
+              -strict \
+              -summary \
+              -output text \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -skip CustomResourceDefinition
+          done
+          for manifest in argocd-apps/dev/root-app.yaml argocd-apps/prod/root-app.yaml; do
+            echo "=== $manifest ==="
+            kubeconform \
+              -strict \
+              -summary \
+              -output text \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              "$manifest"
+          done
+
+  tofu-validate:
+    name: Tofu Validate
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    defaults:
+      run:
+        working-directory: TroveInfrastructure/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v2
+      - name: Check formatting
+        run: tofu fmt -check -diff
+      - name: Initialize
+        run: tofu init -backend=false
+      - name: Validate
+        run: tofu validate
+
+  kind-smoke-test:
+    name: KIND Smoke Test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: TroveInfrastructure
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install KIND
+        run: |
+          curl -sSLo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+      - name: Create KIND cluster
+        run: kind create cluster --name trove --config tools/kind-config.yaml
+      # The dev overlay runs the published images, which do not exist for an unmerged change.
+      # Building them here and loading them into the cluster is what lets the apps start at all.
+      - name: Build and load the application images
+        working-directory: .
+        run: |
+          docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+          docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+          kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-server:main
+          kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-web:main
+      - name: Bootstrap ArgoCD and applications
+        env:
+          REPOSITORY_TOKEN: ${{ github.token }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}.git
+        run: python3 tools/setup.py
+      - name: Wait for ArgoCD Applications
+        run: bash tools/smoke-test.sh
+        env:
+          SMOKE_TEST_TIMEOUT: "1200"
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== ArgoCD Applications ==="
+          kubectl get applications -n argocd -o wide
+          echo ""
+          # get -o wide hides the comparison error, which is where the real reason lives.
+          echo "=== Application Conditions ==="
+          kubectl get applications -n argocd \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions}{"\n"}{end}'
+          echo ""
+          echo "=== All Pods ==="
+          kubectl get pods -A
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -40
+          echo ""
+          echo "=== Crashing Pod Logs ==="
+          for pod in $(kubectl get pods -n trove --no-headers | grep -E 'CrashLoop|Error' | awk '{print $1}'); do
+            for flag in "" "--previous"; do
+              echo "--- $pod $flag ---"
+              kubectl logs -n trove "$pod" --all-containers $flag --tail=40 2>&1 || true
+            done
+          done

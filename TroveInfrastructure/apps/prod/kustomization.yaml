@@ -1,0 +1,18 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - pdb.yaml
+patches:
+  - path: patches/server-deployment.yaml
+  - path: patches/web-deployment.yaml
+  - path: patches/server-configmap.yaml
+  - path: patches/web-configmap.yaml

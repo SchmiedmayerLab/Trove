@@ -1,0 +1,21 @@
+meta {
+  name: Upgrade Enrollment
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/participant/enrollments/:enrollmentId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  enrollmentId: {{enrollmentId}}
+}
+
+body:json {
+  {
+    "revision": 2
+  }
+}

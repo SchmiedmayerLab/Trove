@@ -1,0 +1,36 @@
+meta {
+  name: Create Questionnaire Component
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/questionnaire
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Daily Survey",
+    "data": {
+      "en-US": {
+        "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey\",\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}]}"
+      }
+    }
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("componentId", body.id);
+  console.log("Component created with id: " + body.id);
+}

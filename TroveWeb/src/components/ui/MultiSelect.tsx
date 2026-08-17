@@ -1,0 +1,503 @@
+//
+// This source file is part of the Trove open-source project
+//
+// SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+//
+// SPDX-License-Identifier: MIT
+//
+
+import {
+  Badge,
+  Button,
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "@schmiedmayerlab/grove-design-system";
+import { CheckIcon, ChevronsUpDownIcon, XIcon } from "lucide-react";
+import {
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { cn } from "@/utils/cn";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "./Command";
+
+interface MultiSelectContextType {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  selectedValues: Set<string>;
+  toggleValue: (value: string) => void;
+  items: Map<string, ReactNode>;
+  onItemAdded: (value: string, label: ReactNode) => void;
+}
+
+const MultiSelectContext = createContext<MultiSelectContextType | null>(null);
+
+const useMultiSelectContext = () => {
+  const context = use(MultiSelectContext);
+  if (context == null) {
+    throw new Error(
+      "useMultiSelectContext must be used within a MultiSelectContext",
+    );
+  }
+  return context;
+};
+
+interface MultiSelectProps {
+  children: ReactNode;
+  /**
+   * Controlled selected values. If provided, the component acts in a controlled manner.
+   */
+  values?: string[];
+  /**
+   * Default selected values for uncontrolled usage.
+   */
+  defaultValues?: string[];
+  /**
+   * Callback fired when the selected values change.
+   */
+  onValuesChange?: (values: string[]) => void;
+}
+
+/**
+ * Root component that provides context for building a multi-select input.
+ *
+ * Compose with `MultiSelectTrigger`, `MultiSelectValue`, and `MultiSelectContent`.
+ *
+ * @example
+ * <MultiSelect>
+ *   <MultiSelectTrigger className="w-full max-w-[400px]">
+ *     <MultiSelectValue placeholder="Select fruit..." />
+ *   </MultiSelectTrigger>
+ *   <MultiSelectContent>
+ *     <MultiSelectGroup>
+ *       <MultiSelectItem value="apple">Apple</MultiSelectItem>
+ *       <MultiSelectItem value="banana">Banana</MultiSelectItem>
+ *     </MultiSelectGroup>
+ *   </MultiSelectContent>
+ * </MultiSelect>
+ */
+export const MultiSelect = ({
+  children,
+  values,
+  defaultValues,
+  onValuesChange,
+}: MultiSelectProps) => {
+  const [open, setOpen] = useState(false);
+  const [selectedValues, setSelectedValues] = useState(
+    () => new Set(values ?? defaultValues),
+  );
+  const [items, setItems] = useState(() => new Map<string, ReactNode>());
+
+  const toggleValue = (value: string) => {
+    const updatedSelection = new Set(selectedValues);
+    if (updatedSelection.has(value)) {
+      updatedSelection.delete(value);
+    } else {
+      updatedSelection.add(value);
+    }
+    setSelectedValues(updatedSelection);
+    onValuesChange?.(Array.from(updatedSelection));
+  };
+
+  const onItemAdded = (value: string, label: ReactNode) => {
+    setItems((previousItems) => {
+      if (previousItems.get(value) === label) return previousItems;
+      return new Map(previousItems).set(value, label);
+    });
+  };
+
+  const contextValue = useMemo(
+    () => ({
+      open,
+      setOpen,
+      selectedValues: values ? new Set(values) : selectedValues,
+      toggleValue,
+      items,
+      onItemAdded,
+    }),
+    // eslint-disable-next-line @eslint-react/exhaustive-deps -- the callbacks are stable for a render
+    [open, values, selectedValues, items],
+  );
+
+  return (
+    <MultiSelectContext value={contextValue}>
+      <PopoverRoot open={open} onOpenChange={setOpen}>
+        {children}
+      </PopoverRoot>
+    </MultiSelectContext>
+  );
+};
+
+/**
+ * Clickable trigger element that opens the selection popover.
+ *
+ * Renders like an input using the Button component. Place `MultiSelectValue` inside to show selected items.
+ *
+ * @example
+ * <MultiSelectTrigger>
+ *   <MultiSelectValue placeholder="Choose options..." />
+ * </MultiSelectTrigger>
+ */
+export const MultiSelectTrigger = ({
+  role = "combobox",
+  "aria-expanded": propsAriaExpanded,
+  className,
+  children,
+  ...props
+}: Omit<ComponentPropsWithoutRef<typeof Button>, "size" | "variant">) => {
+  const { open } = useMultiSelectContext();
+
+  return (
+    <PopoverTrigger asChild>
+      <Button
+        {...props}
+        role={role}
+        size={null}
+        variant={null}
+        aria-expanded={propsAriaExpanded ?? open}
+        className={cn(
+          "group border-input bg-surface-primary ring-offset-surface placeholder:text-muted-foreground focus-ring flex h-auto min-h-10 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm",
+          "[&>span]:line-clamp-1 [&>span]:text-left",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+      >
+        {children}
+        <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50 transition group-hover:opacity-80" />
+      </Button>
+    </PopoverTrigger>
+  );
+};
+
+interface MultiSelectValueProps extends Omit<
+  ComponentPropsWithoutRef<"div">,
+  "children"
+> {
+  /**
+   * Placeholder text to show when no items are selected.
+   */
+  placeholder?: string;
+  /**
+   * If true, clicking a badge removes that item from the selection.
+   *
+   * @default true
+   */
+  clickToRemove?: boolean;
+  /**
+   * Controls layout of badges:
+   * - "wrap": always wrap to multiple lines as needed.
+   * - "wrap-when-open": wrap only when the popover is open.
+   * - "cutoff": single line with a "+N" badge for overflow.
+   *
+   * @default "wrap-when-open"
+   */
+  overflowBehavior?: "wrap" | "wrap-when-open" | "cutoff";
+}
+
+/**
+ * Displays the current selection inside the trigger, with badges for each selected item.
+ *
+ * @example
+ * <MultiSelectTrigger>
+ *   <MultiSelectValue placeholder="Select tags..." overflowBehavior="cutoff" />
+ * </MultiSelectTrigger>
+ */
+export const MultiSelectValue = ({
+  placeholder,
+  clickToRemove = true,
+  className,
+  overflowBehavior = "wrap-when-open",
+  ...props
+}: MultiSelectValueProps) => {
+  const { selectedValues, toggleValue, items, open } = useMultiSelectContext();
+  const [overflowAmount, setOverflowAmount] = useState(0);
+  const valueRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  const shouldWrap =
+    overflowBehavior === "wrap" ||
+    (overflowBehavior === "wrap-when-open" && open);
+
+  const checkOverflow = useCallback(() => {
+    if (valueRef.current == null) return;
+
+    const containerElement = valueRef.current;
+    const overflowElement = overflowRef.current;
+    const badgeElements = containerElement.querySelectorAll<HTMLElement>(
+      "[data-selected-item]",
+    );
+
+    if (overflowElement != null) overflowElement.style.display = "none";
+    badgeElements.forEach((element) => element.style.removeProperty("display"));
+    let hiddenCount = 0;
+    for (let i = badgeElements.length - 1; i >= 0; i--) {
+      const element = badgeElements[i];
+      if (containerElement.scrollWidth <= containerElement.clientWidth) {
+        break;
+      }
+      hiddenCount = badgeElements.length - i;
+      element.style.display = "none";
+      overflowElement?.style.removeProperty("display");
+    }
+    // eslint-disable-next-line @eslint-react/set-state-in-effect -- measures the rendered width, so it can only run after layout
+    setOverflowAmount(hiddenCount);
+  }, []);
+
+  useLayoutEffect(() => {
+    checkOverflow();
+  }, [selectedValues, checkOverflow, shouldWrap]);
+
+  const handleResize = (element: HTMLDivElement) => {
+    valueRef.current = element;
+
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      valueRef.current = null;
+    };
+  };
+
+  if (selectedValues.size === 0 && placeholder) {
+    return (
+      <span className="text-muted-foreground w-full min-w-0 overflow-hidden font-normal">
+        {placeholder}
+      </span>
+    );
+  }
+
+  return (
+    <div
+      {...props}
+      ref={handleResize}
+      className={cn(
+        "flex w-full gap-1.5 overflow-hidden",
+        shouldWrap && "h-full flex-wrap",
+        className,
+      )}
+    >
+      {Array.from(selectedValues)
+        .filter((value) => items.has(value))
+        .map((value) => (
+          <Badge
+            variant="secondary"
+            data-selected-item
+            className={cn(
+              "group/badge flex items-center gap-1 transition",
+              "active:scale-95",
+            )}
+            key={value}
+            onClick={
+              clickToRemove ?
+                (event) => {
+                  event.stopPropagation();
+                  toggleValue(value);
+                }
+              : undefined
+            }
+          >
+            {items.get(value)}
+            {clickToRemove && (
+              <XIcon className="size-2.5 stroke-3 opacity-50 transition group-hover/badge:opacity-100" />
+            )}
+          </Badge>
+        ))}
+      <Badge
+        variant="secondary"
+        ref={overflowRef}
+        className={cn((overflowAmount <= 0 || shouldWrap) && "hidden")}
+      >
+        +{overflowAmount}
+      </Badge>
+    </div>
+  );
+};
+
+interface MultiSelectContentProps extends Omit<
+  ComponentPropsWithoutRef<typeof Command>,
+  "children"
+> {
+  /**
+   * Enable or disable the search input. Accepts three possible values:
+   * - `true`: shows a search input with default placeholder and empty message.
+   * - `false`: disables the search input.
+   * - `object`: allows customizing the `placeholder` and `emptyMessage`.
+   *
+   * @default true
+   */
+  search?: boolean | { placeholder?: string; emptyMessage?: string };
+  children: ReactNode;
+}
+
+/**
+ * Transform the `search` prop into a normalized object with default values for
+ * placeholder and emptyMessage. Returns null if search is disabled.
+ */
+const normalizeSearchProp = (search: MultiSelectContentProps["search"]) => {
+  if (search === false) return null;
+
+  const defaults = {
+    placeholder: "Search...",
+    emptyMessage: "No results found.",
+  };
+
+  if (search === undefined || search === true) return defaults;
+
+  return {
+    placeholder: search.placeholder ?? defaults.placeholder,
+    emptyMessage: search.emptyMessage ?? defaults.emptyMessage,
+  };
+};
+
+/**
+ * Popover content that renders the `Command`-based searchable list of items.
+ *
+ * @example
+ * <MultiSelectContent search={{ placeholder: "Search fruits...", emptyMessage: "Nothing found" }}>
+ *   <MultiSelectGroup>
+ *     <MultiSelectItem value="apple">Apple</MultiSelectItem>
+ *   </MultiSelectGroup>
+ * </MultiSelectContent>
+ *
+ * @example
+ * // Without search field
+ * <MultiSelectContent search={false}>
+ *   <MultiSelectItem value="a">A</MultiSelectItem>
+ * </MultiSelectContent>
+ */
+export const MultiSelectContent = ({
+  search = true,
+  children,
+  ...props
+}: MultiSelectContentProps) => {
+  const searchObject = normalizeSearchProp(search);
+  return (
+    <>
+      {/* Render a hidden list of children, so the useEffect on the MultiSelectItem fires */}
+      <div className="hidden">
+        <Command>
+          <CommandList>{children}</CommandList>
+        </Command>
+      </div>
+      <PopoverContent className="min-w-[var(--radix-popover-trigger-width)] !p-0">
+        <Command {...props}>
+          {searchObject ?
+            <CommandInput placeholder={searchObject.placeholder} />
+          : <button autoFocus className="sr-only" type="button" />}
+          <CommandList>
+            {searchObject && (
+              <CommandEmpty>{searchObject.emptyMessage}</CommandEmpty>
+            )}
+            {children}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </>
+  );
+};
+
+interface MultiSelectItemProps extends Omit<
+  ComponentPropsWithoutRef<typeof CommandItem>,
+  "value"
+> {
+  /**
+   * The unique value for this item within the selection.
+   */
+  value: string;
+  /**
+   * Optional custom label to show in the trigger badge (different from the list label).
+   */
+  badgeLabel?: ReactNode;
+  /**
+   * Optional callback fired when this item is selected or deselected.
+   */
+  onSelect?: (value: string) => void;
+}
+
+/**
+ * Selectable item within the list. Toggles inclusion in the selection.
+ *
+ * @example
+ * <MultiSelectItem value="apple">Apple</MultiSelectItem>
+ *
+ * @example
+ * <MultiSelectItem value="us" badgeLabel={<span>United States</span>}>
+ *   USA
+ * </MultiSelectItem>
+ */
+export const MultiSelectItem = ({
+  value,
+  children,
+  badgeLabel,
+  onSelect,
+  ...props
+}: MultiSelectItemProps) => {
+  const { toggleValue, selectedValues, onItemAdded } = useMultiSelectContext();
+  const isSelected = selectedValues.has(value);
+
+  useEffect(() => {
+    onItemAdded(value, badgeLabel ?? children);
+  }, [value, children, onItemAdded, badgeLabel]);
+
+  return (
+    <CommandItem
+      {...props}
+      onSelect={() => {
+        toggleValue(value);
+        onSelect?.(value);
+      }}
+    >
+      <CheckIcon
+        className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
+      />
+      {children}
+    </CommandItem>
+  );
+};
+
+/**
+ * Group wrapper for grouping related `MultiSelectItem`s under a heading.
+ *
+ * @example
+ * <MultiSelectGroup heading="Fruits">
+ *   <MultiSelectItem value="apple">Apple</MultiSelectItem>
+ * </MultiSelectGroup>
+ */
+export const MultiSelectGroup = (
+  props: ComponentPropsWithoutRef<typeof CommandGroup>,
+) => {
+  return <CommandGroup {...props} />;
+};
+
+/**
+ * Visual separator between groups or sections in the list.
+ *
+ * @example
+ * <>
+ *   <MultiSelectGroup heading="A" />
+ *   <MultiSelectSeparator />
+ *   <MultiSelectGroup heading="B" />
+ * </>
+ */
+export const MultiSelectSeparator = (
+  props: ComponentPropsWithoutRef<typeof CommandSeparator>,
+) => {
+  return <CommandSeparator {...props} />;
+};

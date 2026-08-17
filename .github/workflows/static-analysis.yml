@@ -1,0 +1,74 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Static Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  swiftlint:
+    name: SwiftLint
+    uses: SchmiedmayerLab/.github/.github/workflows/swiftlint.yml@v0.5
+    permissions:
+      contents: read
+    with:
+      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
+
+  # Code scanning needs Advanced Security, which a private repository only has with GHAS.
+  availability:
+    name: Check Code Scanning Availability
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check whether code scanning is available
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repository=$(gh api "repos/$GITHUB_REPOSITORY")
+          private=$(echo "$repository" | jq -r '.private')
+          advanced=$(echo "$repository" | jq -r '.security_and_analysis.advanced_security.status // "unknown"')
+
+          if [ "$private" = "false" ] || [ "$advanced" = "enabled" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping Swift code scanning: the repository is private and Advanced Security is not enabled."
+          fi
+
+  # codeql.yml scans JavaScript and TypeScript; Swift needs a build to analyse,
+  # so the iOS app is scanned through xcodebuild instead.
+  codeql:
+    name: CodeQL (Swift)
+    needs: availability
+    if: needs.availability.outputs.enabled == 'true'
+    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    with:
+      path: TroveiOS
+      runsonlabels: '["self-hosted", "macOS"]'
+      scheme: Trove
+      test: false
+      codeql: true

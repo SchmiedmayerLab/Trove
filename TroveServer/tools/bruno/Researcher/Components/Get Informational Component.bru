@@ -1,0 +1,16 @@
+meta {
+  name: Get Informational Component
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/studies/:studyId/components/informational/:componentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}

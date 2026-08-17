@@ -1,0 +1,41 @@
+meta {
+  name: Create Schedule (Daily)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "scheduleDefinition": {
+      "type": "repeated",
+      "pattern": {
+        "type": "daily",
+        "hour": 9,
+        "minute": 0,
+        "second": 0
+      }
+    },
+    "completionPolicy": "anytime",
+    "notification": false
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("scheduleId", body.id);
+}

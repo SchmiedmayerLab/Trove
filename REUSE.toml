@@ -1,1 +1,20 @@
 version = 1
+
+# Files that can't carry an inline SPDX header (JSON, binaries, or Xcode-managed
+# project files that get rewritten) are annotated centrally here. Everything else
+# uses in-file headers.
+[[annotations]]
+path = [
+    "TroveServer/tools/bruno/**",
+]
+SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
+SPDX-License-Identifier = "MIT"
+
+# Xcode-generated project files and asset catalogs.
+[[annotations]]
+path = [
+    "TroveiOS/Trove.xcodeproj/**",
+    "TroveiOS/Trove/Assets.xcassets/**",
+]
+SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
+SPDX-License-Identifier = "MIT"

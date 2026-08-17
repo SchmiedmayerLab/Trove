@@ -1,0 +1,31 @@
+meta {
+  name: Update Questionnaire Component
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/studies/:studyId/components/questionnaire/:componentId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Daily Survey Updated",
+    "data": {
+      "en-US": {
+        "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey Updated\",\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}]}"
+      }
+    }
+  }
+}

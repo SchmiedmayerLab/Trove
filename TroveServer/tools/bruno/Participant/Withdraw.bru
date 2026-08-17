@@ -1,0 +1,15 @@
+meta {
+  name: Withdraw
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/participant/enrollments/:enrollmentId/withdraw
+  body: none
+  auth: inherit
+}
+
+params:path {
+  enrollmentId: {{enrollmentId}}
+}
