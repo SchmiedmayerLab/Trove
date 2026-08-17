@@ -43,10 +43,12 @@ jobs:
           filters: |
             api:
               - "TroveAPI/**"
+              - ".github/workflows/swift-package.yml"
               - ".github/workflows/build-and-test.yml"
             server:
               - "TroveServer/**"
               - "TroveAPI/**"
+              - ".github/workflows/swift-package.yml"
               - ".github/workflows/build-and-test.yml"
             web:
               - "TroveWeb/**"
@@ -68,27 +70,25 @@ jobs:
     name: API
     needs: changes
     if: needs.changes.outputs.api == 'true'
-    uses: SchmiedmayerLab/.github/.github/workflows/swift-test.yml@v0.5
+    uses: ./.github/workflows/swift-package.yml
     permissions:
       contents: read
     with:
       path: TroveAPI
-      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
-      artifact_name: Trove-API-Tests.lcov
+      artifact-name: Trove-API-Tests.lcov
 
   server:
     name: Server
     needs: changes
     if: needs.changes.outputs.server == 'true'
-    uses: SchmiedmayerLab/.github/.github/workflows/swift-test.yml@v0.5
+    uses: ./.github/workflows/swift-package.yml
     permissions:
       contents: read
     with:
       path: TroveServer
-      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
-      artifact_name: Trove-Server-Tests.lcov
+      artifact-name: Trove-Server-Tests.lcov
       # The integration suites share one in-memory database per suite.
-      test_flags: --no-parallel
+      test-flags: --no-parallel
 
   ios:
     name: iOS
@@ -173,7 +173,9 @@ jobs:
     # Path filtering can skip every component, and the shared workflow fails when it finds
     # no reports, so only collect once at least one of them has produced something.
     if: >-
-      always() && (
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') && (
         needs.api.result == 'success' ||
         needs.server.result == 'success' ||
         needs.ios.result == 'success' ||
