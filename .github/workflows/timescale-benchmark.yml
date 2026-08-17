@@ -1,0 +1,68 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Timescale Benchmark
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+    inputs:
+      participants:
+        description: Number of participants
+        required: true
+        default: "200"
+        type: string
+      days:
+        description: Days per participant
+        required: true
+        default: "30"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: PostgreSQL vs TimescaleDB
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 360
+    env:
+      COMPOSE_PROJECT_NAME: trove-benchmark-${{ github.run_id }}
+      BENCHMARK_PARTICIPANTS: ${{ inputs.participants || '200' }}
+      BENCHMARK_DAYS: ${{ inputs.days || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start TimescaleDB
+        working-directory: TroveInfrastructure/docker
+        run: docker compose --env-file .env.example up -d server-timescale
+      - name: Run benchmark
+        run: |
+          python3 TroveServer/Benchmarks/benchmark.py \
+            --participants "$BENCHMARK_PARTICIPANTS" \
+            --days "$BENCHMARK_DAYS" \
+            --output benchmark-results.json
+          cat benchmark-results.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark results
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: timescale-benchmark-${{ github.run_id }}
+          path: |
+            benchmark-results.json
+            benchmark-results.md
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Collect diagnostics on failure
+        if: failure()
+        working-directory: TroveInfrastructure/docker
+        run: docker compose --env-file .env.example logs --tail 200 server-timescale
+      - name: Tear down
+        if: always()
+        working-directory: TroveInfrastructure/docker
+        run: docker compose --env-file .env.example down -v
