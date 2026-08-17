@@ -23,6 +23,14 @@ extension ResourceProxy {
 }
 
 
+extension Components.Schemas.FHIRResource {
+    init(_ resource: ResourceProxy) throws {
+        let data = try JSONEncoder().encode(resource)
+        self = try JSONDecoder().decode(Self.self, from: data)
+    }
+}
+
+
 extension FHIRResourceRecord {
     convenience init(_ resource: ResourceProxy, participantID: UUID, receivedAt: Date = Date()) {
         let externalID = resource.get().id?.value?.string ?? UUID().uuidString
@@ -52,6 +60,24 @@ extension FHIRResourceRecord {
             value: quantity?.value?.value?.doubleValue,
             valueCode: quantity?.code?.value?.string,
             valueSystem: quantity?.system?.value?.url.absoluteString
+        )
+    }
+
+    func responseSchema() throws -> Components.Schemas.StoredFHIRResource {
+        guard let id else {
+            throw ServerError.internalServerError("Stored FHIR resource is missing its composite identifier")
+        }
+
+        return try .init(
+            time: id.time,
+            externalId: id.externalID,
+            resourceType: resourceType,
+            code: code,
+            codeSystem: codeSystem,
+            value: value,
+            valueCode: valueCode,
+            valueSystem: valueSystem,
+            resource: .init(resource.proxy)
         )
     }
 }
