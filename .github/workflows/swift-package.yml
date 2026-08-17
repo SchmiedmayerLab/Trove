@@ -36,6 +36,7 @@ jobs:
       image: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
     defaults:
       run:
+        shell: bash
         working-directory: ${{ inputs.path }}
     steps:
       - uses: actions/checkout@v7
