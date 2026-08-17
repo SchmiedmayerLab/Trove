@@ -118,6 +118,18 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+      - name: Provide a container runtime
+        shell: bash
+        run: |
+          if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
+            brew install colima docker docker-compose
+          fi
+          if ! docker info >/dev/null 2>&1; then
+            colima start --cpu 4 --memory 8 --disk 30
+            echo "TROVE_COLIMA_STARTED=true" >> "$GITHUB_ENV"
+          fi
+          docker version
+          docker compose version
       - name: Build the server image
         run: docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
       - name: Start the development stack
@@ -167,7 +179,11 @@ jobs:
       - name: Tear down the development stack
         if: always()
         working-directory: TroveInfrastructure/docker
-        run: docker compose down -v
+        run: |
+          docker compose down -v
+          if [[ "${TROVE_COLIMA_STARTED:-false}" == "true" ]]; then
+            colima stop
+          fi
 
   web:
     name: Web
