@@ -189,6 +189,11 @@ jobs:
       runs_on_labels: '["self-hosted", "macOS"]'
       xcodeversion: latest-stable
       coveragereports: Trove-*.xcresult
-      coveragereports_lcov: Trove-*.lcov
+      # The shared Swift jobs name the report after the artifact, while the local web jobs
+      # upload their native lcov.info files inside named artifact directories.
+      coveragereports_lcov: >-
+        Trove-API-Tests.lcov
+        Trove-Server-Tests.lcov
+        Trove-Web-*.lcov/lcov.info
     secrets:
       token: ${{ secrets.CODECOV_TOKEN }}
