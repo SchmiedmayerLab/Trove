@@ -104,6 +104,68 @@ jobs:
       resultBundle: Trove-iOS-Tests.xcresult
       artifactname: Trove-iOS-Tests.xcresult
 
+  ios-ui:
+    name: iOS Real Stack UI
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Build the server image
+        run: docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+      - name: Start the development stack
+        working-directory: TroveInfrastructure/docker
+        run: |
+          cp .env.example .env
+          docker compose --profile migrate run --rm server-migrate
+          docker compose up -d server
+      - name: Seed the UI-test study and participant
+        run: |
+          dev_password="$(jq -r '.users[] | select(.username == "alice@example.com") | .credentials[] | select(.type == "password") | .value' TroveInfrastructure/docker/keycloak/realm.json)"
+          KEYCLOAK_DEV_PASSWORD="$dev_password" TroveiOS/scripts/seed-ui-test.sh
+      - name: Resolve iOS dependencies
+        working-directory: TroveiOS
+        run: >-
+          xcodebuild -project Trove.xcodeproj -scheme Trove
+          -resolvePackageDependencies -derivedDataPath .derivedData
+      - name: Run the real-stack UI test
+        working-directory: TroveiOS
+        run: |
+          xcodebuild test \
+            -project Trove.xcodeproj \
+            -scheme Trove \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
+            -only-testing:TroveUITests/TroveUITests/testParticipantCanSignInEnrollAndWithdraw \
+            -derivedDataPath .derivedData \
+            -resultBundlePath Trove-iOS-UI-Tests.xcresult \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation
+      - name: Upload the UI-test result
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-iOS-UI-Tests.xcresult
+          path: TroveiOS/Trove-iOS-UI-Tests.xcresult
+          if-no-files-found: warn
+      - name: Collect stack diagnostics
+        if: failure()
+        working-directory: TroveInfrastructure/docker
+        run: |
+          docker compose ps
+          docker compose logs --tail 150
+      - name: Tear down the development stack
+        if: always()
+        working-directory: TroveInfrastructure/docker
+        run: docker compose down -v
+
   web:
     name: Web
     needs: changes
@@ -169,7 +231,7 @@ jobs:
 
   coverage:
     name: Upload Coverage Report
-    needs: [api, server, ios, web, dev-stack]
+    needs: [api, server, ios, ios-ui, web, dev-stack]
     # Path filtering can skip every component, and the shared workflow fails when it finds
     # no reports, so only collect once at least one of them has produced something.
     if: >-
@@ -177,6 +239,7 @@ jobs:
         needs.api.result == 'success' ||
         needs.server.result == 'success' ||
         needs.ios.result == 'success' ||
+        needs.ios-ui.result == 'success' ||
         needs.web.result == 'success' ||
         needs.dev-stack.result == 'success'
       )

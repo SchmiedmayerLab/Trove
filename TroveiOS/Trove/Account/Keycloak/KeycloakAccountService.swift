@@ -69,6 +69,13 @@ public final class KeycloakAccountService: AccountService {
     }
 
     public func configure() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--reset-authentication-state") {
+            authState = nil
+            try? clearState()
+        }
+        #endif
+
         let stream = externalStorage.updatedDetails
         Task { [weak self] in
             for await update in stream { await self?.applyExternalUpdate(update) }
