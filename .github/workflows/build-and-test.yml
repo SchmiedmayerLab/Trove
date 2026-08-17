@@ -190,7 +190,7 @@ jobs:
       # Merging xcresult bundles needs macOS.
       runs_on_labels: '["self-hosted", "macOS"]'
       xcodeversion: latest-stable
-      coveragereports: Trove-*.xcresult
+      coveragereports: ${{ needs.ios.result == 'success' && 'Trove-*.xcresult' || '' }}
       # The shared Swift jobs name the report after the artifact, while the local web jobs
       # upload their native lcov.info files inside named artifact directories.
       coveragereports_lcov: >-
