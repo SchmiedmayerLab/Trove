@@ -11,15 +11,18 @@ configs:
     resource.customizations.ignoreResourceUpdates.external-secrets.io_PushSecret: |
       jsonPointers:
         - /status
+    # App-of-apps waves must wait for both the child sync and its resource health.
     resource.customizations.health.argoproj.io_Application: |
       hs = {}
       hs.status = "Progressing"
+      hs.message = "Waiting for application sync"
+      if obj.status == nil or obj.status.sync == nil or obj.status.sync.status ~= "Synced" then
+        return hs
+      end
       hs.message = "Waiting for application health"
-      if obj.status ~= nil and obj.status.health ~= nil then
+      if obj.status.health ~= nil then
         hs.status = obj.status.health.status
-        if obj.status.health.message ~= nil then
-          hs.message = obj.status.health.message
-        end
+        hs.message = obj.status.health.message or hs.message
       end
       return hs
     resource.customizations.health.external-secrets.io_ClusterSecretStore: |
