@@ -21,4 +21,15 @@ final class FHIRResourceRepository: Module, Sendable {
     func create(_ record: FHIRResourceRecord) async throws {
         try await record.save(on: database)
     }
+
+    func listObservations(participantID: UUID, code: String, start: Date, end: Date) async throws -> [FHIRResourceRecord] {
+        try await FHIRResourceRecord.query(on: database)
+            .filter(\.$id.$participantID == participantID)
+            .filter(\.$resourceType == "Observation")
+            .filter(\.$code == code)
+            .filter(\.$id.$time >= start)
+            .filter(\.$id.$time <= end)
+            .sort("time", .ascending)
+            .all()
+    }
 }

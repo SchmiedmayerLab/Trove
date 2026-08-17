@@ -1023,6 +1023,50 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /participant/fhir/resource:
+    get:
+      tags:
+        - Participant
+      summary: Read stored observations for the authenticated participant
+      description: >
+        Returns the authenticated participant's stored observations matching
+        a code and inclusive time window. The indexed projection is returned
+        alongside the preserved FHIR resource so ingestion can be verified.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Matching stored observations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StoredFHIRResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
     post:
       tags:
         - Participant
@@ -2496,6 +2540,36 @@ components:
           examples:
             - Observation
       additionalProperties: true
+
+    StoredFHIRResource:
+      type: object
+      description: A preserved FHIR resource and its indexed Timescale projection.
+      required:
+        - time
+        - externalId
+        - resourceType
+        - resource
+      properties:
+        time:
+          type: string
+          format: date-time
+        externalId:
+          type: string
+        resourceType:
+          type: string
+        code:
+          type: string
+        codeSystem:
+          type: string
+        value:
+          type: number
+          format: double
+        valueCode:
+          type: string
+        valueSystem:
+          type: string
+        resource:
+          $ref: '#/components/schemas/FHIRResource'
 
     ParticipantProfileInput:
       type: object

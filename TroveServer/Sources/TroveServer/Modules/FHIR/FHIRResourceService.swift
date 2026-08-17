@@ -22,4 +22,18 @@ final class FHIRResourceService: Module, @unchecked Sendable {
         let record = FHIRResourceRecord(resource, participantID: participantId)
         try await repository.create(record)
     }
+
+    func listObservations(code: String, start: Date, end: Date) async throws -> [FHIRResourceRecord] {
+        guard start <= end else {
+            throw ServerError.badRequest("The observation time window must start before it ends")
+        }
+
+        let participant = try await profileService.getProfile()
+        return try await repository.listObservations(
+            participantID: try participant.requireId(),
+            code: code,
+            start: start,
+            end: end
+        )
+    }
 }

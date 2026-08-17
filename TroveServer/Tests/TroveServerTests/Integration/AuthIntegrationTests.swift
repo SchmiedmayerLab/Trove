@@ -325,6 +325,7 @@ extension AuthIntegrationTests {
         let scheduleBody = jsonData(scheduleBody())
         let dummyId = dummyUUID
         let base = apiBasePath
+        let fhirQuery = "code=8867-4&start=2026-08-17T00%3A00%3A00Z&end=2026-08-18T00%3A00%3A00Z"
 
         return [
             // Groups
@@ -400,7 +401,8 @@ extension AuthIntegrationTests {
                     "status": "final",
                     "code": ["coding": [["system": "http://loinc.org", "code": "8867-4"]]]
                 ] as [String: Any])
-            )
+            ),
+            participant(.GET, "\(base)/participant/fhir/resource?\(fhirQuery)", successStatus: .ok)
         ]
     }
 
@@ -430,14 +432,13 @@ extension AuthIntegrationTests {
         Set(
             allEndpoints(.dummy)
                 .map {
-                    "\($0.method.rawValue) /\($0.path)"
+                    "\($0.method.rawValue) /\($0.path.split(separator: "?", maxSplits: 1).first ?? "")"
                         .replacingOccurrences(of: dummyUUID.uuidString, with: "*")
                         .replacingOccurrences(of: dummyRevision, with: "*")
                 }
         )
     }
 }
-
 
 // MARK: - File-Private Helpers
 

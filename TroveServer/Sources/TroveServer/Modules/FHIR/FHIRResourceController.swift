@@ -13,6 +13,17 @@ import TroveAPIServer
 
 
 extension Controller {
+    func getParticipantFhirResource(
+        _ input: Operations.GetParticipantFhirResource.Input
+    ) async throws -> Operations.GetParticipantFhirResource.Output {
+        let records = try await fhirResourceService.listObservations(
+            code: input.query.code,
+            start: input.query.start,
+            end: input.query.end
+        )
+        return .ok(.init(body: .json(try records.map { try $0.responseSchema() })))
+    }
+
     func postParticipantFhirResource(
         _ input: Operations.PostParticipantFhirResource.Input
     ) async throws -> Operations.PostParticipantFhirResource.Output {

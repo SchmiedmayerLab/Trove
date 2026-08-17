@@ -36,6 +36,9 @@ jobs:
         run: |
           cp .env.example .env
           docker compose run --rm server-migrate
+      - name: Verify the Timescale schema
+        working-directory: TroveInfrastructure/docker
+        run: ./verify-timescale.sh
       - name: Start the stack
         working-directory: TroveInfrastructure/docker
         run: docker compose up -d
