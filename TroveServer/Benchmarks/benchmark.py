@@ -18,6 +18,7 @@ from pathlib import Path
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 
 from workload import LOINC_SYSTEM, PROFILES, expected_row_count, parse_start, participant_id
@@ -72,8 +73,8 @@ class Benchmark:
             text=True,
         )
 
-    def load(self, table: str) -> tuple[int, float]:
-        generator = [
+    def generator_command(self) -> list[str]:
+        return [
             sys.executable,
             str(self.directory / "workload.py"),
             "--participants",
@@ -85,8 +86,25 @@ class Benchmark:
             "--payload-bytes",
             str(self.args.payload_bytes),
         ]
+
+    def generate_dataset(self, path: Path) -> tuple[int, float]:
         started = time.monotonic()
-        producer = subprocess.Popen(generator, stdout=subprocess.PIPE)
+        with path.open("wb") as output:
+            producer = subprocess.Popen(self.generator_command(), stdout=subprocess.PIPE)
+            assert producer.stdout is not None
+            compressor = subprocess.Popen(["gzip", "-1", "-c"], stdin=producer.stdout, stdout=output)
+            producer.stdout.close()
+            compressor_status = compressor.wait()
+            producer_status = producer.wait()
+        if compressor_status or producer_status:
+            raise RuntimeError(
+                f"dataset generation failed: generator={producer_status}, gzip={compressor_status}"
+            )
+        return path.stat().st_size, time.monotonic() - started
+
+    def load(self, table: str, dataset: Path) -> tuple[int, float]:
+        started = time.monotonic()
+        producer = subprocess.Popen(["gzip", "-d", "-c", str(dataset)], stdout=subprocess.PIPE)
         assert producer.stdout is not None
         consumer = subprocess.Popen(
             [*self.psql, "-c", f"\\copy {table} ({COLUMNS}) FROM STDIN WITH (FORMAT csv)"],
@@ -96,7 +114,7 @@ class Benchmark:
         consumer_status = consumer.wait()
         producer_status = producer.wait()
         if consumer_status or producer_status:
-            raise RuntimeError(f"load failed: generator={producer_status}, psql={consumer_status}")
+            raise RuntimeError(f"load failed: gzip={producer_status}, psql={consumer_status}")
         elapsed = time.monotonic() - started
         rows = int(self.sql(f"SELECT count(*) FROM {table}"))
         return rows, elapsed
@@ -190,15 +208,18 @@ class Benchmark:
         self.prepare()
         expected = expected_row_count(self.args.participants, self.args.days)
         ingestion: dict[str, object] = {}
-        for table in ("benchmark_postgres", "benchmark_timescale"):
-            rows, seconds = self.load(table)
-            if rows != expected:
-                raise RuntimeError(f"{table} loaded {rows} rows, expected {expected}")
-            ingestion[table] = {
-                "rows": rows,
-                "seconds": round(seconds, 3),
-                "rows_per_second": round(rows / seconds, 1),
-            }
+        with tempfile.TemporaryDirectory(prefix="trove-benchmark-") as temporary_directory:
+            dataset = Path(temporary_directory) / "healthkit-fhir.csv.gz"
+            dataset_bytes, generation_seconds = self.generate_dataset(dataset)
+            for table in ("benchmark_postgres", "benchmark_timescale"):
+                rows, seconds = self.load(table, dataset)
+                if rows != expected:
+                    raise RuntimeError(f"{table} loaded {rows} rows, expected {expected}")
+                ingestion[table] = {
+                    "rows": rows,
+                    "seconds": round(seconds, 3),
+                    "rows_per_second": round(rows / seconds, 1),
+                }
 
         timescale_before, compressed_chunks, compression_seconds = self.compress()
         sizes = {
@@ -224,6 +245,11 @@ class Benchmark:
                 ),
             },
             "ingestion": ingestion,
+            "dataset_generation": {
+                "compressed_bytes": dataset_bytes,
+                "seconds": round(generation_seconds, 3),
+                "excluded_from_ingest_throughput": True,
+            },
             "storage_bytes": sizes,
             "average_resource_bytes": round(average_payload, 1),
             "compression": {
