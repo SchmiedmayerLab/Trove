@@ -45,6 +45,11 @@ jobs:
       - name: Verify the stack
         working-directory: TroveInfrastructure/docker
         run: ./smoke-test.sh
+      - name: Verify FHIR ingestion and readback
+        working-directory: TroveInfrastructure/docker
+        run: |
+          dev_password="$(jq -r '.users[] | select(.username == "alice@example.com") | .credentials[] | select(.type == "password") | .value' keycloak/realm.json)"
+          KEYCLOAK_DEV_PASSWORD="$dev_password" ./verify-fhir-round-trip.sh
       # The end-to-end tests drive the real application, so they belong with the running stack
       # rather than in the web job, which has no backend to talk to.
       - name: Install the web dependencies
