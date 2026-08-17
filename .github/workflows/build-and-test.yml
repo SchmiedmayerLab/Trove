@@ -109,6 +109,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ios == 'true'
     runs-on: [self-hosted, macOS]
+    concurrency: trove-ios-real-stack
     timeout-minutes: 60
     permissions:
       contents: read
@@ -137,11 +138,13 @@ jobs:
       - name: Run the real-stack UI test
         working-directory: TroveiOS
         run: |
+          simulator_os="$(xcrun --sdk iphonesimulator --show-sdk-version)"
           xcodebuild test \
             -project Trove.xcodeproj \
             -scheme Trove \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=$simulator_os" \
             -only-testing:TroveUITests/TroveUITests/testParticipantCanSignInEnrollAndWithdraw \
+            -parallel-testing-enabled NO \
             -derivedDataPath .derivedData \
             -resultBundlePath Trove-iOS-UI-Tests.xcresult \
             CODE_SIGNING_REQUIRED=NO \
