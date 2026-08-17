@@ -1,0 +1,23 @@
+meta {
+  name: Update Profile
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/participant/profile
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "firstName": "Alice",
+    "lastName": "Doe",
+    "gender": "female",
+    "dateOfBirth": "1995-06-15",
+    "region": "US-CA",
+    "language": "en",
+    "phoneNumber": "+1234567890"
+  }
+}

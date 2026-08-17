@@ -1,0 +1,86 @@
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": [
+          "squash"
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {
+            "context": "API / Swift Test"
+          },
+          {
+            "context": "Server / Swift Test"
+          },
+          {
+            "context": "Web / Lint & Build"
+          },
+          {
+            "context": "iOS / Build and Test with xcodebuild"
+          },
+          {
+            "context": "Infrastructure / Validate Manifests"
+          },
+          {
+            "context": "Infrastructure / Tofu Validate"
+          },
+          {
+            "context": "Infrastructure / KIND Smoke Test"
+          },
+          {
+            "context": "Dev Stack / Docker Compose Smoke Test"
+          },
+          {
+            "context": "Upload Coverage Report / Merge and Upload Coverage"
+          },
+          {
+            "context": "SwiftLint / Run SwiftLint"
+          },
+          {
+            "context": "Standards / Licensing / REUSE Compliance"
+          },
+          {
+            "context": "Standards / Docs / Markdown Links"
+          },
+          {
+            "context": "Standards / Actions / Run actionlint"
+          },
+          {
+            "context": "Standards / Surface"
+          }
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}

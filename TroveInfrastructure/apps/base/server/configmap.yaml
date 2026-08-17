@@ -1,0 +1,22 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trove-server-config
+  namespace: trove
+data:
+  DATABASE_HOST: trove-db-rw
+  DATABASE_NAME: trove
+  KEYCLOAK_URL: http://keycloak.trove.svc.cluster.local/auth
+  KEYCLOAK_REALM: trove
+  KEYCLOAK_CLIENT_ID: trove-server
+  KEYCLOAK_RESEARCHER_ROLE: trove-researcher
+  KEYCLOAK_PARTICIPANT_ROLE: trove-participant
+  APP_ENVIRONMENT: development

@@ -1,0 +1,19 @@
+meta {
+  name: List Enrollments
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/participant/enrollments
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.length > 0) {
+    bru.setVar("enrollmentId", body[0].id);
+    bru.setVar("revision", body[0].currentRevision);
+  }
+}

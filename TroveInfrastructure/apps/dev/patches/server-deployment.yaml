@@ -1,0 +1,34 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trove-server
+  namespace: trove
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      initContainers:
+        - name: trove-server-migrate
+          image: ghcr.io/schmiedmayerlab/trove-server:main
+          imagePullPolicy: IfNotPresent
+      containers:
+        - name: trove-server-container
+          image: ghcr.io/schmiedmayerlab/trove-server:main
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m

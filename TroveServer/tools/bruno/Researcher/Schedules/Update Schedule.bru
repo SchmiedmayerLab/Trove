@@ -1,0 +1,37 @@
+meta {
+  name: Update Schedule
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules/:scheduleId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+  scheduleId: {{scheduleId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "scheduleDefinition": {
+      "type": "repeated",
+      "pattern": {
+        "type": "daily",
+        "hour": 14,
+        "minute": 0,
+        "second": 0
+      }
+    },
+    "completionPolicy": "anytime",
+    "notification": false
+  }
+}

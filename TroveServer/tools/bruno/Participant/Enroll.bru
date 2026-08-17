@@ -1,0 +1,26 @@
+meta {
+  name: Enroll
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/participant/studies/:studyId/enrollments
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+body:json {
+  {
+    "invitationCode": null
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("enrollmentId", body.id);
+}

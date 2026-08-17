@@ -1,0 +1,75 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Dev Stack
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Docker Compose Smoke Test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      # The compose file runs the published images. Building them here from the same
+      # Dockerfiles the deployment uses keeps the local stack and production in step,
+      # and means this job fails if either Dockerfile breaks.
+      - name: Build the server and web images
+        run: |
+          docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+          docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+      # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
+      # migration has to run first. It starts the backing services it depends on.
+      - name: Apply the migrations
+        working-directory: TroveInfrastructure/docker
+        run: |
+          cp .env.example .env
+          docker compose run --rm server-migrate
+      - name: Start the stack
+        working-directory: TroveInfrastructure/docker
+        run: docker compose up -d
+      - name: Verify the stack
+        working-directory: TroveInfrastructure/docker
+        run: ./smoke-test.sh
+      # The end-to-end tests drive the real application, so they belong with the running stack
+      # rather than in the web job, which has no backend to talk to.
+      - name: Install the web dependencies
+        working-directory: TroveWeb
+        run: |
+          cp .env.example .env
+          npm ci --ignore-scripts
+          npm run generate:api
+      - name: Install Playwright browsers
+        working-directory: TroveWeb
+        run: npx playwright install --with-deps
+      - name: End-to-end tests
+        working-directory: TroveWeb
+        run: npm run test:e2e:coverage
+      - name: Upload the end-to-end coverage report
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Web-E2E.lcov
+          path: TroveWeb/coverage-e2e/lcov.info
+          if-no-files-found: warn
+      - name: Collect diagnostics on failure
+        if: failure()
+        working-directory: TroveInfrastructure/docker
+        run: |
+          docker compose ps
+          docker compose logs --tail 150
+      - name: Tear down
+        if: always()
+        working-directory: TroveInfrastructure/docker
+        run: docker compose down -v

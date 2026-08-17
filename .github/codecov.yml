@@ -1,0 +1,31 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+coverage:
+  status:
+    project:
+      default:
+        # Coverage is still being established; hold the line rather than a fixed target.
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true
+
+ignore:
+  - "TroveAPI/Sources/**/Generated/**"
+  - "TroveWeb/src/lib/api/generated/**"
+  - "TroveWeb/src/routeTree.gen.ts"
+  - "**/Tests/**"
+  - "TroveiOS/TroveTests/**"
+  - "TroveiOS/TroveUITests/**"

@@ -1,0 +1,42 @@
+meta {
+  name: Create Schedule (Weekly)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "scheduleDefinition": {
+      "type": "repeated",
+      "pattern": {
+        "type": "weekly",
+        "weekday": "monday",
+        "hour": 10,
+        "minute": 30,
+        "second": 0
+      }
+    },
+    "completionPolicy": "anytime",
+    "notification": true
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("scheduleId", body.id);
+}

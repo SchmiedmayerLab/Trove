@@ -1,0 +1,111 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-server-secret-setup
+  namespace: vault
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-setup
+          image: hashicorp/vault:1.15
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: VAULT_TOKEN
+              value: dev-only-token
+          command:
+            - sh
+            - -c
+            - |
+              until vault status >/dev/null 2>&1; do echo "Waiting for Vault..."; sleep 2; done
+              vault kv get secret/server-credentials >/dev/null 2>&1 || \
+                vault kv put secret/server-credentials KEYCLOAK_CLIENT_SECRET=dev-server-secret
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-db-secret-setup
+  namespace: vault
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-setup
+          image: hashicorp/vault:1.15
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: VAULT_TOKEN
+              value: dev-only-token
+          command:
+            - sh
+            - -c
+            - |
+              until vault status >/dev/null 2>&1; do echo "Waiting for Vault..."; sleep 2; done
+              vault kv get secret/server-db-credentials >/dev/null 2>&1 || \
+                vault kv put secret/server-db-credentials username=trove password=trove
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-keycloak-admin-secret-setup
+  namespace: vault
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-setup
+          image: hashicorp/vault:1.15
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: VAULT_TOKEN
+              value: dev-only-token
+          command:
+            - sh
+            - -c
+            - |
+              until vault status >/dev/null 2>&1; do echo "Waiting for Vault..."; sleep 2; done
+              vault kv get secret/keycloak-admin-credentials >/dev/null 2>&1 || \
+                vault kv put secret/keycloak-admin-credentials username=admin password=admin
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-keycloak-db-secret-setup
+  namespace: vault
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-setup
+          image: hashicorp/vault:1.15
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: VAULT_TOKEN
+              value: dev-only-token
+          command:
+            - sh
+            - -c
+            - |
+              until vault status >/dev/null 2>&1; do echo "Waiting for Vault..."; sleep 2; done
+              vault kv get secret/keycloak-db-credentials >/dev/null 2>&1 || \
+                vault kv put secret/keycloak-db-credentials username=keycloak password=keycloak

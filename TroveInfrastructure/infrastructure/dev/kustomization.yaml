@@ -1,0 +1,34 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - cert-issuer.yaml
+  - tls-certificate.yaml
+  - vault-namespace.yaml
+  - vault-server.yaml
+  - vault-token-secret.yaml
+  - vault-seed-jobs.yaml
+  - cluster-secret-store.yaml
+patches:
+  - path: patches/db-cluster.yaml
+  - path: patches/keycloak-db-cluster.yaml
+  - path: patches/main-ingress.yaml
+  - path: patches/auth-ingress.yaml
+  - path: patches/keycloak.yaml
+  - path: patches/keycloak-config-cli-job.yaml
+configMapGenerator:
+  - name: keycloak-realm-config
+    namespace: trove
+    behavior: replace
+    files:
+      - 00-realm.json=realm/00-realm.json
+generatorOptions:
+  disableNameSuffixHash: true

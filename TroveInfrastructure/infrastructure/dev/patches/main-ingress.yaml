@@ -1,0 +1,33 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: trove-ingress
+  namespace: trove
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-issuer
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`localhost`)
+      priority: 1
+      services:
+        - name: trove-web-service
+          port: 80
+      middlewares:
+        - name: security-headers
+    - kind: Rule
+      match: Host(`localhost`) && PathPrefix(`/api`)
+      priority: 2
+      services:
+        - name: trove-server-service
+          port: 8080
+      middlewares:
+        - name: security-headers

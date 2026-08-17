@@ -1,0 +1,46 @@
+meta {
+  name: Create Schedule (Once)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/components/:componentId/schedules
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "scheduleDefinition": {
+      "type": "once",
+      "pattern": {
+        "type": "event",
+        "event": {
+          "type": "enrollment"
+        },
+        "offsetInDays": 0,
+        "time": {
+          "hour": 9,
+          "minute": 0
+        }
+      }
+    },
+    "completionPolicy": "anytime",
+    "notification": false
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("scheduleId", body.id);
+}

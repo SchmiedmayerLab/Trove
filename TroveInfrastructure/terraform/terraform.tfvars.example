@@ -1,0 +1,20 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+project_id   = "trove-dev"
+region       = "us-west1"
+cluster_name = "trove-dev"
+domain       = "console.troveplatform.org"
+
+# Restrict kubectl access to specific CIDRs (recommended for production)
+# authorized_networks = [
+#   {
+#     display_name = "office-vpn"
+#     cidr_block   = "171.64.0.0/14"
+#   }
+# ]

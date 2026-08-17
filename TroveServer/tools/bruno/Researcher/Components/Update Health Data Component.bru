@@ -1,0 +1,43 @@
+meta {
+  name: Update Health Data Component
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/studies/:studyId/components/health-data/:componentId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Health Data Collection Updated",
+    "data": {
+      "sampleTypes": [
+        "HKQuantityType;HKQuantityTypeIdentifierDietaryCholesterol",
+              "HKWorkoutType;HKWorkoutTypeIdentifier"
+      ],
+      "historicalDataCollection": {
+        "enabled": true,
+        "startDate": {
+          "type": "last",
+          "components": {
+            "day": 60,
+            "month": 2,
+            "year": 1
+          }
+        }
+      }
+    }
+  }
+}

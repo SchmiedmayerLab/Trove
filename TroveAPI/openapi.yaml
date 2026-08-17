@@ -1,0 +1,2531 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+openapi: 3.1.0
+info:
+  title: Trove API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api/v0
+
+security:
+  - bearerAuth: []
+
+paths:
+  /groups:
+    get:
+      tags:
+        - Groups
+      summary: List all groups (synced from Keycloak)
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /groups/{groupId}:
+    get:
+      tags:
+        - Groups
+      summary: Get a group by ID
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: The group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /groups/{groupId}/studies:
+    get:
+      tags:
+        - Studies
+      summary: List all studies in a group
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: List of studies with ID and title
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudyListItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Studies
+      summary: Create a study in a group
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyCreateInput'
+      responses:
+        '201':
+          description: Study created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}:
+    get:
+      tags:
+        - Studies
+      summary: Get a study by ID
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '200':
+          description: Study found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Studies
+      summary: Partially update a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyPatchInput'
+      responses:
+        '200':
+          description: Study updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Studies
+      summary: Delete a study by ID
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '204':
+          description: Study deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/publish:
+    post:
+      tags:
+        - Studies
+      summary: Publish a study
+      description: >
+        Builds the study bundle, increments the study revision, and creates
+        a published study record. Returns the published study metadata.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '201':
+          description: Study published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedStudyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/published:
+    get:
+      tags:
+        - Studies
+      summary: List published revisions of a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '200':
+          description: List of published revisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublishedStudyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/invitation-codes:
+    get:
+      tags:
+        - Invitation Codes
+      summary: List invitation codes for a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '200':
+          description: List of invitation codes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitationCodeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Invitation Codes
+      summary: Generate new invitation codes for a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationCodeCreateInput'
+      responses:
+        '201':
+          description: Invitation codes generated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitationCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/invitation-codes/{codeId}:
+    delete:
+      tags:
+        - Invitation Codes
+      summary: Delete an invitation code
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/CodeId'
+      responses:
+        '204':
+          description: Invitation code deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /studies/{studyId}/enrollments:
+    get:
+      tags:
+        - Studies
+      summary: List enrollments for a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '200':
+          description: List of enrollments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnrollmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/components:
+    get:
+      tags:
+        - Components
+      summary: List all components for a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      responses:
+        '200':
+          description: List of components
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Component'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/components/{componentId}:
+    delete:
+      tags:
+        - Components
+      summary: Remove a component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '204':
+          description: Component deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Informational Components ──
+
+  /studies/{studyId}/components/informational:
+    post:
+      tags:
+        - Components
+      summary: Add an informational component to a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InformationalComponentInput'
+      responses:
+        '201':
+          description: Component added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InformationalComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/components/informational/{componentId}:
+    get:
+      tags:
+        - Components
+      summary: Get a single informational component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '200':
+          description: The informational component
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InformationalComponentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Components
+      summary: Replace an informational component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InformationalComponentInput'
+      responses:
+        '200':
+          description: Component replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InformationalComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Questionnaire Components ──
+
+  /studies/{studyId}/components/questionnaire:
+    post:
+      tags:
+        - Components
+      summary: Add a questionnaire component to a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireComponentInput'
+      responses:
+        '201':
+          description: Component added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/components/questionnaire/{componentId}:
+    get:
+      tags:
+        - Components
+      summary: Get a single questionnaire component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '200':
+          description: The questionnaire component
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireComponentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Components
+      summary: Replace a questionnaire component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireComponentInput'
+      responses:
+        '200':
+          description: Component replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Health Data Components ──
+
+  /studies/{studyId}/components/health-data:
+    post:
+      tags:
+        - Components
+      summary: Add a health data component to a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthDataComponentInput'
+      responses:
+        '201':
+          description: Component added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDataComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /studies/{studyId}/components/health-data/{componentId}:
+    get:
+      tags:
+        - Components
+      summary: Get a single health data component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '200':
+          description: The health data component
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDataComponentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Components
+      summary: Replace a health data component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthDataComponentInput'
+      responses:
+        '200':
+          description: Component replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDataComponentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Schedules ──
+
+  /studies/{studyId}/components/{componentId}/schedules:
+    get:
+      tags:
+        - Schedules
+      summary: List all schedules for a component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '200':
+          description: List of schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComponentSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Schedules
+      summary: Add a schedule to a component
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComponentScheduleInput'
+      responses:
+        '201':
+          description: Schedule added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComponentSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /studies/{studyId}/components/{componentId}/schedules/{scheduleId}:
+    get:
+      tags:
+        - Schedules
+      summary: Get a single schedule
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: The schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComponentSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Schedules
+      summary: Replace a schedule
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComponentScheduleInput'
+      responses:
+        '200':
+          description: Schedule replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComponentSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      tags:
+        - Schedules
+      summary: Remove a schedule
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '204':
+          description: Schedule deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Participant ──────────────────────────────────────────────────────
+
+  /participant/profile:
+    get:
+      tags:
+        - Participant
+      summary: Get the authenticated participant's profile
+      responses:
+        '200':
+          description: The participant profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Participant
+      summary: Create the authenticated participant's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantProfileInput'
+      responses:
+        '201':
+          description: Participant profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    put:
+      tags:
+        - Participant
+      summary: Update the authenticated participant's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantProfileInput'
+      responses:
+        '200':
+          description: The updated participant profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/studies:
+    get:
+      tags:
+        - Participant
+      summary: Browse published studies
+      description: >
+        Without `studyId`, returns publicly listed studies (visibility = public).
+        With `studyId`, returns the matching study even if it is unlisted, allowing
+        participants to access private studies they know the ID for.
+      parameters:
+        - name: studyId
+          in: query
+          required: false
+          description: Look up a specific study by its ID. Required to access unlisted studies.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of published studies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublishedStudyListItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /participant/enrollments:
+    get:
+      tags:
+        - Participant
+      summary: List my enrollments
+      responses:
+        '200':
+          description: List of enrollments for the authenticated participant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnrollmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /participant/studies/{studyId}/enrollments:
+    post:
+      tags:
+        - Participant
+      summary: Enroll in a study
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollInput'
+      responses:
+        '201':
+          description: Enrollment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /participant/enrollments/{enrollmentId}:
+    patch:
+      tags:
+        - Participant
+      summary: Upgrade enrollment to a specified published revision
+      description: >
+        Sets the participant's `currentRevision` to the requested revision of
+        the study. The target revision must be a published revision and
+        greater than the enrollment's current revision. Use this when the
+        consent has not changed. If the consent has changed for the new
+        revision, submit a new consent via the consents endpoint instead, that
+        flow advances the revision atomically.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollmentUpgradeInput'
+      responses:
+        '200':
+          description: Enrollment upgraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /participant/enrollments/{enrollmentId}/withdraw:
+    post:
+      tags:
+        - Participant
+      summary: Withdraw from a study
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+      responses:
+        '200':
+          description: Successfully withdrawn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /participant/enrollments/{enrollmentId}/consents:
+    get:
+      tags:
+        - Participant
+      summary: List consent records for an enrollment
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+      responses:
+        '200':
+          description: List of consent records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentRecordResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Participant
+      summary: Submit a consent record
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - consentData
+                - consentPDF
+              properties:
+                consentData:
+                  $ref: '#/components/schemas/UserResponses'
+                consentPDF:
+                  type: string
+                  format: binary
+            encoding:
+              consentData:
+                contentType: application/json
+              consentPDF:
+                contentType: application/pdf
+      responses:
+        '201':
+          description: Consent record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/fhir/resource:
+    post:
+      tags:
+        - Participant
+      summary: Upload a FHIR resource for the authenticated participant
+      description: >
+        Stores a FHIR R4 resource for the authenticated participant. The
+        `resourceType` field selects how the resource is indexed and stored.
+        Currently only `Observation` is supported; other resource types return
+        `400 Bad Request`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FHIRResource'
+      responses:
+        '201':
+          description: Resource stored
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/studies/{studyId}/{revision}/bundle:
+    get:
+      tags:
+        - Participant
+      summary: Download a study bundle for a published revision
+      description: >
+        Downloads the study bundle ZIP for a specific published revision
+        from object storage. Requires the participant to be enrolled in the
+        study.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/Revision'
+      responses:
+        '200':
+          description: Study bundle ZIP file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment header for file download
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/enrollments/{enrollmentId}/consents/{consentId}/pdf:
+    get:
+      tags:
+        - Participant
+      summary: Download a consent PDF
+      description: >
+        Downloads the signed consent PDF for a specific consent record
+        from object storage.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - $ref: '#/components/parameters/ConsentId'
+      responses:
+        '200':
+          description: Consent PDF file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment header for file download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StudyId:
+      name: studyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ComponentId:
+      name: componentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ScheduleId:
+      name: scheduleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CodeId:
+      name: codeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EnrollmentId:
+      name: enrollmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ConsentId:
+      name: consentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Revision:
+      name: revision
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Conflict:
+      description: Conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Keycloak-issued JWT access token
+  schemas:
+    # ── Shared ────────────────────────────────────────────────────────────
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details for HTTP APIs
+      required:
+        - title
+        - status
+      properties:
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type
+        status:
+          type: integer
+          description: The HTTP status code
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence
+
+    LocalizationKey:
+      type: string
+      description: 'A locale identifier in language-region format (e.g. en-US, de-DE)'
+      examples:
+        - 'en-US'
+
+    LocalizedString:
+      type: object
+      description: Localized string keyed by locale (e.g., "en-US" -> "value")
+      additionalProperties:
+        type: string
+      examples:
+        - en-US: 'Hello'
+
+    DateComponents:
+      type: object
+      description: >
+        Calendar-relative offset applied from the session creation time.
+        At least one component must be provided. Uses Swift DateComponents naming (singular).
+      properties:
+        year:
+          type: integer
+          minimum: 0
+        month:
+          type: integer
+          minimum: 0
+        day:
+          type: integer
+          minimum: 0
+      minProperties: 1
+      additionalProperties: false
+
+    SampleTypesCollection:
+      type: array
+      description: HealthKit sample types in GroveHealthKit format (ClassName;Identifier)
+      items:
+        type: string
+      examples:
+        - - 'HKQuantityType;HKQuantityTypeIdentifierHeartRate'
+          - 'HKQuantityType;HKQuantityTypeIdentifierStepCount'
+          - 'HKCategoryType;HKCategoryTypeIdentifierSleepAnalysis'
+
+    # ── Groups ────────────────────────────────────────────────────────────
+
+    GroupResponse:
+      type: object
+      description: Group synced from Keycloak. Name is unique.
+      required:
+        - id
+        - name
+        - icon
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Keycloak group ID
+        name:
+          type: string
+          description: Unique group name (matches Keycloak group name)
+        icon:
+          type: string
+          description: Icon identifier (e.g. SF Symbol name, stored as Keycloak group attribute)
+
+    # ── Studies — Building Blocks ─────────────────────────────────────────
+
+    StudyDetailContent:
+      type: object
+      description: Per-locale study detail fields
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        shortTitle:
+          type: string
+        explanationText:
+          type: string
+        shortExplanationText:
+          type: string
+
+    StudyDetailData:
+      type: object
+      description: Localized study details keyed by locale
+      additionalProperties:
+        $ref: '#/components/schemas/StudyDetailContent'
+      examples:
+        - en-US:
+            title: 'My Heart Counts'
+            shortTitle: 'MHC'
+            explanationText: 'This study aims to...'
+            shortExplanationText: 'A heart health study'
+
+    ParticipationCriterion:
+      description: >
+        A criterion which must be satisfied for a person to participate in a study.
+        Uses a discriminated union on "type". Leaf criteria carry a single value.
+        Logical operators (not, all, any) are recursive.
+      oneOf:
+        - $ref: '#/components/schemas/AgeAtLeastCriterion'
+        - $ref: '#/components/schemas/IsFromRegionCriterion'
+        - $ref: '#/components/schemas/SpeaksLanguageCriterion'
+        - $ref: '#/components/schemas/NotCriterion'
+        - $ref: '#/components/schemas/AllCriterion'
+        - $ref: '#/components/schemas/AnyCriterion'
+      discriminator:
+        propertyName: type
+        mapping:
+          ageAtLeast: '#/components/schemas/AgeAtLeastCriterion'
+          isFromRegion: '#/components/schemas/IsFromRegionCriterion'
+          speaksLanguage: '#/components/schemas/SpeaksLanguageCriterion'
+          not: '#/components/schemas/NotCriterion'
+          all: '#/components/schemas/AllCriterion'
+          any: '#/components/schemas/AnyCriterion'
+
+    AgeAtLeastCriterion:
+      type: object
+      description: Requires the participant to be at least a certain age
+      required:
+        - type
+        - age
+      properties:
+        type:
+          type: string
+          enum: [ageAtLeast]
+        age:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+
+    IsFromRegionCriterion:
+      type: object
+      description: Requires the participant to be from a specific region
+      required:
+        - type
+        - region
+      properties:
+        type:
+          type: string
+          enum: [isFromRegion]
+        region:
+          type: string
+          description: Region identifier (e.g. "US", "DE")
+      additionalProperties: false
+
+    SpeaksLanguageCriterion:
+      type: object
+      description: Requires the participant to speak a specific language
+      required:
+        - type
+        - language
+      properties:
+        type:
+          type: string
+          enum: [speaksLanguage]
+        language:
+          type: string
+          description: Language identifier (e.g. "en", "de")
+      additionalProperties: false
+
+    NotCriterion:
+      type: object
+      description: Negates a criterion
+      required:
+        - type
+        - criterion
+      properties:
+        type:
+          type: string
+          enum: [not]
+        criterion:
+          $ref: '#/components/schemas/ParticipationCriterion'
+      additionalProperties: false
+
+    AllCriterion:
+      type: object
+      description: Requires all criteria to be satisfied (logical AND)
+      required:
+        - type
+        - criteria
+      properties:
+        type:
+          type: string
+          enum: [all]
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipationCriterion'
+      additionalProperties: false
+      examples:
+        - type: all
+          criteria:
+            - type: ageAtLeast
+              age: 18
+            - type: any
+              criteria:
+                - type: isFromRegion
+                  region: 'US'
+                - type: isFromRegion
+                  region: 'DE'
+
+    AnyCriterion:
+      type: object
+      description: Requires at least one criterion to be satisfied (logical OR)
+      required:
+        - type
+        - criteria
+      properties:
+        type:
+          type: string
+          enum: [any]
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipationCriterion'
+      additionalProperties: false
+
+    # ── Studies — Request / Response ──────────────────────────────────────
+
+    StudyListItem:
+      type: object
+      description: Summary of a study for list views
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          description: Study title (en-US preferred, falls back to first available locale)
+
+    StudyCreateInput:
+      type: object
+      description: Request body for creating a new study
+      required:
+        - title
+        - icon
+      properties:
+        title:
+          type: string
+          description: Study title (stored under en-US locale)
+          examples:
+            - 'My Heart Counts'
+        icon:
+          type: string
+          description: Icon identifier (e.g. SF Symbol name)
+          examples:
+            - heart
+
+    StudyPatchInput:
+      type: object
+      description: Partial update for a study. All fields are optional.
+      properties:
+        locales:
+          type: array
+          uniqueItems: true
+          description: Supported locales for the study
+          items:
+            $ref: '#/components/schemas/LocalizationKey'
+          minItems: 1
+          examples:
+            - ['en-US', 'de-DE']
+        icon:
+          type: string
+          description: Icon identifier (e.g. SF Symbol name)
+          examples:
+            - heart
+        details:
+          $ref: '#/components/schemas/StudyDetailData'
+        participationCriterion:
+          $ref: '#/components/schemas/ParticipationCriterion'
+        consent:
+          $ref: '#/components/schemas/StudyConsent'
+        visibility:
+          $ref: '#/components/schemas/StudyVisibility'
+        enrollmentConditions:
+          $ref: '#/components/schemas/EnrollmentConditions'
+
+    StudyResponse:
+      type: object
+      description: Full study response
+      required:
+        - id
+        - locales
+        - icon
+        - details
+        - participationCriterion
+        - consent
+        - visibility
+        - enrollmentConditions
+      properties:
+        id:
+          type: string
+          format: uuid
+        locales:
+          type: array
+          uniqueItems: true
+          description: Supported locales for the study
+          items:
+            $ref: '#/components/schemas/LocalizationKey'
+          examples:
+            - ['en-US', 'de-DE']
+        icon:
+          type: string
+          description: Icon identifier (e.g. SF Symbol name)
+          examples:
+            - heart
+        details:
+          $ref: '#/components/schemas/StudyDetailData'
+        participationCriterion:
+          $ref: '#/components/schemas/ParticipationCriterion'
+        consent:
+          $ref: '#/components/schemas/StudyConsent'
+        visibility:
+          $ref: '#/components/schemas/StudyVisibility'
+        enrollmentConditions:
+          $ref: '#/components/schemas/EnrollmentConditions'
+
+    # ── Enrollment Conditions ──────────────────────────────────────────────
+
+    EnrollmentConditions:
+      type: string
+      description: Defines how enrollment into a study works
+      enum:
+        - none
+        - requiresInvitationCode
+
+    # ── Published Studies ────────────────────────────────────────────────
+
+    StudyVisibility:
+      type: string
+      description: Whether a published study is listed publicly or only accessible via invitation code
+      enum:
+        - public
+        - unlisted
+
+    PublishedStudyResponse:
+      type: object
+      description: A published study revision
+      required:
+        - id
+        - studyId
+        - revision
+        - visibility
+        - publishedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          description: The revision number of this publication
+          examples:
+            - 1
+        visibility:
+          $ref: '#/components/schemas/StudyVisibility'
+        publishedAt:
+          type: string
+          format: date-time
+          description: When this revision was published
+
+    # ── Components — Shared ───────────────────────────────────────────────
+
+    Component:
+      type: object
+      description: A component summary with type, id, and name
+      required:
+        - id
+        - type
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - informational
+            - questionnaire
+            - healthDataCollection
+          description: Component type
+        name:
+          type: string
+          description: Display name for the component
+
+    # ── Component Schedules ─────────────────────────────────────────────
+
+    ComponentScheduleInput:
+      type: object
+      description: Request body for creating or updating a component schedule
+      required:
+        - scheduleDefinition
+        - completionPolicy
+        - notification
+      properties:
+        scheduleDefinition:
+          $ref: '#/components/schemas/ScheduleDefinition'
+        completionPolicy:
+          $ref: '#/components/schemas/AllowedCompletionPolicy'
+        notification:
+          type: boolean
+          description: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+
+    ComponentSchedule:
+      type: object
+      description: A schedule defining when a component should be presented to the participant
+      required:
+        - id
+        - scheduleDefinition
+        - completionPolicy
+        - notification
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Schedule ID (assigned by server on creation)
+        scheduleDefinition:
+          $ref: '#/components/schemas/ScheduleDefinition'
+        completionPolicy:
+          $ref: '#/components/schemas/AllowedCompletionPolicy'
+        notification:
+          type: boolean
+          description: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+
+    ScheduleDefinition:
+      description: Defines when and how often a schedule fires
+      oneOf:
+        - $ref: '#/components/schemas/OnceScheduleDefinition'
+        - $ref: '#/components/schemas/RepeatedScheduleDefinition'
+      discriminator:
+        propertyName: type
+        mapping:
+          once: '#/components/schemas/OnceScheduleDefinition'
+          repeated: '#/components/schemas/RepeatedScheduleDefinition'
+
+    OnceScheduleDefinition:
+      type: object
+      description: A schedule that fires a single time
+      required:
+        - type
+        - pattern
+      properties:
+        type:
+          type: string
+          enum: [once]
+        pattern:
+          $ref: '#/components/schemas/OneTimeSchedule'
+      additionalProperties: false
+
+    RepeatedScheduleDefinition:
+      type: object
+      description: A schedule that fires repeatedly based on a pattern
+      required:
+        - type
+        - pattern
+      properties:
+        type:
+          type: string
+          enum: [repeated]
+        pattern:
+          $ref: '#/components/schemas/RepetitionPattern'
+        offset:
+          $ref: '#/components/schemas/DateComponents'
+      additionalProperties: false
+
+    OneTimeSchedule:
+      description: Defines when a one-time schedule fires
+      oneOf:
+        - $ref: '#/components/schemas/DateOneTimeSchedule'
+        - $ref: '#/components/schemas/EventOneTimeSchedule'
+      discriminator:
+        propertyName: type
+        mapping:
+          date: '#/components/schemas/DateOneTimeSchedule'
+          event: '#/components/schemas/EventOneTimeSchedule'
+
+    DateOneTimeSchedule:
+      type: object
+      description: Fires once at a specific date
+      required:
+        - type
+        - dateComponents
+      properties:
+        type:
+          type: string
+          enum: [date]
+        dateComponents:
+          $ref: '#/components/schemas/DateComponents'
+      additionalProperties: false
+
+    EventOneTimeSchedule:
+      type: object
+      description: Fires once in response to a study lifecycle event
+      required:
+        - type
+        - event
+      properties:
+        type:
+          type: string
+          enum: [event]
+        event:
+          $ref: '#/components/schemas/StudyLifecycleEvent'
+        offsetInDays:
+          type: integer
+          default: 0
+          description: Number of days after the event
+        time:
+          $ref: '#/components/schemas/ScheduleTime'
+      additionalProperties: false
+      examples:
+        - type: event
+          event:
+            type: activation
+          offsetInDays: 1
+          time:
+            hour: 9
+            minute: 0
+
+    RepetitionPattern:
+      description: Defines how a repeated schedule recurs
+      oneOf:
+        - $ref: '#/components/schemas/DailyRepetition'
+        - $ref: '#/components/schemas/WeeklyRepetition'
+        - $ref: '#/components/schemas/MonthlyRepetition'
+      discriminator:
+        propertyName: type
+        mapping:
+          daily: '#/components/schemas/DailyRepetition'
+          weekly: '#/components/schemas/WeeklyRepetition'
+          monthly: '#/components/schemas/MonthlyRepetition'
+
+    DailyRepetition:
+      type: object
+      description: Repeats every N days at a specific time
+      required:
+        - type
+        - hour
+      properties:
+        type:
+          type: string
+          enum: [daily]
+        interval:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Repeat every N days
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+        second:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+      additionalProperties: false
+
+    WeeklyRepetition:
+      type: object
+      description: Repeats every N weeks on an optional weekday at a specific time
+      required:
+        - type
+        - hour
+      properties:
+        type:
+          type: string
+          enum: [weekly]
+        interval:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Repeat every N weeks
+        weekday:
+          type: string
+          description: Day of week (e.g. "monday", "tuesday"). Omit to repeat relative to enrollment date.
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+        second:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+      additionalProperties: false
+
+    MonthlyRepetition:
+      type: object
+      description: Repeats every N months on an optional day at a specific time
+      required:
+        - type
+        - hour
+      properties:
+        type:
+          type: string
+          enum: [monthly]
+        interval:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Repeat every N months
+        day:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Day of month. Omit to repeat relative to enrollment date.
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+        second:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+      additionalProperties: false
+
+    StudyLifecycleEvent:
+      description: A study lifecycle event that can trigger a one-time schedule
+      oneOf:
+        - $ref: '#/components/schemas/EnrollmentEvent'
+        - $ref: '#/components/schemas/ActivationEvent'
+        - $ref: '#/components/schemas/UnenrollmentEvent'
+        - $ref: '#/components/schemas/StudyEndEvent'
+        - $ref: '#/components/schemas/CompletedTaskEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          enrollment: '#/components/schemas/EnrollmentEvent'
+          activation: '#/components/schemas/ActivationEvent'
+          unenrollment: '#/components/schemas/UnenrollmentEvent'
+          studyEnd: '#/components/schemas/StudyEndEvent'
+          completedTask: '#/components/schemas/CompletedTaskEvent'
+
+    EnrollmentEvent:
+      type: object
+      description: Triggered on first enrollment
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [enrollment]
+      additionalProperties: false
+
+    ActivationEvent:
+      type: object
+      description: Triggered on study activation
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [activation]
+      additionalProperties: false
+
+    UnenrollmentEvent:
+      type: object
+      description: Triggered when participant unenrolls
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [unenrollment]
+      additionalProperties: false
+
+    StudyEndEvent:
+      type: object
+      description: Triggered when the study officially ends
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [studyEnd]
+      additionalProperties: false
+
+    CompletedTaskEvent:
+      type: object
+      description: Triggered when a specific component task is completed
+      required:
+        - type
+        - componentId
+      properties:
+        type:
+          type: string
+          enum: [completedTask]
+        componentId:
+          type: string
+          format: uuid
+          description: ID of the component whose completion triggers this event
+      additionalProperties: false
+
+    ScheduleTime:
+      type: object
+      description: Time of day for a schedule occurrence
+      required:
+        - hour
+      properties:
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+        second:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+      additionalProperties: false
+
+    AllowedCompletionPolicy:
+      type: string
+      description: When a scheduled event is allowed to be completed
+      enum:
+        - sameDay
+        - afterStart
+        - sameDayAfterStart
+        - duringEvent
+        - anytime
+
+    # ── Components — Informational ────────────────────────────────────────
+
+    InformationalContent:
+      type: object
+      description: Content for a single locale in an informational component
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          description: The title of the informational component
+        lede:
+          type: string
+          description: A short introductory text or subtitle
+        content:
+          type: string
+          description: The main content text
+
+    InformationalComponentData:
+      type: object
+      description: Localized informational content keyed by locale (e.g., "en-US", "de-DE")
+      additionalProperties:
+        $ref: '#/components/schemas/InformationalContent'
+      examples:
+        - en-US:
+            title: 'Welcome'
+            lede: 'Introduction to the study'
+            content: 'Welcome to the study'
+          de-DE:
+            title: 'Willkommen'
+            lede: 'Einführung in die Studie'
+            content: 'Willkommen zur Studie'
+
+    InformationalComponentInput:
+      type: object
+      description: Request body for creating or updating an informational component
+      required:
+        - name
+        - data
+      properties:
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/InformationalComponentData'
+
+    InformationalComponentResponse:
+      type: object
+      description: Response containing informational component with ID and name
+      required:
+        - id
+        - name
+        - data
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/InformationalComponentData'
+
+    # ── Components — Questionnaire ────────────────────────────────────────
+
+    QuestionnaireContent:
+      type: object
+      description: Content for a single locale in a questionnaire component
+      required:
+        - questionnaire
+      properties:
+        questionnaire:
+          type: string
+          description: FHIR Questionnaire as JSON string
+
+    QuestionnaireComponentData:
+      type: object
+      description: Localized questionnaire content keyed by locale (e.g., "en-US", "de-DE")
+      additionalProperties:
+        $ref: '#/components/schemas/QuestionnaireContent'
+      examples:
+        - en-US:
+            questionnaire: '{"resourceType": "Questionnaire", "title": "Daily Survey"}'
+          de-DE:
+            questionnaire: '{"resourceType": "Questionnaire", "title": "Tägliche Umfrage"}'
+
+    QuestionnaireComponentInput:
+      type: object
+      description: Request body for creating or updating a questionnaire component
+      required:
+        - name
+        - data
+      properties:
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/QuestionnaireComponentData'
+
+    QuestionnaireComponentResponse:
+      type: object
+      description: Response containing questionnaire component with ID and name
+      required:
+        - id
+        - name
+        - data
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/QuestionnaireComponentData'
+
+    # ── Components — Health Data ──────────────────────────────────────────
+
+    ExportSessionStartDate:
+      description: >
+        Defines how the start date of an export session is determined.
+        This represents a strategy rather than a concrete date.
+      oneOf:
+        - $ref: '#/components/schemas/OldestSampleStartDate'
+        - $ref: '#/components/schemas/RelativeStartDate'
+        - $ref: '#/components/schemas/AbsoluteStartDate'
+      discriminator:
+        propertyName: type
+        mapping:
+          oldestSample: '#/components/schemas/OldestSampleStartDate'
+          last: '#/components/schemas/RelativeStartDate'
+          absolute: '#/components/schemas/AbsoluteStartDate'
+
+    OldestSampleStartDate:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [oldestSample]
+      additionalProperties: false
+      description: >
+        Uses the oldest available sample as the start date.
+
+    RelativeStartDate:
+      type: object
+      required:
+        - type
+        - components
+      properties:
+        type:
+          type: string
+          enum: [last]
+        components:
+          $ref: '#/components/schemas/DateComponents'
+      additionalProperties: false
+      description: >
+        Uses a calendar-relative offset from the time the session was created.
+
+    AbsoluteStartDate:
+      type: object
+      required:
+        - type
+        - date
+      properties:
+        type:
+          type: string
+          enum: [absolute]
+        date:
+          type: string
+          format: date-time
+      additionalProperties: false
+      description: >
+        Uses a fixed absolute date as the start date.
+
+    HealthDataComponentData:
+      type: object
+      description: A health data component for collecting health metrics
+      required:
+        - sampleTypes
+      properties:
+        sampleTypes:
+          $ref: '#/components/schemas/SampleTypesCollection'
+        historicalDataCollection:
+          type: object
+          description: Configuration for collecting historical health data
+          properties:
+            enabled:
+              type: boolean
+              default: false
+            startDate:
+              $ref: '#/components/schemas/ExportSessionStartDate'
+
+    HealthDataComponentInput:
+      type: object
+      description: Request body for creating or updating a health data component
+      required:
+        - name
+        - data
+      properties:
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/HealthDataComponentData'
+
+    HealthDataComponentResponse:
+      type: object
+      description: Response containing health data component with ID and name
+      required:
+        - id
+        - name
+        - data
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Display name for the component
+        data:
+          $ref: '#/components/schemas/HealthDataComponentData'
+
+    # ── Invitation Codes ───────────────────────────────────────────────
+
+    InvitationCodeResponse:
+      type: object
+      description: An invitation code for a study
+      required:
+        - id
+        - studyId
+        - code
+        - used
+      properties:
+        id:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        used:
+          type: boolean
+        enrollmentId:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+
+    InvitationCodeCreateInput:
+      type: object
+      description: Request body for generating invitation codes
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: Number of invitation codes to generate
+        expiresAt:
+          type: string
+          format: date-time
+          description: Optional expiration date for the generated codes
+
+    # ── Enrollments ────────────────────────────────────────────────────
+
+    EnrollmentResponse:
+      type: object
+      description: An enrollment in a study
+      required:
+        - id
+        - studyId
+        - participantId
+        - currentRevision
+        - enrolledAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        participantId:
+          type: string
+          format: uuid
+        currentRevision:
+          type: integer
+        enrolledAt:
+          type: string
+          format: date-time
+        withdrawnAt:
+          type: string
+          format: date-time
+
+    # ── Participant ────────────────────────────────────────────────────
+
+    PublishedStudyListItem:
+      type: object
+      description: Summary of a published study for participant browsing
+      required:
+        - studyId
+        - revision
+        - metadata
+        - enrollmentConditions
+      properties:
+        studyId:
+          type: string
+          format: uuid
+          description: The study ID
+        revision:
+          type: integer
+          minimum: 1
+          description: The latest published revision number
+        metadata:
+          $ref: '#/components/schemas/StudyMetadataCodable'
+        enrollmentConditions:
+          $ref: '#/components/schemas/EnrollmentConditions'
+
+    StudyMetadataCodable:
+      description: >
+        Study metadata as GroveStudyDefinition.StudyDefinition.Metadata.
+        Mapped via typeOverride; the wire format matches Swift's auto-synthesized Codable output.
+      type: object
+      additionalProperties: true
+
+    EnrollInput:
+      type: object
+      description: Optional request body for enrolling in a study
+      properties:
+        invitationCode:
+          type: string
+          description: Optional invitation code for studies that require one
+
+    EnrollmentUpgradeInput:
+      type: object
+      description: Request body for upgrading an enrollment to a specific published revision
+      required:
+        - revision
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+          description: Target published revision to upgrade the enrollment to
+
+    # ── Consent Schemas ──────────────────────────────────────────────────
+
+    ConsentContent:
+      type: object
+      description: Localized consent form content (title and markdown body)
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+          description: Consent document markdown
+
+    StudyConsent:
+      type: object
+      description: Locale-keyed map of consent content
+      additionalProperties:
+        $ref: '#/components/schemas/ConsentContent'
+      examples:
+        - en-US:
+            title: Study Consent Form
+            content: "# Consent\n\nBy participating..."
+          de-DE:
+            title: Einwilligungserklärung
+            content: "# Einwilligung\n\nDurch die Teilnahme..."
+
+    NameComponents:
+      type: object
+      properties:
+        givenName:
+          type: string
+        familyName:
+          type: string
+
+    SignatureData:
+      type: object
+      required:
+        - name
+        - signature
+        - size
+      properties:
+        name:
+          $ref: '#/components/schemas/NameComponents'
+        signature:
+          type: string
+          description: Base64-encoded PKDrawing data
+        size:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: '[width, height] in points'
+
+    UserResponses:
+      type: object
+      properties:
+        toggles:
+          type: object
+          additionalProperties:
+            type: boolean
+        selects:
+          type: object
+          additionalProperties:
+            type: string
+        signatures:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SignatureData'
+
+    ConsentRecordResponse:
+      type: object
+      description: A submitted consent record
+      required:
+        - id
+        - enrollmentId
+        - revision
+        - userResponses
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        enrollmentId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+        userResponses:
+          $ref: '#/components/schemas/UserResponses'
+        createdAt:
+          type: string
+          format: date-time
+          description: When the consent was submitted
+
+    GenderIdentity:
+      type: string
+      description: Self-identified gender identity
+      enum:
+        - female
+        - male
+        - transgender
+        - nonBinary
+        - preferNotToState
+
+    ParticipantProfile:
+      type: object
+      description: The authenticated participant's profile
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - gender
+        - dateOfBirth
+        - region
+        - language
+        - phoneNumber
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          maxLength: 200
+        lastName:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          format: email
+        gender:
+          $ref: '#/components/schemas/GenderIdentity'
+        dateOfBirth:
+          type: string
+          format: date
+        region:
+          type: string
+          maxLength: 10
+        language:
+          type: string
+          maxLength: 10
+        phoneNumber:
+          type: string
+          maxLength: 30
+
+    FHIRResource:
+      type: object
+      description: >
+        A FHIR R4 resource of any type. The `resourceType` field acts as the
+        discriminator and the remainder of the payload is preserved verbatim.
+      required:
+        - resourceType
+      properties:
+        resourceType:
+          type: string
+          description: FHIR resource type (e.g. `Observation`, `Patient`, `Bundle`).
+          examples:
+            - Observation
+      additionalProperties: true
+
+    ParticipantProfileInput:
+      type: object
+      description: Input for creating or updating the participant's profile
+      required:
+        - firstName
+        - lastName
+        - gender
+        - dateOfBirth
+        - region
+        - language
+        - phoneNumber
+      properties:
+        firstName:
+          type: string
+          maxLength: 200
+        lastName:
+          type: string
+          maxLength: 200
+        gender:
+          $ref: '#/components/schemas/GenderIdentity'
+        dateOfBirth:
+          type: string
+          format: date
+        region:
+          type: string
+          maxLength: 10
+        language:
+          type: string
+          maxLength: 10
+        phoneNumber:
+          type: string
+          maxLength: 30

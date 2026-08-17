@@ -1,0 +1,25 @@
+meta {
+  name: Submit Consent
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/participant/enrollments/:enrollmentId/consents
+  body: multipartForm
+  auth: inherit
+}
+
+params:path {
+  enrollmentId: {{enrollmentId}}
+}
+
+body:multipart-form {
+  consentData: {"toggles":{"agree_data_use":true},"selects":{},"signatures":{"primary":{"name":{"givenName":"Jane","familyName":"Doe"},"signature":"","size":[0,0]}}}
+  consentPDF: @file(consent.pdf)
+}
+
+script:post-response {
+  const body = res.getBody();
+  bru.setVar("consentId", body.id);
+}

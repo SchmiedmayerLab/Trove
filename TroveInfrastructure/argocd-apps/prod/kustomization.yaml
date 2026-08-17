@@ -1,0 +1,42 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - root-app.yaml
+patches:
+  - target:
+      kind: Application
+      name: traefik
+    patch: |
+      - op: replace
+        path: /spec/sources/0/helm/valueFiles/0
+        value: $values/TroveInfrastructure/argocd-apps/prod/traefik-values.yaml
+  - target:
+      kind: Application
+      name: infrastructure
+    patch: |
+      - op: replace
+        path: /spec/source/path
+        value: TroveInfrastructure/infrastructure/prod
+  - target:
+      kind: Application
+      name: apps
+    patch: |
+      - op: replace
+        path: /spec/source/path
+        value: TroveInfrastructure/apps/prod
+  - target:
+      kind: Application
+      name: bootstrap
+    patch: |
+      - op: replace
+        path: /spec/source/path
+        value: TroveInfrastructure/bootstrap/prod

@@ -1,0 +1,16 @@
+meta {
+  name: Get Questionnaire Component
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/studies/:studyId/components/questionnaire/:componentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+  componentId: {{componentId}}
+}

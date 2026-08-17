@@ -16,3 +16,31 @@ updates:
     directory: "/"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "swift"
+    directory: "/api"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "swift"
+    directory: "/server"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "npm"
+    directory: "/web"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "docker"
+    directory: "/server"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "docker"
+    directory: "/web"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "docker-compose"
+    directory: "/infrastructure/docker"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "terraform"
+    directory: "/infrastructure/terraform"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"

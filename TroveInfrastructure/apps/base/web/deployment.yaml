@@ -1,0 +1,68 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trove-web
+  namespace: trove
+  labels:
+    app: trove-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trove-web
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: trove-web
+    spec:
+      serviceAccountName: trove-web
+      containers:
+        - name: trove-web-container
+          image: ghcr.io/schmiedmayerlab/trove-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 25m
+            limits:
+              memory: 256Mi
+              cpu: 100m
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 101
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - configMapRef:
+                name: trove-web-config
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            periodSeconds: 15

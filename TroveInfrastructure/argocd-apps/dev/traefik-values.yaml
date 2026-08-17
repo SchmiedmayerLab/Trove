@@ -1,0 +1,66 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+service:
+  enabled: true
+  type: NodePort
+logs:
+  general:
+    level: DEBUG
+  access:
+    enabled: true
+    fields:
+      headers:
+        defaultmode: keep
+persistence:
+  enabled: true
+  name: traefik-data
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: standard
+  path: /data
+  annotations: {}
+deployment:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  initContainers:
+    - name: volume-permissions
+      image: busybox:1.37
+      command: ["sh", "-c", "touch /data/acme.json; chown 65532:65532 /data/acme.json; chmod -v 600 /data/acme.json"]
+      securityContext:
+        runAsNonRoot: false
+        runAsGroup: 0
+        runAsUser: 0
+      volumeMounts:
+        - name: traefik-data
+          mountPath: /data
+          readOnly: false
+podSecurityContext:
+  fsGroupChangePolicy: OnRootMismatch
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+ports:
+  web:
+    port: 80
+    nodePort: 30080
+    expose:
+      default: true
+  websecure:
+    port: 443
+    nodePort: 30443
+    expose:
+      default: true
+    tls:
+      enabled: true
+ingressRoute:
+  dashboard:
+    enabled: true
+additionalArguments:
+  - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.244.0.0/16,127.0.0.1/32,172.16.0.0/12"
+  - "--entrypoints.web.forwardedHeaders.trustedIPs=10.244.0.0/16,127.0.0.1/32,172.16.0.0/12"
