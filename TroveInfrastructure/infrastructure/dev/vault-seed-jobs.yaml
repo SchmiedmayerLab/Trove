@@ -11,6 +11,8 @@ kind: Job
 metadata:
   name: vault-server-secret-setup
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   backoffLimit: 5
   template:
@@ -37,6 +39,8 @@ kind: Job
 metadata:
   name: vault-db-secret-setup
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   backoffLimit: 5
   template:
@@ -63,6 +67,8 @@ kind: Job
 metadata:
   name: vault-keycloak-admin-secret-setup
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   backoffLimit: 5
   template:
@@ -89,6 +95,8 @@ kind: Job
 metadata:
   name: vault-keycloak-db-secret-setup
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
 spec:
   backoffLimit: 5
   template:

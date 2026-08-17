@@ -88,26 +88,10 @@ jobs:
           kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-server:main
           kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-web:main
       - name: Bootstrap ArgoCD and applications
-        run: python3 tools/setup.py
-      # The repository is private, so ArgoCD cannot read the manifests it deploys without
-      # credentials. The job token is scoped to this repository and lasts for the run.
-      - name: Give ArgoCD access to the repository
         env:
           REPOSITORY_TOKEN: ${{ github.token }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}.git
-        run: |
-          kubectl create secret generic trove-repository \
-            --namespace argocd \
-            --from-literal=type=git \
-            --from-literal=url="$REPOSITORY_URL" \
-            --from-literal=username=x-access-token \
-            --from-literal=password="$REPOSITORY_TOKEN" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          kubectl label secret trove-repository -n argocd \
-            argocd.argoproj.io/secret-type=repository --overwrite
-          # The Applications were created before the credentials existed, so compare them again.
-          kubectl annotate applications -n argocd --all \
-            argocd.argoproj.io/refresh=hard --overwrite
+        run: python3 tools/setup.py
       - name: Wait for ArgoCD Applications
         run: bash tools/smoke-test.sh
         env:

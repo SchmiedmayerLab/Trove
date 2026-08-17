@@ -19,13 +19,16 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ARGOCD_CHART_VERSION = "9.5.1"
+APPLICATION_SYNC_TIMEOUT = int(os.environ.get("APPLICATION_SYNC_TIMEOUT", "1200"))
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +79,7 @@ def header(msg: str):
 
 
 def step_install_argocd():
-    header("Step 1/3: Install ArgoCD")
+    header("Step 1/4: Install ArgoCD")
     helm("repo", "add", "argo",
          "https://argoproj.github.io/argo-helm", "--force-update")
     helm("repo", "update")
@@ -97,7 +100,7 @@ def step_bootstrap_config(env: str):
     Traefik are installed later by ArgoCD). The full bootstrap overlay is
     synced by the ArgoCD bootstrap Application after operators are ready.
     """
-    header("Step 2/3: Pre-apply bootstrap config")
+    header("Step 2/4: Pre-apply bootstrap config")
     rendered = subprocess.run(
         ["kubectl", "kustomize", str(ROOT / "bootstrap" / env)],
         capture_output=True, text=True, check=True,
@@ -125,6 +128,90 @@ def step_bootstrap_config(env: str):
                 "--for=condition=Available", "--timeout=300s")
 
 
+def step_configure_repository():
+    """Configure access to the private manifest repository when a token is supplied."""
+    header("Step 3/4: Configure repository access")
+    token = os.environ.get("REPOSITORY_TOKEN", "").strip()
+    if not token:
+        print("  REPOSITORY_TOKEN is not set; using existing ArgoCD credentials.")
+        return
+
+    repository_url = os.environ.get(
+        "REPOSITORY_URL", "https://github.com/SchmiedmayerLab/Trove.git"
+    ).strip()
+    manifest = subprocess.run(
+        [
+            "kubectl", "create", "secret", "generic", "trove-repository",
+            "--namespace", "argocd",
+            "--from-literal=type=git",
+            f"--from-literal=url={repository_url}",
+            "--from-literal=username=x-access-token",
+            f"--from-literal=password={token}",
+            "--dry-run=client", "-o", "yaml",
+        ],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    kubectl("apply", "-f", "-", input=manifest, text=True)
+    kubectl(
+        "label", "secret", "trove-repository", "-n", "argocd",
+        "argocd.argoproj.io/secret-type=repository", "--overwrite",
+    )
+
+
+def application_metadata(document: str) -> tuple[str, int]:
+    """Return the name and sync wave from a rendered Application manifest."""
+    name = ""
+    wave = 0
+    in_metadata = False
+    for line in document.splitlines():
+        if line == "metadata:":
+            in_metadata = True
+            continue
+        if in_metadata and line and not line.startswith(" "):
+            break
+        if in_metadata and line.startswith("  name:"):
+            name = line.split(":", 1)[1].strip()
+        if in_metadata and "argocd.argoproj.io/sync-wave:" in line:
+            wave = int(line.split(":", 1)[1].strip().strip("\"'"))
+    if not name:
+        raise ValueError("Rendered Application is missing metadata.name")
+    return name, wave
+
+
+def wait_for_applications(names: list[str]):
+    """Wait until every Application in a sync wave is synced and healthy."""
+    deadline = time.monotonic() + APPLICATION_SYNC_TIMEOUT
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            [
+                "kubectl", "get", "applications", "-n", "argocd",
+                "-o", "json",
+            ],
+            capture_output=True, text=True, check=True,
+        )
+        items = {
+            item["metadata"]["name"]: item
+            for item in json.loads(result.stdout).get("items", [])
+        }
+        states = []
+        all_ready = True
+        for name in names:
+            status = items.get(name, {}).get("status", {})
+            sync = status.get("sync", {}).get("status", "Unknown")
+            health = status.get("health", {}).get("status", "Unknown")
+            states.append(f"{name}={sync}/{health}")
+            if sync != "Synced" or health != "Healthy":
+                all_ready = False
+        print(f"  {' '.join(states)}")
+        if all_ready:
+            return
+        time.sleep(15)
+    raise TimeoutError(
+        f"Applications did not become ready within {APPLICATION_SYNC_TIMEOUT}s: "
+        + ", ".join(names)
+    )
+
+
 def step_apply_applications(env: str, branch: str):
     """Apply ArgoCD Applications.
 
@@ -135,7 +222,7 @@ def step_apply_applications(env: str, branch: str):
     For prod: applies the root Application which manages everything
     via the app-of-apps pattern from the main branch.
     """
-    header("Step 3/3: Apply ArgoCD Applications")
+    header("Step 4/4: Apply ArgoCD Applications")
 
     if env == "prod":
         root_yaml = (ROOT / "argocd-apps" / env / "root-app.yaml").read_text()
@@ -150,14 +237,23 @@ def step_apply_applications(env: str, branch: str):
         capture_output=True, text=True, check=True,
     ).stdout
     docs = rendered.split("\n---\n")
-    patched = []
+    applications: dict[int, list[tuple[str, str]]] = {}
     for doc in docs:
         if "kind: Application" in doc:
             doc = doc.replace(
                 "targetRevision: main", f"targetRevision: {branch}")
-        patched.append(doc)
-    rendered = "\n---\n".join(patched)
-    kubectl("apply", "-f", "-", input=rendered, text=True)
+            name, wave = application_metadata(doc)
+            applications.setdefault(wave, []).append((name, doc))
+
+    # Dev has no root Application, so ArgoCD cannot orchestrate the child
+    # Application sync waves for us. Apply and await each wave explicitly.
+    for wave in sorted(applications):
+        wave_apps = applications[wave]
+        names = [name for name, _ in wave_apps]
+        print(f"\nApplying Application sync wave {wave}: {', '.join(names)}")
+        wave_manifest = "\n---\n".join(doc for _, doc in wave_apps)
+        kubectl("apply", "-f", "-", input=wave_manifest, text=True)
+        wait_for_applications(names)
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +283,7 @@ def main():
 
     step_install_argocd()
     step_bootstrap_config(args.env)
+    step_configure_repository()
     step_apply_applications(args.env, branch)
 
     domain = "localhost" if args.env == "dev" else "console.troveplatform.org"
@@ -209,5 +306,8 @@ if __name__ == "__main__":
     try:
         main()
     except subprocess.CalledProcessError as e:
+        print(f"\nFailed: {e}", file=sys.stderr)
+        sys.exit(1)
+    except (TimeoutError, ValueError) as e:
         print(f"\nFailed: {e}", file=sys.stderr)
         sys.exit(1)

@@ -11,6 +11,8 @@ kind: Deployment
 metadata:
   name: trove-server
   namespace: trove
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app: trove-server
 spec:

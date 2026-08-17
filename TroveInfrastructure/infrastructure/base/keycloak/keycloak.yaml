@@ -11,6 +11,8 @@ kind: Deployment
 metadata:
   name: keycloak
   namespace: trove
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app: keycloak
 spec:
@@ -108,6 +110,8 @@ kind: Service
 metadata:
   name: keycloak
   namespace: trove
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app: keycloak
 spec:

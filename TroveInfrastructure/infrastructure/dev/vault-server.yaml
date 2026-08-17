@@ -11,6 +11,8 @@ kind: Deployment
 metadata:
   name: vault
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
   labels:
     app: vault
 spec:
@@ -51,6 +53,8 @@ kind: Service
 metadata:
   name: vault
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
 spec:
   selector:
     app: vault
