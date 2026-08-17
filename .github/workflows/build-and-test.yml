@@ -187,6 +187,7 @@ jobs:
     with:
       # Merging xcresult bundles needs macOS.
       runs_on_labels: '["self-hosted", "macOS"]'
+      xcodeversion: latest-stable
       coveragereports: Trove-*.xcresult
       coveragereports_lcov: Trove-*.lcov
     secrets:
