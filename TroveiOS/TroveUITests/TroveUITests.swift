@@ -40,10 +40,10 @@ final class TroveUITests: XCTestCase {
         username.tap()
         username.typeText("alice@example.com")
 
-        let password = authenticationSession.secureTextFields["Password"]
-        XCTAssertTrue(password.waitForExistence(timeout: 5), "Keycloak did not present its password field.")
-        password.tap()
-        password.typeText("password123")
+        let passwordField = authenticationSession.secureTextFields["Password"]
+        XCTAssertTrue(passwordField.waitForExistence(timeout: 5), "Keycloak did not present its password field.")
+        passwordField.tap()
+        passwordField.typeText("password123") // Local development realm fixture; not a production credential.
         authenticationSession.buttons["Sign In"].tap()
 
         let studies = app.navigationBars["Studies"]
