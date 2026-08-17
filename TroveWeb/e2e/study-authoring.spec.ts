@@ -63,23 +63,6 @@ test.describe("study authoring", () => {
     const questionnaireName = `Wellbeing ${suffix}`;
     const healthDataName = `Vitals ${suffix}`;
 
-    const refreshedSession = page.waitForResponse(
-      (response) =>
-        response.url().includes("/protocol/openid-connect/token") &&
-        response.request().postData()?.includes("grant_type=refresh_token") ===
-          true,
-    );
-    await page.goto("/");
-    expect((await refreshedSession).ok()).toBe(true);
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () =>
-            window.sessionStorage.getItem("trove:e2e-keycloak-session") !==
-            null,
-        ),
-      )
-      .toBe(true);
     await expect(
       page.getByText("Schmiedmayer Lab", { exact: true }),
     ).toBeVisible();

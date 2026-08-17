@@ -57,7 +57,6 @@ jobs:
         working-directory: TroveWeb
         env:
           KEYCLOAK_DEV_PASSWORD: password123
-          VITE_KEYCLOAK_CLIENT_ID: trove-dev-cli
         run: npm run test:e2e:coverage
       - name: Upload the end-to-end coverage report
         if: success() || failure()

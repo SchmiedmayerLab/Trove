@@ -11,13 +11,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { test as base, type Page } from "@playwright/test";
 
 const OUTPUT_DIRECTORY = ".nyc_output";
-const E2E_SESSION_STORAGE_KEY = "trove:e2e-keycloak-session";
-
-interface KeycloakTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  id_token?: string;
-}
 
 interface Fixtures {
   researcherPage: Page;
@@ -53,48 +46,22 @@ export const test = base.extend<Fixtures>({
       JSON.stringify(coverage),
     );
   },
-  researcherPage: async ({ page, request }, runTest) => {
-    const keycloakUrl = process.env.KEYCLOAK_URL ?? "http://localhost:8180";
-    const realm = process.env.KEYCLOAK_REALM ?? "trove";
+  researcherPage: async ({ page }, runTest) => {
     const password = process.env.KEYCLOAK_DEV_PASSWORD;
     if (!password) {
       throw new Error(
         "KEYCLOAK_DEV_PASSWORD is required for authenticated end-to-end tests",
       );
     }
-    const response = await request.post(
-      `${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`,
-      {
-        form: {
-          client_id: process.env.KEYCLOAK_DEV_CLIENT ?? "trove-dev-cli",
-          grant_type: "password",
-          username: process.env.KEYCLOAK_DEV_USER ?? "leland@example.com",
-          password,
-          scope: "openid",
-        },
-      },
-    );
 
-    if (!response.ok()) {
-      throw new Error(
-        `Could not mint the researcher token (${response.status()}): ${await response.text()}`,
-      );
-    }
-
-    const tokens = (await response.json()) as KeycloakTokenResponse;
-    await page.addInitScript(
-      ({ storageKey, session }) => {
-        window.sessionStorage.setItem(storageKey, JSON.stringify(session));
-      },
-      {
-        storageKey: E2E_SESSION_STORAGE_KEY,
-        session: {
-          token: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          idToken: tokens.id_token,
-        },
-      },
-    );
+    await page.goto("/");
+    await page.getByRole("button", { name: "Sign into the dashboard" }).click();
+    await page
+      .locator("#username")
+      .fill(process.env.KEYCLOAK_DEV_USER ?? "leland@example.com");
+    await page.locator("#password").fill(password);
+    await page.locator("#kc-login").click();
+    await page.waitForURL((url) => url.origin === "http://localhost:3001");
 
     await runTest(page);
   },
