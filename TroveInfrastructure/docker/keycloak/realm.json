@@ -266,7 +266,7 @@
         "pkce.code.challenge.method": "S256"
       },
       "redirectUris": [],
-      "webOrigins": [],
+      "webOrigins": ["http://localhost:3001"],
       "protocol": "openid-connect",
       "defaultClientScopes": [
         "web-origins",
