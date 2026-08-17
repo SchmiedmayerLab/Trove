@@ -11,6 +11,7 @@ kind: Kustomization
 resources:
   - admin-secret-es.yaml
   - db-secret-es.yaml
+  - server-secret-es.yaml
   - keycloak.yaml
   - service-account.yaml
   - keycloak-config-cli-job.yaml
