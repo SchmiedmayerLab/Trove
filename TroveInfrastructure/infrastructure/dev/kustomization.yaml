@@ -17,6 +17,9 @@ resources:
   - vault-token-secret.yaml
   - vault-seed-jobs.yaml
   - cluster-secret-store.yaml
+  - timescale.yaml
+  - seaweedfs.yaml
+  - dev-network-policies.yaml
 patches:
   - path: patches/db-cluster.yaml
   - path: patches/keycloak-db-cluster.yaml

@@ -13,3 +13,8 @@ metadata:
   namespace: trove
 data:
   APP_ENVIRONMENT: development
+  S3_ENDPOINT: http://seaweedfs.trove.svc.cluster.local:8333
+  S3_ACCESS_KEY: admin
+  S3_SECRET_KEY: admin
+  S3_BUCKET: trove
+  S3_REGION: us-east-1

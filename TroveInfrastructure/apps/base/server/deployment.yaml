@@ -61,6 +61,16 @@ spec:
                 secretKeyRef:
                   name: trove-postgres-credentials
                   key: password
+            - name: TIMESCALE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: trove-postgres-credentials
+                  key: username
+            - name: TIMESCALE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trove-postgres-credentials
+                  key: password
       containers:
         - name: trove-server-container
           image: ghcr.io/schmiedmayerlab/trove-server:latest
@@ -91,6 +101,16 @@ spec:
                   name: trove-postgres-credentials
                   key: username
             - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trove-postgres-credentials
+                  key: password
+            - name: TIMESCALE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: trove-postgres-credentials
+                  key: username
+            - name: TIMESCALE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: trove-postgres-credentials

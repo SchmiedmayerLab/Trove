@@ -13,7 +13,11 @@ metadata:
   namespace: trove
 data:
   DATABASE_HOST: trove-db-rw
+  DATABASE_PORT: "5432"
   DATABASE_NAME: trove
+  TIMESCALE_HOST: trove-timescale
+  TIMESCALE_PORT: "5432"
+  TIMESCALE_NAME: trove
   KEYCLOAK_URL: http://keycloak.trove.svc.cluster.local/auth
   KEYCLOAK_REALM: trove
   KEYCLOAK_CLIENT_ID: trove-server

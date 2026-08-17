@@ -1,0 +1,74 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-timescale
+  namespace: trove
+spec:
+  podSelector:
+    matchLabels:
+      app: trove-timescale
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: trove-server
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-seaweedfs
+  namespace: trove
+spec:
+  podSelector:
+    matchLabels:
+      app: seaweedfs
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: trove-server
+      ports:
+        - protocol: TCP
+          port: 8333
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-dev-services-egress
+  namespace: trove
+spec:
+  podSelector:
+    matchLabels:
+      app: trove-server
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: trove-timescale
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: seaweedfs
+      ports:
+        - protocol: TCP
+          port: 8333
