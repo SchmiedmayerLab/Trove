@@ -37,7 +37,7 @@ jobs:
       BENCHMARK_PARTICIPANTS: ${{ inputs.participants || '200' }}
       BENCHMARK_DAYS: ${{ inputs.days || '30' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Start TimescaleDB
         working-directory: TroveInfrastructure/docker
         run: docker compose --env-file .env.example up -d server-timescale
