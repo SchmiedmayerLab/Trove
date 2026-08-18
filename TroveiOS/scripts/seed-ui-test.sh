@@ -31,6 +31,38 @@ token_for() {
 researcher_token="$(token_for 'leland@example.com')"
 participant_token="$(token_for 'alice@example.com')"
 
+profile="$(jq --null-input '{
+    firstName: "Alice",
+    lastName: "Participant",
+    gender: "preferNotToState",
+    dateOfBirth: "1990-01-01",
+    region: "US",
+    language: "en-US",
+    phoneNumber: "+16505550123"
+}')"
+
+profile_status="$(
+    curl --silent --output /dev/null --write-out '%{http_code}' \
+        --header "Authorization: Bearer $participant_token" \
+        "$SERVER_URL/participant/profile"
+)"
+
+case "$profile_status" in
+    200) profile_method=PUT ;;
+    404) profile_method=POST ;;
+    *)
+        echo "Unexpected participant profile status: $profile_status" >&2
+        exit 1
+        ;;
+esac
+
+curl --fail-with-body --silent --show-error \
+    --request "$profile_method" "$SERVER_URL/participant/profile" \
+    --header "Authorization: Bearer $participant_token" \
+    --header 'Content-Type: application/json' \
+    --data-binary "$profile" \
+    > /dev/null
+
 curl --fail-with-body --silent --show-error \
     --header "Authorization: Bearer $participant_token" \
     "$SERVER_URL/participant/enrollments" \
@@ -73,38 +105,6 @@ study_id="$(
 curl --fail-with-body --silent --show-error \
     --request POST "$SERVER_URL/studies/$study_id/publish" \
     --header "Authorization: Bearer $researcher_token" \
-    > /dev/null
-
-profile="$(jq --null-input '{
-    firstName: "Alice",
-    lastName: "Participant",
-    gender: "preferNotToState",
-    dateOfBirth: "1990-01-01",
-    region: "US",
-    language: "en-US",
-    phoneNumber: "+16505550123"
-}')"
-
-profile_status="$(
-    curl --silent --output /dev/null --write-out '%{http_code}' \
-        --header "Authorization: Bearer $participant_token" \
-        "$SERVER_URL/participant/profile"
-)"
-
-case "$profile_status" in
-    200) profile_method=PUT ;;
-    404) profile_method=POST ;;
-    *)
-        echo "Unexpected participant profile status: $profile_status" >&2
-        exit 1
-        ;;
-esac
-
-curl --fail-with-body --silent --show-error \
-    --request "$profile_method" "$SERVER_URL/participant/profile" \
-    --header "Authorization: Bearer $participant_token" \
-    --header 'Content-Type: application/json' \
-    --data-binary "$profile" \
     > /dev/null
 
 curl --fail-with-body --silent --show-error \
