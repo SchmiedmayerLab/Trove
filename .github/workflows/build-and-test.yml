@@ -36,8 +36,8 @@ jobs:
       infrastructure: ${{ steps.filter.outputs.infrastructure }}
       devstack: ${{ steps.filter.outputs.devstack }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |

@@ -21,7 +21,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The compose file runs the published images. Building them here from the same
       # Dockerfiles the deployment uses keeps the local stack and production in step,
       # and means this job fails if either Dockerfile breaks.

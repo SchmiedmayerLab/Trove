@@ -23,7 +23,7 @@ jobs:
       run:
         working-directory: TroveInfrastructure
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install kubeconform
         run: |
           curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
@@ -60,7 +60,7 @@ jobs:
       run:
         working-directory: TroveInfrastructure/terraform
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@v2
       - name: Check formatting
@@ -78,7 +78,7 @@ jobs:
       run:
         working-directory: TroveInfrastructure
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install KIND
         run: |
           curl -sSLo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
