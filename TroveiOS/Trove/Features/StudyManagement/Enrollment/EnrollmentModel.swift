@@ -11,33 +11,87 @@ import SwiftUI
 import TroveAPIClient
 
 
+enum EnrollmentModelError: LocalizedError {
+    case enrollmentStateUnavailable
+    case mutationInProgress
+
+    var errorDescription: String? {
+        switch self {
+        case .enrollmentStateUnavailable:
+            String(
+                localized: "Enrollment status must be loaded before it can be changed.",
+                comment: "Error shown when an enrollment change is attempted before its current status is available."
+            )
+        case .mutationInProgress:
+            String(
+                localized: "Another enrollment change is already in progress.",
+                comment: "Error shown when an enrollment change is attempted while another change is still running."
+            )
+        }
+    }
+}
+
+
+@MainActor
 @Observable
 final class EnrollmentModel: Module, EnvironmentAccessible {
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
 
     private(set) var state: LoadingState<[Trove.Enrollment]> = .idle
+    private(set) var isMutating = false
 
     func refresh() async {
-        state = .loading
+        let hadValue = state.value != nil
+        state.beginLoading()
         do {
-            state = .loaded(try await api.requireClient().getParticipantEnrollments(.init()).ok.body.json)
+            let enrollments = try await api.requireClient().getParticipantEnrollments(.init()).ok.body.json
+            guard !Task.isCancelled else {
+                state.cancelLoading()
+                return
+            }
+            state.resolve(with: enrollments)
         } catch {
-            state = .failed(error)
+            if Task.isCancelled {
+                state.cancelLoading()
+            } else {
+                state.reject(with: error)
+                if hadValue {
+                    ErrorHandler.shared.handle(error)
+                }
+            }
         }
     }
 
     func enroll(studyId: String, invitationCode: String? = nil) async throws {
-        _ = try await api.requireClient().postParticipantStudiesStudyIdEnrollments(
+        guard state.isLoaded else {
+            throw EnrollmentModelError.enrollmentStateUnavailable
+        }
+        guard !isMutating else {
+            throw EnrollmentModelError.mutationInProgress
+        }
+        isMutating = true
+        defer { isMutating = false }
+
+        let enrollment = try await api.requireClient().postParticipantStudiesStudyIdEnrollments(
             .init(path: .init(studyId: studyId), body: .json(.init(invitationCode: invitationCode)))
         ).created.body.json
-        await refresh()
+        store(enrollment)
     }
 
     func withdraw(enrollmentId: String) async throws {
-        _ = try await api.requireClient().postParticipantEnrollmentsEnrollmentIdWithdraw(
+        guard state.isLoaded else {
+            throw EnrollmentModelError.enrollmentStateUnavailable
+        }
+        guard !isMutating else {
+            throw EnrollmentModelError.mutationInProgress
+        }
+        isMutating = true
+        defer { isMutating = false }
+
+        let enrollment = try await api.requireClient().postParticipantEnrollmentsEnrollmentIdWithdraw(
             .init(path: .init(enrollmentId: enrollmentId))
-        ).ok
-        await refresh()
+        ).ok.body.json
+        store(enrollment)
     }
 
     func activeEnrollment(forStudy studyId: String) -> Trove.Enrollment? {
@@ -51,5 +105,15 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
         return items
             .filter { $0.studyId == studyId }
             .max(by: { $0.enrolledAt < $1.enrolledAt })
+    }
+
+    private func store(_ enrollment: Trove.Enrollment) {
+        var items = state.value ?? []
+        if let index = items.firstIndex(where: { $0.id == enrollment.id }) {
+            items[index] = enrollment
+        } else {
+            items.append(enrollment)
+        }
+        state.resolve(with: items)
     }
 }

@@ -68,8 +68,10 @@ struct BrowseFindView: View {
                     }
                 }
             }
-        case .failed:
-            EmptyView()
+        case .failed(let error, _):
+            Section {
+                ProblemUnavailableView(title: "Could Not Find Study", error: error, retry: search)
+            }
         }
     }
 

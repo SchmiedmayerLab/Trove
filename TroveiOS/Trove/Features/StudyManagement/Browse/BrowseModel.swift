@@ -11,6 +11,7 @@ import SwiftUI
 import TroveAPIClient
 
 
+@MainActor
 @Observable
 final class BrowseModel: Module, EnvironmentAccessible {
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
@@ -19,20 +20,46 @@ final class BrowseModel: Module, EnvironmentAccessible {
     private(set) var findState: LoadingState<[Trove.Study]> = .idle
 
     func refresh() async {
-        state = .loading
+        let hadValue = state.value != nil
+        state.beginLoading()
         do {
-            state = .loaded(try await api.requireClient().getParticipantStudies(.init(query: .init(studyId: nil))).ok.body.json)
+            let studies = try await api.requireClient()
+                .getParticipantStudies(.init(query: .init(studyId: nil)))
+                .ok.body.json
+            guard !Task.isCancelled else {
+                state.cancelLoading()
+                return
+            }
+            state.resolve(with: studies)
         } catch {
-            state = .failed(error)
+            if Task.isCancelled {
+                state.cancelLoading()
+            } else {
+                state.reject(with: error)
+                if hadValue {
+                    ErrorHandler.shared.handle(error)
+                }
+            }
         }
     }
 
     func find(studyId: String) async {
-        findState = .loading
+        findState.beginLoading(preservingValue: false)
         do {
-            findState = .loaded(try await api.requireClient().getParticipantStudies(.init(query: .init(studyId: studyId))).ok.body.json)
+            let studies = try await api.requireClient()
+                .getParticipantStudies(.init(query: .init(studyId: studyId)))
+                .ok.body.json
+            guard !Task.isCancelled else {
+                findState.cancelLoading()
+                return
+            }
+            findState.resolve(with: studies)
         } catch {
-            findState = .failed(error)
+            if Task.isCancelled {
+                findState.cancelLoading()
+            } else {
+                findState.reject(with: error)
+            }
         }
     }
 
