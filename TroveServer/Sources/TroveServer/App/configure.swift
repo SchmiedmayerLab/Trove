@@ -20,15 +20,30 @@ private var isServing: Bool {
     !CommandLine.arguments.dropFirst().contains(where: { $0 == "migrate" || $0 == "revert" })
 }
 
+private func usesEphemeralUITestServices(_ app: Application) -> Bool {
+    app.environment == .testing && Environment.get("TROVE_UI_TEST_MODE") == "true"
+}
+
 /// Configures the application: database, migrations, and (when serving) services and routes.
 public func configure(_ app: Application) async throws {
     let logger = app.logger
+    let usesEphemeralServices = usesEphemeralUITestServices(app)
     logger.info("Starting server configuration (\(Environment.appEnvironment))...")
 
-    logger.info("Configuring PostgreSQL database connection...")
-    try DatabaseConfiguration.postgres.configure(for: app)
+    if usesEphemeralServices {
+        logger.info("Configuring ephemeral UI-test databases...")
+        try DatabaseConfiguration.inMemory.configure(for: app)
+    } else {
+        logger.info("Configuring PostgreSQL database connection...")
+        try DatabaseConfiguration.postgres.configure(for: app)
+    }
     configureMigrations(for: app)
-    logger.info("PostgreSQL database configured.")
+    if usesEphemeralServices {
+        try await app.autoMigrate()
+        logger.info("Ephemeral UI-test databases configured.")
+    } else {
+        logger.info("PostgreSQL database configured.")
+    }
 
 
     guard isServing else {
@@ -46,14 +61,19 @@ public func configure(_ app: Application) async throws {
         )
     }
 
-    logger.info("Connecting to S3 object storage...")
-    let storageConfig = S3ObjectStorageConfiguration()
-    let storageProvider = S3ObjectStorageProvider(config: storageConfig)
-    await configureServices(for: app, storageProvider: storageProvider)
-    let storageService = app.grove[ObjectStorageService.self]
-    try await storageService.ensureBucketExists()
-    app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
-    logger.info("Object storage ready.")
+    if usesEphemeralServices {
+        logger.info("Configuring ephemeral UI-test object storage...")
+        await configureServices(for: app, storageProvider: InMemoryObjectStorageProvider())
+    } else {
+        logger.info("Connecting to S3 object storage...")
+        let storageConfig = S3ObjectStorageConfiguration()
+        let storageProvider = S3ObjectStorageProvider(config: storageConfig)
+        await configureServices(for: app, storageProvider: storageProvider)
+        let storageService = app.grove[ObjectStorageService.self]
+        try await storageService.ensureBucketExists()
+        app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
+        logger.info("Object storage ready.")
+    }
 
     logger.info("Fetching groups from Keycloak")
     let keycloakConfig = KeycloakConfiguration()
