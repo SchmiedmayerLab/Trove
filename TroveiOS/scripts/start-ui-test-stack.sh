@@ -21,10 +21,22 @@ jq --arg server_client_secret "$server_client_secret" '
         .clients[]
         | select(.clientId == "trove-server")
     ] as $server_clients
+    | [
+        .clientScopes[]?
+        | select(.name == "groups")
+    ] as $group_scopes
     | if ($server_clients | length) != 1 then
         error("Expected exactly one trove-server client")
+      elif ($group_scopes | length) != 1 then
+        error("Expected exactly one groups client scope")
       else
-        (.clients[] | select(.clientId == "trove-server") | .secret) = $server_client_secret
+        ($group_scopes[0].protocolMappers // []) as $group_mappers
+        | del(.clientScopes)
+        | .clients |= map(
+            .defaultClientScopes = ((.defaultClientScopes // []) | map(select(. != "groups")))
+            | .protocolMappers = ((.protocolMappers // []) + $group_mappers)
+          )
+        | (.clients[] | select(.clientId == "trove-server") | .secret) = $server_client_secret
       end
 ' TroveInfrastructure/docker/keycloak/realm.json \
     > "$KEYCLOAK_HOME/data/import/trove-realm.json"
@@ -66,6 +78,26 @@ if ! curl --fail-with-body --silent --show-error \
     --data-urlencode "client_secret=$server_client_secret" \
     > /dev/null; then
     echo "The imported trove-server client credentials are invalid." >&2
+    tail -n 200 "$keycloak_log" >&2
+    exit 1
+fi
+
+authorization_response="$runtime_directory/authorization.html"
+if ! curl --fail-with-body --silent --show-error --get \
+    http://127.0.0.1:8180/realms/trove/protocol/openid-connect/auth \
+    --data-urlencode 'client_id=trove-app' \
+    --data-urlencode 'redirect_uri=trove://callback' \
+    --data-urlencode 'response_type=code' \
+    --data-urlencode 'scope=openid profile email' \
+    --data-urlencode 'code_challenge=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' \
+    --data-urlencode 'code_challenge_method=S256' \
+    --output "$authorization_response"; then
+    echo "The trove-app authorization endpoint rejected the configured OIDC scopes." >&2
+    tail -n 200 "$keycloak_log" >&2
+    exit 1
+fi
+if ! grep --quiet 'id="username"' "$authorization_response"; then
+    echo "The trove-app authorization endpoint did not return the login form." >&2
     tail -n 200 "$keycloak_log" >&2
     exit 1
 fi

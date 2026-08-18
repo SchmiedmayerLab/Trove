@@ -45,8 +45,8 @@ final class TroveUITests: XCTestCase {
         let passwordField = authenticationSession.secureTextFields["Password"]
         XCTAssertTrue(passwordField.waitForExistence(timeout: 5), "Keycloak did not present its password field.")
         passwordField.tap()
-        passwordField.typeText("password123") // Local development realm fixture; not a production credential.
-        authenticationSession.buttons["Sign In"].tap()
+        // Return submits the web form without relying on a button that the software keyboard can obscure.
+        passwordField.typeText("password123\n") // Local development realm fixture; not a production credential.
 
         let studies = app.navigationBars["Studies"]
         XCTAssertTrue(studies.waitForExistence(timeout: 30), "The app did not reach the study list after sign-in.")
