@@ -28,6 +28,8 @@ final class TroveUITests: XCTestCase {
     func testParticipantCanSignInEnrollAndWithdraw() throws {
         let app = XCUIApplication()
         app.launchArguments.append("--reset-authentication-state")
+        app.launchEnvironment["TROVE_API_BASE_URL"] = "http://127.0.0.1:8080/api/v0"
+        app.launchEnvironment["TROVE_KEYCLOAK_ISSUER"] = "http://127.0.0.1:8180/realms/trove"
         app.launch()
 
         let signIn = app.buttons["Sign in with Keycloak"]
