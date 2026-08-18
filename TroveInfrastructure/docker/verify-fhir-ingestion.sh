@@ -15,6 +15,7 @@ REALM="${KEYCLOAK_REALM:-trove}"
 DEV_CLIENT="${KEYCLOAK_DEV_CLIENT:-trove-dev-cli}"
 DEV_PASSWORD="${KEYCLOAK_DEV_PASSWORD:?KEYCLOAK_DEV_PASSWORD is required}"
 DEV_USER="${KEYCLOAK_DEV_USER:-alice@example.com}"
+environment_file="${TROVE_ENV_FILE:-.env}"
 OBSERVATION_TIME="2026-08-17T18:30:00Z"
 run_identity="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-$$-$(date +%s)}"
 OBSERVATION_CODE="trove-timescale-round-trip-$run_identity"
@@ -70,25 +71,35 @@ jq --null-input \
         --data-binary @- \
         > /dev/null
 
-curl --fail-with-body --silent --show-error --get \
-    "$SERVER_URL/participant/fhir/resource" \
-    --header "Authorization: Bearer $token" \
-    --data-urlencode "code=$OBSERVATION_CODE" \
-    --data-urlencode 'start=2026-08-17T18:29:00Z' \
-    --data-urlencode 'end=2026-08-17T18:31:00Z' \
-    | jq --exit-status \
-        --arg code "$OBSERVATION_CODE" \
-        'length == 1
-        and .[0].resourceType == "Observation"
-        and .[0].code == $code
-        and .[0].codeSystem == "http://loinc.org"
-        and .[0].value == 73.25
-        and .[0].valueCode == "/min"
-        and .[0].valueSystem == "http://unitsofmeasure.org"
-        and .[0].resource.resourceType == .[0].resourceType
-        and .[0].resource.code.coding[0].code == .[0].code
-        and .[0].resource.code.coding[0].system == .[0].codeSystem
-        and .[0].resource.valueQuantity.value == .[0].value' \
-        > /dev/null
+set -a
+# shellcheck disable=SC1090
+source "$environment_file"
+set +a
 
-echo "Verified authenticated FHIR ingestion and readback through Timescale."
+matching_records="$(
+    docker compose exec -T server-timescale \
+        psql --username "$TIMESCALE_USERNAME" --dbname "$TIMESCALE_NAME" \
+            --set ON_ERROR_STOP=1 --set observation_code="$OBSERVATION_CODE" \
+            --tuples-only --no-align <<'SQL'
+SELECT count(*)
+    FROM fhir_resources
+    WHERE external_id = :'observation_code'
+      AND resource_type = 'Observation'
+      AND code = :'observation_code'
+      AND code_system = 'http://loinc.org'
+      AND value = 73.25
+      AND value_code = '/min'
+      AND value_system = 'http://unitsofmeasure.org'
+      AND resource ->> 'resourceType' = resource_type
+      AND resource #>> '{code,coding,0,code}' = code
+      AND resource #>> '{code,coding,0,system}' = code_system
+      AND (resource #>> '{valueQuantity,value}')::double precision = value;
+SQL
+)"
+
+if [ "$matching_records" != "1" ]; then
+    echo "Expected one matching authenticated FHIR ingestion record, got $matching_records" >&2
+    exit 1
+fi
+
+echo "Verified authenticated FHIR ingestion directly in Timescale."
