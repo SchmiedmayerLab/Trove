@@ -128,13 +128,15 @@ jobs:
             brew install openjdk@21
           fi
           archive="$RUNNER_TEMP/keycloak-$KEYCLOAK_VERSION.tar.gz"
+          installation_root="$RUNNER_TEMP/trove-keycloak-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           curl --fail --location --retry 3 \
             "https://github.com/keycloak/keycloak/releases/download/$KEYCLOAK_VERSION/keycloak-$KEYCLOAK_VERSION.tar.gz" \
             --output "$archive"
           echo "$KEYCLOAK_SHA256  $archive" | shasum --algorithm 256 --check
-          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP"
+          mkdir -p "$installation_root"
+          tar --extract --gzip --file "$archive" --directory "$installation_root"
           echo "JAVA_HOME=$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home" >> "$GITHUB_ENV"
-          echo "KEYCLOAK_HOME=$RUNNER_TEMP/keycloak-$KEYCLOAK_VERSION" >> "$GITHUB_ENV"
+          echo "KEYCLOAK_HOME=$installation_root/keycloak-$KEYCLOAK_VERSION" >> "$GITHUB_ENV"
       - name: Start the native test stack
         run: |
           chmod +x TroveiOS/scripts/start-ui-test-stack.sh

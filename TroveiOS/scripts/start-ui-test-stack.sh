@@ -14,11 +14,22 @@ set -euo pipefail
 : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
 
 runtime_directory="$RUNNER_TEMP/trove-ui-test-stack"
+server_client_secret="${TROVE_UI_TEST_SERVER_CLIENT_SECRET:-dev-server-secret}"
 mkdir -p "$runtime_directory" "$KEYCLOAK_HOME/data/import"
-cp TroveInfrastructure/docker/keycloak/realm.json "$KEYCLOAK_HOME/data/import/trove-realm.json"
+jq --arg server_client_secret "$server_client_secret" '
+    [
+        .clients[]
+        | select(.clientId == "trove-server")
+    ] as $server_clients
+    | if ($server_clients | length) != 1 then
+        error("Expected exactly one trove-server client")
+      else
+        (.clients[] | select(.clientId == "trove-server") | .secret) = $server_client_secret
+      end
+' TroveInfrastructure/docker/keycloak/realm.json \
+    > "$KEYCLOAK_HOME/data/import/trove-realm.json"
 
 keycloak_log="$runtime_directory/keycloak.log"
-SERVER_CLIENT_SECRET=dev-server-secret \
 KC_BOOTSTRAP_ADMIN_USERNAME=admin \
 KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
     "$KEYCLOAK_HOME/bin/kc.sh" start-dev \
@@ -47,6 +58,18 @@ if ! curl --fail --silent http://127.0.0.1:8180/realms/trove > /dev/null; then
     exit 1
 fi
 
+if ! curl --fail-with-body --silent --show-error \
+    --request POST http://127.0.0.1:8180/realms/trove/protocol/openid-connect/token \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode 'grant_type=client_credentials' \
+    --data-urlencode 'client_id=trove-server' \
+    --data-urlencode "client_secret=$server_client_secret" \
+    > /dev/null; then
+    echo "The imported trove-server client credentials are invalid." >&2
+    tail -n 200 "$keycloak_log" >&2
+    exit 1
+fi
+
 server_log="$runtime_directory/server.log"
 (
     cd TroveServer
@@ -56,7 +79,7 @@ server_log="$runtime_directory/server.log"
         KEYCLOAK_URL=http://127.0.0.1:8180 \
         KEYCLOAK_REALM=trove \
         KEYCLOAK_CLIENT_ID=trove-server \
-        KEYCLOAK_CLIENT_SECRET=dev-server-secret \
+        KEYCLOAK_CLIENT_SECRET="$server_client_secret" \
         KEYCLOAK_RESEARCHER_ROLE=trove-researcher \
         KEYCLOAK_PARTICIPANT_ROLE=trove-participant \
         swift run TroveServer serve \
