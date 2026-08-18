@@ -194,8 +194,9 @@ jobs:
       # The shared Swift jobs name the report after the artifact, while the local web jobs
       # upload their native lcov.info files inside named artifact directories.
       coveragereports_lcov: >-
-        Trove-API-Tests.lcov
-        Trove-Server-Tests.lcov
-        Trove-Web-*.lcov/lcov.info
+        ${{ needs.api.result == 'success' && 'Trove-API-Tests.lcov' || '' }}
+        ${{ needs.server.result == 'success' && 'Trove-Server-Tests.lcov' || '' }}
+        ${{ needs.web.result == 'success' && 'Trove-Web-Tests.lcov/lcov.info' || '' }}
+        ${{ needs.dev-stack.result == 'success' && 'Trove-Web-E2E.lcov/lcov.info' || '' }}
     secrets:
       token: ${{ secrets.CODECOV_TOKEN }}
