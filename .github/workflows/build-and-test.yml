@@ -147,13 +147,19 @@ jobs:
           KEYCLOAK_DEV_PASSWORD="$dev_password" TroveiOS/scripts/seed-ui-test.sh
       - name: Resolve iOS dependencies
         working-directory: TroveiOS
-        run: >-
-          xcodebuild -project Trove.xcodeproj -scheme Trove
-          -resolvePackageDependencies -derivedDataPath .derivedData
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Trove.xcodeproj \
+            -scheme Trove \
+            -resolvePackageDependencies \
+            -derivedDataPath .derivedData \
+          | xcbeautify
       - name: Run the real-stack UI test
         working-directory: TroveiOS
         run: |
           simulator_os="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          set -o pipefail
           xcodebuild test \
             -project Trove.xcodeproj \
             -scheme Trove \
@@ -165,7 +171,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             -skipPackagePluginValidation \
-            -skipMacroValidation
+            -skipMacroValidation \
+          | xcbeautify
       - name: Upload the UI-test result
         if: success() || failure()
         uses: actions/upload-artifact@v7

@@ -12,6 +12,7 @@ import XCTest
 
 final class TroveUITests: XCTestCase {
     private static let studyTitle = "Trove UI Test Study"
+    private static let authenticationTimeout: TimeInterval = 60
 
     override func setUp() async throws {
         try await super.setUp()
@@ -37,8 +38,15 @@ final class TroveUITests: XCTestCase {
         signIn.tap()
 
         let authenticationSession = XCUIApplication(bundleIdentifier: "com.apple.SafariViewService")
+        XCTAssertTrue(
+            authenticationSession.wait(for: .runningForeground, timeout: Self.authenticationTimeout),
+            "The authentication session did not enter the foreground."
+        )
         let username = authenticationSession.textFields["Email"]
-        XCTAssertTrue(username.waitForExistence(timeout: 20), "Keycloak did not present its username field.")
+        XCTAssertTrue(
+            username.waitForExistence(timeout: Self.authenticationTimeout),
+            "Keycloak did not present its username field."
+        )
         username.tap()
         username.typeText("alice@example.com")
 
