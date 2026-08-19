@@ -64,7 +64,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.93.0",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@playwright/test": "^1.58.2",
     "@schmiedmayerlab/grove-configurations": "^0.1.1",
     "@tanstack/router-plugin": "^1.161.0",
