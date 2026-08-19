@@ -430,14 +430,13 @@ extension AuthIntegrationTests {
         Set(
             allEndpoints(.dummy)
                 .map {
-                    "\($0.method.rawValue) /\($0.path)"
+                    "\($0.method.rawValue) /\($0.path.split(separator: "?", maxSplits: 1).first ?? "")"
                         .replacingOccurrences(of: dummyUUID.uuidString, with: "*")
                         .replacingOccurrences(of: dummyRevision, with: "*")
                 }
         )
     }
 }
-
 
 // MARK: - File-Private Helpers
 
