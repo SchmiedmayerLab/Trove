@@ -16,8 +16,20 @@ enum Config {
     private static let environment = Environment.production
     #endif
 
-    static var apiBaseURL: URL { environment.apiBaseURL }
-    static var keycloakIssuer: URL { environment.keycloakIssuer }
+    static var apiBaseURL: URL {
+        #if DEBUG
+        endpointOverride(named: "TROVE_API_BASE_URL") ?? environment.apiBaseURL
+        #else
+        environment.apiBaseURL
+        #endif
+    }
+    static var keycloakIssuer: URL {
+        #if DEBUG
+        endpointOverride(named: "TROVE_KEYCLOAK_ISSUER") ?? environment.keycloakIssuer
+        #else
+        environment.keycloakIssuer
+        #endif
+    }
     static var keycloakClientID: String { environment.keycloakClientID }
     static var keycloakRedirectScheme: String { environment.keycloakRedirectScheme }
     static var keycloakRedirectURI: URL {
@@ -26,6 +38,21 @@ enum Config {
         }
         return url
     }
+
+    #if DEBUG
+    private static func endpointOverride(named name: String) -> URL? {
+        guard let value = ProcessInfo.processInfo.environment[name] else {
+            return nil
+        }
+        guard let url = URL(string: value),
+              let scheme = url.scheme,
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            preconditionFailure("Invalid endpoint override for \(name)")
+        }
+        return url
+    }
+    #endif
 }
 
 extension Config {

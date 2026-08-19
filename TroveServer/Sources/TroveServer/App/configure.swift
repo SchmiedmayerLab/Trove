@@ -20,40 +20,71 @@ private var isServing: Bool {
     !CommandLine.arguments.dropFirst().contains(where: { $0 == "migrate" || $0 == "revert" })
 }
 
+private func usesEphemeralUITestServices(_ app: Application) -> Bool {
+    app.environment == .testing && Environment.get("TROVE_UI_TEST_MODE") == "true"
+}
+
+private func configureDatabases(for app: Application, ephemeral: Bool) async throws {
+    if ephemeral {
+        app.logger.info("Configuring ephemeral UI-test databases...")
+        try DatabaseConfiguration.inMemory.configure(for: app)
+    } else {
+        app.logger.info("Configuring PostgreSQL database connection...")
+        try DatabaseConfiguration.postgres.configure(for: app)
+    }
+    configureMigrations(for: app)
+    if ephemeral {
+        try await app.autoMigrate()
+        app.logger.info("Ephemeral UI-test databases configured.")
+    } else {
+        app.logger.info("PostgreSQL database configured.")
+    }
+}
+
+private func configureDevelopmentCORS(for app: Application) {
+    guard Environment.appEnvironment == .development else {
+        return
+    }
+    app.middleware.use(
+        CORSMiddleware(configuration: .init(
+            allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
+            allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
+            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
+        )),
+        at: .beginning
+    )
+}
+
+private func configureObjectStorage(for app: Application, ephemeral: Bool) async throws {
+    if ephemeral {
+        app.logger.info("Configuring ephemeral UI-test object storage...")
+        await configureServices(for: app, storageProvider: InMemoryObjectStorageProvider())
+        return
+    }
+
+    app.logger.info("Connecting to S3 object storage...")
+    let storageProvider = S3ObjectStorageProvider(config: S3ObjectStorageConfiguration())
+    await configureServices(for: app, storageProvider: storageProvider)
+    let storageService = app.grove[ObjectStorageService.self]
+    try await storageService.ensureBucketExists()
+    app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
+    app.logger.info("Object storage ready.")
+}
+
 /// Configures the application: database, migrations, and (when serving) services and routes.
 public func configure(_ app: Application) async throws {
     let logger = app.logger
+    let usesEphemeralServices = usesEphemeralUITestServices(app)
     logger.info("Starting server configuration (\(Environment.appEnvironment))...")
 
-    logger.info("Configuring PostgreSQL database connection...")
-    try DatabaseConfiguration.postgres.configure(for: app)
-    configureMigrations(for: app)
-    logger.info("PostgreSQL database configured.")
-
+    try await configureDatabases(for: app, ephemeral: usesEphemeralServices)
 
     guard isServing else {
         return
     }
 
-    if Environment.appEnvironment == .development {
-        app.middleware.use(
-            CORSMiddleware(configuration: .init(
-                allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
-                allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
-                allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
-            )),
-            at: .beginning
-        )
-    }
-
-    logger.info("Connecting to S3 object storage...")
-    let storageConfig = S3ObjectStorageConfiguration()
-    let storageProvider = S3ObjectStorageProvider(config: storageConfig)
-    await configureServices(for: app, storageProvider: storageProvider)
-    let storageService = app.grove[ObjectStorageService.self]
-    try await storageService.ensureBucketExists()
-    app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
-    logger.info("Object storage ready.")
+    configureDevelopmentCORS(for: app)
+    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices)
 
     logger.info("Fetching groups from Keycloak")
     let keycloakConfig = KeycloakConfiguration()

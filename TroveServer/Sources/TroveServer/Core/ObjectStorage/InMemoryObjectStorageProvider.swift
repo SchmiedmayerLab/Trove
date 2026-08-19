@@ -7,7 +7,6 @@
 //
 
 import Foundation
-@testable import TroveServer
 
 
 final class InMemoryObjectStorageProvider: ObjectStorageProvider, @unchecked Sendable {

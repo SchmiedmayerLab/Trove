@@ -10,6 +10,7 @@ import OSLog
 import SwiftUI
 
 
+@MainActor
 @Observable
 final class ErrorHandler {
     static let shared = ErrorHandler()
@@ -24,10 +25,11 @@ final class ErrorHandler {
 }
 
 @discardableResult
+@MainActor
 func catchingTask(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> Void
+    operation: @MainActor @escaping () async throws -> Void
 ) -> Task<Void, Never> {
     Task(name: name, priority: priority) {
         do { try await operation() } catch { ErrorHandler.shared.handle(error) }

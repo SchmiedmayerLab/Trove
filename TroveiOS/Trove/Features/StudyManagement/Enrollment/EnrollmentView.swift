@@ -131,7 +131,12 @@ struct EnrollmentView: View {
     }
 
     @ViewBuilder private var actionButton: some View {
-        if activeEnrollment != nil {
+        if !enrollments.state.isLoaded {
+            enrollmentStateAction
+        } else if enrollments.isMutating {
+            ProgressView("Updating Enrollment…")
+                .frame(maxWidth: .infinity)
+        } else if activeEnrollment != nil {
             Button("Withdraw from Study", role: .destructive) {
                 isPresentingWithdrawConfirmation = true
             }
@@ -146,9 +151,25 @@ struct EnrollmentView: View {
         }
     }
 
+    @ViewBuilder private var enrollmentStateAction: some View {
+        if enrollments.state.isLoading || enrollments.state.error == nil {
+            ProgressView("Loading Enrollment…")
+                .frame(maxWidth: .infinity)
+        } else {
+            VStack(spacing: 8) {
+                Text("Enrollment status is unavailable.")
+                    .foregroundStyle(.secondary)
+                Button("Retry") {
+                    Task { await enrollments.refresh() }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
 
     private var showInvitationCodeField: Bool {
-        guard item.enrollmentConditions == .requiresInvitationCode else {
+        guard enrollments.state.isLoaded, item.enrollmentConditions == .requiresInvitationCode else {
             return false
         }
         if activeEnrollment != nil {
