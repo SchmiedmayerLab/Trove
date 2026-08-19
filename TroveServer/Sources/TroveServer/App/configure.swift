@@ -38,7 +38,7 @@ public func configure(_ app: Application) async throws {
     if Environment.appEnvironment == .development {
         app.middleware.use(
             CORSMiddleware(configuration: .init(
-                allowedOrigin: .any(["http://localhost:3000"]),
+                allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
                 allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
                 allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
             )),

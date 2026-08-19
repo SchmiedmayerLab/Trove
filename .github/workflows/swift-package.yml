@@ -1,0 +1,131 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Swift Package
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Path to the Swift package.
+        required: true
+        type: string
+      artifact-name:
+        description: Name of the LCOV coverage artifact.
+        required: true
+        type: string
+      test-flags:
+        description: Additional flags passed to swift test.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Swift Test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    container:
+      image: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.path }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check toolchain
+        run: |
+          swift --version
+          llvm-cov --version | head -n 1
+      - name: Build package
+        run: swift build
+      - name: Run tests
+        env:
+          TEST_FLAGS: ${{ inputs.test-flags }}
+        run: |
+          test_args=()
+          if [ -n "$TEST_FLAGS" ]; then
+            read -r -a test_args <<< "$TEST_FLAGS"
+          fi
+          swift test --enable-code-coverage "${test_args[@]}"
+      - name: Generate coverage report
+        run: |
+          coverage_file="$(find .build/*/debug/codecov -name '*.profdata' -type f | head -n 1)"
+          test_bundle="$(find .build/*/debug -name '*.xctest' -type f | head -n 1)"
+          if [ -z "$coverage_file" ] || [ -z "$test_bundle" ]; then
+            echo "::error::SwiftPM did not produce the expected coverage inputs"
+            exit 1
+          fi
+          llvm-cov export \
+            "$test_bundle" \
+            --instr-profile="$coverage_file" \
+            --format=lcov > tmp.lcov
+      - name: Convert LCOV format
+        env:
+          ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        run: |
+          awk '
+          function clear_record(key) {
+              for (key in function_lines) delete function_lines[key]
+              for (key in function_counts) delete function_counts[key]
+          }
+          function write_record(function_name) {
+              for (function_name in function_lines) {
+                  if (function_name in function_counts) {
+                      print "DA:" function_lines[function_name] "," function_counts[function_name]
+                  }
+              }
+          }
+          /^SF:/ {
+              if (in_record) {
+                  write_record()
+                  print "end_of_record"
+              }
+              clear_record()
+              print
+              in_record = 1
+              next
+          }
+          /^FN:/ {
+              payload = substr($0, 4)
+              separator = index(payload, ",")
+              if (separator) {
+                  function_lines[substr(payload, separator + 1)] = substr(payload, 1, separator - 1)
+              }
+              next
+          }
+          /^FNDA:/ {
+              payload = substr($0, 6)
+              separator = index(payload, ",")
+              if (separator) {
+                  function_counts[substr(payload, separator + 1)] = substr(payload, 1, separator - 1)
+              }
+              next
+          }
+          /^end_of_record$/ {
+              write_record()
+              print
+              clear_record()
+              in_record = 0
+              next
+          }
+          END {
+              if (in_record) {
+                  write_record()
+                  print "end_of_record"
+              }
+          }
+          ' tmp.lcov > "$ARTIFACT_NAME"
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.path }}/${{ inputs.artifact-name }}
+          if-no-files-found: error
