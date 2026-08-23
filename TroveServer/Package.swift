@@ -34,8 +34,8 @@ let package = Package(
         .package(path: "../TroveAPI"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        // SchmiedmayerLab/Spezi grove branch (Grove framework). GroveVapor is a local target below.
-        .package(url: "https://github.com/SchmiedmayerLab/Spezi.git", branch: "grove"),
+        // SchmiedmayerLab/Grove pinned to pre-release 0.3.0-beta.6 (Grove framework). GroveVapor is a local target below.
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.6"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),
@@ -52,14 +52,14 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
                 .product(name: "TroveAPIServer", package: "TroveAPI"),
-                .product(name: "GroveStudyDefinition", package: "Spezi"),
-                .product(name: "GroveHealthKit", package: "Spezi"),
-                .product(name: "GroveHealthKitBulkExport", package: "Spezi"),
-                .product(name: "Grove", package: "Spezi"),
+                .product(name: "GroveStudyDefinition", package: "Grove"),
+                .product(name: "GroveHealthKit", package: "Grove"),
+                .product(name: "GroveHealthKitBulkExport", package: "Grove"),
+                .product(name: "Grove", package: "Grove"),
                 .target(name: "GroveVapor"),
                 .product(name: "JWTKit", package: "jwt-kit"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
-                .product(name: "GroveLocalization", package: "Spezi"),
+                .product(name: "GroveLocalization", package: "Grove"),
                 .product(name: "SotoS3", package: "soto"),
                 .product(name: "ModelsR4", package: "FHIRModels")
             ],
@@ -69,7 +69,7 @@ let package = Package(
         .target(
             name: "GroveVapor",
             dependencies: [
-                .product(name: "Grove", package: "Spezi"),
+                .product(name: "Grove", package: "Grove"),
                 .product(name: "Vapor", package: "vapor")
             ],
             swiftSettings: swiftSettings,

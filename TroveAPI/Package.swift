@@ -32,16 +32,16 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.10.0"),
-        .package(url: "https://github.com/SchmiedmayerLab/Spezi.git", branch: "grove")
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.6")
     ] + swiftLintPackage(),
     targets: [
         .target(
             name: "TroveAPITypes",
             dependencies: [
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
-                .product(name: "GroveLocalization", package: "Spezi"),
-                .product(name: "GroveHealthKit", package: "Spezi"),
-                .product(name: "GroveStudyDefinition", package: "Spezi")
+                .product(name: "GroveLocalization", package: "Grove"),
+                .product(name: "GroveHealthKit", package: "Grove"),
+                .product(name: "GroveStudyDefinition", package: "Grove")
             ],
             plugins: [] + swiftLintPlugin()
         ),
