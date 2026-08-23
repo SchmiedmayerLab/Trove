@@ -56,6 +56,21 @@ class Benchmark:
             args.database_name,
         ]
 
+    def wait_for_readiness(self, timeout_seconds: int = 120, interval_seconds: float = 0.5) -> None:
+        """Wait for TimescaleDB to accept connections before continuing."""
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            try:
+                self.sql("SELECT 1")
+                return
+            except subprocess.CalledProcessError:
+                pass
+
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Timed out waiting for TimescaleDB to become available")
+
+            time.sleep(interval_seconds)
+
     def sql(self, statement: str) -> str:
         result = subprocess.run(
             [*self.psql, "-Atqc", statement],
@@ -205,6 +220,7 @@ class Benchmark:
         return results
 
     def run(self) -> dict[str, object]:
+        self.wait_for_readiness()
         self.prepare()
         expected = expected_row_count(self.args.participants, self.args.days)
         ingestion: dict[str, object] = {}
