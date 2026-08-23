@@ -635,10 +635,10 @@
 		};
 		DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/SchmiedmayerLab/Spezi.git";
+			repositoryURL = "https://github.com/SchmiedmayerLab/Grove.git";
 			requirement = {
-				branch = "grove";
-				kind = branch;
+				kind = exact;
+				version = "0.3.0-beta.6";
 			};
 		};
 		DFBAF4732FA5300000CCAEAA /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */ = {
