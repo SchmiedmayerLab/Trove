@@ -28,12 +28,12 @@ jobs:
     permissions:
       contents: read
     with:
-      runs_on_labels: '["blacksmith-4vcpu-ubuntu-2404"]'
+      runs_on_labels: '["ubuntu-24.04"]'
 
   # Code scanning needs Advanced Security, which a private repository only has with GHAS.
   availability:
     name: Check Code Scanning Availability
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:

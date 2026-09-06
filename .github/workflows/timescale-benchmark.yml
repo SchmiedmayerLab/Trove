@@ -30,7 +30,7 @@ permissions:
 jobs:
   benchmark:
     name: PostgreSQL vs TimescaleDB
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
       COMPOSE_PROJECT_NAME: trove-benchmark-${{ github.run_id }}

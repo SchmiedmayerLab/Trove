@@ -24,7 +24,7 @@ permissions:
 jobs:
   changes:
     name: Detect Changed Components
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -237,8 +237,8 @@ jobs:
       imageName: schmiedmayerlab/trove-server
       dockerFile: TroveServer/Dockerfile
       workingDirectory: .
-      runs_on_labels_amd64: '["blacksmith-4vcpu-ubuntu-2404"]'
-      runs_on_labels_arm64: '["blacksmith-4vcpu-ubuntu-2404-arm"]'
+      runs_on_labels_amd64: '["ubuntu-24.04"]'
+      runs_on_labels_arm64: '["ubuntu-24.04-arm"]'
     secrets: inherit
 
   publish-web:
@@ -254,8 +254,8 @@ jobs:
       imageName: schmiedmayerlab/trove-web
       dockerFile: TroveWeb/Dockerfile
       workingDirectory: .
-      runs_on_labels_amd64: '["blacksmith-4vcpu-ubuntu-2404"]'
-      runs_on_labels_arm64: '["blacksmith-4vcpu-ubuntu-2404-arm"]'
+      runs_on_labels_amd64: '["ubuntu-24.04"]'
+      runs_on_labels_arm64: '["ubuntu-24.04-arm"]'
     secrets: inherit
 
   coverage:

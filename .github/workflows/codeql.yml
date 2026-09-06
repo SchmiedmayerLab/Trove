@@ -24,7 +24,7 @@ jobs:
   # Checking at run time means the scan starts working on its own once that changes.
   availability:
     name: Check Code Scanning Availability
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -52,7 +52,7 @@ jobs:
     name: Analyze (JavaScript/TypeScript)
     needs: availability
     if: needs.availability.outputs.enabled == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       security-events: write
       packages: read
