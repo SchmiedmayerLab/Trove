@@ -18,7 +18,7 @@ permissions:
 jobs:
   manifests:
     name: Validate Manifests
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: TroveInfrastructure
@@ -55,7 +55,7 @@ jobs:
 
   tofu-validate:
     name: Tofu Validate
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: TroveInfrastructure/terraform
@@ -72,7 +72,7 @@ jobs:
 
   kind-smoke-test:
     name: KIND Smoke Test
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     defaults:
       run:
