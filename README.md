@@ -93,6 +93,10 @@ swift run --package-path TroveServer TroveServer migrate --yes
 
 Container images are published to `ghcr.io/schmiedmayerlab/trove-server` and `ghcr.io/schmiedmayerlab/trove-web`, built from the repository root so the inlined `TroveAPI/` package is in the build context.
 
+## Platform Design and Roadmap
+
+The [design documentation](docs/README.md) describes the target architecture, study model, integrations and delivery sequence. These plans are distinct from currently released functionality. Implementation priorities and status are tracked in the [Trove project](https://github.com/orgs/SchmiedmayerLab/projects/4).
+
 ## Contributing
 
 Contributions to this project are welcome. Please make sure to read the [contribution guidelines](https://github.com/SchmiedmayerLab/.github/blob/main/CONTRIBUTING.md) and the [contributor covenant code of conduct](https://github.com/SchmiedmayerLab/.github/blob/main/CODE_OF_CONDUCT.md) first. You can find a list of contributors in the [CONTRIBUTORS.md](CONTRIBUTORS.md) file.
