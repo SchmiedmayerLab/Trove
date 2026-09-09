@@ -1,0 +1,86 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+name: Publish Verified Images
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  publish:
+    name: Publish the Verified Candidate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: candidate-publication
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Require the configured independent approval boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/candidate-publication" > "$RUNNER_TEMP/publication-environment.json"
+          python3 -B scripts/release-artifact.py approval --environment "$RUNNER_TEMP/publication-environment.json"
+      - uses: actions/download-artifact@v8
+        with:
+          name: Trove-Candidates-amd64
+          path: ${{ runner.temp }}/candidates/amd64
+      - uses: actions/download-artifact@v8
+        with:
+          name: Trove-Candidates-arm64
+          path: ${{ runner.temp }}/candidates/arm64
+      - name: Verify both architectures from this successful run
+        run: |
+          python3 -B scripts/release-artifact.py verify --artifacts "$RUNNER_TEMP/candidates" \
+            --revision "$GITHUB_SHA" --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$RUNNER_TEMP/publication-plan.json"
+      - uses: docker/setup-docker-action@v5
+        with:
+          daemon-config: '{"features":{"containerd-snapshotter":true}}'
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish the verified bytes without rebuilding
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/publication-plan.json"
+          tag="$(jq -r .tag "$plan")"
+          mkdir "$RUNNER_TEMP/registry-evidence"
+          for component in server web; do
+            repository="ghcr.io/schmiedmayerlab/trove-$component"
+            for architecture in amd64 arm64; do
+              identity="$(jq -r --arg c "$component" --arg a "$architecture" '.images[$c][$a]' "$plan")"
+              docker image load --input "$RUNNER_TEMP/candidates/$architecture/$component/image.tar"
+              [[ "$(docker image inspect "$identity" --format '{{.Id}}')" == "$identity" ]]
+              [[ "$(docker image inspect "$identity" --format '{{.Architecture}}')" == "$architecture" ]]
+              docker image tag "$identity" "$repository:$tag-$architecture"
+              docker image push "$repository:$tag-$architecture"
+              docker buildx imagetools inspect "$repository:$tag-$architecture" --format '{{json .Manifest}}' \
+                > "$RUNNER_TEMP/registry-evidence/$component-$architecture.json"
+              [[ "$(jq -r .digest "$RUNNER_TEMP/registry-evidence/$component-$architecture.json")" == "$identity" ]]
+            done
+            amd64="$(jq -r --arg c "$component" '.images[$c].amd64' "$plan")"
+            arm64="$(jq -r --arg c "$component" '.images[$c].arm64' "$plan")"
+            docker buildx imagetools create --tag "$repository:$tag" "$repository@$amd64" "$repository@$arm64"
+            docker buildx imagetools inspect "$repository:$tag" --format '{{json .Manifest}}' \
+              > "$RUNNER_TEMP/registry-evidence/$component.json"
+          done
+          python3 -B scripts/release-artifact.py registry --plan "$plan" --directory "$RUNNER_TEMP/registry-evidence" \
+            --output "$RUNNER_TEMP/registry-evidence/candidate.json"
+      - name: Retain published candidate digests
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Published-Candidate
+          path: ${{ runner.temp }}/registry-evidence
+          if-no-files-found: error

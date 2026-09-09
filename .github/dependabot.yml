@@ -17,30 +17,38 @@ updates:
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "swift"
-    directory: "/api"
+    directory: "/TroveAPI"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "swift"
-    directory: "/server"
+    directory: "/TroveServer"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "npm"
-    directory: "/web"
+    directory: "/TroveWeb"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "pip"
+    directory: "/TroveInfrastructure/tools"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
+  - package-ecosystem: "pip"
+    directory: "/TroveInfrastructure/validator"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "docker"
-    directory: "/server"
+    directory: "/TroveServer"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "docker"
-    directory: "/web"
+    directory: "/TroveWeb"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "docker-compose"
-    directory: "/infrastructure/docker"
+    directory: "/TroveInfrastructure/docker"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "terraform"
-    directory: "/infrastructure/terraform"
+    directory: "/TroveInfrastructure/terraform"
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"

@@ -17,26 +17,61 @@ permissions:
 
 jobs:
   smoke-test:
-    name: Docker Compose Smoke Test
-    runs-on: ubuntu-24.04
-    # Include cold image compilation and bounded integration checks.
+    name: Docker Compose Smoke Test (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    # A cold hosted release build takes about 40 minutes before service and browser checks.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-docker-action@v5
+        with:
+          daemon-config: '{"features":{"containerd-snapshotter":true}}'
       # The compose file runs the published images. Building them here from the same
       # Dockerfiles the deployment uses keeps the local stack and production in step,
       # and means this job fails if either Dockerfile breaks.
       - name: Build the server and web images
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
         run: |
-          docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
-          # Release Swift build cache before the web image needs its own workspace.
+          set -euo pipefail
+          docker build --provenance=mode=max --sbom=true --label "org.opencontainers.image.revision=$SOURCE_REVISION" \
+            -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+          # Release the much larger Swift build before npm needs its own cache.
           if [ "${{ runner.environment }}" = "github-hosted" ]; then
             docker builder prune --all --force
           fi
-          docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+          docker build --provenance=mode=max --sbom=true --label "org.opencontainers.image.revision=$SOURCE_REVISION" \
+            -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+      - uses: ./.github/actions/setup-trivy
+      - name: Scan the application images used by this stack
+        run: |
+          set -euo pipefail
+          result=0
+          for component in server web; do
+            bash scripts/check vulnerabilities image --image "ghcr.io/schmiedmayerlab/trove-$component:main" \
+              --output "$RUNNER_TEMP/trove-image-scans/$component" --cache "$RUNNER_TEMP/trivy-cache" || result=1
+          done
+          exit "$result"
+      - name: Retain application image scans and inventories
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Stack-Image-Scans-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/trove-image-scans
+          if-no-files-found: error
       - name: Release build cache before pulling backing services
         if: runner.environment == 'github-hosted'
-        # Keep tagged runtime images; remove only ephemeral hosted build cache.
+        # Runtime images remain tagged. Only build cache on this ephemeral hosted runner is removed.
         run: |
           docker builder prune --all --force
           df -h /
@@ -56,13 +91,18 @@ jobs:
       - name: Verify the stack
         working-directory: TroveInfrastructure/docker
         run: ./smoke-test.sh
-      - name: Verify authenticated FHIR ingestion
+      - name: Verify Legacy Upload Retirement
         working-directory: TroveInfrastructure/docker
         run: |
           dev_password="$(jq -r '.users[] | select(.username == "alice@example.com") | .credentials[] | select(.type == "password") | .value' keycloak/realm.json)"
           KEYCLOAK_DEV_PASSWORD="$dev_password" ./verify-fhir-ingestion.sh
       # The end-to-end tests drive the real application, so they belong with the running stack
       # rather than in the web job, which has no backend to talk to.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: TroveWeb/package-lock.json
       - name: Install the web dependencies
         working-directory: TroveWeb
         run: |
@@ -77,14 +117,46 @@ jobs:
         env:
           KEYCLOAK_DEV_PASSWORD: password123
         run: npm run test:e2e:coverage
+      - name: End-to-end tests against the built dashboard image
+        working-directory: TroveWeb
+        env:
+          KEYCLOAK_DEV_PASSWORD: password123
+          TROVE_E2E_IMAGE: "true"
+        run: npm run test:e2e
+      - name: Package the tested image artifacts
+        env:
+          TARGET_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          for component in server web; do
+            python3 -B scripts/release-artifact.py package --component "$component" \
+              --architecture "$TARGET_ARCHITECTURE" --image "ghcr.io/schmiedmayerlab/trove-$component:main" \
+              --scans "$RUNNER_TEMP/trove-image-scans/$component" --output "$RUNNER_TEMP/trove-candidates/$component"
+          done
+      - name: Retain tested image candidates
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Candidates-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/trove-candidates
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload the end-to-end coverage report
-        if: success() || failure()
+        if: (success() || failure()) && matrix.architecture == 'amd64'
         uses: actions/upload-artifact@v7
         with:
           name: Trove-Web-E2E.lcov
           path: TroveWeb/coverage-e2e/lcov.info
           if-no-files-found: warn
       - name: Collect diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Web-E2E-diagnostics-${{ matrix.architecture }}
+          path: TroveWeb/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Collect service diagnostics on failure
         if: failure()
         working-directory: TroveInfrastructure/docker
         run: |

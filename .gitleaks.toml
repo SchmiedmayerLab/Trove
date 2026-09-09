@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+title = "Trove Publication Secret Scan"
+
+[extend]
+useDefault = true
+
+# Exact nonsecret values only. New credentials in these files still fail the scan.
+[[allowlists]]
+description = "Public Keycloak release archive checksum, verified before extraction"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)(?:\.github/workflows/build-and-test\.yml|TroveInfrastructure/validator/verify_process_restart\.py)$''']
+regexes = ['''^f3ce596dcf772ae145581ef338f9c3937ee37c74d7c1793e563c61519baaaafc$''']
+
+[[allowlists]]
+description = "Public development-only Vault token; never used by production overlays"
+targetRules = ["generic-api-key", "kubernetes-secret-yaml"]
+condition = "AND"
+paths = ['''(?:^|/)TroveInfrastructure/infrastructure/dev/vault-token-secret\.yaml$''']
+regexes = ['''^(?:token: )?ZGV2LW9ubHktdG9rZW4=$''']
+
+[[allowlists]]
+description = "Swift type name, not private-key material"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)TroveServer/Tests/TroveServerTests/Support/TransportCertificates\.swift$''']
+regexes = ['''^P256\.Signing\.PrivateKey$''']
+
+[[allowlists]]
+description = "Synthetic encrypted envelope containing a Swift expression, not retained key bytes"
+targetRules = ["private-key"]
+condition = "AND"
+paths = ['''(?:^|/)TroveServer/Tests/TroveServerTests/Integration/InboundTransportTests\.swift$''']
+regexes = ['''\\\(Data\(repeating: 0, count: 32\)\.base64EncodedString\(\)\)''']

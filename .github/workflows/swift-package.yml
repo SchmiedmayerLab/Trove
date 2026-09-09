@@ -19,11 +19,6 @@ on:
         description: Name of the LCOV coverage artifact.
         required: true
         type: string
-      test-flags:
-        description: Additional flags passed to swift test.
-        required: false
-        default: ""
-        type: string
 
 permissions:
   contents: read
@@ -34,100 +29,142 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ inputs.path }}
     steps:
       - uses: actions/checkout@v7
-      - name: Check toolchain
+      - name: Install verification and client journal build dependencies
         run: |
-          swift --version
-          llvm-cov --version | head -n 1
-      - name: Install Client Journal Build Dependencies
-        run: apt-get update && apt-get install --yes pkg-config libsqlite3-dev
-      - name: Build package
-        run: swift build
-      - name: Run tests
+          apt-get update
+          apt-get install --yes --no-install-recommends python3 pkg-config libsqlite3-dev
+      - name: Build, test and generate coverage
         env:
-          TEST_FLAGS: ${{ inputs.test-flags }}
-        run: |
-          test_args=()
-          if [ -n "$TEST_FLAGS" ]; then
-            read -r -a test_args <<< "$TEST_FLAGS"
-          fi
-          swift test --enable-code-coverage "${test_args[@]}"
-      - name: Generate coverage report
-        run: |
-          coverage_file="$(find .build/*/debug/codecov -name '*.profdata' -type f | head -n 1)"
-          test_bundle="$(find .build/*/debug -name '*.xctest' -type f | head -n 1)"
-          if [ -z "$coverage_file" ] || [ -z "$test_bundle" ]; then
-            echo "::error::SwiftPM did not produce the expected coverage inputs"
-            exit 1
-          fi
-          llvm-cov export \
-            "$test_bundle" \
-            --instr-profile="$coverage_file" \
-            --format=lcov > tmp.lcov
-      - name: Convert LCOV format
-        env:
+          PACKAGE_PATH: ${{ inputs.path }}
           ARTIFACT_NAME: ${{ inputs.artifact-name }}
-        run: |
-          awk '
-          function clear_record(key) {
-              for (key in function_lines) delete function_lines[key]
-              for (key in function_counts) delete function_counts[key]
-          }
-          function write_record(function_name) {
-              for (function_name in function_lines) {
-                  if (function_name in function_counts) {
-                      print "DA:" function_lines[function_name] "," function_counts[function_name]
-                  }
-              }
-          }
-          /^SF:/ {
-              if (in_record) {
-                  write_record()
-                  print "end_of_record"
-              }
-              clear_record()
-              print
-              in_record = 1
-              next
-          }
-          /^FN:/ {
-              payload = substr($0, 4)
-              separator = index(payload, ",")
-              if (separator) {
-                  function_lines[substr(payload, separator + 1)] = substr(payload, 1, separator - 1)
-              }
-              next
-          }
-          /^FNDA:/ {
-              payload = substr($0, 6)
-              separator = index(payload, ",")
-              if (separator) {
-                  function_counts[substr(payload, separator + 1)] = substr(payload, 1, separator - 1)
-              }
-              next
-          }
-          /^end_of_record$/ {
-              write_record()
-              print
-              clear_record()
-              in_record = 0
-              next
-          }
-          END {
-              if (in_record) {
-                  write_record()
-                  print "end_of_record"
-              }
-          }
-          ' tmp.lcov > "$ARTIFACT_NAME"
+        run: bash scripts/check swift "$PACKAGE_PATH" "$ARTIFACT_NAME"
+      - name: Upload package diagnostics
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.path }}-verification
+          path: ${{ inputs.path }}/.build/verification/
+          include-hidden-files: true
+          if-no-files-found: warn
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ inputs.path }}/${{ inputs.artifact-name }}
           if-no-files-found: error
+
+  postgres:
+    name: PostgreSQL and Timescale Tests
+    if: inputs.path == 'TroveServer'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DATABASE_CONTAINER: trove-test-database-${{ github.run_id }}-${{ github.run_attempt }}
+      STORAGE_CONTAINER: trove-test-storage-${{ github.run_id }}-${{ github.run_attempt }}
+      SWIFT_CONTAINER: trove-test-swift-${{ github.run_id }}-${{ github.run_attempt }}
+      # Exercise supported PG17 here; the development stack and native checks use PG18.
+      TIMESCALE_IMAGE: timescale/timescaledb:latest-pg17@sha256:bc8527e62f70f0766b29515077965025872fabb5349db421565f69ee273baf2d
+      SWIFT_IMAGE: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
+      STORAGE_IMAGE: chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start an isolated test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name "$DATABASE_CONTAINER" \
+            --publish 127.0.0.1:15432:5432 \
+            --env POSTGRES_USER=trove_test \
+            --env POSTGRES_PASSWORD=trove_test \
+            --env POSTGRES_DB=postgres \
+            --health-cmd 'pg_isready -h 127.0.0.1 -U trove_test -d postgres' \
+            --health-interval 2s --health-timeout 5s --health-retries 60 \
+            "$TIMESCALE_IMAGE"
+          for _ in $(seq 1 60); do
+            if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$DATABASE_CONTAINER")" == healthy ]]; then
+              docker exec "$DATABASE_CONTAINER" psql -U trove_test -d postgres \
+                --set ON_ERROR_STOP=1 --command "SELECT version(); SELECT extversion FROM pg_extension WHERE extname = 'timescaledb';"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Isolated test database did not become healthy." >&2
+          exit 1
+      - name: Start isolated object storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name "$STORAGE_CONTAINER" \
+            --publish 127.0.0.1:18333:8333 \
+            --health-cmd 'wget -qO- http://127.0.0.1:8333/ || exit 1' \
+            --health-interval 2s --health-timeout 5s --health-retries 60 \
+            "$STORAGE_IMAGE" server -s3 -dir=/data -master.volumeSizeLimitMB=100 \
+            -volume.port=8081 -volume.max=32 -master.telemetry=false
+          for _ in $(seq 1 60); do
+            if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$STORAGE_CONTAINER")" == healthy ]]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Isolated object storage did not become healthy." >&2
+          exit 1
+      - name: Run the full server suite against PostgreSQL, Timescale and S3
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Linux host networking keeps the test helper's fixed loopback boundary.
+          docker run --name "$SWIFT_CONTAINER" --network host \
+            --env TROVE_TEST_POSTGRES_PORT=15432 \
+            --env TROVE_TEST_S3_PORT=18333 \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            "$SWIFT_IMAGE" bash -euo pipefail -c '
+              apt-get update
+              apt-get install --yes --no-install-recommends python3 pkg-config libsqlite3-dev
+              exec bash scripts/check swift TroveServer
+            '
+          remaining="$(docker exec "$DATABASE_CONTAINER" psql -U trove_test -d postgres \
+            --set ON_ERROR_STOP=1 --tuples-only --no-align \
+            --command "SELECT count(*) FROM pg_database WHERE datname LIKE 'trove_test_%';")"
+          if [[ "$remaining" != 0 ]]; then
+            echo "The server suite left disposable test databases behind." >&2
+            exit 1
+          fi
+      - name: Restore ownership of real-store test diagnostics
+        if: always()
+        shell: bash
+        run: |
+          # Docker creates private evidence directories as root. Preserve their
+          # permissions while allowing this runner's artifact uploader to read them.
+          if [[ -d TroveServer/.build/verification ]]; then
+            sudo chown -R "$(id -u):$(id -g)" TroveServer/.build/verification
+          fi
+      - name: Upload real-store test diagnostics
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: TroveServer-postgres-verification
+          path: TroveServer/.build/verification/
+          include-hidden-files: true
+          if-no-files-found: warn
+      - name: Collect database diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if docker inspect "$DATABASE_CONTAINER" >/dev/null 2>&1; then
+            docker logs --tail 200 "$DATABASE_CONTAINER"
+          fi
+          if docker inspect "$STORAGE_CONTAINER" >/dev/null 2>&1; then
+            docker logs --tail 200 "$STORAGE_CONTAINER"
+          fi
+      - name: Remove only this job's disposable containers and volumes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for container in "$SWIFT_CONTAINER" "$DATABASE_CONTAINER" "$STORAGE_CONTAINER"; do
+            if docker inspect "$container" >/dev/null 2>&1; then
+              docker rm --force --volumes "$container"
+            fi
+          done

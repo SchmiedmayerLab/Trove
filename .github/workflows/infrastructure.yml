@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     defaults:
       run:
+        shell: bash
         working-directory: TroveInfrastructure
     steps:
       - uses: actions/checkout@v7
@@ -73,7 +74,7 @@ jobs:
   kind-smoke-test:
     name: KIND Smoke Test
     runs-on: ubuntu-24.04
-    # Include cold image compilation and bounded integration checks.
+    # Include the cold release build and bounded cluster bootstrap in the job budget.
     timeout-minutes: 90
     defaults:
       run:
@@ -95,12 +96,13 @@ jobs:
         working-directory: .
         run: |
           docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
-          # Release Swift build cache before the web image needs its own workspace.
+          # KIND already occupies disk space; free Swift build cache before npm starts.
           if [ "${{ runner.environment }}" = "github-hosted" ]; then
             docker builder prune --all --force
           fi
           docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
-          # This runner is ephemeral; never prune a shared development host.
+          # Release Swift build layers before KIND exports the tagged runtime images.
+          # This job uses an ephemeral GitHub-hosted runner; do not prune a shared host.
           if [ "${{ runner.environment }}" = "github-hosted" ]; then
             docker builder prune --all --force
           fi
@@ -111,7 +113,7 @@ jobs:
         env:
           REPOSITORY_TOKEN: ${{ github.token }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}.git
-        run: python3 tools/setup.py
+        run: python3 tools/setup.py --revision "$GITHUB_SHA"
       - name: Wait for ArgoCD Applications
         run: bash tools/smoke-test.sh
         env:
