@@ -21,10 +21,17 @@ struct StudyPatch: Sendable {
     var consent: LocalizationsDictionary<ConsentContent>?
     var visibility: StudyVisibility?
     var enrollmentCondition: EnrollmentConditions?
+    var collectionRequirements: [CollectionRequirement]? // swiftlint:disable:this discouraged_optional_collection
 }
 
 
 final class Study: Model, @unchecked Sendable {
+    /// A document wrapper prevents PostgreSQL's driver from treating a Swift array
+    /// as a native SQL array rather than the JSON collection configuration.
+    private struct CollectionConfiguration: Codable, Sendable {
+        var requirements: [CollectionRequirement]
+    }
+
     static let schema = "studies"
 
     @ID(key: .id) var id: UUID?
@@ -45,6 +52,8 @@ final class Study: Model, @unchecked Sendable {
 
     @Field(key: "enrollment_condition") var enrollmentCondition: EnrollmentConditions
 
+    @Field(key: "collection_configuration") private var collectionConfiguration: CollectionConfiguration
+
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
@@ -57,6 +66,11 @@ final class Study: Model, @unchecked Sendable {
 
     @Children(for: \.$study) var invitationCodes: [InvitationCode]
 
+    var collectionRequirements: [CollectionRequirement] {
+        get { collectionConfiguration.requirements }
+        set { collectionConfiguration = .init(requirements: newValue) }
+    }
+
     init() {}
 
     init(
@@ -68,6 +82,7 @@ final class Study: Model, @unchecked Sendable {
         consent: LocalizationsDictionary<ConsentContent> = .init(),
         visibility: StudyVisibility = .public,
         enrollmentCondition: EnrollmentConditions = .none,
+        collectionRequirements: [CollectionRequirement] = [],
         id: UUID? = nil
     ) {
         self.id = id
@@ -79,9 +94,13 @@ final class Study: Model, @unchecked Sendable {
         self.consent = consent
         self.visibility = visibility
         self.enrollmentCondition = enrollmentCondition
+        self.collectionRequirements = collectionRequirements
     }
 
-    func apply(_ patch: StudyPatch) {
+    func apply(_ patch: StudyPatch) throws {
+        if let requirements = patch.collectionRequirements {
+            try CollectionRequirement.validate(requirements)
+        }
         func apply<T>(_ otherKeyPath: KeyPath<StudyPatch, T?>, to selfKeyPath: ReferenceWritableKeyPath<Study, T>) {
             if let value = patch[keyPath: otherKeyPath] {
                 self[keyPath: selfKeyPath] = value
@@ -95,5 +114,6 @@ final class Study: Model, @unchecked Sendable {
         apply(\.consent, to: \.consent)
         apply(\.visibility, to: \.visibility)
         apply(\.enrollmentCondition, to: \.enrollmentCondition)
+        apply(\.collectionRequirements, to: \.collectionRequirements)
     }
 }

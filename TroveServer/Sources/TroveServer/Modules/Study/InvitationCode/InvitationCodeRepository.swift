@@ -49,7 +49,13 @@ final class InvitationCodeRepository: Module, Sendable {
     }
 
     func delete(_ code: InvitationCode) async throws {
-        try await code.delete(on: database)
+        do {
+            try await code.delete(on: database)
+        } catch where (error as? any DatabaseError)?.isConstraintFailure == true {
+            // Redemption may commit after the service's unused-code check.
+            // The restrictive foreign key is the final authority in that race.
+            throw ServerError.conflict("Cannot delete an invitation code that has already been redeemed")
+        }
     }
 
     /// Finds an invitation code that exists, is not expired, and has not been redeemed.

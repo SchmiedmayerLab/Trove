@@ -17,6 +17,7 @@ struct AuthContextTests {
 
     private func makeContext(roles: [String] = [researcherRole], groups: [String] = []) -> AuthContext {
         AuthContext(
+            issuer: TestApp.issuer,
             subject: "test",
             email: "test@example.com",
             roles: roles,
@@ -61,6 +62,12 @@ struct AuthContextTests {
         "",                         // empty string
         "no-leading-slash/admin",   // no leading slash
         "/Group/admin/extra",       // trailing segment
+        "//Group/admin",            // empty leading group segment
+        "///Group/admin",
+        "/Group//admin",            // empty role segment
+        "/Group/admin/",            // trailing separator
+        "/Group/",
+        "//admin",
         "/"                         // slash only
     ])
     func ignoresInvalidGroupPath(path: String) {
@@ -74,6 +81,47 @@ struct AuthContextTests {
         let memberships = context.groupMemberships
 
         #expect(memberships["Schmiedmayer Lab"] == .admin)
+    }
+
+    @Test(arguments: [
+        ["/MyGroup/admin", "/MyGroup/audit-reader"],
+        ["/MyGroup/audit-reader", "/MyGroup/admin"],
+        ["/MyGroup/admin", "/MyGroup/researcher", "/MyGroup/audit-reader"],
+        ["/MyGroup/admin", "/MyGroup/audit-reader", "/MyGroup/researcher"],
+        ["/MyGroup/researcher", "/MyGroup/admin", "/MyGroup/audit-reader"],
+        ["/MyGroup/researcher", "/MyGroup/audit-reader", "/MyGroup/admin"],
+        ["/MyGroup/audit-reader", "/MyGroup/admin", "/MyGroup/researcher"],
+        ["/MyGroup/audit-reader", "/MyGroup/researcher", "/MyGroup/admin"]
+    ])
+    func auditCapabilityIsIndependentOfMembershipOrder(groups: [String]) throws {
+        let context = makeContext(groups: groups)
+        #expect(context.groupMemberships == ["MyGroup": .admin])
+        #expect(context.auditReaderGroups == ["MyGroup"])
+        try AuthContext.$current.withValue(context) { try AuthContext.checkHasAuditAccess(groupName: "MyGroup") }
+    }
+
+    @Test(arguments: [
+        "/MyGroup/audit-reader/extra", "MyGroup/audit-reader", "/MyGroup/Audit-Reader",
+        "//MyGroup/audit-reader", "///MyGroup/audit-reader", "/MyGroup//audit-reader", "/MyGroup/audit-reader/"
+    ])
+    func invalidAuditMembershipCannotGrantAccess(path: String) {
+        let context = makeContext(groups: ["/MyGroup/admin", path])
+        #expect(context.auditReaderGroups.isEmpty)
+        AuthContext.$current.withValue(context) {
+            #expect(throws: ServerError.self) { try AuthContext.checkHasAuditAccess(groupName: "MyGroup") }
+        }
+    }
+
+    @Test(arguments: [
+        ["/MyGroup/admin", "/MyGroup/researcher"],
+        ["/MyGroup/researcher", "/MyGroup/admin"],
+        ["/MyGroup/admin", "/MyGroup/admin", "/MyGroup/researcher"]
+    ])
+    func strongestExplicitRoleDoesNotDependOnOrderOrDuplicates(groups: [String]) throws {
+        let context = makeContext(groups: groups)
+        #expect(context.groupMemberships == ["MyGroup": .admin])
+        #expect(context.auditReaderGroups.isEmpty)
+        try AuthContext.$current.withValue(context) { try AuthContext.checkHasAccess(groupName: "MyGroup", role: .admin) }
     }
 
     // MARK: - checkIsResearcher / checkIsParticipant

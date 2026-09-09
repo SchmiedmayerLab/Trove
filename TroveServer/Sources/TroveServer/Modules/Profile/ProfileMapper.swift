@@ -14,7 +14,9 @@ private let dateOnlyFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd"
     formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
     formatter.timeZone = TimeZone(identifier: "UTC")
+    formatter.isLenient = false
     return formatter
 }()
 
@@ -31,11 +33,16 @@ struct ParticipantProfileInput: Sendable {
     init(_ schema: Components.Schemas.ParticipantProfileInput) throws {
         self.firstName = schema.firstName
         self.lastName = schema.lastName
-        guard let gender = GenderIdentity(rawValue: schema.gender.rawValue) else {
-            throw ServerError.badRequest("Invalid gender value")
+        self.gender = switch schema.gender {
+        case .female: .female
+        case .male: .male
+        case .transgender: .transgender
+        case .nonBinary: .nonBinary
+        case .preferNotToState: .preferNotToState
         }
-        self.gender = gender
-        guard let dateOfBirth = dateOnlyFormatter.date(from: schema.dateOfBirth) else {
+        guard schema.dateOfBirth.utf8.count == 10,
+              let dateOfBirth = dateOnlyFormatter.date(from: schema.dateOfBirth),
+              dateOnlyFormatter.string(from: dateOfBirth) == schema.dateOfBirth else {
             throw ServerError.badRequest("Invalid date format, expected yyyy-MM-dd")
         }
         self.dateOfBirth = dateOfBirth
@@ -48,8 +55,12 @@ struct ParticipantProfileInput: Sendable {
 
 extension Components.Schemas.ParticipantProfile {
     init(_ model: Participant) throws {
-        guard let gender = Components.Schemas.GenderIdentity(rawValue: model.gender.rawValue) else {
-            throw ServerError.internalServerError("Invalid gender value in database")
+        let gender: Components.Schemas.GenderIdentity = switch model.gender {
+        case .female: .female
+        case .male: .male
+        case .transgender: .transgender
+        case .nonBinary: .nonBinary
+        case .preferNotToState: .preferNotToState
         }
         self.init(
             id: try model.requireId().uuidString,

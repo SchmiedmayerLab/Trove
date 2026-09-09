@@ -49,6 +49,14 @@ extension Controller {
         grove[ProfileService.self]
     }
 
+    var sourceBindingService: SourceBindingService {
+        grove[SourceBindingService.self]
+    }
+
+    var clinicalEventService: ClinicalEventService {
+        grove[ClinicalEventService.self]
+    }
+
     var invitationCodeService: InvitationCodeService {
         grove[InvitationCodeService.self]
     }
@@ -67,10 +75,6 @@ extension Controller {
 
     var consentService: ConsentService {
         grove[ConsentService.self]
-    }
-
-    var fhirResourceService: FHIRResourceService {
-        grove[FHIRResourceService.self]
     }
 
     var objectStorageService: ObjectStorageService {

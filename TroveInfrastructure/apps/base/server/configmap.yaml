@@ -11,16 +11,18 @@ kind: ConfigMap
 metadata:
   name: trove-server-config
   namespace: trove
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
 data:
   DATABASE_HOST: trove-db-rw
   DATABASE_PORT: "5432"
   DATABASE_NAME: trove
-  TIMESCALE_HOST: trove-timescale
-  TIMESCALE_PORT: "5432"
-  TIMESCALE_NAME: trove
   KEYCLOAK_URL: http://keycloak.trove.svc.cluster.local/auth
   KEYCLOAK_REALM: trove
+  KEYCLOAK_ISSUER: https://DOMAIN_PLACEHOLDER/auth/realms/trove
+  KEYCLOAK_API_AUDIENCE: trove-api
   KEYCLOAK_CLIENT_ID: trove-server
   KEYCLOAK_RESEARCHER_ROLE: trove-researcher
   KEYCLOAK_PARTICIPANT_ROLE: trove-participant
-  APP_ENVIRONMENT: development
+  APP_ENVIRONMENT: production
+  PGSSLMODE: verify-full

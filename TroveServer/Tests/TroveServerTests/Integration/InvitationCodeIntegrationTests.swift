@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Fluent
 import Foundation
 import Testing
 import TroveAPIServer
@@ -15,6 +16,40 @@ import VaporTesting
 
 @Suite(.serialized)
 struct InvitationCodeIntegrationTests {
+    @Test
+    func redemptionAfterUnusedReadPreventsDeletion() async throws {
+        try await TestApp.withApp { app, _ in
+            let group = try await GroupFixtures.createGroup(on: app.db)
+            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
+            let studyID = try study.requireId()
+            let code = InvitationCode(studyId: studyID, code: "LATE-USE1")
+            try await code.save(on: app.db)
+            let codeID = try code.requireId()
+            let repository = InvitationCodeRepository(database: app.db)
+            let unused = try #require(try await repository.find(id: codeID, studyId: studyID))
+            #expect(unused.enrollment == nil)
+
+            let participant = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "late-redemption")
+            let enrollment = Enrollment(
+                participantId: try participant.requireId(), studyId: studyID, currentRevision: 1, invitationCodeId: codeID
+            )
+            try await enrollment.save(on: app.db)
+
+            // Reproduce the exact stale-read ordering without timing-dependent concurrent tasks.
+            await #expect {
+                try await repository.delete(unused)
+            } throws: { error in
+                guard let error = error as? ServerError else {
+                    return false
+                }
+                return error.status == .conflict
+            }
+            #expect(try await InvitationCode.find(codeID, on: app.db) != nil)
+            let retained = try #require(try await Enrollment.find(enrollment.requireId(), on: app.db))
+            #expect(retained.$invitationCode.id == codeID)
+        }
+    }
+
     @Test
     func listCodesEmpty() async throws {
         try await TestApp.withApp { app, token in

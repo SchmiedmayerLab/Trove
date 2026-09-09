@@ -37,43 +37,6 @@ private struct FixtureIDs: Sendable {
     let scheduleId: UUID
 }
 
-private enum EndpointRole: Sendable {
-    /// Requires the researcher realm role. `minRole` controls the required group-level role.
-    case researcher(minRole: AuthContext.GroupRole, requiresGroupAccess: Bool)
-    /// Requires the participant realm role.
-    case participant
-}
-
-private struct Endpoint: Sendable {
-    let method: HTTPMethod
-    let path: String
-    let body: Data?
-    let contentType: HTTPMediaType?
-    let role: EndpointRole
-    let successStatus: HTTPStatus
-
-    var isParticipant: Bool {
-        if case .participant = role {
-            return true
-        }
-        return false
-    }
-
-    var requiresGroupAccess: Bool {
-        if case .researcher(_, let requiresGroupAccess) = role {
-            return requiresGroupAccess
-        }
-        return false
-    }
-
-    var minRole: AuthContext.GroupRole {
-        if case .researcher(let minRole, _) = role {
-            return minRole
-        }
-        return .researcher
-    }
-}
-
 @Suite(.serialized)
 struct AuthIntegrationTests {
     @Test
@@ -110,7 +73,7 @@ struct AuthIntegrationTests {
     func wrongSignatureReturns401() async throws {
         try await TestApp.withApp(token: .none) { app, _ in
             let wrongKeys = JWTKeyCollection()
-            await wrongKeys.add(hmac: HMACKey(from: "wrong-secret"), digestAlgorithm: .sha256)
+            await wrongKeys.add(hmac: HMACKey(from: TestApp.wrongTestSecret), digestAlgorithm: .sha256)
 
             let badToken = try await TestApp.signToken(
                 keys: wrongKeys,
@@ -156,8 +119,22 @@ struct AuthIntegrationTests {
     @Test
     func adminAllowedActions() async throws {
         try await withFixtures(token: .researcher(groups: ["/Test Group/admin"])) { app, token, endpoints in
-            for endpoint in endpoints where endpoint.requiresGroupAccess && endpoint.minRole == .admin {
+            for endpoint in endpoints where endpoint.requiresGroupAccess && endpoint.minRole == .admin && !endpoint.requiresAuditReader {
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
+            }
+        }
+    }
+
+    @Test(arguments: [
+        (["/Test Group/admin"], HTTPStatus.forbidden),
+        (["/Test Group/admin", "/Test Group/audit-reader"], HTTPStatus.ok),
+        (["/Test Group/admin", "/Test Group/researcher", "/Test Group/audit-reader"], HTTPStatus.ok),
+        (["/Test Group/audit-reader", "/Test Group/researcher", "/Test Group/admin"], HTTPStatus.ok)
+    ])
+    func auditReadersRequireExplicitCapability(groups: [String], expected: HTTPStatus) async throws {
+        try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
+            for endpoint in endpoints where endpoint.requiresAuditReader {
+                try await self.expectStatus(expected, for: endpoint, token: token, on: app)
             }
         }
     }
@@ -211,7 +188,7 @@ struct AuthIntegrationTests {
 
     private func withFixtures(
         token tokenConfig: TestApp.Token,
-        _ test: @escaping @Sendable (Application, String?, [Endpoint]) async throws -> Void
+        _ test: @escaping @Sendable (Application, String?, [AuthEndpoint]) async throws -> Void
     ) async throws {
         try await TestApp.withApp(token: tokenConfig) { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
@@ -245,12 +222,16 @@ struct AuthIntegrationTests {
 
     private func expectStatus(
         _ expected: HTTPStatus,
-        for endpoint: Endpoint,
+        for endpoint: AuthEndpoint,
         token: String?,
         on app: Application
     ) async throws {
         try await app.test(endpoint.method, endpoint.path, beforeRequest: { req in
             req.bearerAuth(token)
+            if endpoint.method == .POST, endpoint.path.hasSuffix("/consents") {
+                req.headers.replaceOrAdd(name: "Idempotency-Key", value: UUID().uuidString)
+                req.headers.replaceOrAdd(name: "If-Match", value: EnrollmentStateTag.make(enrollmentID: dummyUUID, version: 1))
+            }
             if let body = endpoint.body {
                 if let contentType = endpoint.contentType {
                     req.headers.contentType = contentType
@@ -274,8 +255,8 @@ extension AuthIntegrationTests {
         minRole: AuthContext.GroupRole = .researcher, // swiftlint:disable:this function_default_parameter_at_end
         successStatus: HTTPStatus,
         requiresGroupAccess: Bool = true
-    ) -> Endpoint {
-        Endpoint(
+    ) -> AuthEndpoint {
+        AuthEndpoint(
             method: method,
             path: path,
             body: body,
@@ -291,8 +272,8 @@ extension AuthIntegrationTests {
         successStatus: HTTPStatus,
         body: Data? = nil,
         contentType: HTTPMediaType? = nil
-    ) -> Endpoint {
-        Endpoint(
+    ) -> AuthEndpoint {
+        AuthEndpoint(
             method: method,
             path: path,
             body: body,
@@ -303,7 +284,7 @@ extension AuthIntegrationTests {
     }
 
     // swiftlint:disable:next function_body_length
-    private static func allEndpoints(_ ids: FixtureIDs) -> [Endpoint] {
+    private static func allEndpoints(_ ids: FixtureIDs) -> [AuthEndpoint] {
         let groupId = ids.groupId
         let studyId = ids.studyId
         let healthDataId = ids.healthDataId
@@ -330,25 +311,30 @@ extension AuthIntegrationTests {
             // Groups
             researcher(.GET, "\(base)/groups", successStatus: .ok, requiresGroupAccess: false),
             researcher(.GET, "\(base)/groups/\(groupId)", successStatus: .ok),
-
             // Studies
             researcher(.GET, "\(base)/studies/\(studyId)", successStatus: .ok),
             researcher(.GET, "\(base)/groups/\(groupId)/studies", successStatus: .ok),
             researcher(.PATCH, "\(base)/studies/\(studyId)", body: jsonData(patchBody()), successStatus: .ok),
             researcher(.POST, "\(base)/groups/\(groupId)/studies", body: jsonData(studyBody()), minRole: .admin, successStatus: .created),
-
             // Invitation Codes
             researcher(.GET, "\(base)/studies/\(studyId)/invitation-codes", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/invitation-codes", body: jsonData(["count": 1] as [String: Any]), successStatus: .created),
             researcher(.DELETE, "\(base)/studies/\(studyId)/invitation-codes/\(dummyId)", successStatus: .notFound),
-
             // Published Studies & Enrollments
             researcher(.POST, "\(base)/studies/\(studyId)/publish", minRole: .admin, successStatus: .created),
             researcher(.GET, "\(base)/studies/\(studyId)/published", successStatus: .ok),
+            AuthEndpoint(
+                method: .GET,
+                path: "\(base)/studies/\(studyId)/audit-events",
+                body: nil,
+                contentType: nil,
+                role: .auditReader,
+                successStatus: .ok
+            ),
             researcher(.GET, "\(base)/studies/\(studyId)/enrollments", successStatus: .ok),
 
-            // Studies — destructive
-            researcher(.DELETE, "\(base)/studies/\(studyId)", minRole: .admin, successStatus: .noContent),
+            // Publication above makes this study retained, including for administrators.
+            researcher(.DELETE, "\(base)/studies/\(studyId)", minRole: .admin, successStatus: .conflict),
 
             // Components
             researcher(.GET, "\(base)/studies/\(studyId)/components", successStatus: .ok),
@@ -361,14 +347,12 @@ extension AuthIntegrationTests {
             researcher(.PUT, "\(base)/studies/\(studyId)/components/informational/\(informationalId)", body: informational, successStatus: .ok),
             researcher(.PUT, "\(base)/studies/\(studyId)/components/questionnaire/\(questionnaireId)", body: questionnaire, successStatus: .ok),
             researcher(.PUT, "\(base)/studies/\(studyId)/components/health-data/\(healthDataId)", body: healthData, successStatus: .ok),
-
             // Component Schedules (use questionnaire — health-data doesn't support schedules)
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", body: scheduleBody, successStatus: .created),
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules/\(scheduleId)", successStatus: .ok),
             researcher(.PUT, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules/\(scheduleId)", body: scheduleBody, successStatus: .ok),
             researcher(.DELETE, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules/\(scheduleId)", successStatus: .noContent),
-
             // Components — destructive (after schedules, which depend on the component existing)
             researcher(.DELETE, "\(base)/studies/\(studyId)/components/\(healthDataId)", successStatus: .noContent),
 
@@ -376,31 +360,62 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/profile", successStatus: .conflict, body: jsonData(profileBody())),
             participant(.GET, "\(base)/participant/profile", successStatus: .ok),
             participant(.PUT, "\(base)/participant/profile", successStatus: .ok, body: jsonData(profileBody(firstName: "Updated"))),
+            participant(.POST, "\(base)/participant/sources", successStatus: .ok, body: jsonData(["registrationID": dummyId.uuidString])),
+            participant(.GET, "\(base)/participant/sources/\(dummyId)", successStatus: .notFound),
+            participant(.POST, "\(base)/participant/sources/\(dummyId)/revoke", successStatus: .notFound),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/event-receipts/lookup",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.EventReceiptLookup(
+                    producerEventIdentifier: .init(
+                        system: "urn:uuid:11111111-1111-4111-8111-111111111111",
+                        value: "e0:11111111-1111-4111-8111-111111111111:1"
+                    ),
+                    payloadSHA256: String(repeating: "0", count: 64),
+                    targets: [.init(consentId: dummyId.uuidString, outputFullUrls: ["urn:uuid:point"])]
+                ))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/events",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.EventSubmission(
+                    eventBase64: Data("{}".utf8).base64EncodedString(),
+                    targets: [.init(consentId: dummyId.uuidString, outputFullUrls: ["urn:uuid:point"]) ]
+                ))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/events/batch",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.EventBatchSubmission(events: [.init(eventBase64: "e30=", targets: [])]))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/events/\(dummyId)/attributions",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.EventAttribution(
+                    commandId: dummyId.uuidString,
+                    targets: [.init(consentId: dummyId.uuidString, outputFullUrls: ["urn:uuid:point"])]
+                ))
+            ),
             participant(.GET, "\(base)/participant/studies", successStatus: .ok),
             participant(.GET, "\(base)/participant/studies/\(studyId)/\(dummyRevision)/bundle", successStatus: .notFound),
             participant(.POST, "\(base)/participant/studies/\(studyId)/enrollments", successStatus: .notFound, body: jsonData([String: String]())),
             participant(.GET, "\(base)/participant/enrollments", successStatus: .ok),
-            participant(.PATCH, "\(base)/participant/enrollments/\(dummyId)", successStatus: .notFound, body: jsonData(["revision": 2] as [String: Any])),
+            participant(.GET, "\(base)/participant/enrollments/\(dummyId)/collection-plan", successStatus: .notFound),
             participant(.POST, "\(base)/participant/enrollments/\(dummyId)/withdraw", successStatus: .notFound),
+            participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consent-presentation?locale=en-US", successStatus: .notFound),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consents", successStatus: .notFound),
             participant(
                 .POST,
                 "\(base)/participant/enrollments/\(dummyId)/consents",
                 successStatus: .notFound,
-                body: multipartConsentBody(),
+                body: ConsentRequestFixtures.authorizationBody(),
                 contentType: .init(type: "multipart", subType: "form-data", parameters: ["boundary": "AuthTestBoundary"])
             ),
-            participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consents/\(dummyId)/pdf", successStatus: .notFound),
-            participant(
-                .POST,
-                "\(base)/participant/fhir/resource",
-                successStatus: .created,
-                body: jsonData([
-                    "resourceType": "Observation",
-                    "status": "final",
-                    "code": ["coding": [["system": "http://loinc.org", "code": "8867-4"]]]
-                ] as [String: Any])
-            )
+            participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consents/\(dummyId)/pdf", successStatus: .notFound)
         ]
     }
 
@@ -438,8 +453,6 @@ extension AuthIntegrationTests {
     }
 }
 
-// MARK: - File-Private Helpers
-
 private func jsonData(_ dict: [String: Any]) -> Data? {
     try? JSONSerialization.data(withJSONObject: dict)
 }
@@ -469,30 +482,4 @@ private func scheduleBody() -> [String: Any] {
         "completionPolicy": "anytime",
         "notification": false
     ] as [String: Any]
-}
-
-private func multipartConsentBody() -> Data? {
-    let boundary = "AuthTestBoundary"
-    let consentData: [String: Any] = [
-        "metadata": ["title": "", "version": ""] as [String: String],
-        "userResponses": [
-            "toggles": [:] as [String: Bool],
-            "selects": [:] as [String: String],
-            "signatures": [:] as [String: Any]
-        ] as [String: Any]
-    ]
-    guard let jsonData = try? JSONSerialization.data(withJSONObject: consentData) else {
-        return nil
-    }
-    var body = Data()
-    body.append(Data("--\(boundary)\r\n".utf8))
-    body.append(Data("Content-Disposition: form-data; name=\"consentData\"\r\n".utf8))
-    body.append(Data("Content-Type: application/json\r\n\r\n".utf8))
-    body.append(jsonData)
-    body.append(Data("\r\n--\(boundary)\r\n".utf8))
-    body.append(Data("Content-Disposition: form-data; name=\"consentPDF\"; filename=\"consent.pdf\"\r\n".utf8))
-    body.append(Data("Content-Type: application/pdf\r\n\r\n".utf8))
-    body.append(Data("%PDF-1.4 test".utf8))
-    body.append(Data("\r\n--\(boundary)--\r\n".utf8))
-    return body
 }

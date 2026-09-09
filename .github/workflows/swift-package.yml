@@ -44,6 +44,8 @@ jobs:
         run: |
           swift --version
           llvm-cov --version | head -n 1
+      - name: Install Client Journal Build Dependencies
+        run: apt-get update && apt-get install --yes pkg-config libsqlite3-dev
       - name: Build package
         run: swift build
       - name: Run tests

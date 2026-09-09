@@ -20,6 +20,7 @@ struct CreateStudy: AsyncMigration {
             .field("consent", .json, .required)
             .field("visibility", .string, .required)
             .field("enrollment_condition", .string, .required)
+            .field("collection_configuration", .json, .required)
             .field(
                 "group_id",
                 .uuid,

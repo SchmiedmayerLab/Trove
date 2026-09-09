@@ -29,6 +29,9 @@ final class Enrollment: Model, @unchecked Sendable {
 
     @Field(key: "current_revision") var currentRevision: Int
 
+    /// Monotonic concurrency token, initialized to 1 for a new enrollment.
+    @Field(key: "state_version") var stateVersion: Int64
+
     @Field(key: "participation_data") var participationData: ParticipationData
     
     @OptionalField(key: "withdrawn_at") var withdrawnAt: Date?
@@ -54,6 +57,7 @@ final class Enrollment: Model, @unchecked Sendable {
         self.$study.id = studyId
         self.$invitationCode.id = invitationCodeId
         self.currentRevision = currentRevision
+        self.stateVersion = 1
         self.participationData = participationData
     }
 }

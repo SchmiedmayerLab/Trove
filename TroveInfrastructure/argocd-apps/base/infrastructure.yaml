@@ -15,6 +15,8 @@ metadata:
     troveplatform.org/revision-source: single
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    # Compare API-defaulted PVC templates with a real server-side dry run.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default
   source:

@@ -19,7 +19,8 @@ jobs:
   smoke-test:
     name: Docker Compose Smoke Test
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Include cold image compilation and bounded integration checks.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       # The compose file runs the published images. Building them here from the same
@@ -28,7 +29,17 @@ jobs:
       - name: Build the server and web images
         run: |
           docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+          # Release Swift build cache before the web image needs its own workspace.
+          if [ "${{ runner.environment }}" = "github-hosted" ]; then
+            docker builder prune --all --force
+          fi
           docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+      - name: Release build cache before pulling backing services
+        if: runner.environment == 'github-hosted'
+        # Keep tagged runtime images; remove only ephemeral hosted build cache.
+        run: |
+          docker builder prune --all --force
+          df -h /
       # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
       # migration has to run first. It starts the backing services it depends on.
       - name: Apply the migrations

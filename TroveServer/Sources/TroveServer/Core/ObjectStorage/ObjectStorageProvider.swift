@@ -11,7 +11,9 @@ import Foundation
 
 protocol ObjectStorageProvider: Sendable {
     func upload(data: Data, key: String, contentType: String) async throws
-    func download(key: String) async throws -> Data
+    func download(key: String, maximumBytes: Int) async throws -> Data
+    /// Idempotent for an absent object; failures must not be reported as successful deletion.
+    func delete(key: String) async throws
 
     func ensureBucketExists() async throws
 

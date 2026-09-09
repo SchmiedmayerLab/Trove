@@ -28,49 +28,6 @@ spec:
         app: trove-server
     spec:
       serviceAccountName: trove-server
-      initContainers:
-        - name: trove-server-migrate
-          image: ghcr.io/schmiedmayerlab/trove-server:latest
-          imagePullPolicy: Always
-          command: ["./TroveServer", "migrate", "--yes"]
-          resources:
-            requests:
-              memory: 256Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-              cpu: 500m
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 999
-            capabilities:
-              drop:
-                - ALL
-          envFrom:
-            - configMapRef:
-                name: trove-server-config
-          env:
-            - name: DATABASE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: username
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: password
-            - name: TIMESCALE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: username
-            - name: TIMESCALE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: password
       containers:
         - name: trove-server-container
           image: ghcr.io/schmiedmayerlab/trove-server:latest
@@ -98,22 +55,12 @@ spec:
             - name: DATABASE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: trove-postgres-credentials
+                  name: trove-postgres-runtime-credentials
                   key: username
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: password
-            - name: TIMESCALE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
-                  key: username
-            - name: TIMESCALE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trove-postgres-credentials
+                  name: trove-postgres-runtime-credentials
                   key: password
             - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:

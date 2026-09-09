@@ -10,15 +10,20 @@ import Fluent
 import Vapor
 
 
-/// Registers migrations targeting the primary PostgreSQL database (`.psql`).
+/// Creates the current schema in a fresh primary database (`.psql`).
+/// Development schema changes require recreating the database, not upgrading old rows.
 func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateGroups())
     app.migrations.add(CreateStudy())
     app.migrations.add(CreateComponents())
     app.migrations.add(CreateComponentSchedules())
+    app.migrations.add(CreateStoredArtifacts())
     app.migrations.add(CreatePublishedStudies())
     app.migrations.add(CreateParticipants())
+    app.migrations.add(CreateSourceBindings())
     app.migrations.add(CreateInvitationCodes())
     app.migrations.add(CreateEnrollments())
     app.migrations.add(CreateEnrollmentConsents())
+    app.migrations.add(CreateAuditEvents())
+    app.migrations.add(CreateClinicalEvents())
 }

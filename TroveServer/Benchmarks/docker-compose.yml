@@ -1,0 +1,25 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+name: trove-benchmark
+services:
+  benchmark-db:
+    image: timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c
+    network_mode: none
+    cpus: 2
+    mem_limit: 2g
+    environment:
+      POSTGRES_USER: trove_benchmark
+      POSTGRES_PASSWORD: synthetic-benchmark-only
+      POSTGRES_DB: trove_benchmark
+      PGDATA: /pgdata
+    volumes:
+      - benchmark_data:/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U trove_benchmark -d trove_benchmark -t 2"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+volumes:
+  benchmark_data:

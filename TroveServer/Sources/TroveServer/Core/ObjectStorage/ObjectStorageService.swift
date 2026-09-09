@@ -21,8 +21,15 @@ final class ObjectStorageService: Module, @unchecked Sendable {
         try await provider.upload(data: data, key: key, contentType: contentType)
     }
 
-    func download(key: String) async throws -> Data {
-        try await provider.download(key: key)
+    func download(key: String, maximumBytes: Int = 50 * 1024 * 1024) async throws -> Data {
+        guard maximumBytes > 0, maximumBytes <= 50 * 1024 * 1024 else {
+            throw ServerError.badRequest("Unsupported artifact read limit")
+        }
+        return try await provider.download(key: key, maximumBytes: maximumBytes)
+    }
+
+    func delete(key: String) async throws {
+        try await provider.delete(key: key)
     }
 
     func ensureBucketExists() async throws {

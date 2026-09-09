@@ -17,6 +17,7 @@ extension Components.Schemas.EnrollmentResponse {
             studyId: model.$study.id.uuidString,
             participantId: model.$participant.id.uuidString,
             currentRevision: model.currentRevision,
+            stateVersion: model.stateVersion,
             enrolledAt: model.createdAt!,  // swiftlint:disable:this force_unwrapping
             withdrawnAt: model.withdrawnAt
         )

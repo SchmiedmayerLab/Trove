@@ -18,6 +18,7 @@ final class ParticipantEnrollmentService: Module, @unchecked Sendable {
     @Dependency(PublishedStudyRepository.self) var publishedStudyRepository
     @Dependency(InvitationCodeService.self) var invitationCodeService
     @Dependency(AuthorizationService.self) var authorizationService
+    @Dependency(ConsentRepository.self) var consentRepository
 
     func enroll(studyId: UUID, invitationCode: String?) async throws -> Enrollment {
         let participant = try await profileService.getProfile()
@@ -65,37 +66,29 @@ final class ParticipantEnrollmentService: Module, @unchecked Sendable {
     }
 
     func withdraw(enrollmentId: UUID) async throws -> Enrollment {
-        let enrollment = try await authorizationService.checkParticipantHasEnrollmentAccess(id: enrollmentId)
+        _ = try await authorizationService.checkParticipantHasEnrollmentAccess(id: enrollmentId)
 
-        if enrollment.withdrawnAt != nil {
-            throw ServerError.conflict("Already withdrawn from this study")
-        }
-
-        enrollment.withdrawnAt = Date()
-        return try await enrollmentRepository.update(enrollment)
-    }
-
-    func upgradeToRevision(enrollmentId: UUID, targetRevision: Int) async throws -> Enrollment {
-        let enrollment = try await authorizationService.checkParticipantHasEnrollmentAccess(id: enrollmentId)
-
-        if enrollment.withdrawnAt != nil {
-            throw ServerError.conflict("Cannot upgrade a withdrawn enrollment")
-        }
-
-        if targetRevision <= enrollment.currentRevision {
-            throw ServerError.conflict("Target revision must be greater than the current enrollment revision")
-        }
-
-        let studyId = enrollment.$study.id
-        let publishedRevisions = try await publishedStudyRepository.listByStudyId(studyId)
-        guard publishedRevisions.contains(where: { $0.revision == targetRevision }) else {
-            throw ServerError.notFound(
-                resource: "Revision \(targetRevision) for study",
-                identifier: studyId.uuidString
+        let actor = try AuthContext.checkIsParticipant()
+        return try await enrollmentRepository.database.transaction { transaction in
+            let enrollment = try await self.consentRepository.lockEnrollment(id: enrollmentId, on: transaction)
+            guard enrollment.withdrawnAt == nil else {
+                throw ServerError.conflict("Already withdrawn from this study")
+            }
+            guard let study = try await Study.find(enrollment.$study.id, on: transaction) else {
+                throw ServerError.notFound("Study not found")
+            }
+            enrollment.stateVersion = try await self.consentRepository.advanceEnrollmentVersion(
+                id: enrollmentId, expectedVersion: enrollment.stateVersion, on: transaction
             )
+            enrollment.withdrawnAt = Date()
+            try await enrollment.save(on: transaction)
+            try await AuditRepository.recordMutation(AuditEvent(
+                context: actor.auditContext,
+                action: .enrollmentWithdrawn,
+                scope: .study(studyID: enrollment.$study.id, groupID: study.$group.id),
+                target: .init(id: enrollmentId, version: String(enrollment.stateVersion))
+            ), on: transaction)
+            return enrollment
         }
-
-        enrollment.currentRevision = targetRevision
-        return try await enrollmentRepository.update(enrollment)
     }
 }

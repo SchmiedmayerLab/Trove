@@ -1,0 +1,116 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trove-database-operator
+  namespace: trove
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: trove-database-operator
+    spec:
+      serviceAccountName: trove-database-operator
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: initialize-schema
+          image: ghcr.io/schmiedmayerlab/trove-server:latest
+          imagePullPolicy: Always
+          command: ["./TroveServer", "migrate", "--yes"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: APP_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: APP_ENVIRONMENT}
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_HOST}
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_PORT}
+            - name: DATABASE_NAME
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_NAME}
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-credentials, key: username}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-credentials, key: password}
+      containers:
+        - name: grant-runtime
+          image: timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c
+          command: ["bash", "/operator/grant-runtime.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          env:
+            - name: PGHOST
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_HOST}
+            - name: PGPORT
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_PORT}
+            - name: PGDATABASE
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: DATABASE_NAME}
+            - name: PGSSLMODE
+              valueFrom:
+                configMapKeyRef: {name: trove-server-config, key: PGSSLMODE}
+            - name: PGCONNECT_TIMEOUT
+              value: "10"
+            - name: PGOPTIONS
+              value: "-c statement_timeout=60000 -c lock_timeout=15000 -c transaction_timeout=120000"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-credentials, key: username}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-credentials, key: password}
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-runtime-credentials, key: username}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: trove-postgres-runtime-credentials, key: password}
+          volumeMounts:
+            - name: operator
+              mountPath: /operator
+              readOnly: true
+      volumes:
+        - name: operator
+          configMap:
+            name: trove-database-operator

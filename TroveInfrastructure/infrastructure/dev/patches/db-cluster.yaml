@@ -11,8 +11,4 @@ kind: Cluster
 metadata:
   name: trove-db
   namespace: trove
-spec:
-  instances: 1
-  storage:
-    size: 1Gi
-  enableSuperuserAccess: true
+$patch: delete

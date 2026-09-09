@@ -12,9 +12,6 @@ accessModifier: public
 namingStrategy: idiomatic
 additionalImports:
   - TroveAPITypes
-  - GroveLocalization
-  - GroveHealthKit
-  - GroveStudyDefinition
 typeOverrides:
   schemas:
     InformationalContent: TroveAPITypes.InformationalContent

@@ -52,6 +52,27 @@
   },
   "clientScopes": [
     {
+      "name": "trove-api",
+      "description": "Intended audience for the Trove API",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "Trove API audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "trove-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
       "name": "groups",
       "description": "Groups membership with full path",
       "protocol": "openid-connect",
@@ -141,7 +162,7 @@
       "redirectUris": ["$(env:WEB_URL)/*"],
       "webOrigins": ["$(env:WEB_URL)"],
       "protocol": "openid-connect",
-      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups", "trove-api"],
       "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"],
       "protocolMappers": [
         {
@@ -184,7 +205,7 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
-      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups", "trove-api"],
       "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"]
     }
   ],

@@ -33,20 +33,6 @@ extension Controller {
         return .ok(.init(body: .json(try enrollments.map { try .init($0) })))
     }
 
-    func patchParticipantEnrollmentsEnrollmentId(
-        _ input: Operations.PatchParticipantEnrollmentsEnrollmentId.Input
-    ) async throws -> Operations.PatchParticipantEnrollmentsEnrollmentId.Output {
-        guard case .json(let body) = input.body else {
-            throw ServerError.jsonBodyRequired
-        }
-        let enrollmentId = try input.path.enrollmentId.requireId()
-        let enrollment = try await participantEnrollmentService.upgradeToRevision(
-            enrollmentId: enrollmentId,
-            targetRevision: body.revision
-        )
-        return .ok(.init(body: .json(try .init(enrollment))))
-    }
-
     func postParticipantEnrollmentsEnrollmentIdWithdraw(
         _ input: Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Input
     ) async throws -> Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Output {
@@ -60,9 +46,7 @@ extension Controller {
     ) async throws -> Operations.GetParticipantStudiesStudyIdRevisionBundle.Output {
         let studyId = try input.path.studyId.requireId()
         let revision = input.path.revision
-        _ = try await authorizationService.checkParticipantHasEnrollmentAccess(studyId: studyId)
-        let key = "studies/\(studyId)/\(revision).zip"
-        let data = try await objectStorageService.download(key: key)
+        let data = try await publishedStudyService.participantBundle(studyId: studyId, revision: revision)
         return .ok(.init(
             headers: .init(contentDisposition: "attachment; filename=\"\(studyId)-\(revision).studybundle.zip\""),
             body: .applicationZip(HTTPBody(data))

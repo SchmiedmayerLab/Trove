@@ -1,11 +1,10 @@
-#
 # This source file is part of the Trove open-source project
-#
 # SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
-#
 # SPDX-License-Identifier: MIT
-#
 
-self-hosted-runner:
-  labels:
-    - macOS
+paths:
+  .github/workflows/build-and-test.yml:
+    ignore:
+      # GitHub supports queue: max; actionlint 1.7.12 does not parse it yet.
+      # The exact UI concurrency mapping is checked in test_ci_paths.py.
+      - '^unexpected key "queue" for "concurrency" section\.'

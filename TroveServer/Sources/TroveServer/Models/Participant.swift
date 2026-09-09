@@ -34,6 +34,8 @@ final class Participant: Model, @unchecked Sendable {
 
     @ID(key: .id) var id: UUID?
 
+    @Field(key: "identity_provider_issuer") var identityProviderIssuer: String
+
     @Field(key: "identity_provider_id") var identityProviderId: String
 
     @Field(key: "first_name") var firstName: String
@@ -61,6 +63,7 @@ final class Participant: Model, @unchecked Sendable {
     init() {}
 
     init(
+        identityProviderIssuer: String,
         identityProviderId: String,
         firstName: String,
         lastName: String,
@@ -73,6 +76,7 @@ final class Participant: Model, @unchecked Sendable {
         id: UUID? = nil
     ) {
         self.id = id
+        self.identityProviderIssuer = identityProviderIssuer
         self.identityProviderId = identityProviderId
         self.firstName = firstName
         self.lastName = lastName

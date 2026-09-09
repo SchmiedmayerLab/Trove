@@ -109,7 +109,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ios == 'true'
     runs-on: [self-hosted, macOS]
-    concurrency: trove-ios-real-stack
+    concurrency:
+      group: trove-ios-real-stack
+      queue: max
     timeout-minutes: 60
     permissions:
       contents: read

@@ -28,33 +28,55 @@ struct AuthContext: Sendable {
 
     @TaskLocal static var current: AuthContext?
 
+    let issuer: String
     let subject: String
     let email: String
     let roles: [String]
     let researcherRole: String
     let participantRole: String
+    /// Capture once at the trusted boundary and carry explicitly across database callbacks.
+    let auditContext: AuditEvent.Context
 
     /// Parsed JWT group paths (e.g., "/Schmiedmayer Lab/admin") as a membership map.
     let groupMemberships: [String: GroupRole]
+    /// Independent governed-data capability; administration alone does not imply it.
+    let auditReaderGroups: Set<String>
 
-    init(subject: String, email: String, roles: [String], groups: [String], researcherRole: String, participantRole: String) {
+    init(
+        issuer: String,
+        subject: String,
+        email: String,
+        roles: [String],
+        groups: [String],
+        researcherRole: String,
+        participantRole: String,
+        auditConfiguration: AuditConfiguration? = nil
+    ) {
+        self.issuer = issuer
         self.subject = subject
         self.email = email
         self.roles = roles
         self.researcherRole = researcherRole
         self.participantRole = participantRole
+        self.auditContext = .init(actor: .init(issuer: issuer, subject: subject), applicationRevision: auditConfiguration?.applicationRevision)
 
         var memberships: [String: GroupRole] = [:]
+        var auditReaders: Set<String> = []
         for path in groups {
             guard path.hasPrefix("/") else { continue }
-            let parts = path.dropFirst().split(separator: "/", maxSplits: 1)
-            guard parts.count == 2,
-                  let role = GroupRole(rawValue: String(parts[1])) else {
+            // Empty segments are invalid claims, not alternate spellings of a group.
+            let parts = path.dropFirst().split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, !parts[0].isEmpty else { continue }
+            let groupName = String(parts[0])
+            if parts[1] == "audit-reader" {
+                auditReaders.insert(groupName)
                 continue
             }
-            memberships[String(parts[0])] = role
+            guard let role = GroupRole(rawValue: String(parts[1])) else { continue }
+            memberships[groupName] = max(memberships[groupName] ?? role, role)
         }
         self.groupMemberships = memberships
+        self.auditReaderGroups = auditReaders
     }
 
     @discardableResult
@@ -82,6 +104,11 @@ struct AuthContext: Sendable {
             throw ServerError.forbidden
         }
         return context
+    }
+
+    static func checkHasAuditAccess(groupName: String) throws {
+        let context = try checkHasAccess(groupName: groupName, role: .admin)
+        guard context.auditReaderGroups.contains(groupName) else { throw ServerError.forbidden }
     }
 
     private static func requireCurrent() throws -> AuthContext {

@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Fluent
 import Foundation
 import Grove
 import Logging
@@ -31,16 +32,26 @@ final class StudyService: Module, @unchecked Sendable {
 
     func patchStudy(id: UUID, patch: StudyPatch) async throws -> Study {
         let study = try await authorizationService.checkResearcherHasStudyAccess(id, role: .researcher)
-        study.apply(patch)
+        try study.apply(patch)
         return try await repository.update(study)
     }
 
     func deleteStudy(id: UUID) async throws {
-        try await authorizationService.checkResearcherHasStudyAccess(id, role: .admin)
-
-        let deleted = try await repository.delete(id: id)
-        if !deleted {
-            throw ServerError.notFound(resource: "Study", identifier: id.uuidString)
+        let authorized = try await authorizationService.checkResearcherHasStudyAccess(id, role: .admin)
+        let actor = try AuthContext.checkIsResearcher()
+        try await repository.database.transaction { transaction in
+            guard let study = try await self.repository.deleteUnusedDraft(
+                id: id, expectedGroupID: authorized.$group.id, on: transaction
+            ) else {
+                throw ServerError.notFound(resource: "Study", identifier: id.uuidString)
+            }
+            let event = AuditEvent(
+                context: actor.auditContext,
+                action: .studyDraftDeleted,
+                scope: .study(studyID: id, groupID: study.$group.id),
+                target: .init(id: id)
+            )
+            try await AuditRepository.recordMutation(event, on: transaction)
         }
     }
 }

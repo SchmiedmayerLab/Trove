@@ -15,36 +15,47 @@ import TroveAPIServer
 import ZIPFoundation
 
 
-/// Wraps a string in double quotes and escapes special characters for YAML front matter.
-private func yamlEscape(_ value: String) -> String {
-    let specialChars = ":{}[]#&*!|>'\"%@`"
-    let needsQuoting = value.contains(where: { specialChars.contains($0) })
-        || value.contains(where: { $0.isNewline || $0 == "\t" || $0 == "\0" })
-    if !needsQuoting {
-        return value
-    }
-    let escaped = value
-        .replacingOccurrences(of: "\\", with: "\\\\")
-        .replacingOccurrences(of: "\"", with: "\\\"")
-        .replacingOccurrences(of: "\n", with: "\\n")
-        .replacingOccurrences(of: "\r", with: "\\r")
-        .replacingOccurrences(of: "\t", with: "\\t")
-        .replacingOccurrences(of: "\0", with: "\\0")
-    return "\"\(escaped)\""
-}
-
-
 final class StudyBundleService: Module, @unchecked Sendable {
+    struct Publication: Sendable {
+        let metadata: StudyDefinition.Metadata
+        let consent: LocalizationsDictionary<String>
+        let visibility: StudyVisibility
+        let enrollmentCondition: EnrollmentConditions
+        let collectionPolicy: PublishedCollectionPolicy
+        let groupID: UUID
+        let bundle: Data
+    }
+
     @Dependency(AuthorizationService.self) var authorizationService
     @Dependency(StudyRepository.self) var studyRepository
 
     func buildBundle(studyId: UUID, revision: Int) async throws -> Data {
+        try await preparePublication(studyId: studyId, revision: revision).bundle
+    }
+
+    /// One captured draft supplies both database metadata and the immutable archive.
+    func preparePublication(studyId: UUID, revision: Int) async throws -> Publication {
+        guard revision > 0 else {
+            throw ServerError.badRequest("Study revision must be positive")
+        }
         try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
         guard let study = try await studyRepository.findWithComponentsAndSchedules(id: studyId) else {
             throw ServerError.notFound(resource: "Study", identifier: studyId.uuidString)
         }
+        let collectionPolicy = try PublishedCollectionPolicy.compile(studyID: studyId, revision: revision, requirements: study.collectionRequirements)
 
-        let (metadata, consentFiles) = try await buildMetadata(from: study)
+        var consentMarkdown = LocalizationsDictionary<String>()
+        for (locale, content) in study.consent {
+            let markdown = ConsentPresentation.markdown(content: content)
+            do {
+                _ = try ConsentResponseRequirements(markdown: markdown)
+            } catch {
+                throw ServerError.badRequest("Consent contains invalid or unsupported response controls")
+            }
+            consentMarkdown[locale] = markdown
+        }
+
+        let (metadata, consentFiles) = try await buildMetadata(from: study, consentMarkdown: consentMarkdown)
         let (components, componentFiles) = try buildComponents(from: study.components)
         let schedules = study.components.flatMap { $0.schedules.map(\.scheduleData) }
 
@@ -55,13 +66,24 @@ final class StudyBundleService: Module, @unchecked Sendable {
             componentSchedules: schedules
         )
 
-        return try writeBundleZip(studyId: studyId, definition: definition, files: consentFiles + componentFiles)
+        return Publication(
+            metadata: metadata,
+            consent: consentMarkdown,
+            visibility: study.visibility,
+            enrollmentCondition: study.enrollmentCondition,
+            collectionPolicy: collectionPolicy,
+            groupID: study.$group.id,
+            bundle: try writeBundleZip(
+                studyId: studyId, definition: definition, files: consentFiles + componentFiles, collectionPolicy: collectionPolicy
+            )
+        )
     }
 
     // MARK: - Metadata
 
-    func buildMetadata(
-        from study: Study
+    private func buildMetadata(
+        from study: Study,
+        consentMarkdown: LocalizationsDictionary<String>
     ) async throws -> (StudyDefinition.Metadata, [StudyBundle.FileResourceInput]) {
         try await authorizationService.checkResearcherHasStudyAccess(study.requireId(), role: .researcher)
         
@@ -77,7 +99,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
             shortExplanationTexts[locale] = content.shortExplanationText
         }
 
-        let (consentRef, consentFiles) = try buildConsentFiles(from: study.consent)
+        let (consentRef, consentFiles) = try buildConsentFiles(from: consentMarkdown)
 
         let metadata = StudyDefinition.Metadata(
             id: try study.requireId(),
@@ -94,18 +116,15 @@ final class StudyBundleService: Module, @unchecked Sendable {
     }
 
     private func buildConsentFiles(
-        from consent: LocalizationsDictionary<ConsentContent>
+        from consent: LocalizationsDictionary<String>
     ) throws -> (StudyBundle.FileReference?, [StudyBundle.FileResourceInput]) {
         guard !consent.isEmpty else {
             return (nil, [])
         }
 
-        let version = Version(1, 0, 0)
-        
         let ref = StudyBundle.FileReference(category: .consent, filename: "Consent", fileExtension: "md")
-        let files = try consent.map { locale, definition in
-            let markdown = "---\ntitle: \(yamlEscape(definition.title))\nversion: \(version)\n---\n\(definition.content)"
-            return try StudyBundle.FileResourceInput(fileRef: ref, localization: locale, contents: markdown)
+        let files = try consent.map { locale, markdown in
+            try StudyBundle.FileResourceInput(fileRef: ref, localization: locale, contents: markdown)
         }
         return (ref, files)
     }
@@ -157,9 +176,9 @@ final class StudyBundleService: Module, @unchecked Sendable {
         let definition = StudyDefinition.Component.informational(.init(id: id, fileRef: fileRef))
 
         let files = try content.map { locale, item in
-            var markdown = "---\nid: \(id.uuidString)\ntitle: \(yamlEscape(item.title))\n"
+            var markdown = "---\nid: \(id.uuidString)\ntitle: \(ConsentPresentation.yamlEscape(item.title))\n"
             if let lede = item.lede {
-                markdown += "lede: \(yamlEscape(lede))\n"
+                markdown += "lede: \(ConsentPresentation.yamlEscape(lede))\n"
             }
             markdown += "---\n\(item.content)"
             return try StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: markdown)
@@ -188,7 +207,8 @@ final class StudyBundleService: Module, @unchecked Sendable {
     private func writeBundleZip(
         studyId: UUID,
         definition: StudyDefinition,
-        files: [StudyBundle.FileResourceInput]
+        files: [StudyBundle.FileResourceInput],
+        collectionPolicy: PublishedCollectionPolicy
     ) throws -> Data {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let bundleURL = tempDir.appendingPathComponent("\(studyId).\(StudyBundle.fileExtension)", isDirectory: true)
@@ -199,8 +219,14 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
+        let policyURL = tempDir.appendingPathComponent(PublishedCollectionPolicy.filename)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        try encoder.encode(collectionPolicy).write(to: policyURL, options: .atomic)
+        let policyFile = StudyBundle.FileResourceInput(pathInBundle: PublishedCollectionPolicy.filename, contentsOf: policyURL)
+
         do {
-            _ = try StudyBundle.writeToDisk(at: bundleURL, definition: definition, files: files)
+            _ = try StudyBundle.writeToDisk(at: bundleURL, definition: definition, files: files + [policyFile])
         } catch {
             throw ServerError.internalServerError("Failed to build study bundle: \(error)")
         }

@@ -31,13 +31,10 @@ class Benchmark:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self.directory = Path(__file__).resolve().parent
-        self.repository = self.directory.parents[1]
-        self.compose_directory = self.repository / "TroveInfrastructure" / "docker"
+        self.compose_directory = self.directory
         self.compose = [
             "docker",
             "compose",
-            "--env-file",
-            str(self.compose_directory / args.env_file),
             "-f",
             str(self.compose_directory / "docker-compose.yml"),
         ]
@@ -45,11 +42,15 @@ class Benchmark:
             *self.compose,
             "exec",
             "-T",
-            "server-timescale",
+            "benchmark-db",
             "psql",
             "-X",
             "-v",
             "ON_ERROR_STOP=1",
+            # The image's temporary initialization server accepts Unix sockets only.
+            # TCP reaches the final server after extension initialization has finished.
+            "-h",
+            "127.0.0.1",
             "-U",
             args.database_user,
             "-d",
@@ -57,26 +58,31 @@ class Benchmark:
         ]
 
     def wait_for_readiness(self, timeout_seconds: int = 120, interval_seconds: float = 0.5) -> None:
-        """Wait for TimescaleDB to accept connections before continuing."""
+        """Wait for the final server and its installed extension, without racing DDL."""
+        if timeout_seconds <= 0 or interval_seconds <= 0:
+            raise ValueError("Readiness timeout and interval must be positive")
         deadline = time.monotonic() + timeout_seconds
         while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("Timed out waiting for TimescaleDB initialization")
             try:
-                self.sql("SELECT 1")
-                return
-            except subprocess.CalledProcessError:
+                if self.sql(
+                    "SELECT EXISTS (SELECT FROM pg_extension WHERE extname = 'timescaledb')",
+                    timeout_seconds=min(5.0, remaining),
+                ) == "t":
+                    return
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 pass
+            time.sleep(min(interval_seconds, max(0, deadline - time.monotonic())))
 
-            if time.monotonic() >= deadline:
-                raise RuntimeError("Timed out waiting for TimescaleDB to become available")
-
-            time.sleep(interval_seconds)
-
-    def sql(self, statement: str) -> str:
+    def sql(self, statement: str, *, timeout_seconds: float | None = None) -> str:
         result = subprocess.run(
             [*self.psql, "-Atqc", statement],
             check=True,
             capture_output=True,
             text=True,
+            timeout=timeout_seconds,
         )
         return result.stdout.strip()
 
@@ -310,9 +316,8 @@ def main() -> None:
     parser.add_argument("--payload-bytes", type=int, default=2560)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--runs", type=int, default=20)
-    parser.add_argument("--database-user", default="trove")
-    parser.add_argument("--database-name", default="trove")
-    parser.add_argument("--env-file", default=".env.example")
+    parser.add_argument("--database-user", default="trove_benchmark")
+    parser.add_argument("--database-name", default="trove_benchmark")
     parser.add_argument("--output", type=Path, default=Path("benchmark-results.json"))
     args = parser.parse_args()
     if min(args.participants, args.days, args.runs) < 1 or args.warmups < 0 or args.payload_bytes < 512:

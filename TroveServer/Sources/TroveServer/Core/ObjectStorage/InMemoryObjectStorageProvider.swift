@@ -17,15 +17,20 @@ final class InMemoryObjectStorageProvider: ObjectStorageProvider, @unchecked Sen
         lock.withLock { storage[key] = data }
     }
 
-    func download(key: String) async throws -> Data {
+    func download(key: String, maximumBytes: Int) async throws -> Data {
         let value = lock.withLock { storage[key] }
         guard let value else {
             throw ServerError.notFound("Object not found: \(key)")
         }
+        guard value.count <= maximumBytes else { throw ServerError.internalServerError("Stored object exceeds the read limit") }
         return value
     }
 
     func ensureBucketExists() async throws {}
+
+    func delete(key: String) async throws {
+        _ = lock.withLock { storage.removeValue(forKey: key) }
+    }
 
     func shutdown() async throws {}
 }

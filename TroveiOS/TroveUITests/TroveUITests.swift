@@ -30,7 +30,7 @@ final class TroveUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments.append("--reset-authentication-state")
         app.launchEnvironment["TROVE_API_BASE_URL"] = "http://127.0.0.1:8080/api/v0"
-        app.launchEnvironment["TROVE_KEYCLOAK_ISSUER"] = "http://127.0.0.1:8180/realms/trove"
+        app.launchEnvironment["TROVE_KEYCLOAK_ISSUER"] = "http://localhost:8180/realms/trove"
         app.launch()
 
         let signIn = app.buttons["Sign in with Keycloak"]

@@ -637,8 +637,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SchmiedmayerLab/Grove.git";
 			requirement = {
-				kind = exact;
-				version = "0.3.0-beta.6";
+				kind = revision;
+				revision = 53d2d475571d634371b58871fc1ad749259f401b;
 			};
 		};
 		DFBAF4732FA5300000CCAEAA /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */ = {

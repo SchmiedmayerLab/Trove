@@ -1,0 +1,155 @@
+{
+  "contractRevision": "444e06fb25680c3af29e5d3ccbebeb0249be7318",
+  "sourceArchiveSHA256": "5dfa795726eb897a64ed00fa145e7252259a0bab083d0b776ecdce736656e469",
+  "validatorVersion": "6.10.4",
+  "validatorSHA256": "1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc",
+  "bootstrap": [
+    {
+      "file": "hl7.fhir.pubpack-0.2.5.tgz",
+      "sha256": "ce55f91c9e4ca723711a9c6a55aee22368278b73e3c4e0c6408bf90488a1a360"
+    },
+    {
+      "file": "hl7.fhir.r4.core-4.0.1.tgz",
+      "sha256": "ebd7731df7d36b5b7d39d5fb6c9d77b44bb7fe5742f1a2e87f164738c3289d44"
+    },
+    {
+      "file": "hl7.fhir.r5.core-5.0.0.tgz",
+      "sha256": "74b27cd1bfce9e80eaceac431edf230b0945a443564fbf5512f82e5fa50a80d4"
+    },
+    {
+      "file": "hl7.fhir.xver-extensions-0.1.0.tgz",
+      "sha256": "f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a"
+    },
+    {
+      "file": "hl7.terminology.r4-6.2.0.tgz",
+      "sha256": "79404c9cc95491fc0155627cd039c401a6eb4748175328131e91b709a41300e2"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r4-5.2.0.tgz",
+      "sha256": "b406e75575f05676559d0759770c5939d023ee72fb2ef38e0b3259328487720a"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r5-5.2.0.tgz",
+      "sha256": "e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170"
+    },
+    {
+      "file": "hl7.terminology.r5-7.1.0.tgz",
+      "sha256": "473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r5-5.3.0.tgz",
+      "sha256": "f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105"
+    },
+    {
+      "file": "hl7.terminology-7.3.0.tgz",
+      "sha256": "8318f87cdcb44a6dfc5c197ca569c9b0499b06f45522324bfc4b4b810d51d4b9"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions-5.3.0.tgz",
+      "sha256": "6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0"
+    },
+    {
+      "file": "hl7.terminology.r4-7.1.0.tgz",
+      "sha256": "1cb0cd5601972925fcd04f2c175d9cc63a9ecd9346a91a6e735f1a865dc5fba1"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r4-5.3.0.tgz",
+      "sha256": "dfbc3ac95df91ed845cc6b60920d2875f679361fa0e16f227cee93c4a9ab2104"
+    },
+    {
+      "file": "hl7.terminology.r4-7.3.0.tgz",
+      "sha256": "1a1ef2aa22ecc820341267f2bdba3b2d1f4adafb9bdddfc9e51c611cd64f3b54"
+    },
+    {
+      "file": "hl7.fhir.uv.sdc-4.0.0.tgz",
+      "sha256": "d785be8474c7ec7988e32e326430d9ca4aeb2cac4a1f195022e4d6f7dc5c5291"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r4-5.3.0-ballot-tc1.tgz",
+      "sha256": "5f5d1e88052d615453e6b7a1eb4f885df36590f14b52974e5860485d16819bd9"
+    },
+    {
+      "file": "hl7.fhir.r4.examples-4.0.1.tgz",
+      "sha256": "e18b31e7a52145a31f1f3f409cf6847583b08b7306cc4e9460a95a7b5efba930"
+    },
+    {
+      "file": "hl7.fhir.uv.xver-r5.r4-0.1.0.tgz",
+      "sha256": "7ee6f04d78ced803dd567559a0d178bafbd2d3b71db61bbbf6b15c796a1a664d"
+    },
+    {
+      "file": "hl7.fhir.uv.tools.r4-1.1.2.tgz",
+      "sha256": "a1f166f8808629a40c4acabc16a4fbfd164d9f38f9db95b6f4b38bb69155dfe4"
+    },
+    {
+      "file": "hl7.terminology.r4-6.5.0.tgz",
+      "sha256": "a28b638483a11df696ed92198276236d759e41c7a3a8960c9e7e7d0a1185bd06"
+    }
+  ],
+  "guides": [
+    {
+      "source": "mobile",
+      "packageId": "org.grovealliance.fhir.mobile",
+      "file": "mobile-0.6.0.tgz",
+      "sha256": "12b8c3a96736c12279105fb9cd803ba5ab1f6ad1fd4a66e4c54a952eb0c578d2"
+    },
+    {
+      "source": "questionnaire",
+      "packageId": "org.grovealliance.fhir.questionnaire",
+      "file": "questionnaire-0.6.0.tgz",
+      "sha256": "8c93fa72a85355d52377a96720b1cedee6930575010eef9e2462786fc6aa3f00"
+    },
+    {
+      "source": "sensor",
+      "packageId": "org.grovealliance.fhir.sensor",
+      "file": "sensor-0.6.0.tgz",
+      "sha256": "af57535a2cbe0b10be6767054cbf1da4a0858e6cd293c244de9d7ec2ee40f68b"
+    },
+    {
+      "source": "sensorkit",
+      "packageId": "org.grovealliance.fhir.sensorkit",
+      "file": "sensorkit-0.6.0.tgz",
+      "sha256": "545a72751aa05df6df28db3cfa02adc49151349f1d4732ed17504026485b34b9"
+    },
+    {
+      "source": "healthkit",
+      "packageId": "org.grovealliance.fhir.healthkit",
+      "file": "healthkit-0.6.0.tgz",
+      "sha256": "55b4b51f81a6f7d14988fb5cc2d2a6335f3c6625274f0dc084657e81f632eb96"
+    },
+    {
+      "source": "health-connect",
+      "packageId": "org.grovealliance.fhir.health-connect",
+      "file": "health-connect-0.6.0.tgz",
+      "sha256": "d325b1f03d519f89d0763a9353e8b1332ef6b08f38d1d08b785eda040748a1e8"
+    },
+    {
+      "source": "providers",
+      "packageId": "org.grovealliance.fhir.providers",
+      "file": "providers-0.6.0.tgz",
+      "sha256": "af62c5dc519e3b4aeeebbf247a4c93c86586ade6f31c1368fd9ea39206f673a3"
+    },
+    {
+      "source": "withings",
+      "packageId": "org.grovealliance.fhir.withings",
+      "file": "withings-0.6.0.tgz",
+      "sha256": "f97f94cf1e8f8a83debfae8338e311d714a6a435171401972352678aa74ed7a9"
+    },
+    {
+      "source": "oura",
+      "packageId": "org.grovealliance.fhir.oura",
+      "file": "oura-0.6.0.tgz",
+      "sha256": "7051c9cb262061c4983f0a0f56eb7029ab26e66c05dd88c94b486d176a608ca2"
+    },
+    {
+      "source": "google-health",
+      "packageId": "org.grovealliance.fhir.google-health",
+      "file": "google-health-0.6.0.tgz",
+      "sha256": "f37b8168c3a3505d94635c622702e4e874557e6c9da862493c0874c5d8b7f1cd"
+    }
+  ],
+  "workerSHA256": "325d4237316d9e5c6839eb888163697af2081d515e0b5ce56494872990861c52",
+  "runtimeImages": {
+    "python": "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+    "java": "eclipse-temurin:21-jre-jammy@sha256:eebd356ad7358b7094758e5787a6726f332917cfd56feab6457c56dab895cdbf"
+  }
+}

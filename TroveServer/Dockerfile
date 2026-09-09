@@ -9,7 +9,8 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.3-noble AS build
+FROM swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4 AS build
+ARG TARGETARCH
 
 # Install OS updates
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
@@ -30,8 +31,8 @@ COPY TroveAPI ./TroveAPI
 # files do not change.
 COPY TroveServer/Package.* ./TroveServer/
 WORKDIR /build/TroveServer
-RUN swift package resolve \
-        $([ -f ./Package.resolved ] && echo "--force-resolved-versions" || true)
+RUN --mount=type=cache,id=trove-server-${TARGETARCH},target=/build/TroveServer/.build,sharing=locked \
+    swift package resolve --force-resolved-versions
 
 # Copy the server sources into the build area
 COPY TroveServer ./
@@ -40,8 +41,8 @@ RUN mkdir /staging
 
 # Build the application, with optimizations, with static linking, and using jemalloc
 # N.B.: The static version of jemalloc is incompatible with the static Swift runtime.
-RUN --mount=type=cache,target=/build/server/.build \
-    swift build -c release \
+RUN --mount=type=cache,id=trove-server-${TARGETARCH},target=/build/TroveServer/.build,sharing=locked \
+    swift build -c release --force-resolved-versions --jobs 4 \
         --product TroveServer \
         --static-swift-stdlib \
         -Xlinker -ljemalloc && \
@@ -59,30 +60,19 @@ RUN cp "/usr/libexec/swift/linux/swift-backtrace-static" ./
 
 # Copy any resources from the public directory and views directory if the directories exist
 # Ensure that by default, neither the directory nor any of its contents are writable.
-RUN [ -d /build/server/Public ] && { mv /build/server/Public ./Public && chmod -R a-w ./Public; } || true
-RUN [ -d /build/server/Resources ] && { mv /build/server/Resources ./Resources && chmod -R a-w ./Resources; } || true
+RUN if [ -d /build/TroveServer/Public ]; then mv /build/TroveServer/Public ./Public && chmod -R a-w ./Public; fi
+RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources ./Resources && chmod -R a-w ./Resources; fi
 
 # ================================
 # Run image
 # ================================
-FROM ubuntu:noble
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:918a593b8268c222afd4e2c4f06860ac984e60719b4697e4c71d796bc8fcd042
 
-# Make sure all system packages are up to date, and install only essential packages.
-RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-    && apt-get -q update \
-    && apt-get -q dist-upgrade -y \
-    && apt-get -q install -y \
-      libjemalloc2 \
-      ca-certificates \
-      tzdata \
-# If your app or its dependencies import FoundationNetworking, also install `libcurl4`.
-      # libcurl4 \
-# If your app or its dependencies import FoundationXML, also install `libxml2`.
-      # libxml2 \
-    && rm -r /var/lib/apt/lists/*
-
-# Create a vapor user and group with /app as its home directory
-RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
+# Keep the Swift toolchain in the build stage. The serving image needs only the
+# binary's dynamic libraries, certificate roots and time-zone data.
+RUN apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
+    && addgroup -S -g 999 vapor \
+    && adduser -S -D -H -u 999 -G vapor -h /app vapor
 
 # Switch to the new home directory
 WORKDIR /app

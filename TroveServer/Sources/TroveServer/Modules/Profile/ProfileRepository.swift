@@ -18,10 +18,11 @@ final class ProfileRepository: Module, Sendable {
         self.database = database
     }
 
-    func findByIdentityProviderId(_ id: String) async throws -> Participant? {
+    func findByIdentity(issuer: String, subject: String) async throws -> Participant? {
         // swiftlint:disable:next first_where
         try await Participant.query(on: database)
-            .filter(\.$identityProviderId == id)
+            .filter(\.$identityProviderIssuer == issuer)
+            .filter(\.$identityProviderId == subject)
             .first()
     }
 
