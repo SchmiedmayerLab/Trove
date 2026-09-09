@@ -12,10 +12,15 @@ import OpenAPIRuntime
 
 
 struct BearerAuthMiddleware: ClientMiddleware {
-    let tokenProvider: @Sendable () async throws -> String?
+    let tokenProvider: @Sendable () async throws -> String
+    let validateSession: @Sendable () async throws -> Void
 
-    init(tokenProvider: @escaping @Sendable () async throws -> String?) {
+    init(
+        tokenProvider: @escaping @Sendable () async throws -> String,
+        validateSession: @escaping @Sendable () async throws -> Void
+    ) {
         self.tokenProvider = tokenProvider
+        self.validateSession = validateSession
     }
 
     func intercept(
@@ -26,9 +31,17 @@ struct BearerAuthMiddleware: ClientMiddleware {
         next: @Sendable @concurrent (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
         var mutableRequest = request
-        if let token = try await tokenProvider(), !token.isEmpty {
-            mutableRequest.headerFields[.authorization] = "Bearer \(token)"
+        try Task.checkCancellation()
+        let token = try await tokenProvider()
+        guard !token.isEmpty else {
+            throw KeycloakAccountError.notSignedIn
         }
-        return try await next(mutableRequest, body, baseURL)
+        try await validateSession()
+        try Task.checkCancellation()
+        mutableRequest.headerFields[.authorization] = "Bearer \(token)"
+        let response = try await next(mutableRequest, body, baseURL)
+        try await validateSession()
+        // A response already received can reconcile a mutation even if its view task ended.
+        return response
     }
 }

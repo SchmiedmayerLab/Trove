@@ -35,26 +35,83 @@ enum EnrollmentModelError: LocalizedError {
 @MainActor
 @Observable
 final class EnrollmentModel: Module, EnvironmentAccessible {
-    @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
+    /// A bounded transport seam; production requests use a client bound to the captured session.
+    struct Transport {
+        var session: @MainActor () -> KeycloakSessionSnapshot?
+        var list: @MainActor (KeycloakSessionSnapshot) async throws -> [Trove.Enrollment]
+        var enroll: @MainActor (KeycloakSessionSnapshot, String, String?) async throws -> Trove.Enrollment
+        var withdraw: @MainActor (KeycloakSessionSnapshot, String) async throws -> Trove.Enrollment
+    }
 
-    private(set) var state: LoadingState<[Trove.Enrollment]> = .idle
-    private(set) var isMutating = false
+    @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
+    @ObservationIgnored private let transport: Transport?
+
+    private var storedState: LoadingState<[Trove.Enrollment]> = .idle
+    private var storedSession: KeycloakSessionSnapshot?
+    private var refreshID: UUID?
+    private var mutationID: UUID?
+
+    var state: LoadingState<[Trove.Enrollment]> {
+        currentSession != nil && currentSession == storedSession ? storedState : .idle
+    }
+
+    var isMutating: Bool {
+        currentSession != nil && currentSession == storedSession && mutationID != nil
+    }
+
+    private var currentSession: KeycloakSessionSnapshot? {
+        if let transport {
+            return transport.session()
+        }
+        return api.sessionSnapshot
+    }
+
+    init(transport: Transport? = nil) {
+        self.transport = transport
+    }
+
+    /// Also checked on every read, so delayed view callbacks cannot expose the prior account's state.
+    func invalidateSession() {
+        storedState = .idle
+        storedSession = nil
+        refreshID = nil
+        mutationID = nil
+    }
 
     func refresh() async {
-        let hadValue = state.value != nil
-        state.beginLoading()
+        guard let session = synchronizeSession(), mutationID == nil else {
+            return
+        }
+        let identifier = UUID()
+        refreshID = identifier
+        let hadValue = storedState.value != nil
+        storedState.beginLoading()
+        defer {
+            if refreshID == identifier { refreshID = nil }
+        }
         do {
-            let enrollments = try await api.requireClient().getParticipantEnrollments(.init()).ok.body.json
-            guard !Task.isCancelled else {
-                state.cancelLoading()
+            let enrollments: [Trove.Enrollment]
+            if let transport {
+                enrollments = try await transport.list(session)
+            } else {
+                enrollments = try await api.requireClient(for: session).getParticipantEnrollments(.init()).ok.body.json
+            }
+            guard isCurrent(session), refreshID == identifier else {
                 return
             }
-            state.resolve(with: enrollments)
+            guard !Task.isCancelled else {
+                storedState.cancelLoading()
+                return
+            }
+            storedState.resolve(with: enrollments)
         } catch {
+            guard isCurrent(session), refreshID == identifier else {
+                return
+            }
             if Task.isCancelled {
-                state.cancelLoading()
+                storedState.cancelLoading()
             } else {
-                state.reject(with: error)
+                storedState.reject(with: error)
                 if hadValue {
                     ErrorHandler.shared.handle(error)
                 }
@@ -63,35 +120,25 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
     }
 
     func enroll(studyId: String, invitationCode: String? = nil) async throws {
-        guard state.isLoaded else {
-            throw EnrollmentModelError.enrollmentStateUnavailable
+        try await mutate { session in
+            if let transport = self.transport {
+                return try await transport.enroll(session, studyId, invitationCode)
+            }
+            return try await self.api.requireClient(for: session).postParticipantStudiesStudyIdEnrollments(
+                .init(path: .init(studyId: studyId), body: .json(.init(invitationCode: invitationCode)))
+            ).created.body.json
         }
-        guard !isMutating else {
-            throw EnrollmentModelError.mutationInProgress
-        }
-        isMutating = true
-        defer { isMutating = false }
-
-        let enrollment = try await api.requireClient().postParticipantStudiesStudyIdEnrollments(
-            .init(path: .init(studyId: studyId), body: .json(.init(invitationCode: invitationCode)))
-        ).created.body.json
-        store(enrollment)
     }
 
     func withdraw(enrollmentId: String) async throws {
-        guard state.isLoaded else {
-            throw EnrollmentModelError.enrollmentStateUnavailable
+        try await mutate { session in
+            if let transport = self.transport {
+                return try await transport.withdraw(session, enrollmentId)
+            }
+            return try await self.api.requireClient(for: session).postParticipantEnrollmentsEnrollmentIdWithdraw(
+                .init(path: .init(enrollmentId: enrollmentId))
+            ).ok.body.json
         }
-        guard !isMutating else {
-            throw EnrollmentModelError.mutationInProgress
-        }
-        isMutating = true
-        defer { isMutating = false }
-
-        let enrollment = try await api.requireClient().postParticipantEnrollmentsEnrollmentIdWithdraw(
-            .init(path: .init(enrollmentId: enrollmentId))
-        ).ok.body.json
-        store(enrollment)
     }
 
     func activeEnrollment(forStudy studyId: String) -> Trove.Enrollment? {
@@ -108,12 +155,58 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
     }
 
     private func store(_ enrollment: Trove.Enrollment) {
-        var items = state.value ?? []
+        var items = storedState.value ?? []
         if let index = items.firstIndex(where: { $0.id == enrollment.id }) {
             items[index] = enrollment
         } else {
             items.append(enrollment)
         }
-        state.resolve(with: items)
+        storedState.resolve(with: items)
+    }
+
+    @discardableResult
+    func synchronizeSession() -> KeycloakSessionSnapshot? {
+        let session = currentSession
+        if session != storedSession {
+            invalidateSession()
+            storedSession = session
+        }
+        return session
+    }
+
+    private func isCurrent(_ session: KeycloakSessionSnapshot) -> Bool {
+        currentSession == session && storedSession == session
+    }
+
+    private func mutate(_ operation: @MainActor (KeycloakSessionSnapshot) async throws -> Trove.Enrollment) async throws {
+        guard let session = synchronizeSession(), storedState.value != nil,
+              storedState.isLoaded || storedState.isLoading else {
+            throw EnrollmentModelError.enrollmentStateUnavailable
+        }
+        guard mutationID == nil else {
+            throw EnrollmentModelError.mutationInProgress
+        }
+        let identifier = UUID()
+        mutationID = identifier
+        refreshID = nil
+        storedState.cancelLoading()
+        defer {
+            if mutationID == identifier { mutationID = nil }
+        }
+        do {
+            try Task.checkCancellation()
+            let enrollment = try await operation(session)
+            guard isCurrent(session), mutationID == identifier else {
+                throw CancellationError()
+            }
+            // A received server result remains authoritative even if the view task was cancelled.
+            store(enrollment)
+        } catch {
+            guard isCurrent(session), mutationID == identifier else {
+                throw CancellationError()
+            }
+            storedState.reject(with: error)
+            throw error
+        }
     }
 }

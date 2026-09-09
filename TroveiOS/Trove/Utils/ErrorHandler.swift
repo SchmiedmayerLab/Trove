@@ -16,11 +16,14 @@ final class ErrorHandler {
     static let shared = ErrorHandler()
 
     private let logger = Logger(subsystem: "org.troveplatform.app", category: "ErrorHandler")
-    var currentError: (any Error)?
+    var currentError: ErrorPresentation?
 
     func handle(_ error: any Error) {
-        logger.error("Unhandled error: \(error.localizedDescription, privacy: .public)")
-        currentError = error
+        guard !Task.isCancelled, let presentation = ErrorPresentation(error) else {
+            return
+        }
+        logger.error("An operation failed; displaying a reviewed app message.")
+        currentError = presentation
     }
 }
 
@@ -32,7 +35,14 @@ func catchingTask(
     operation: @MainActor @escaping () async throws -> Void
 ) -> Task<Void, Never> {
     Task(name: name, priority: priority) {
-        do { try await operation() } catch { ErrorHandler.shared.handle(error) }
+        do {
+            try await operation()
+        } catch {
+            guard !Task.isCancelled, !ErrorPresentation.isCancellation(error) else {
+                return
+            }
+            ErrorHandler.shared.handle(error)
+        }
     }
 }
 
@@ -48,7 +58,7 @@ extension View {
         ) { _ in
             Button("OK", role: .cancel) {}
         } message: { error in
-            Text(error.localizedDescription)
+            Text(error.message)
         }
     }
 }

@@ -1,0 +1,18 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSHealthShareUsageDescription" : {
+      "comment" : "System permission prompt explaining why the participant app requests read access to heart rate samples.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trove reads heart rate data to share measurements covered by your study consents."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

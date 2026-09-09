@@ -16,26 +16,69 @@ import TroveAPIClient
 final class BrowseModel: Module, EnvironmentAccessible {
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
 
-    private(set) var state: LoadingState<[Trove.Study]> = .idle
-    private(set) var findState: LoadingState<[Trove.Study]> = .idle
+    private var storedState: LoadingState<[Trove.Study]> = .idle
+    private var storedFindState: LoadingState<[Trove.Study]> = .idle
+    private var owner: KeycloakSessionSnapshot?
+    private var refreshID: UUID?
+    private var findID: UUID?
+
+    var state: LoadingState<[Trove.Study]> {
+        owner == api.sessionSnapshot ? storedState : .idle
+    }
+
+    var findState: LoadingState<[Trove.Study]> {
+        owner == api.sessionSnapshot ? storedFindState : .idle
+    }
+
+    func invalidateSession() {
+        storedState = .idle
+        storedFindState = .idle
+        refreshID = nil
+        findID = nil
+        owner = nil
+    }
+
+    private func currentSession() -> KeycloakSessionSnapshot? {
+        let current = api.sessionSnapshot
+        if owner != current {
+            invalidateSession()
+            owner = current
+        }
+        return current
+    }
+
+    func synchronizeSession() {
+        _ = currentSession()
+    }
 
     func refresh() async {
+        guard let session = currentSession() else {
+            return
+        }
+        let operation = UUID()
+        refreshID = operation
         let hadValue = state.value != nil
-        state.beginLoading()
+        storedState.beginLoading()
         do {
-            let studies = try await api.requireClient()
+            let studies = try await api.requireClient(for: session)
                 .getParticipantStudies(.init(query: .init(studyId: nil)))
                 .ok.body.json
-            guard !Task.isCancelled else {
-                state.cancelLoading()
+            guard refreshID == operation, api.sessionSnapshot == session else {
                 return
             }
-            state.resolve(with: studies)
+            guard !Task.isCancelled else {
+                storedState.cancelLoading()
+                return
+            }
+            storedState.resolve(with: studies)
         } catch {
+            guard refreshID == operation, api.sessionSnapshot == session else {
+                return
+            }
             if Task.isCancelled {
-                state.cancelLoading()
+                storedState.cancelLoading()
             } else {
-                state.reject(with: error)
+                storedState.reject(with: error)
                 if hadValue {
                     ErrorHandler.shared.handle(error)
                 }
@@ -44,26 +87,38 @@ final class BrowseModel: Module, EnvironmentAccessible {
     }
 
     func find(studyId: String) async {
-        findState.beginLoading(preservingValue: false)
+        guard let session = currentSession() else {
+            return
+        }
+        let operation = UUID()
+        findID = operation
+        storedFindState.beginLoading(preservingValue: false)
         do {
-            let studies = try await api.requireClient()
+            let studies = try await api.requireClient(for: session)
                 .getParticipantStudies(.init(query: .init(studyId: studyId)))
                 .ok.body.json
-            guard !Task.isCancelled else {
-                findState.cancelLoading()
+            guard findID == operation, api.sessionSnapshot == session else {
                 return
             }
-            findState.resolve(with: studies)
+            guard !Task.isCancelled else {
+                storedFindState.cancelLoading()
+                return
+            }
+            storedFindState.resolve(with: studies)
         } catch {
+            guard findID == operation, api.sessionSnapshot == session else {
+                return
+            }
             if Task.isCancelled {
-                findState.cancelLoading()
+                storedFindState.cancelLoading()
             } else {
-                findState.reject(with: error)
+                storedFindState.reject(with: error)
             }
         }
     }
 
     func resetFind() {
-        findState = .idle
+        findID = nil
+        storedFindState = .idle
     }
 }

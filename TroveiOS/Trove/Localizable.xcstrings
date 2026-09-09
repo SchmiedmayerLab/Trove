@@ -1,0 +1,27 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Health Data" : { "comment" : "Participant tab and screen title for device data collection." },
+    "Heart Rate" : { "comment" : "The measurement collected by the initial device integration." },
+    "Working…" : { "comment" : "Progress indicator for a foreground health data operation." },
+    "Set Up This Device" : { "comment" : "Explicitly creates local collection state and registers this device." },
+    "Review Health Access" : { "comment" : "Requests the system HealthKit read-access prompt." },
+    "Sync Available Data" : { "comment" : "Runs one bounded foreground collection and delivery pass." },
+    "Sign in to manage health data collection." : {},
+    "Set up this device to share heart rate data with your enrolled studies." : {},
+    "This device is set up. You can review Health access and sync available data." : {},
+    "This sync pass finished. More data may be available; you can sync again." : {},
+    "Some data is waiting to be sent. Try syncing again later." : {},
+    "This collection pass reached its limit. Keep the app open to continue." : {},
+    "Some data could not be processed safely. Your saved data has been preserved. Contact your study team." : {},
+    "Collection from this device has been revoked. Contact your study team." : {},
+    "An active study consent for heart rate collection is required. Review your studies before continuing." : {},
+    "Health data sync is unavailable. Check your connection and try again." : {},
+    "The Health access request finished. You can review permissions in Health." : {},
+    "Review Health access before syncing data from this device." : {},
+    "Only data covered by your study consents is shared. One sample can support more than one study without being uploaded twice." : {},
+    "Health does not tell apps whether read access was denied. An empty sync does not confirm permission or complete data delivery." : {},
+    "After device setup and Health access review, collection can resume when Health notifies this app. Open the app to continue pending uploads. Background updates depend on the system and are not guaranteed." : {}
+  },
+  "version" : "1.0"
+}
