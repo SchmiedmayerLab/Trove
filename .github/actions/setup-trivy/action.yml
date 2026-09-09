@@ -1,0 +1,31 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+name: Set Up Trivy
+description: Install the checksum-verified vulnerability scanner on hosted Linux runners.
+runs:
+  using: composite
+  steps:
+    - name: Install the pinned scanner
+      shell: bash
+      env:
+        TRIVY_RELEASE: 0.74.0
+        TRIVY_X64_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+        TRIVY_ARM64_SHA256: b94ce1976bbf3c15b514b605ee88be7c6d94a29be2302847ff01cb794d47aad5
+      run: |
+        set -euo pipefail
+        [[ "$(uname -s)" == Linux ]]
+        case "$(uname -m)" in
+          x86_64) platform=Linux-64bit; checksum="$TRIVY_X64_SHA256" ;;
+          aarch64) platform=Linux-ARM64; checksum="$TRIVY_ARM64_SHA256" ;;
+          *) exit 1 ;;
+        esac
+        installation="$(mktemp -d "$RUNNER_TEMP/trove-trivy.XXXXXX")"
+        archive="$installation/release.tar.gz"
+        curl --fail --location --retry 3 --max-time 120 \
+          "https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_RELEASE/trivy_${TRIVY_RELEASE}_${platform}.tar.gz" \
+          --output "$archive"
+        printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --strict
+        tar --extract --gzip --file "$archive" --directory "$installation" trivy
+        echo "$installation" >> "$GITHUB_PATH"

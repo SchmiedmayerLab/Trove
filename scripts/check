@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repository_root"
+
+require_tool() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Required verification tool is missing: $1" >&2
+        exit 1
+    fi
+}
+
+verify_swift_diagnostics() {
+    # A compiler-plugin failure can be printed even when SwiftPM exits zero.
+    # Keep raw logs and fail verification; do not hide these diagnostics as warnings.
+    if ! awk '/^(Internal Error:|LLVM Profile Error:)/ { failed = 1 } END { exit failed ? 1 : 0 }' "$1"; then
+        echo "Swift compiler or coverage diagnostics require investigation: $1" >&2
+        return 1
+    fi
+}
+
+case "${1:-}" in
+    swift)
+        package="${2:-}"
+        case "$package" in
+            TroveAPI|TroveServer) ;;
+            *) echo "Expected package TroveAPI or TroveServer." >&2; exit 2 ;;
+        esac
+        if [[ -n "${3:-}" ]] && { [[ "$3" != "$(basename "$3")" ]] || [[ "$3" != *.lcov ]]; }; then
+            echo "Coverage artifact must be an .lcov filename, not a path." >&2
+            exit 2
+        fi
+        require_tool swift
+        require_tool awk
+        require_tool tee
+        require_tool python3
+        require_tool mktemp
+        swift_version="$(swift --version)"
+        echo "$swift_version"
+        if [[ ! "$swift_version" =~ Swift\ version\ 6\.3(\.[0-9]+)?[[:space:]] ]]; then
+            echo "CI parity requires Swift 6.3.x; run with the pinned workflow container/toolchain." >&2
+            exit 1
+        fi
+        if [[ "$(uname -s)" == Darwin ]]; then
+            require_tool xcrun
+            coverage_tool=(xcrun llvm-cov)
+        else
+            require_tool llvm-cov
+            coverage_tool=(llvm-cov)
+            # Both packages exercise the client journal, including receiver recovery tests.
+            require_tool pkg-config
+            if ! pkg-config --exists sqlite3; then
+                echo "The client delivery journal requires SQLite development files (Ubuntu: libsqlite3-dev)." >&2
+                exit 1
+            fi
+            pkg-config --modversion sqlite3
+        fi
+        "${coverage_tool[@]}" --version
+        cd "$package"
+        mkdir -p .build/verification
+        # Bound compiler fan-out consistently on hosted runners and larger local hosts.
+        # This changes build concurrency, not which tests execute.
+        build_args=(--force-resolved-versions --enable-code-coverage --jobs 4)
+        # Compiler macros execute inside a read-only sandbox. Their own process
+        # profiles are not application test coverage. Build all instrumented test
+        # products first; only discard host-tool profiles during this build step.
+        LLVM_PROFILE_FILE=/dev/null swift build --build-tests "${build_args[@]}" 2>&1 | tee .build/verification/build.log
+        verify_swift_diagnostics .build/verification/build.log
+        test_args=("${build_args[@]}")
+        if [[ "$package" == TroveServer ]]; then
+            # Test applications own isolated databases. Keep suite scheduling bounded
+            # until full-suite parallel resource limits are verified; individual tests
+            # still exercise concurrent transactions and applications.
+            test_args+=(--no-parallel)
+        fi
+        # SwiftPM owns the real test profile destination. Do not inherit a caller's
+        # build-tool destination or rebuild macros during test execution.
+        execution_reports="$(mktemp -d "$PWD/.build/verification/execution.XXXXXX")"
+        env -u LLVM_PROFILE_FILE swift test --skip-build "${test_args[@]}" \
+            --xunit-output "$execution_reports/tests.xml" 2>&1 | tee .build/verification/test.log
+        verify_swift_diagnostics .build/verification/test.log
+        python3 "$repository_root/scripts/check-swift-test-report.py" "$execution_reports/tests-swift-testing.xml"
+        binary_path="$(swift build --force-resolved-versions --show-bin-path)"
+        shopt -s nullglob
+        profiles=("$binary_path"/codecov/*.profdata)
+        bundles=("$binary_path"/*.xctest)
+        if [[ "${#profiles[@]}" -ne 1 || "${#bundles[@]}" -ne 1 ]]; then
+            echo "Expected exactly one coverage profile and test bundle; refusing ambiguous or missing coverage." >&2
+            exit 1
+        fi
+        test_binary="${bundles[0]}"
+        if [[ -d "$test_binary" ]]; then
+            test_binary="$test_binary/Contents/MacOS/$(basename "$test_binary" .xctest)"
+        fi
+        "${coverage_tool[@]}" export "$test_binary" \
+            --instr-profile="${profiles[0]}" --format=lcov > .build/verification/raw.lcov
+        awk -f "$repository_root/scripts/line-coverage.awk" \
+            .build/verification/raw.lcov > .build/verification/coverage.lcov
+        if [[ -n "${3:-}" ]]; then
+            cp .build/verification/coverage.lcov "$3"
+        fi
+        ;;
+    web)
+        require_tool node
+        require_tool npm
+        node --version
+        npm --version
+        if [[ "$(node -p 'process.versions.node.split(".")[0]')" != 24 ]]; then
+            echo "CI parity requires Node.js 24, as declared in TroveWeb/package.json." >&2
+            exit 1
+        fi
+        cd TroveWeb
+        npm ci --ignore-scripts
+        npm run generate:api
+        npm run lint -- --max-warnings 0
+        npm run format:check
+        npm run build
+        npm run test:coverage
+        ;;
+    secrets)
+        require_tool git
+        require_tool python3
+        require_tool gitleaks
+        if [[ -z "${2:-}" || -n "${3:-}" ]]; then
+            echo "Expected one empty evidence output directory." >&2
+            exit 2
+        fi
+        python3 -B scripts/check-secrets.py --output "$2"
+        ;;
+    vulnerabilities)
+        require_tool python3
+        require_tool trivy
+        shift
+        python3 -B scripts/check-vulnerabilities.py "$@"
+        ;;
+    validator-pin)
+        require_tool gh
+        require_tool python3
+        python3 -B TroveInfrastructure/validator/check_tool_pin.py
+        ;;
+    tooling)
+        require_tool kubectl
+        require_tool actionlint
+        require_tool shellcheck
+        require_tool python3
+        actionlint
+        shellcheck scripts/check TroveiOS/scripts/start-ui-test-stack.sh TroveiOS/scripts/seed-ui-test.sh TroveiOS/scripts/verify-ui-test-consent.sh
+        shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
+        shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
+        shellcheck TroveWeb/docker-entrypoint.sh
+        python3 -B -m unittest discover -s scripts/tests -v
+        python3 -B -m unittest discover -s TroveServer/Benchmarks -v
+        python3 -B -m unittest discover -s TroveInfrastructure/tools/tests -v
+        python3 -B -m unittest discover -s TroveInfrastructure/validator -p 'test_*.py' -v
+        ;;
+    *)
+        echo "Usage: bash scripts/check {swift <TroveAPI|TroveServer> [artifact.lcov]|web|tooling|secrets <output-directory>|vulnerabilities <dependencies|image> --output <directory> --cache <directory> [--image <image>]|validator-pin}" >&2
+        exit 2
+        ;;
+esac

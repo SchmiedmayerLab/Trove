@@ -39,8 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Start TimescaleDB
-        working-directory: TroveInfrastructure/docker
-        run: docker compose --env-file .env.example up -d server-timescale
+        working-directory: TroveServer/Benchmarks
+        run: docker compose up -d --wait benchmark-db
       - name: Run benchmark
         run: |
           python3 TroveServer/Benchmarks/benchmark.py \
@@ -60,9 +60,9 @@ jobs:
           retention-days: 90
       - name: Collect diagnostics on failure
         if: failure()
-        working-directory: TroveInfrastructure/docker
-        run: docker compose --env-file .env.example logs --tail 200 server-timescale
+        working-directory: TroveServer/Benchmarks
+        run: docker compose logs --tail 200 benchmark-db
       - name: Tear down
         if: always()
-        working-directory: TroveInfrastructure/docker
-        run: docker compose --env-file .env.example down -v
+        working-directory: TroveServer/Benchmarks
+        run: docker compose down -v

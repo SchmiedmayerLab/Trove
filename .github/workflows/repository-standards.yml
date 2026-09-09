@@ -19,6 +19,28 @@ permissions:
   pull-requests: read
 
 jobs:
+  verification-scripts:
+    name: Verification Scripts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify the locked FHIR validator release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check validator-pin
+      - name: Check verification scripts and coverage fixtures
+        run: |
+          shellcheck scripts/check TroveiOS/scripts/start-ui-test-stack.sh TroveiOS/scripts/seed-ui-test.sh TroveiOS/scripts/verify-ui-test-consent.sh
+          shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
+          shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
+          python3 -m venv "$RUNNER_TEMP/trove-tooling"
+          "$RUNNER_TEMP/trove-tooling/bin/python" -m pip install --requirement TroveInfrastructure/tools/requirements.txt
+          export PATH="$RUNNER_TEMP/trove-tooling/bin:$PATH"
+          python3 -B -m unittest discover -s scripts/tests -v
+          python3 -B -m unittest discover -s TroveServer/Benchmarks -v
+          python3 -B -m unittest discover -s TroveInfrastructure/tools/tests -v
+          python3 -B -m unittest discover -s TroveInfrastructure/validator -p 'test_*.py' -v
+
   standards:
     name: Standards
     uses: SchmiedmayerLab/.github/.github/workflows/repository-standards.yml@v0.5

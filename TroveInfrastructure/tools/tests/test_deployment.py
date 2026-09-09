@@ -76,7 +76,7 @@ class DeploymentContractTests(unittest.TestCase):
                 self.assertEqual(api_rules, [{"to": [{"ipBlock": {"cidr": "192.0.2.1/32"}}],
                                              "ports": [{"protocol": "TCP", "port": 6443}]}])
 
-    def test_local_object_stores_bound_collection_slots_and_disable_telemetry(self):
+    def test_local_and_ci_object_stores_bound_collection_slots_and_disable_telemetry(self):
         storage = named(self.rendered["infrastructure", "dev"], "StatefulSet", "seaweedfs")
         arguments = storage["spec"]["template"]["spec"]["containers"][0]["args"]
         compose = yaml.safe_load((ROOT / "docker/docker-compose.yml").read_text())
@@ -84,6 +84,7 @@ class DeploymentContractTests(unittest.TestCase):
             self.assertIn(flag, arguments)
             self.assertIn(flag, compose["services"]["seaweedfs"]["command"].split())
             self.assertIn(flag, (ROOT / "validator/verify_process_restart.py").read_text())
+            self.assertIn(flag, (ROOT.parent / ".github/workflows/swift-package.yml").read_text())
 
     @classmethod
     def setUpClass(cls):

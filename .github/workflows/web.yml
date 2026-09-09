@@ -19,9 +19,6 @@ jobs:
   build-and-test:
     name: Lint & Build
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: TroveWeb
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -29,20 +26,34 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: TroveWeb/package-lock.json
-      # --ignore-scripts skips the postinstall `openapi-ts`, which we run
-      # explicitly below once the inlined spec (../api/openapi.yaml) is present.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-      - name: Generate API client
-        run: npm run generate:api
-      - name: Lint
-        run: npm run lint -- --max-warnings 0
-      - name: Check formatting
-        run: npm run format:check
-      - name: Build
-        run: npm run build
-      - name: Unit tests
-        run: npm run test:coverage
+      - name: Install, lint, build and test
+        run: bash scripts/check web
+      - uses: ./.github/actions/setup-trivy
+      - name: Build and verify the dashboard image
+        run: |
+          python3 -m venv "$RUNNER_TEMP/trove-web-tooling"
+          "$RUNNER_TEMP/trove-web-tooling/bin/python" -m pip install --requirement TroveInfrastructure/tools/requirements.txt
+          docker build -f TroveWeb/Dockerfile -t trove-web:ci .
+          "$RUNNER_TEMP/trove-web-tooling/bin/python" TroveInfrastructure/tools/verify_web_image.py \
+            --image trove-web:ci --output-directory "$RUNNER_TEMP/trove-web-image-evidence"
+      - name: Scan the tested dashboard image
+        run: |
+          bash scripts/check vulnerabilities image --image trove-web:ci \
+            --output "$RUNNER_TEMP/trove-web-image-scan" --cache "$RUNNER_TEMP/trivy-cache"
+      - name: Retain dashboard image scan and inventory
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Web-Image-Scan
+          path: ${{ runner.temp }}/trove-web-image-scan
+          if-no-files-found: error
+      - name: Upload dashboard image verification
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Web-Image-Verification
+          path: ${{ runner.temp }}/trove-web-image-evidence
+          if-no-files-found: warn
       - name: Upload coverage report
         if: success() || failure()
         uses: actions/upload-artifact@v7

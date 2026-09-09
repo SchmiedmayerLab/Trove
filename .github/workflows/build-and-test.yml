@@ -13,6 +13,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 0'
 
 concurrency:
   group: build-and-test-${{ github.ref }}
@@ -29,35 +31,55 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      api: ${{ steps.filter.outputs.api }}
-      server: ${{ steps.filter.outputs.server }}
-      web: ${{ steps.filter.outputs.web }}
-      ios: ${{ steps.filter.outputs.ios }}
-      infrastructure: ${{ steps.filter.outputs.infrastructure }}
-      devstack: ${{ steps.filter.outputs.devstack }}
+      # Manual and weekly runs exercise every Trove component independently of
+      # changed-file selection. Pull requests and pushes keep their affected scope.
+      api: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.api }}
+      server: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.server }}
+      web: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.web }}
+      ios: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.ios }}
+      ios_ui: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.ios_ui }}
+      infrastructure: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.infrastructure }}
+      devstack: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.devstack }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         with:
           filters: |
             api:
               - "TroveAPI/**"
               - ".github/workflows/swift-package.yml"
               - ".github/workflows/build-and-test.yml"
+              - "scripts/**"
             server:
               - "TroveServer/**"
               - "TroveAPI/**"
+              - ".dockerignore"
               - ".github/workflows/swift-package.yml"
               - ".github/workflows/build-and-test.yml"
+              - "scripts/**"
             web:
               - "TroveWeb/**"
               - "TroveAPI/openapi.yaml"
+              - ".dockerignore"
+              - "TroveInfrastructure/tools/verify_web_image.py"
+              - "TroveInfrastructure/tools/requirements.txt"
               - ".github/workflows/web.yml"
+              - ".github/actions/setup-trivy/**"
               - ".github/workflows/build-and-test.yml"
+              - "scripts/**"
             ios:
               - "TroveiOS/**"
               - "TroveAPI/**"
+              - "scripts/native-line-coverage.py"
+              - ".github/workflows/build-and-test.yml"
+            ios_ui:
+              - "TroveiOS/**"
+              - "TroveAPI/**"
+              - "TroveServer/**"
+              - "scripts/native-line-coverage.py"
+              - "TroveInfrastructure/docker/keycloak/realm.json"
               - ".github/workflows/build-and-test.yml"
             infrastructure:
               - "TroveInfrastructure/**"
@@ -65,6 +87,8 @@ jobs:
               - ".github/workflows/build-and-test.yml"
             devstack:
               - ".github/workflows/dev-stack.yml"
+              - ".github/workflows/publish-images.yml"
+              - ".github/actions/setup-trivy/**"
 
   api:
     name: API
@@ -87,8 +111,6 @@ jobs:
     with:
       path: TroveServer
       artifact-name: Trove-Server-Tests.lcov
-      # The integration suites share one in-memory database per suite.
-      test-flags: --no-parallel
 
   ios:
     name: iOS
@@ -107,7 +129,7 @@ jobs:
   ios-ui:
     name: iOS Real Stack UI
     needs: changes
-    if: needs.changes.outputs.ios == 'true'
+    if: needs.changes.outputs.ios_ui == 'true'
     runs-on: [self-hosted, macOS]
     concurrency:
       group: trove-ios-real-stack
@@ -155,6 +177,7 @@ jobs:
             -project Trove.xcodeproj \
             -scheme Trove \
             -resolvePackageDependencies \
+            -onlyUsePackageVersionsFromResolvedFile \
             -derivedDataPath .derivedData \
           | xcbeautify
       - name: Run the real-stack UI test
@@ -165,16 +188,28 @@ jobs:
           xcodebuild test \
             -project Trove.xcodeproj \
             -scheme Trove \
+            -onlyUsePackageVersionsFromResolvedFile \
             -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=$simulator_os" \
             -only-testing:TroveUITests/TroveUITests/testParticipantCanSignInEnrollAndWithdraw \
             -parallel-testing-enabled NO \
+            -enableCodeCoverage YES \
             -derivedDataPath .derivedData \
             -resultBundlePath Trove-iOS-UI-Tests.xcresult \
+            CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
             -skipPackagePluginValidation \
             -skipMacroValidation \
           | xcbeautify
+          xcrun xcresulttool get test-results summary --path Trove-iOS-UI-Tests.xcresult \
+            | jq --exit-status '
+                .result == "Passed" and .totalTestCount == 1 and .passedTests == 1
+                and .failedTests == 0 and .skippedTests == 0 and .expectedFailures == 0'
+      - name: Verify the consent receipts and retained PDFs
+        run: |
+          dev_password="$(jq -r '.users[] | select(.username == "alice@example.com") | .credentials[] | select(.type == "password") | .value' TroveInfrastructure/docker/keycloak/realm.json)"
+          KEYCLOAK_DEV_PASSWORD="$dev_password" TROVE_UI_CONSENT_RESULT_DIR="$RUNNER_TEMP/trove-ui-consent" \
+            bash TroveiOS/scripts/verify-ui-test-consent.sh
       - name: Upload the UI-test result
         if: success() || failure()
         uses: actions/upload-artifact@v7
@@ -225,44 +260,100 @@ jobs:
     permissions:
       contents: read
 
-  publish-server:
-    name: Publish Server Image
-    needs: server
-    if: github.event_name == 'push'
-    # Built from the repository root so the inlined TroveAPI package is in the build context.
-    uses: SchmiedmayerLab/.github/.github/workflows/docker-build-and-push.yml@v0.5
+  secret-scan:
+    name: Secret Scan
+    uses: ./.github/workflows/secret-scan.yml
     permissions:
-      actions: read
       contents: read
-      packages: write
-    with:
-      imageName: schmiedmayerlab/trove-server
-      dockerFile: TroveServer/Dockerfile
-      workingDirectory: .
-      runs_on_labels_amd64: '["ubuntu-24.04"]'
-      runs_on_labels_arm64: '["ubuntu-24.04-arm"]'
-    secrets: inherit
 
-  publish-web:
-    name: Publish Web Image
-    needs: web
-    if: github.event_name == 'push'
-    uses: SchmiedmayerLab/.github/.github/workflows/docker-build-and-push.yml@v0.5
+  vulnerability-scan:
+    name: Vulnerability Scan
+    uses: ./.github/workflows/vulnerability-scan.yml
+    permissions:
+      contents: read
+
+  verification:
+    name: Required Verification
+    needs: [changes, api, server, ios, ios-ui, web, infrastructure, dev-stack, native-line-coverage, coverage, secret-scan, vulnerability-scan]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require every selected verification job to succeed
+        shell: bash
+        env:
+          TROVE_CI_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$TROVE_CI_NEEDS" | python3 scripts/check-ci-results.py
+
+  publish-images:
+    name: Publish Verified Images
+    needs: [verification, dev-stack]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/publish-images.yml
     permissions:
       actions: read
       contents: read
       packages: write
-    with:
-      imageName: schmiedmayerlab/trove-web
-      dockerFile: TroveWeb/Dockerfile
-      workingDirectory: .
-      runs_on_labels_amd64: '["ubuntu-24.04"]'
-      runs_on_labels_arm64: '["ubuntu-24.04-arm"]'
-    secrets: inherit
+
+  native-line-coverage:
+    name: Native Line Coverage
+    needs: [ios, ios-ui]
+    if: >-
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') &&
+      (needs.ios.result == 'success' || needs.ios-ui.result == 'success')
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NATIVE_COVERAGE_SUBDIRECTORY: native-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Download native unit-test coverage
+        if: needs.ios.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: Trove-iOS-Tests.xcresult
+          path: ${{ runner.temp }}/${{ env.NATIVE_COVERAGE_SUBDIRECTORY }}/unit.xcresult
+      - name: Download native UI-test coverage
+        if: needs.ios-ui.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: Trove-iOS-UI-Tests.xcresult
+          path: ${{ runner.temp }}/${{ env.NATIVE_COVERAGE_SUBDIRECTORY }}/ui.xcresult
+      - name: Export measured app source-line coverage
+        shell: bash
+        env:
+          UNIT_RESULT: ${{ needs.ios.result }}
+          UI_RESULT: ${{ needs.ios-ui.result }}
+        run: |
+          set -euo pipefail
+          bundles=()
+          if [[ "$UNIT_RESULT" == success ]]; then bundles+=("$RUNNER_TEMP/$NATIVE_COVERAGE_SUBDIRECTORY/unit.xcresult"); fi
+          if [[ "$UI_RESULT" == success ]]; then bundles+=("$RUNNER_TEMP/$NATIVE_COVERAGE_SUBDIRECTORY/ui.xcresult"); fi
+          python3 -B scripts/native-line-coverage.py --repository "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/Trove-iOS-Line-Tests.lcov" "${bundles[@]}"
+      - name: Upload native line coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-iOS-Line-Tests.lcov
+          path: ${{ runner.temp }}/Trove-iOS-Line-Tests.lcov
+          if-no-files-found: error
 
   coverage:
     name: Upload Coverage Report
-    needs: [api, server, ios, ios-ui, web, dev-stack]
+    needs: [api, server, ios, ios-ui, native-line-coverage, web, dev-stack]
     # Path filtering can skip every component, and the shared workflow fails when it finds
     # no reports, so only collect once at least one of them has produced something.
     if: >-
@@ -276,20 +367,21 @@ jobs:
         needs.web.result == 'success' ||
         needs.dev-stack.result == 'success'
       )
-    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@v0.5
+    # Includes the merged GPG prerequisite fix, which is not yet in the v0.5 release tag.
+    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@515937b1588515b88149b73d18347008043d8289
     permissions:
       actions: read
       contents: read
     with:
-      # Merging xcresult bundles needs macOS.
+      # The shared collector requires a macOS toolchain even for LCOV-only inputs.
       runs_on_labels: '["self-hosted", "macOS"]'
       xcodeversion: latest-stable
-      coveragereports: ${{ needs.ios.result == 'success' && 'Trove-*.xcresult' || '' }}
       # The shared Swift jobs name the report after the artifact, while the local web jobs
       # upload their native lcov.info files inside named artifact directories.
       coveragereports_lcov: >-
         ${{ needs.api.result == 'success' && 'Trove-API-Tests.lcov' || '' }}
         ${{ needs.server.result == 'success' && 'Trove-Server-Tests.lcov' || '' }}
+        ${{ needs.native-line-coverage.result == 'success' && 'Trove-iOS-Line-Tests.lcov' || '' }}
         ${{ needs.web.result == 'success' && 'Trove-Web-Tests.lcov/lcov.info' || '' }}
         ${{ needs.dev-stack.result == 'success' && 'Trove-Web-E2E.lcov/lcov.info' || '' }}
     secrets:

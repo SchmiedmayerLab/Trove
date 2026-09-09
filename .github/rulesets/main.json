@@ -37,31 +37,7 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
-            "context": "API / Swift Test"
-          },
-          {
-            "context": "Server / Swift Test"
-          },
-          {
-            "context": "Web / Lint & Build"
-          },
-          {
-            "context": "iOS / Build and Test with xcodebuild"
-          },
-          {
-            "context": "Infrastructure / Validate Manifests"
-          },
-          {
-            "context": "Infrastructure / Tofu Validate"
-          },
-          {
-            "context": "Infrastructure / KIND Smoke Test"
-          },
-          {
-            "context": "Dev Stack / Docker Compose Smoke Test"
-          },
-          {
-            "context": "Upload Coverage Report / Merge and Upload Coverage"
+            "context": "Required Verification"
           },
           {
             "context": "SwiftLint / Run SwiftLint"
