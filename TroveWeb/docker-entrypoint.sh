@@ -10,6 +10,14 @@
 
 set -eu
 
+# Select only a fixed, reviewed configuration. An unset or unknown mode cannot
+# silently enable plaintext; the image defaults to production.
+case "${APP_ENVIRONMENT:-}" in
+  production|development) ;;
+  *) echo 'APP_ENVIRONMENT must be production or development' >&2; exit 1 ;;
+esac
+cp "/etc/nginx/trove-transport/$APP_ENVIRONMENT.conf" /var/cache/nginx/transport.conf
+
 # Validate required environment variables.
 : "${VITE_API_BASE_PATH:?VITE_API_BASE_PATH is required}"
 : "${VITE_KEYCLOAK_URL:?VITE_KEYCLOAK_URL is required}"
@@ -25,7 +33,7 @@ esc() {
           -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
 }
 
-cat > /usr/share/nginx/html/env.js <<EOF
+cat > /var/cache/nginx/env.js <<EOF
 window.__ENV__ = {
   VITE_API_BASE_PATH: "$(esc "$VITE_API_BASE_PATH")",
   VITE_KEYCLOAK_URL: "$(esc "$VITE_KEYCLOAK_URL")",
@@ -33,3 +41,5 @@ window.__ENV__ = {
   VITE_KEYCLOAK_CLIENT_ID: "$(esc "$VITE_KEYCLOAK_CLIENT_ID")"
 };
 EOF
+
+exec "$@"

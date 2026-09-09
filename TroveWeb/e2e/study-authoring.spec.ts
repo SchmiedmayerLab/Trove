@@ -7,7 +7,7 @@
 //
 
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, openNewStudyDialog, test } from "./fixtures";
 
 const questionnaire = JSON.stringify({
   resourceType: "Questionnaire",
@@ -23,17 +23,6 @@ const questionnaire = JSON.stringify({
     },
   ],
 });
-
-const openNewStudyDialog = async (page: Page) => {
-  const firstStudyButton = page.getByRole("button", { name: "Create study" });
-  if (await firstStudyButton.isVisible()) {
-    await firstStudyButton.click();
-    return;
-  }
-
-  await page.locator("[data-element='header-selector']").nth(1).click();
-  await page.getByText("Add study", { exact: true }).click();
-};
 
 const openNewComponentDialog = async (page: Page) => {
   const firstComponentButton = page.getByRole("button", {
@@ -57,6 +46,10 @@ test.describe("study authoring", () => {
   test("creates, schedules, and publishes a complete study", async ({
     researcherPage: page,
   }, testInfo) => {
+    // This journey includes login, three component forms, scheduling and publication.
+    // Allow the full workflow its own budget without relaxing individual assertions.
+    test.slow();
+
     const suffix = `${Date.now()}-${testInfo.project.name}`;
     const studyTitle = `Authoring E2E ${suffix}`;
     const informationName = `Welcome ${suffix}`;

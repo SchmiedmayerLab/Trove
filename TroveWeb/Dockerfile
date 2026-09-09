@@ -26,18 +26,21 @@ RUN npm run generate:api && npm run build
 # ---- Serve stage ----
 FROM nginx:alpine
 
+ENV APP_ENVIRONMENT=production
+
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY TroveWeb/nginx-main.conf /etc/nginx/nginx.conf
 COPY TroveWeb/nginx.conf /etc/nginx/conf.d/default.conf
-COPY TroveWeb/docker-entrypoint.sh /docker-entrypoint.d/10-generate-env-js.sh
-RUN chmod +x /docker-entrypoint.d/10-generate-env-js.sh
+COPY TroveWeb/nginx-transport /etc/nginx/trove-transport
+COPY --chmod=755 TroveWeb/docker-entrypoint.sh /usr/local/bin/trove-web-entrypoint
 
 # Run as non-root for defense in depth
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown nginx:nginx /var/run/nginx.pid
+RUN apk upgrade --no-cache \
+    && chown nginx:nginx /var/cache/nginx
 
 USER nginx
 
 EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/trove-web-entrypoint"]
+CMD ["nginx", "-g", "daemon off;"]

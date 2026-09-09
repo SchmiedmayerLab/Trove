@@ -7,8 +7,7 @@
 //
 
 import { Button } from "@schmiedmayerlab/grove-design-system";
-import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SearchX } from "lucide-react";
 import { OnboardingLayout } from "@/components/layouts/OnboardingLayout";
 import { FeaturedIconContainer } from "@/components/ui/FeaturedIconContainer";
@@ -16,15 +15,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupListQueryOptions } from "@/lib/queries/group";
 
 const OnboardingRoute = () => {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { logout } = useAuth();
-
-  const handleSignOut = async () => {
-    queryClient.clear();
-    await logout();
-    await navigate({ to: "/sign-in" });
-  };
 
   return (
     <OnboardingLayout>
@@ -43,7 +34,7 @@ const OnboardingRoute = () => {
             organization's administrator to get started.
           </p>
         </div>
-        <Button variant="outline" onClick={handleSignOut}>
+        <Button variant="outline" onClick={logout}>
           Sign out
         </Button>
       </div>
