@@ -6,17 +6,23 @@
 # SPDX-License-Identifier: MIT
 #
 
-# Local production build test — mirrors the container image used in K8s.
+# Local image test with explicitly enabled development HTTP.
 # Requires a .env file with VITE_API_BASE_PATH, VITE_KEYCLOAK_URL, VITE_KEYCLOAK_REALM, VITE_KEYCLOAK_CLIENT_ID.
 # Usage: docker compose up --build
 
 services:
   web:
-    build: .
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:uid=101,gid=101,mode=0700,size=16m
+    build:
+      context: ..
+      dockerfile: TroveWeb/Dockerfile
     environment:
+      APP_ENVIRONMENT: development
       VITE_API_BASE_PATH: ${VITE_API_BASE_PATH:?VITE_API_BASE_PATH is required}
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:?VITE_KEYCLOAK_URL is required}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:?VITE_KEYCLOAK_REALM is required}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:?VITE_KEYCLOAK_CLIENT_ID is required}
     ports:
-      - "3000:8080"
+      - "127.0.0.1:3000:8080"

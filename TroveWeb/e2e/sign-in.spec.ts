@@ -9,6 +9,64 @@
 import { expect, test } from "./fixtures";
 
 test.describe("sign in", () => {
+  test("signs out through Keycloak and protects the previous dashboard URL", async ({
+    researcherPage: page,
+  }) => {
+    await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
+    const dashboardURL = page.url();
+    const logout = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        new URL(request.url()).pathname.endsWith(
+          "/protocol/openid-connect/logout",
+        ),
+    );
+    await page.getByRole("button", { name: "User menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    expect(
+      new URL((await logout).url()).searchParams.has("id_token_hint"),
+    ).toBe(false);
+    // The POST commits a new document before its application modules finish loading.
+    await page.waitForURL(new URL("/sign-in", dashboardURL).href, {
+      waitUntil: "load",
+    });
+    await expect(
+      page.getByRole("button", { name: "Sign into the dashboard" }),
+    ).toBeVisible();
+    await page.goto(dashboardURL);
+    await expect(
+      page.getByRole("button", { name: "Sign into the dashboard" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "User menu" })).toHaveCount(
+      0,
+    );
+    await page.getByRole("button", { name: "Sign into the dashboard" }).click();
+    await expect(page.locator("#username")).toBeVisible();
+  });
+
+  test("keeps the dashboard closed if logout does not navigate", async ({
+    researcherPage: page,
+  }) => {
+    await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
+    await page.route("**/protocol/openid-connect/logout*", (route) =>
+      route.fulfill({ status: 204 }),
+    );
+    await page.getByRole("button", { name: "User menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(
+      page.getByText("Your session ended or its permissions changed."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Continue to sign in" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "User menu" })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole("link", { name: "Components", exact: true }),
+    ).toHaveCount(0);
+  });
+
   test("shows the landing page to a signed-out visitor", async ({ page }) => {
     await page.goto("/");
 

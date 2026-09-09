@@ -30,17 +30,13 @@ type OperationId =
   | "getStudiesByStudyIdComponentsHealthDataByComponentId"
   | "getStudiesByStudyIdComponentsByComponentIdSchedules";
 
-const hasStringProperty = (
-  object: object,
-  key: string,
-): object is Record<string, unknown> =>
-  key in object && typeof (object as Record<string, unknown>)[key] === "string";
-
 const getErrorDescription = (error: unknown): string | undefined => {
   if (typeof error !== "object" || error === null) return undefined;
-  if (hasStringProperty(error, "detail")) return error.detail as string;
-  if (hasStringProperty(error, "title")) return error.title as string;
-  if (hasStringProperty(error, "message")) return error.message as string;
+  if ("detail" in error && typeof error.detail === "string")
+    return error.detail;
+  if ("title" in error && typeof error.title === "string") return error.title;
+  if ("message" in error && typeof error.message === "string")
+    return error.message;
   return undefined;
 };
 

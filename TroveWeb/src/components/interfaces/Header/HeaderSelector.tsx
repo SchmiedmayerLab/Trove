@@ -119,7 +119,7 @@ export const HeaderSelector = ({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="min-w-60! rounded-lg"
+        className="max-h-(--radix-dropdown-menu-content-available-height) min-w-60! overflow-y-auto rounded-lg"
         align="start"
         side="bottom"
         sideOffset={4}

@@ -34,7 +34,7 @@
     "postinstall": "openapi-ts",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:coverage": "COVERAGE=true playwright test; status=$?; nyc report --reporter=lcov --reporter=text-summary --report-dir coverage-e2e; exit $status"
+    "test:e2e:coverage": "COVERAGE=true playwright test; test_status=$?; nyc report --reporter=lcov --reporter=text-summary --report-dir coverage-e2e; coverage_status=$?; if [ \"$test_status\" -ne 0 ]; then exit \"$test_status\"; fi; exit \"$coverage_status\""
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
@@ -43,9 +43,9 @@
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.160.2",
     "@tanstack/react-table": "^8.21.3",
-    "@tiptap/pm": "^3.19.0",
-    "@tiptap/react": "^3.19.0",
-    "@tiptap/starter-kit": "^3.19.0",
+    "@tiptap/pm": "^3.30.4",
+    "@tiptap/react": "^3.30.4",
+    "@tiptap/starter-kit": "^3.30.4",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "es-toolkit": "^1.44.0",
@@ -64,7 +64,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.93.0",
+    "@hey-api/openapi-ts": "^0.97.3",
     "@playwright/test": "^1.58.2",
     "@schmiedmayerlab/grove-configurations": "^0.1.1",
     "@tanstack/router-plugin": "^1.161.0",
@@ -73,13 +73,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.8.0",
     "nyc": "^18.0.0",
     "prettier": "^3",
     "typescript": "^5",
     "vite": "^7.3.2",
     "vite-plugin-istanbul": "^9.0.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@hey-api/json-schema-ref-parser": {
+      "js-yaml": "4.3.2"
+    }
   }
 }

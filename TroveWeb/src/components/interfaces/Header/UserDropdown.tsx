@@ -16,8 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@schmiedmayerlab/grove-design-system";
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { Layers2, LogOut, User } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { notImplementedToast } from "@/utils/notImplementedToast";
@@ -25,15 +23,7 @@ import { UserAvatar } from "./UserAvatar";
 import { UserDropdownSkeleton } from "./UserDropdownSkeleton";
 
 export const UserDropdown = () => {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
-
-  const handleSignOut = async () => {
-    queryClient.clear();
-    await logout();
-    await navigate({ to: "/sign-in" });
-  };
 
   if (!user) {
     return <UserDropdownSkeleton />;
@@ -89,7 +79,7 @@ export const UserDropdown = () => {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={logout}>
           <LogOut className="size-3.5 opacity-80" />
           Sign out
         </DropdownMenuItem>
