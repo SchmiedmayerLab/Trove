@@ -23,15 +23,18 @@ public enum KeycloakAccountError: LocalizedError {
     case missingIDToken
     /// Account deletion is not supported by this provider.
     case deletionUnsupported
+    /// Authentication failed without a safe provider-supplied message to display.
+    case authenticationFailed
 
     public var errorDescription: String? {
         switch self {
-        case .notSignedIn: "You are not signed in."
-        case .couldNotStartSession: "Could not start authentication session."
-        case .invalidCallback: "Authentication callback was invalid."
-        case .tokenRefreshFailed: "Token refresh failed."
-        case .missingIDToken: "Identity token missing from token response."
-        case .deletionUnsupported: "Account deletion is not supported."
+        case .notSignedIn: String(localized: "You are not signed in.")
+        case .couldNotStartSession: String(localized: "Could not start authentication session.")
+        case .invalidCallback: String(localized: "Authentication callback was invalid.")
+        case .tokenRefreshFailed: String(localized: "Token refresh failed.")
+        case .missingIDToken: String(localized: "Identity token missing from token response.")
+        case .deletionUnsupported: String(localized: "Account deletion is not supported.")
+        case .authenticationFailed: String(localized: "Could not sign in. Please try again.")
         }
     }
 }

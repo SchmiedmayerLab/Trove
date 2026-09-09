@@ -19,7 +19,9 @@ struct ProblemUnavailableView: View {
         ContentUnavailableView {
             Label(title, systemImage: "exclamationmark.triangle")
         } description: {
-            Text(error.localizedDescription)
+            if let presentation = ErrorPresentation(error) {
+                Text(presentation.message)
+            }
         } actions: {
             if let retry {
                 Button("Retry", action: retry)

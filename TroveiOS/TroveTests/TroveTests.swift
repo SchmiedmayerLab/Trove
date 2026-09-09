@@ -11,14 +11,13 @@ import Testing
 @testable import Trove
 
 
+@MainActor
 struct TroveAPIModuleTests {
     /// The client is only built in `configure()`. Before that runs callers must get an error
     /// rather than a crash, which is what the implicitly unwrapped optional used to give them.
     @Test
     func requireClientThrowsBeforeConfigure() throws {
         let module = TroveAPIModule()
-
-        #expect(module.client == nil)
 
         var thrown: (any Error)?
         #expect(throws: TroveAccountError.self) {

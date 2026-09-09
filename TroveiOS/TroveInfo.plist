@@ -4,6 +4,8 @@
 <!-- SPDX-License-Identifier: MIT -->
 <plist version="1.0">
 <dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Trove reads heart rate data to share measurements covered by your study consents.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

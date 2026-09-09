@@ -24,11 +24,11 @@ public enum TroveAccountError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .notSignedIn: "You are not signed in."
-        case .clientUnavailable: "Trove API client is not ready."
-        case .profileFetchFailed: "Could not load your profile."
-        case .profileUpdateFailed: "Could not save your profile."
-        case .deletionUnsupported: "Account deletion is not supported."
+        case .notSignedIn: String(localized: "You are not signed in.")
+        case .clientUnavailable: String(localized: "Trove API client is not ready.")
+        case .profileFetchFailed: String(localized: "Could not load your profile.")
+        case .profileUpdateFailed: String(localized: "Could not save your profile.")
+        case .deletionUnsupported: String(localized: "Account deletion is not supported.")
         }
     }
 }

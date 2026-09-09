@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DFAA0001000000000000A009 /* XCTHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A008 /* XCTHealthKit */; };
+		DFAA0001000000000000A005 /* TroveHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A004 /* TroveHealthKit */; };
+		DFAA0001000000000000A007 /* GroveHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A006 /* GroveHealthKit */; };
 		DFAA0001000000000000A003 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A002 /* AppAuth */; };
 		DFBAF4592FA5206F00CCAEAA /* TroveAPIClient in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF4582FA5206F00CCAEAA /* TroveAPIClient */; };
 		DFBAF45C2FA5207900CCAEAA /* GroveAccount in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF45B2FA5207900CCAEAA /* GroveAccount */; };
@@ -18,6 +21,7 @@
 		DFBAF4942FA5300000CCAEAA /* OpenAPIURLSession in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF4842FA5300000CCAEAA /* OpenAPIURLSession */; };
 		DFBAF4952FA5300000CCAEAA /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF4852FA5300000CCAEAA /* HTTPTypes */; };
 		DFBAF4962FA5300000CCAEAA /* GroveStudyDefinition in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF4862FA5300000CCAEAA /* GroveStudyDefinition */; };
+		DFBAF4972FA5300000CCAEAA /* GroveConsent in Frameworks */ = {isa = PBXBuildFile; productRef = DFBAF4872FA5300000CCAEAA /* GroveConsent */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +72,8 @@
 			files = (
 				DFBAF45C2FA5207900CCAEAA /* GroveAccount in Frameworks */,
 				DFBAF4592FA5206F00CCAEAA /* TroveAPIClient in Frameworks */,
+				DFAA0001000000000000A005 /* TroveHealthKit in Frameworks */,
+				DFAA0001000000000000A007 /* GroveHealthKit in Frameworks */,
 				DFBAF45F2FA5208700CCAEAA /* GroveStudy in Frameworks */,
 				DFBAF4902FA5300000CCAEAA /* Grove in Frameworks */,
 				DFBAF4912FA5300000CCAEAA /* GroveKeychainStorage in Frameworks */,
@@ -76,6 +82,7 @@
 				DFBAF4942FA5300000CCAEAA /* OpenAPIURLSession in Frameworks */,
 				DFBAF4952FA5300000CCAEAA /* HTTPTypes in Frameworks */,
 				DFBAF4962FA5300000CCAEAA /* GroveStudyDefinition in Frameworks */,
+				DFBAF4972FA5300000CCAEAA /* GroveConsent in Frameworks */,
 				DFAA0001000000000000A003 /* AppAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -91,6 +98,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DFAA0001000000000000A009 /* XCTHealthKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,6 +146,8 @@
 			name = Trove;
 			packageProductDependencies = (
 				DFBAF4582FA5206F00CCAEAA /* TroveAPIClient */,
+				DFAA0001000000000000A004 /* TroveHealthKit */,
+				DFAA0001000000000000A006 /* GroveHealthKit */,
 				DFBAF45B2FA5207900CCAEAA /* GroveAccount */,
 				DFBAF45E2FA5208700CCAEAA /* GroveStudy */,
 				DFBAF4802FA5300000CCAEAA /* Grove */,
@@ -147,6 +157,7 @@
 				DFBAF4842FA5300000CCAEAA /* OpenAPIURLSession */,
 				DFBAF4852FA5300000CCAEAA /* HTTPTypes */,
 				DFBAF4862FA5300000CCAEAA /* GroveStudyDefinition */,
+				DFBAF4872FA5300000CCAEAA /* GroveConsent */,
 				DFAA0001000000000000A002 /* AppAuth */,
 			);
 			productName = Trove;
@@ -194,6 +205,7 @@
 			);
 			name = TroveUITests;
 			packageProductDependencies = (
+				DFAA0001000000000000A008 /* XCTHealthKit */,
 			);
 			productName = TroveUITests;
 			productReference = DFBAF3F82FA4785300CCAEAA /* TroveUITests.xctest */;
@@ -444,6 +456,7 @@
 				DEVELOPMENT_TEAM = CB57CJ4M58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Trove.entitlements;
 				INFOPLIST_FILE = TroveInfo.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -475,6 +488,7 @@
 				DEVELOPMENT_TEAM = CB57CJ4M58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Trove.entitlements;
 				INFOPLIST_FILE = TroveInfo.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -668,6 +682,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		DFAA0001000000000000A008 /* XCTHealthKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
+			productName = XCTHealthKit;
+		};
+		DFAA0001000000000000A004 /* TroveHealthKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TroveHealthKit;
+		};
+		DFAA0001000000000000A006 /* GroveHealthKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
+			productName = GroveHealthKit;
+		};
 		DFAA0001000000000000A002 /* AppAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DFAA0001000000000000A001 /* XCRemoteSwiftPackageReference "AppAuth-iOS" */;
@@ -721,6 +749,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
 			productName = GroveStudyDefinition;
+		};
+		DFBAF4872FA5300000CCAEAA /* GroveConsent */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
+			productName = GroveConsent;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -21,6 +21,7 @@ struct EnrollmentView: View {
 
     @State private var isPresentingWithdrawConfirmation = false
     @State private var enteredInvitationCode: String = ""
+    @State private var consentReview: ConsentReviewView.Request?
 
     var body: some View {
         Form {
@@ -31,6 +32,15 @@ struct EnrollmentView: View {
             criteriaSection
             detailsSection
             enrollmentSection
+            if let enrollment = enrollments.latestEnrollment(forStudy: item.studyId) {
+                EnrollmentConsentSection(
+                    enrollment: enrollment,
+                    latestRevision: item.revision,
+                    locale: account?.details?.language,
+                    isEnabled: enrollments.state.isLoaded && !enrollments.isMutating,
+                    review: $consentReview
+                )
+            }
             invitationSection
             Section {
                 actionButton
@@ -38,6 +48,9 @@ struct EnrollmentView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $consentReview) { request in
+            ConsentReviewView(request: request)
+        }
         .task {
             if case .idle = enrollments.state {
                 await enrollments.refresh()
@@ -53,7 +66,7 @@ struct EnrollmentView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("You can re-enroll later if you choose.")
+            Text("You will no longer be enrolled in this study. You cannot enroll again after withdrawing.")
         }
     }
 
@@ -230,7 +243,10 @@ struct EnrollmentView: View {
                 .accessibilityHidden(true)
         }
     }
+}
 
+
+extension EnrollmentView {
     private var title: String {
         item.metadata.title[.currentOrDefault] ?? item.studyId
     }
@@ -269,7 +285,7 @@ struct EnrollmentView: View {
     }
 
     private func statusText(for enrollment: Trove.Enrollment) -> String {
-        enrollment.withdrawnAt == nil ? "Active" : "Withdrawn"
+        enrollment.withdrawnAt == nil ? String(localized: "Active") : String(localized: "Withdrawn")
     }
     private func performEnroll() {
         let trimmed = enteredInvitationCode.trimmingCharacters(in: .whitespaces)
