@@ -7,20 +7,13 @@
 #
 
 locals {
-  secrets = {
-    "server-db-credentials" = {
-      placeholder = jsonencode({ username = "trove", password = "trove" })
-    }
-    "keycloak-db-credentials" = {
-      placeholder = jsonencode({ username = "keycloak", password = "keycloak" })
-    }
-    "keycloak-admin-credentials" = {
-      placeholder = jsonencode({ username = "admin", password = "admin" })
-    }
-    "server-credentials" = {
-      placeholder = jsonencode({ KEYCLOAK_CLIENT_SECRET = "change-after-keycloak-setup" })
-    }
-  }
+  secrets = toset([
+    "server-db-credentials",
+    "server-runtime-db-credentials",
+    "keycloak-db-credentials",
+    "keycloak-admin-credentials",
+    "server-credentials",
+  ])
 }
 
 resource "google_secret_manager_secret" "secrets" {
@@ -36,15 +29,5 @@ resource "google_secret_manager_secret" "secrets" {
   depends_on = [google_project_service.apis]
 }
 
-# Seed each secret with a placeholder so ESO does not fail on first sync.
-# After apply, replace these values via the GCP console or gcloud CLI.
-resource "google_secret_manager_secret_version" "initial" {
-  for_each = local.secrets
-
-  secret      = google_secret_manager_secret.secrets[each.key].id
-  secret_data = each.value.placeholder
-
-  lifecycle {
-    ignore_changes = [secret_data]
-  }
-}
+# Operators provision values through Secret Manager before synchronization.
+# Missing values must block deployment; never seed production with known passwords.

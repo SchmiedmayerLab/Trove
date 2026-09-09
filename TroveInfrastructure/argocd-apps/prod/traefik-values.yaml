@@ -16,9 +16,19 @@ logs:
     level: WARN
   access:
     enabled: true
+    format: json
     fields:
+      general:
+        defaultmode: drop
+        names:
+          StartUTC: keep
+          RequestMethod: keep
+          DownstreamStatus: keep
+          Duration: keep
+          RouterName: keep
+          ServiceName: keep
       headers:
-        defaultmode: keep
+        defaultmode: drop
 persistence:
   enabled: true
   name: traefik-data

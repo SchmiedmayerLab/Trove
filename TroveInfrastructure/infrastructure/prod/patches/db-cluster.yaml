@@ -16,3 +16,19 @@ spec:
   storage:
     size: 50Gi
   enableSuperuserAccess: false
+  postgresql:
+    shared_preload_libraries:
+      - timescaledb
+    parameters:
+      timescaledb.telemetry_level: "off"
+      max_locks_per_transaction: "128"
+    extensions:
+      - name: timescaledb-oss
+        image:
+          reference: ghcr.io/cloudnative-pg/timescaledb-oss:2.29.2-18-trixie@sha256:bd629506f10ec0450f59659d0ace3cf95c8389eca78a35d223e5b4e22ef387cf
+  bootstrap:
+    initdb:
+      # Runtime role administration belongs to the schema Job, not two reconcilers.
+      postInitApplicationSQL:
+        - ALTER ROLE trove CREATEROLE
+        - GRANT pg_read_all_settings TO trove

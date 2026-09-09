@@ -14,10 +14,14 @@ resources:
   # - tls-certificate.yaml      # TODO: re-enable after DNS is configured
   - cluster-secret-store.yaml
   - external-secrets-sa.yaml
+  - platform-transport.yaml
+  - database.yaml
 patches:
   - path: patches/db-cluster.yaml
   - path: patches/keycloak-db-cluster.yaml
   - path: patches/keycloak.yaml
+  - path: patches/keycloak-service.yaml
+  - path: patches/keycloak-network.yaml
   - path: patches/keycloak-config-cli-job.yaml
   - target:
       kind: IngressRoute
@@ -26,9 +30,21 @@ patches:
       - op: replace
         path: /spec/routes/0/match
         value: "Host(`console.troveplatform.org`)"
+      - op: add
+        path: /spec/routes/0/services/0/scheme
+        value: https
+      - op: add
+        path: /spec/routes/0/services/0/serversTransport
+        value: platform-https
       - op: replace
         path: /spec/routes/1/match
         value: "Host(`console.troveplatform.org`) && PathPrefix(`/api`)"
+      - op: add
+        path: /spec/routes/1/services/0/scheme
+        value: https
+      - op: add
+        path: /spec/routes/1/services/0/serversTransport
+        value: platform-https
       - op: replace
         path: /metadata/annotations/cert-manager.io~1cluster-issuer
         value: letsencrypt-prod
@@ -40,5 +56,31 @@ patches:
         path: /spec/routes/0/match
         value: "Host(`console.troveplatform.org`) && PathPrefix(`/auth`)"
       - op: replace
+        path: /spec/routes/0/services/0/port
+        value: 8443
+      - op: add
+        path: /spec/routes/0/services/0/scheme
+        value: https
+      - op: add
+        path: /spec/routes/0/services/0/serversTransport
+        value: platform-https
+      - op: replace
         path: /metadata/annotations/cert-manager.io~1cluster-issuer
         value: letsencrypt-prod
+  - target:
+      kind: NetworkPolicy
+      name: allow-traefik-egress
+    patch: |
+      - op: replace
+        path: /spec/egress/0/to/0/podSelector/matchExpressions/0/values
+        value: [trove-server, trove-web]
+      - op: add
+        path: /spec/egress/-
+        value:
+          to:
+            - podSelector:
+                matchLabels:
+                  app: keycloak
+          ports:
+            - protocol: TCP
+              port: 8443

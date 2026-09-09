@@ -26,6 +26,8 @@ spec:
         app: trove-web
     spec:
       serviceAccountName: trove-web
+      securityContext:
+        fsGroup: 101
       containers:
         - name: trove-web-container
           image: ghcr.io/schmiedmayerlab/trove-web:latest
@@ -43,9 +45,14 @@ spec:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             runAsUser: 101
+            runAsGroup: 101
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
           envFrom:
             - configMapRef:
                 name: trove-web-config
@@ -66,3 +73,8 @@ spec:
               path: /
               port: 8080
             periodSeconds: 15
+      volumes:
+        - name: nginx-cache
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi

@@ -17,8 +17,13 @@ spec:
       labels:
         app: keycloak-config-cli
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: keycloak-config-cli
           env:
+            - name: KEYCLOAK_URL
+              value: https://console.troveplatform.org/auth
+            - name: KEYCLOAK_SSLVERIFY
+              value: "true"
             - name: WEB_URL
               value: https://console.troveplatform.org

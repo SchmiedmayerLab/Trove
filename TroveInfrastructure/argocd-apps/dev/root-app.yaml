@@ -23,6 +23,30 @@ spec:
             group: argoproj.io
             version: v1alpha1
             kind: Application
+            name: infrastructure
+          patch: |-
+            - op: add
+              path: /spec/source/kustomize
+              value:
+                patches:
+                  - target:
+                      kind: NetworkPolicy
+                      name: allow-cnpg-to-k8s-api
+                    patch: |-
+                      - op: replace
+                        path: /spec/egress/1/to/0/ipBlock/cidr
+                        value: "__KIND_API_CIDR__"
+                  - target:
+                      kind: NetworkPolicy
+                      name: allow-traefik-egress
+                    patch: |-
+                      - op: replace
+                        path: /spec/egress/3/to/0/ipBlock/cidr
+                        value: "__KIND_API_CIDR__"
+        - target:
+            group: argoproj.io
+            version: v1alpha1
+            kind: Application
             labelSelector: troveplatform.org/revision-source=single
           patch: |-
             - op: replace

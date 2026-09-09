@@ -12,6 +12,7 @@ metadata:
   name: trove-web-config
   namespace: trove
 data:
+  APP_ENVIRONMENT: production
   VITE_API_BASE_PATH: https://console.troveplatform.org
   VITE_KEYCLOAK_URL: https://console.troveplatform.org/auth
   VITE_KEYCLOAK_REALM: trove

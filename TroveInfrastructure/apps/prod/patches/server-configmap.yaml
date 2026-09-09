@@ -12,4 +12,10 @@ metadata:
   name: trove-server-config
   namespace: trove
 data:
-  APP_ENVIRONMENT: development
+  KEYCLOAK_URL: https://console.troveplatform.org/auth
+  KEYCLOAK_ISSUER: https://console.troveplatform.org/auth/realms/trove
+  APP_ENVIRONMENT: production
+  LOG_LEVEL: warning
+  TLS_CA_FILE: /run/secrets/database/ca.crt
+  TLS_CERTIFICATE_FILE: /run/secrets/https/tls.crt
+  TLS_PRIVATE_KEY_FILE: /run/secrets/https/tls.key

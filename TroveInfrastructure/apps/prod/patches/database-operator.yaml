@@ -1,0 +1,37 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trove-database-operator
+  namespace: trove
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: initialize-schema
+          env:
+            - name: TLS_CA_FILE
+              value: /run/secrets/database/ca.crt
+          volumeMounts:
+            - name: database-ca
+              mountPath: /run/secrets/database
+              readOnly: true
+      containers:
+        - name: grant-runtime
+          env:
+            - name: PGSSLROOTCERT
+              value: /run/secrets/database/ca.crt
+          volumeMounts:
+            - name: database-ca
+              mountPath: /run/secrets/database
+              readOnly: true
+      volumes:
+        - name: database-ca
+          secret:
+            secretName: trove-db-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
