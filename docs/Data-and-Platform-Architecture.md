@@ -41,6 +41,15 @@ A shared append-only activity record identifies the actor, delegated initiator, 
 
 Activity history excludes bearer tokens, clinical bodies, contact addresses and transcripts. Runtime roles cannot rewrite it, readers are separately scoped, and retention remains governed. This is accountable operation, not a claim of immutability against database administrators or institutional certification.
 
+The study audit reader requires researcher identity and both `admin` and
+`audit-reader` membership in the owning group. The reader capability is explicitly
+assigned by the identity administrator; administration alone does not imply it.
+`GET /studies/{studyId}/audit-events` returns at most 100 records matching the study
+and group, never participant/source history inferred through an enrollment. Pages
+use an in-scope event ID as a cursor, require committed disclosure intent and carry
+`Cache-Control: no-store`. Audit identifiers remain governed data. This bounded
+history reader is not a cross-study activity feed, frozen export or retention policy.
+
 ## Store Source Data Once, Attribute It Explicitly
 
 Consider a participant whose heart-rate observation is eligible for two studies. The source event and its resource version are stored once within the appropriate participant/source scope. Each eligible study receives a separate, exact attribution record.

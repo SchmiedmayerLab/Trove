@@ -171,10 +171,8 @@ A channel must faithfully support the approved instrument and response semantics
 
 ## Coexistence with Other Research Systems
 
-A study may retain REDCap for clinical forms while using Trove for digital collection. Begin with one approved file-based exchange and an explicit authoritative system, mapping version and permitted direction. API integration follows demonstrated need and reviewed access; there is no default bidirectional editing.
+Trove does not include a REDCap importer, synchronization service or dedicated exchange API in the active roadmap. Studies can keep other research systems independently; Trove provides authorized exports with stable identities, versions and provenance.
 
-Preserve verified subject bindings, source record IDs, instrument and repeat-instance identity, units, missing-value semantics and corrections. External forms are not automatically FHIR Questionnaires. Preview and reconcile unsupported mappings or conflicting rows before applying them through normal authorized ingestion or attributed staff entry.
-
-Importing a record cannot create consent or enrollment. Exchanges use governed artifacts and scoped exports rather than database access or custom documents that bypass clinical validation. Verify the selected direction with paired source/expected-output fixtures; do not require bidirectional synchronization. Reviewed dataset finalization and staff-entry workflows are prerequisites only when that transfer needs them. This supports coexistence without replacing institutional clinical-trial administration.
+If a named study later needs interoperability, assess one narrowly scoped external adapter against that study's mappings and authority rules. Do not add generic field mapping, conflict reconciliation or bidirectional editing to the core platform preemptively. An external record must never create Trove consent or bypass normal authorization and validation.
 
 [Platform Overview](README.md) · [Implementation Project](https://github.com/orgs/SchmiedmayerLab/projects/4)

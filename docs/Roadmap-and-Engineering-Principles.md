@@ -12,16 +12,99 @@ Trove's development is organized around complete study workflows rather than a g
 
 The milestones below describe the intended sequence, not announced release dates or claims that the capabilities have shipped. Detailed implementation progress belongs in the project's published issues and release notes.
 
+## Development Before Deployment
+
+M1 and M2 establish exchange and ingestion contracts; they do not require a live
+deployment. M3 builds the first complete study workflow with synthetic accounts.
+Keep implementation acceptance, repository integration and field activation separate:
+
+| Stage | Completion evidence | Not required at this stage |
+|---|---|---|
+| M1: IG Exchange Contract | Validated examples, producer/receiver fixtures and coordinated upstream integration | A running research deployment |
+| M2: Reliable Shared Data Ingestion | Real local stores; consent-backed two-study custody; durable delivery; failure, restart and recovery tests; measured workloads; shared CI and exact-artifact verification | A cloud account, production region, operational recovery targets or human pilot |
+| M3: Portable Study and Trial Execution | A synthetic single-arm study from configuration through tasks, collection, coordinator operations and export | Every optional trial feature or field deployment |
+| M3.1: First Deployment and Reference Pilot | One selected target passes infrastructure acceptance, then an approved bounded study passes its predefined field criteria | Deployment on every cloud or completion of conversation and other later milestones |
+
+M3.1 is the planned deployment milestone; it follows M2 and the required R1 subset
+of M3, not all optional arms, sites or trial features. Preparation can run earlier.
+The existing M4–M7 capability sequence remains unchanged and independent work can
+continue without waiting for the pilot. Schedule field activation only after its
+owners, target and protocol are selected.
+
+Use disposable Docker services for routine integration and a local Kubernetes
+reference setup for orchestration-specific checks. Exercise the real database,
+object store, identity provider and validator, including interrupted writes,
+permission removal, repeated delivery and recovery. For the current M1/M2 iteration,
+Simulator verification is the accepted client boundary; physical-device verification
+does not block local completion. Actual device background and data-protection
+claims remain unverified until later device/field acceptance. Provider sandbox
+access and development signing may still require external services.
+
+Keep required CI, security checks, review and coordinated dependency publication
+in the engineering milestones. Uncommitted local dependencies are not published
+integration evidence. A local restore proves only the tested recovery procedure;
+online backup, WAL recovery and traffic interruption can also be developed locally
+before target-specific durability and recovery objectives are approved. Early
+development uses fresh schemas, not legacy-data migrations.
+
+### Portable Application, Explicit Deployment Adapters
+
+Keep the Swift application independent of a particular cloud and of Kubernetes
+APIs. Use explicit PostgreSQL/Timescale, object-storage and OIDC contracts. Retain
+one Kubernetes application base with small target-specific configuration for
+secrets, workload identity, storage classes, ingress/certificates and backups.
+AWS, GCP and a compatible self-hosted cluster are deployment targets, not three
+different application architectures. The existing GCP bootstrap is one adapter,
+not the portable contract; other targets are not supported until verified.
+
+Do not build a general multi-cloud framework or require all providers to pass
+before the first deployment. In particular, S3 compatibility does not establish
+native GCS support, and a managed PostgreSQL service must support the required
+extensions and privileges before it can replace the reference database.
+
+Local Kubernetes checks do not prove a target's IAM, encryption/key management,
+volume durability, network enforcement, certificate renewal or failure-domain
+behavior. M3.1 verifies these with the exact candidate artifacts and selected
+configuration, first with synthetic data. Recovery includes database state,
+application objects and identity; missing current authority must prevent serving.
+Only then can an independently approved human pilot begin.
+
+### Bounded Foundation Acceptance
+
+M2 issues close against the capabilities they implement, not every future consumer
+of the same infrastructure. Deferred requirements remain mandatory in the owning
+feature's acceptance before that feature is activated:
+
+| M2 foundation | Later acceptance owner |
+|---|---|
+| Fresh schema and immutable custody (#29) | Deployment policy (#34) requires a reviewed upgrade before changing a retained-data deployment; no development legacy importer |
+| Authenticated ingestion measurements (#28) | Export/status performance (#45), governed closeout and erasure workloads (#50), online recovery and target admission limits (#34) |
+| Audit transactions, disclosure and scoped history (#54) | CLI (#52), task/publication/lifecycle/export (#37/#31/#50/#45), connector/communication (#63/#58), inference (#38/#46), custom integration (#48/#49) and target retention/recovery (#34) |
+| Current contract and transition evidence (#61) | Task synchronization (#37), Questionnaire preview/pairing (#53), connectors (#63), erasure (#50), custom/Kotlin integration (#48/#49/#65) and assisted authoring (#44) |
+
+Later issues reuse the same audit and verification mechanisms. They add actions,
+fixtures and evidence for their own activated behavior; they do not require a
+second audit system or reopen the foundation indefinitely. Ingestion retractions,
+withdrawal isolation, failed-audit denial and queue safety remain M2 requirements.
+
+The migration trigger is retained real data, not the final roadmap milestone.
+A real-data pilot counts. Before the first subsequent schema/storage change,
+create a release-specific upgrade plan and verify retained consent, grants,
+receipts, artifacts and pending work, with a reviewed cutover/recovery procedure.
+First deployment needs that policy, not an invented legacy dataset or migration
+engine. Breaking changes remain acceptable in disposable development setups.
+
 ## First: One Complete Study
 
 The first delivery supports a single-arm study with one approved site and administration language. It connects:
 
 - Versioned study configuration, approved consent and a manually supplied questionnaire.
+- A simple questionnaire editor with participant and branching-logic previews; optional assisted authoring uses the same FHIR draft.
 - Participant invitation, verified enrollment and an accessible consent experience.
 - Scheduled questionnaire execution, native iOS collection and one server-linked wearable route.
 - Reliable submission, accepted-state restoration and understandable failure states.
 - Coordinator views, bounded follow-up, meaningful collection status and authorized export.
-- Measured deployment capacity, retained-data upgrades and recovery.
+- Measured local workloads and recovery; target capacity and field acceptance in M3.1.
 
 The first cloud-collection engineering fixture uses Withings body measurements, alongside native collection such as HealthKit steps. The conversion roadmap also covers Oura and Google Health API; the pilot requires one admitted subset rather than completion of every mapping. Provider access and tested conversion remain prerequisites for each activated route.
 
@@ -44,7 +127,7 @@ The acceptance report demonstrates:
 3. Accepted-state restoration and interruption/revision recovery without fabricated completion or lost acknowledged data.
 4. Coordinator identification of setup, authorization, synchronization and partial-coverage problems, followed by permitted outreach.
 5. An interpretable, exact-version export/codebook; separate two-study fixtures prove attribution and withdrawal isolation.
-6. Retained-data upgrade, restore and lifecycle-under-load behavior, measuring access denial separately from payload cleanup.
+6. Restore and lifecycle-under-load behavior, measuring access denial separately from payload cleanup. Retained-data upgrades are required before changing a deployment that retains real study data, not for fresh development schemas.
 7. Observed results against the predeclared criteria, unresolved support cases, cost and an explicit go/no-go decision.
 
 Existing study deployments are not pilot targets without separately approved adoption.
@@ -78,7 +161,6 @@ This milestone tests whether the architecture is genuinely reusable. It should r
 | Source-document and institutional drafting | Stable structured facts, review operations and an approved processing route |
 | Study-scoped retrieval and image capabilities | A concrete intervention need, supported provider behavior and appropriate data handling |
 | Browser, text or voice participation | A protocol that can be represented faithfully through that channel |
-| REDCap exchange | An approved study-specific mapping with one clear owner for each record |
 | Custom document contracts | A real application need that does not belong in core clinical or study state |
 
 These are extensions of the common model, not a requirement to build a full clinical-trial management system. Scientific analysis, advanced allocation systems, supply logistics, arbitrary hosted code and a broad assessment library remain outside the initial scope.
@@ -95,7 +177,7 @@ A useful implementation issue states the current gap, the starting code boundary
 
 Start the core integration by proving transactional custody, then one manually configured Questionnaire from publication through accepted completion and restart. Add collection routes and coordinator operations to that working path. In particular, demonstrate immutable publication under concurrent writers, committed-change pagination and recovery without replaying external effects before broadening those mechanisms. Provider formats, billable request attempts and custom-result ownership need source-specific fixtures, not only generic success tests.
 
-Dependencies distinguish complete prerequisites from tested capability subsets and optional additions. Hosted drafting requires an approved connection and usage handling only when enabled; manual preparation remains independent. Browser questionnaires do not wait for conversation or phone support. A selected one-way REDCap exchange does not require the entire dataset-finalization workflow unless that study needs it.
+Dependencies distinguish complete prerequisites from tested capability subsets and optional additions. Hosted drafting requires an approved connection and usage handling only when enabled; manual preparation remains independent. Browser questionnaires do not wait for conversation or phone support. Dedicated REDCap exchange is outside the active roadmap; standard authorized exports remain in scope.
 
 ## Keep the Architecture Simple
 
@@ -105,7 +187,13 @@ Prefer existing Grove foundations and shared contracts over parallel frameworks.
 
 Core records express domain meaning rather than arbitrary editable status fields. Typed states and explicit commands make invalid transitions easier to reject and reason about. Swift, TypeScript and Kotlin implementations share exact contract fixtures without having to share all runtime code.
 
-The platform can make breaking API and schema changes when they improve its structure. That flexibility does not justify losing retained data or changing a running study's meaning. Changes need coordinated callers, explicit version handling and tested migration or a documented read-only historical representation.
+The platform can make breaking API and schema changes when they improve its structure.
+During early development, Trove targets fresh databases: update the canonical schema
+and recreate explicitly identified disposable setups instead of maintaining upgrade
+paths or legacy-data import machinery. Coordinate clients and test the new schema.
+Once a deployment retains real study data, introduce a reviewed upgrade and recovery
+policy before changing that deployment. This does not change the separate adoption
+requirements for existing MHC or Plainly studies.
 
 ## Quality Is Part of Each Feature
 
@@ -131,9 +219,26 @@ Record exact-revision results with pass, fail, skip and not-run states, includin
 
 One aggregate gate verifies that the checks selected for a change actually executed. Missing evidence, unintended skips and unexpected cancellation cannot produce a passing gate. Test the selection rules and periodically run the full applicable suite. Coverage reports must retain real covered and uncovered lines; scanner availability must be distinguished from successful analysis.
 
+The `Build and Test` workflow's `Required Verification` job checks component
+selection, dependent real-stack tests and coverage jobs. Selected jobs must succeed;
+missing or malformed selection/results fail closed. Documentation-only changes may
+skip the component tests. Server and web image publication also wait for this gate.
+Configure it as a required repository check alongside the separate repository
+standards and security checks; the workflow alone does not configure branch protection
+or establish that the selected tests cover all acceptance requirements. The shared
+Swift package command separately requires a fresh machine-readable Swift Testing
+report with successful executed tests. Missing reports, inconsistent counts, empty
+selections and all-skipped runs fail before coverage export; intentionally gated
+cases remain visible as skips, not passes.
+
 Untrusted changes run without signing, promotion or production credentials and without access to privileged caches. Prefer fresh runners, reviewed pinned tools and explicit network boundaries. Branch enforcement and independent review are verified settings, not assumptions inferred from workflow files.
 
-Build candidates once and test the exact artifacts later promoted. Record source, dependencies, toolchains, configuration and migration versions, with provenance and a component inventory. Test retained-data upgrades and serialized migrations, not only empty databases. API breaks remain acceptable; data loss and silent reinterpretation do not.
+Build candidates once and test the exact artifacts later promoted. Record source,
+dependencies, toolchains, configuration and schema version, with provenance and a
+component inventory. For the current development phase, verify fresh schema creation,
+relational constraints, restricted runtime access and persistence across restart.
+Retained-data upgrade tests become a release requirement before supporting production
+schema changes; they are not a prerequisite for this fresh-database implementation.
 
 ## Operate What Is Shipped
 
