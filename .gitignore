@@ -13,6 +13,8 @@
 .idea/
 .vscode/
 *.swp
+/.local-repositories/
+/Trove.code-workspace
 
 # Secrets
 .env
@@ -24,7 +26,12 @@
 # Swift
 Package.resolved
 */Package.resolved
+!/TroveAPI/Package.resolved
+!/TroveServer/Package.resolved
+!/TroveiOS/Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 .build/
+TroveServer/Packages/
+TroveAPI/Packages/
 .swiftpm/
 .xcodebuild
 .derivedData
@@ -37,6 +44,8 @@ xcuserdata/
 *.dSYM.zip
 *.doccarchive
 coverage.lcov
+*.profraw
+*.profdata
 .docs
 
 # Xcode projects are generated for the Swift packages, but TroveiOS/Trove.xcodeproj is checked in.

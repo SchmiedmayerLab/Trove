@@ -102,6 +102,20 @@ study_id="$(
         | jq --raw-output '.id'
 )"
 
+jq --null-input '{collectionRequirements: [{
+    profile: "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate",
+    sourceKind: "participant-app"
+}], consent: {"en-US": {
+    title: "Study Consent",
+    content: "Please review this synthetic study consent.\n\n<toggle id=\"agree\" expected-value=\"true\">I agree to participate.</toggle>\n\n<signature id=\"participant\"/>"
+}}}' \
+    | curl --fail-with-body --silent --show-error \
+        --request PATCH "$SERVER_URL/studies/$study_id" \
+        --header "Authorization: Bearer $researcher_token" \
+        --header 'Content-Type: application/json' \
+        --data-binary @- \
+        > /dev/null
+
 curl --fail-with-body --silent --show-error \
     --request POST "$SERVER_URL/studies/$study_id/publish" \
     --header "Authorization: Bearer $researcher_token" \

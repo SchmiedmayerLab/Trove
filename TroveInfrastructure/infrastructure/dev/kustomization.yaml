@@ -20,6 +20,7 @@ resources:
   - timescale.yaml
   - seaweedfs.yaml
   - dev-network-policies.yaml
+  - operator-network-policy.yaml
 patches:
   - path: patches/db-cluster.yaml
   - path: patches/keycloak-db-cluster.yaml

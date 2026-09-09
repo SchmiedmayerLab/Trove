@@ -5,42 +5,27 @@
 #
 # SPDX-License-Identifier: MIT
 #
-
 volumes:
-  server_db_data:
-  server_timescale_data:
+  server_authority_data:
   keycloak_db_data:
   seaweedfs_data:
 
 services:
   server-db:
-    image: postgres:18-alpine
+    image: timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c
     volumes:
-      - server_db_data:/var/lib/postgresql
+      - server_authority_data:/pgdata
+      - ./init/010-timescale.sql:/docker-entrypoint-initdb.d/010-trove-timescale.sql:ro
     environment:
-      POSTGRES_USER: ${DATABASE_USERNAME}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      PGDATA: /pgdata
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_USER: ${DATABASE_OPERATOR_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_OPERATOR_PASSWORD}
       POSTGRES_DB: ${DATABASE_NAME}
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  server-timescale:
-    image: timescale/timescaledb:latest-pg17
-    volumes:
-      - server_timescale_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: ${TIMESCALE_USERNAME}
-      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD}
-      POSTGRES_DB: ${TIMESCALE_NAME}
-    ports:
-      - '5433:5432'
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALE_USERNAME}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${DATABASE_OPERATOR_USERNAME} -d ${DATABASE_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -54,7 +39,7 @@ services:
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
       POSTGRES_DB: ${KEYCLOAK_DB_NAME}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USERNAME}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${KEYCLOAK_DB_USERNAME} -d ${KEYCLOAK_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -65,6 +50,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: http://localhost:8180
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USERNAME}
@@ -73,7 +59,7 @@ services:
       keycloak-db:
         condition: service_healthy
     ports:
-      - '8180:8080'
+      - '127.0.0.1:8180:8080'
     healthcheck:
       test:
         - CMD-SHELL
@@ -87,16 +73,15 @@ services:
       retries: 12
 
   seaweedfs:
-    image: chrislusf/seaweedfs:latest
-    command: "server -s3 -dir=/data -master.volumeSizeLimitMB=100 -volume.port=8081"
+    image: chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6
+    command: "server -s3 -dir=/data -master.volumeSizeLimitMB=100 -volume.port=8081 -volume.max=32 -master.telemetry=false"
     volumes:
       - seaweedfs_data:/data
     ports:
-      - "8333:8333" # S3 API
-      - "9333:9333" # Master
-      - "8888:8888" # Filer
+      - "127.0.0.1:8333:8333" # S3 API; master and filer stay on the Compose network.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9333/cluster/status || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8333/ || exit 1"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5
@@ -131,13 +116,10 @@ services:
       DATABASE_NAME: ${DATABASE_NAME}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      TIMESCALE_HOST: server-timescale
-      TIMESCALE_PORT: 5432
-      TIMESCALE_NAME: ${TIMESCALE_NAME}
-      TIMESCALE_USERNAME: ${TIMESCALE_USERNAME}
-      TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      KEYCLOAK_API_AUDIENCE: ${KEYCLOAK_API_AUDIENCE}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
       KEYCLOAK_RESEARCHER_ROLE: ${KEYCLOAK_RESEARCHER_ROLE}
@@ -148,9 +130,9 @@ services:
       S3_BUCKET: ${S3_BUCKET}
       S3_REGION: ${S3_REGION}
     depends_on:
+      server-grants:
+        condition: service_completed_successfully
       server-db:
-        condition: service_healthy
-      server-timescale:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -160,7 +142,7 @@ services:
       seaweedfs:
         condition: service_healthy
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
 
   server-migrate:
     image: ghcr.io/schmiedmayerlab/trove-server:main
@@ -171,42 +153,37 @@ services:
       DATABASE_HOST: server-db
       DATABASE_PORT: 5432
       DATABASE_NAME: ${DATABASE_NAME}
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      TIMESCALE_HOST: server-timescale
-      TIMESCALE_PORT: 5432
-      TIMESCALE_NAME: ${TIMESCALE_NAME}
-      TIMESCALE_USERNAME: ${TIMESCALE_USERNAME}
-      TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD}
-      KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
-      KEYCLOAK_RESEARCHER_ROLE: ${KEYCLOAK_RESEARCHER_ROLE}
-      KEYCLOAK_PARTICIPANT_ROLE: ${KEYCLOAK_PARTICIPANT_ROLE}
-      # The shared configure step builds the storage client before it knows which command ran.
-      S3_ENDPOINT: http://seaweedfs:8333
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_REGION: ${S3_REGION}
+      DATABASE_USERNAME: ${DATABASE_OPERATOR_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_OPERATOR_PASSWORD}
     depends_on:
       server-db:
         condition: service_healthy
-      server-timescale:
-        condition: service_healthy
-      keycloak:
-        condition: service_healthy
-      keycloak-config-cli:
+
+  server-grants:
+    image: timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c
+    entrypoint: ["bash", "/operator/grant-runtime.sh"]
+    environment:
+      PGHOST: server-db
+      PGPORT: 5432
+      PGDATABASE: ${DATABASE_NAME}
+      PGUSER: ${DATABASE_OPERATOR_USERNAME}
+      PGPASSWORD: ${DATABASE_OPERATOR_PASSWORD}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - ../database-operator:/operator:ro
+    depends_on:
+      server-migrate:
         condition: service_completed_successfully
-      seaweedfs:
-        condition: service_healthy
-    profiles:
-      - migrate
+    restart: "no"
 
   web:
     image: ghcr.io/schmiedmayerlab/trove-web:main
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:uid=101,gid=101,mode=0700,size=16m
     environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT}
       VITE_API_BASE_PATH: ${VITE_API_BASE_PATH}
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
@@ -214,4 +191,4 @@ services:
     depends_on:
       - server
     ports:
-      - '3000:8080'
+      - '127.0.0.1:3000:8080'

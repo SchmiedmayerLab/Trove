@@ -48,6 +48,14 @@ struct SignatureData: Codable, Sendable, Hashable {
 }
 
 
+/// The immutable localized document identity accepted with a consent record.
+struct ConsentPresentationProof: Codable, Sendable, Hashable {
+    let presentationID: UUID
+    let locale: String
+    let digest: String
+}
+
+
 final class EnrollmentConsent: Model, @unchecked Sendable {
     static let schema = "enrollment_consents"
 
@@ -59,6 +67,21 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
 
     @Field(key: "user_responses") var userResponses: UserResponses
 
+    @Field(key: "evidence_key") var evidenceKey: String
+
+    @Field(key: "evidence_digest") var evidenceDigest: String
+
+    @Field(key: "artifact_id") var artifactID: UUID
+
+    @Field(key: "presentation_proof") var presentationProof: ConsentPresentationProof
+
+    @Field(key: "command_id") var commandID: UUID
+
+    @Field(key: "expected_enrollment_version") var expectedEnrollmentVersion: Int64
+
+    /// Version at acceptance, never replaced with the enrollment's current version on replay.
+    @Field(key: "accepted_enrollment_version") var acceptedEnrollmentVersion: Int64
+
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
@@ -69,11 +92,25 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
         enrollmentId: UUID,
         revision: Int,
         userResponses: UserResponses,
+        evidenceKey: String,
+        evidenceDigest: String,
+        artifactID: UUID,
+        presentationProof: ConsentPresentationProof,
+        commandID: UUID,
+        expectedEnrollmentVersion: Int64,
+        acceptedEnrollmentVersion: Int64,
         id: UUID? = nil
     ) {
         self.id = id
         self.$enrollment.id = enrollmentId
         self.revision = revision
         self.userResponses = userResponses
+        self.evidenceKey = evidenceKey
+        self.evidenceDigest = evidenceDigest
+        self.artifactID = artifactID
+        self.presentationProof = presentationProof
+        self.commandID = commandID
+        self.expectedEnrollmentVersion = expectedEnrollmentVersion
+        self.acceptedEnrollmentVersion = acceptedEnrollmentVersion
     }
 }

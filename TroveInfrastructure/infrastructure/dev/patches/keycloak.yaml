@@ -23,6 +23,6 @@ spec:
         - name: keycloak
           env:
             - name: KC_HOSTNAME
-              value: localhost
+              value: https://localhost/auth
             - name: KC_HOSTNAME_STRICT
               value: "false"

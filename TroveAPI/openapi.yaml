@@ -165,7 +165,7 @@ paths:
     delete:
       tags:
         - Studies
-      summary: Delete a study by ID
+      summary: Delete an unpublished study without enrollment records
       parameters:
         - $ref: '#/components/parameters/StudyId'
       responses:
@@ -179,6 +179,58 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /studies/{studyId}/audit-events:
+    get:
+      tags: [Studies]
+      summary: Read a bounded page of study audit history
+      description: >
+        Requires researcher identity plus both admin and audit-reader membership
+        in the study's group. Administration alone does not grant audit access.
+        Includes only that study's group-scoped history, never participant/source history.
+        Ordered by occurredAt and id descending. A cursor is an existing event ID in
+        the same scope, not an authorization token. Each page requires committed
+        disclosure intent before release; identifiers remain governed study data.
+        New records require a fresh first page; this is not a frozen export snapshot.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Authorized study audit page
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyAuditPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /studies/{studyId}/publish:
     post:
@@ -815,6 +867,356 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /participant/sources:
+    post:
+      tags:
+        - Participant
+      summary: Register a participant-owned app data stream
+      description: >
+        Requires an existing participant profile. A registrationID is an
+        idempotency key scoped to that participant. Repeating it returns the same
+        stream, including its revoked state; it never reactivates a stream.
+        Registration grants no study access and does not attest the data origin.
+        The server assigns all identity namespaces. Preserve the event sequence
+        and exact retry bytes across restarts; register a new stream if that
+        journal is lost, including after reinstalling the app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - registrationID
+              properties:
+                registrationID:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: The registered stream, or the original result of a retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/sources/{sourceId}:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Participant
+      summary: Get an app data stream owned by the authenticated participant
+      responses:
+        '200':
+          description: The participant-owned stream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/sources/{sourceId}/revoke:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - Participant
+      summary: Permanently revoke a participant-owned app data stream
+      description: >
+        Idempotent. Revocation prevents future admission from this stream; it
+        neither deletes retained data nor changes enrollment or study access.
+      responses:
+        '200':
+          description: The revoked stream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/sources/{sourceId}/event-receipts/lookup:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: lookupParticipantEventReceipt
+      tags:
+        - Participant
+      summary: Recover an immutable receipt for an event owned by the participant
+      description: >
+        Matches the original event identifier, payload digest and exact consent/output intent.
+        Works after source revocation or enrollment withdrawal without admitting data,
+        restoring access or returning samples. Requires source ownership and a committed
+        audit disclosure intent. An unknown or foreign-owned event returns 404.
+        A receipt proves past custody only; clients must match its identity and digest
+        to their staged bytes before retirement. The JSON request is limited to 1 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventReceiptLookup'
+      responses:
+        '200':
+          description: Original persisted custody receipt; never current study access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Lookup request exceeds 1 MiB
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/sources/{sourceId}/events/{eventId}/attributions:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: attributeParticipantEvent
+      tags: [Participant]
+      summary: Authorize additional exact-version study outputs without copying the event
+      description: >
+        Requires participant source ownership and independently eligible exact consent
+        targets. Never changes event bytes, original submission intent or current
+        revision selection. New grants require active enrollment and source, including
+        for historical measurements. Pre-consent collection is not implicitly eligible.
+        Each command is atomic and idempotent within its source. Exact command retries
+        return the original outcome even after withdrawal or revocation; changed event
+        or targets conflict. An unknown or foreign-owned event returns 404. No samples
+        are returned. JSON requests are limited to 1 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventAttribution'
+      responses:
+        '200':
+          description: Original command receipt; not current study access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAttributionReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Attribution request exceeds 1 MiB
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/sources/{sourceId}/events:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - Participant
+      summary: Admit one validated collection or source-retraction event
+      description: >
+        The server validates the original bytes against its pinned Grove FHIR
+        contract, then independently checks each named immutable consent and its
+        collection interval and policy. Adoption of a later study revision does not
+        relabel delayed measurements. Every retained clinical output requires coverage
+        by a named consent; only explicitly selected outputs receive that study's grant.
+        A source retraction requires an empty target list and creates no study grants.
+        It requires an authenticated, active source binding but no active enrollment.
+        Its source-scoped logical Observation targets suppress every version, including
+        later arrivals, without deleting retained evidence or affecting other sources.
+        Event, point indexes or retraction assertions, study grants and audit commit together.
+        The same event bytes and consent/output intent return
+        the original receipt without creating new grants. Reusing an event identity
+        with different bytes or consent/output intent is a conflict. The receipt records
+        acceptance, not current permission to access study data. Initially supports
+        immutable, single-participant point-quantity events and Observation retractions; unsupported valid FHIR
+        shapes are rejected explicitly. No clinical payload is returned. The JSON
+        envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized
+        target intent to 512 KiB. Base64 preserves exact producer bytes; the server
+        never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventSubmission'
+      responses:
+        '200':
+          description: Immutable event acceptance receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Event exceeds the admission size limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Invalid Grove FHIR event or unsupported receiver shape
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Pinned validation service is unavailable
+          headers:
+            Retry-After:
+              description: Earliest retry time, as delay seconds or an HTTP date
+              schema:
+                type: string
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /participant/sources/{sourceId}/events/batch:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: submitParticipantEventBatch
+      tags: [Participant]
+      summary: Admit a bounded batch with independent event outcomes
+      description: >
+        Submit 1–16 original event submissions for one owned active source.
+        Authentication and envelope bounds precede processing. The JSON envelope
+        is limited to 6 MiB and the sum of eventBase64 UTF-8 lengths to 5592408 bytes.
+        Each member retains the single-event validation, consent and size limits.
+        The response has one receipt or sanitized problem per member in input order.
+        Members commit independently and are processed sequentially. One rejection
+        does not roll back another event. Cancellation or a lost response may leave
+        accepted members; recover each original receipt before retrying unchanged
+        bytes and targets. A receipt is custody evidence, not current study access.
+        This is not a background job or a latency guarantee. No clinical payload is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventBatchSubmission'
+      responses:
+        '200':
+          description: One independent outcome per submitted event, in input order
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 16
+                items:
+                  $ref: '#/components/schemas/EventBatchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Batch exceeds the request size limit; no member was processed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /participant/studies:
     get:
       tags:
@@ -896,44 +1298,6 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /participant/enrollments/{enrollmentId}:
-    patch:
-      tags:
-        - Participant
-      summary: Upgrade enrollment to a specified published revision
-      description: >
-        Sets the participant's `currentRevision` to the requested revision of
-        the study. The target revision must be a published revision and
-        greater than the enrollment's current revision. Use this when the
-        consent has not changed. If the consent has changed for the new
-        revision, submit a new consent via the consents endpoint instead, that
-        flow advances the revision atomically.
-      parameters:
-        - $ref: '#/components/parameters/EnrollmentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EnrollmentUpgradeInput'
-      responses:
-        '200':
-          description: Enrollment upgraded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EnrollmentResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-
   /participant/enrollments/{enrollmentId}/withdraw:
     post:
       tags:
@@ -948,6 +1312,89 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EnrollmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /participant/enrollments/{enrollmentId}/collection-plan:
+    get:
+      operationId: getParticipantCollectionPlan
+      tags:
+        - Participant
+      summary: Read exact consented collection windows for an owned enrollment
+      description: >
+        Returns an audited, consistent snapshot of accepted consent windows and
+        their published collection requirements. No consent responses, signatures,
+        artifacts or samples are returned. Withdrawal or no accepted consent yields
+        no windows. Publication alone does not change the timeline. Inconsistent
+        history or unknown policy fails the whole read, never a partial plan.
+        This snapshot is not an upload capability or permission for continued
+        offline collection. Refresh before collection and after enrollment or
+        consent changes; the receiver independently checks every submitted target.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+      responses:
+        '200':
+          description: Exact collection plan, or an empty plan when collection is not allowed
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantCollectionPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/enrollments/{enrollmentId}/consent-presentation:
+    get:
+      tags:
+        - Participant
+      summary: Read the exact consent presentation for an active enrollment
+      description: >
+        Returns retained Markdown for the exact locale and explicitly selected current or forward revision.
+        Omitting revision selects the enrollment's current revision, never the latest publication.
+        Every forward adoption requires fresh consent, even when its text is unchanged.
+        Historical publications without a retained presentation cannot accept new consent.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - name: locale
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Exact published locale identifier; no language fallback is applied.
+        - name: revision
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Exact published current or forward revision to review; omitted means the enrollment's current revision.
+      responses:
+        '200':
+          description: Immutable consent presentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentPresentationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -984,8 +1431,29 @@ paths:
       tags:
         - Participant
       summary: Submit a consent record
+      description: >
+        Requires Idempotency-Key and If-Match. Exact authorized replay returns the
+        original receipt before checking current enrollment state, including after
+        withdrawal; it never restores access. Reusing a key with changed content
+        or expected version conflicts. A new command requires the current active
+        enrollment version and exact reviewed presentation. An explicit forward
+        reviewedRevision requires fresh consent and target eligibility; consent,
+        revision adoption, enrollment version and audit are committed together.
+        Later publication cannot select an unseen revision. Downgrades are rejected.
       parameters:
         - $ref: '#/components/parameters/EnrollmentId'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID scoped to this enrollment; reuse the same key and complete command when retrying.
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          required: true
+          description: Exact strong enrollmentETag from the presentation response. Weak, wildcard and multiple tags are not accepted.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -995,20 +1463,32 @@ paths:
               required:
                 - consentData
                 - consentPDF
+                - reviewedRevision
+                - presentation
               properties:
+                presentation:
+                  $ref: '#/components/schemas/ConsentPresentationReference'
+                reviewedRevision:
+                  type: integer
+                  minimum: 1
+                  description: Exact published current or forward study revision presented to the participant; never implicitly replaced by the latest revision.
                 consentData:
                   $ref: '#/components/schemas/UserResponses'
                 consentPDF:
                   type: string
                   format: binary
             encoding:
+              presentation:
+                contentType: application/json
+              reviewedRevision:
+                contentType: application/json
               consentData:
                 contentType: application/json
               consentPDF:
                 contentType: application/pdf
       responses:
         '201':
-          description: Consent record created
+          description: Consent record created, or the original record returned for an identical retry
           content:
             application/json:
               schema:
@@ -1022,33 +1502,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /participant/fhir/resource:
-    post:
-      tags:
-        - Participant
-      summary: Upload a FHIR resource for the authenticated participant
-      description: >
-        Stores a FHIR R4 resource for the authenticated participant. The
-        `resourceType` field selects how the resource is indexed and stored.
-        Currently only `Observation` is supported; other resource types return
-        `400 Bad Request`.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FHIRResource'
-      responses:
-        '201':
-          description: Resource stored
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
 
   /participant/studies/{studyId}/{revision}/bundle:
     get:
@@ -1091,7 +1549,8 @@ paths:
       summary: Download a consent PDF
       description: >
         Downloads the signed consent PDF for a specific consent record
-        from object storage.
+        from object storage. Modern evidence must match its accepted digest;
+        incomplete metadata or changed bytes return a conflict without the PDF.
       parameters:
         - $ref: '#/components/parameters/EnrollmentId'
         - $ref: '#/components/parameters/ConsentId'
@@ -1116,6 +1575,9 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
 
 components:
   parameters:
@@ -1206,6 +1668,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    PreconditionFailed:
+      description: Enrollment state no longer matches the submitted precondition
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
     InternalServerError:
       description: Internal server error
       content:
@@ -1238,6 +1706,456 @@ components:
         detail:
           type: string
           description: A human-readable explanation specific to this occurrence
+
+    StudyAuditAction:
+      type: string
+      enum:
+        - consent.recorded
+        - consent.pdf.disclosure
+        - consent.records.disclosure
+        - collection.plan.disclosure
+        - enrollment.withdrawn
+        - study.published
+        - study.draft.deleted
+        - study.bundle.disclosure
+        - artifact.discard.scheduled
+        - study.data.granted
+        - study.audit.disclosure
+
+    AuditActor:
+      type: object
+      additionalProperties: false
+      required: [issuer, subject]
+      properties:
+        issuer:
+          type: string
+        subject:
+          type: string
+
+    StudyAuditRecord:
+      type: object
+      additionalProperties: false
+      required: [id, occurredAt, actor, action, targetId, outcome, correlationId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/AuditActor'
+        initiator:
+          $ref: '#/components/schemas/AuditActor'
+        action:
+          $ref: '#/components/schemas/StudyAuditAction'
+        targetId:
+          type: string
+          format: uuid
+        targetVersion:
+          type: string
+        outcome:
+          type: string
+          enum: [succeeded, disclosure_intent]
+        correlationId:
+          type: string
+          format: uuid
+        applicationRevision:
+          type: string
+
+    StudyAuditPage:
+      type: object
+      additionalProperties: false
+      required: [studyId, records]
+      properties:
+        studyId:
+          type: string
+          format: uuid
+        records:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/StudyAuditRecord'
+        nextBefore:
+          type: string
+          format: uuid
+          description: Last returned event ID when another older page exists.
+
+    EventTarget:
+      type: object
+      additionalProperties: false
+      required: [consentId, outputFullUrls]
+      properties:
+        consentId:
+          type: string
+          format: uuid
+          description: Exact immutable consent; enrollment and publication are resolved server-side.
+        outputFullUrls:
+          type: array
+          minItems: 1
+          maxItems: 512
+          uniqueItems: true
+          description: Exact clinical output entry addresses in this event, not moving logical identities.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 512
+
+    EventTargets:
+      type: array
+      minItems: 0
+      maxItems: 16
+      description: >
+        Distinct consent IDs; each target lists distinct output addresses. Normalized intent is limited to 512 KiB.
+        Active events and attribution commands require at least one target. Retraction events require an empty
+        array and never grant study access. Receipt lookup repeats the original event's targets exactly.
+      items:
+        $ref: '#/components/schemas/EventTarget'
+
+    EventSubmission:
+      type: object
+      additionalProperties: false
+      required: [eventBase64, targets]
+      properties:
+        eventBase64:
+          type: string
+          minLength: 4
+          maxLength: 5592408
+          description: RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+        targets:
+          $ref: '#/components/schemas/EventTargets'
+
+    EventBatchSubmission:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/EventSubmission'
+
+    EventBatchResult:
+      description: >
+        An immutable custody receipt or a per-event problem. Retry transient
+        problems (408, 429, 5xx) with unchanged bytes and targets and bounded
+        backoff. Preserve other rejected events for inspection. Never interpret
+        an outer HTTP 200 as acceptance of every member.
+      oneOf:
+        - $ref: '#/components/schemas/EventReceipt'
+        - $ref: '#/components/schemas/ProblemDetails'
+
+    EventAttribution:
+      type: object
+      additionalProperties: false
+      required: [commandId, targets]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          description: Durable client command ID, unique within the registered source.
+        targets:
+          $ref: '#/components/schemas/EventTargets'
+
+    EventAttributionReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, eventId, targetIntentSHA256, acceptedAt, authorizedOutputCount]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        targetIntentSHA256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        acceptedAt:
+          type: string
+          format: date-time
+        authorizedOutputCount:
+          type: integer
+          minimum: 1
+          maximum: 8192
+          description: Requested exact consent/output pairs authorized at command acceptance, including already-existing grants; not current access.
+
+    EventReceiptLookup:
+      type: object
+      additionalProperties: false
+      required: [producerEventIdentifier, payloadSHA256, targets]
+      properties:
+        producerEventIdentifier:
+          type: object
+          additionalProperties: false
+          required: [system, value]
+          properties:
+            system:
+              type: string
+              minLength: 1
+              maxLength: 4096
+            value:
+              type: string
+              minLength: 1
+              maxLength: 4096
+        payloadSHA256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        targets:
+          $ref: '#/components/schemas/EventTargets'
+
+    EventReceipt:
+      type: object
+      additionalProperties: false
+      description: >
+        Durable custody acknowledgement for one original producer event, not a
+        statement of current study access or graph visibility. Before retiring
+        staged bytes, the client must match the source, complete producer event
+        identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP
+        success alone is insufficient. Exact retries return the persisted receipt.
+      required:
+        - eventId
+        - sourceId
+        - producerEventIdentifier
+        - payloadSHA256
+        - targetIntentSHA256
+        - receivedAt
+        - nodeCount
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Server-assigned immutable custody record ID, not the producer's event identifier.
+        sourceId:
+          type: string
+          format: uuid
+        producerEventIdentifier:
+          type: object
+          additionalProperties: false
+          description: Complete identifier from the accepted original Bundle.
+          required:
+            - system
+            - value
+          properties:
+            system:
+              type: string
+              format: uri
+            value:
+              type: string
+              minLength: 1
+        payloadSHA256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Lowercase SHA-256 of the accepted event bytes, before any JSON normalization.
+        targetIntentSHA256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: >
+            SHA-256 of UTF-8 canonical target JSON: array sorted by consent ID,
+            lowercase UUIDs, lexically sorted distinct ASCII output addresses,
+            object keys consentId then outputFullUrls, compact JSON without escaped
+            slashes. Bind this to the original staged intent, not later attribution.
+        receivedAt:
+          type: string
+          format: date-time
+        nodeCount:
+          type: integer
+          minimum: 1
+
+    ParticipantCollectionPlan:
+      type: object
+      additionalProperties: false
+      required: [enrollmentId, stateVersion, asOf, windows]
+      properties:
+        enrollmentId:
+          type: string
+          format: uuid
+        stateVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        asOf:
+          type: string
+          format: date-time
+          description: Server observation time; not an expiration or promise of future eligibility.
+        windows:
+          type: array
+          maxItems: 1024
+          description: Ordered by consent adoption, never by latest publication. Empty means no collection.
+          items:
+            $ref: '#/components/schemas/ConsentCollectionWindow'
+
+    ConsentCollectionWindow:
+      type: object
+      additionalProperties: false
+      required: [consentId, publicationId, revision, start, requirements]
+      properties:
+        consentId:
+          type: string
+          format: uuid
+        publicationId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          minimum: 1
+        start:
+          type: string
+          format: date-time
+          description: Inclusive measurement-time boundary at exact consent acceptance.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+        requirements:
+          type: array
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/CollectionRequirement'
+
+    CollectionRequirement:
+      type: object
+      additionalProperties: false
+      description: >
+        Explicit backend collection permission, independent of native HealthKit
+        components. The current receiver supports the Grove Mobile heart-rate
+        profile as immutable point quantities from participant-app streams,
+        measured at or after the exact consent acceptance. This does not attest
+        the source device or authorize historical data.
+      required:
+        - profile
+        - sourceKind
+      properties:
+        profile:
+          type: string
+          format: uri
+          examples:
+            - https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate
+        sourceKind:
+          type: string
+          enum:
+            - participant-app
+
+    PseudonymousIdentifierSystems:
+      type: object
+      additionalProperties: false
+      description: >
+        Complete, distinct Grove HMAC identifier namespaces for this source.
+        Immutable across registration retries and revocation. These public
+        identifiers are not keys or credentials. Clients persist the returned
+        set with the source binding; they must not substitute global defaults.
+      required:
+        - sourceRecord
+        - sourceOutput
+        - writerRecord
+        - providerRecord
+        - providerOutput
+        - sourceArtifact
+        - providerArtifact
+        - sourceContext
+        - recordingDevice
+        - deviceSnapshot
+      properties:
+        sourceRecord:
+          type: string
+          format: uri
+          maxLength: 512
+        sourceOutput:
+          type: string
+          format: uri
+          maxLength: 512
+        writerRecord:
+          type: string
+          format: uri
+          maxLength: 512
+        providerRecord:
+          type: string
+          format: uri
+          maxLength: 512
+        providerOutput:
+          type: string
+          format: uri
+          maxLength: 512
+        sourceArtifact:
+          type: string
+          format: uri
+          maxLength: 512
+        providerArtifact:
+          type: string
+          format: uri
+          maxLength: 512
+        sourceContext:
+          type: string
+          format: uri
+          maxLength: 512
+        recordingDevice:
+          type: string
+          format: uri
+          maxLength: 512
+        deviceSnapshot:
+          type: string
+          format: uri
+          maxLength: 512
+
+    ParticipantSource:
+      type: object
+      additionalProperties: false
+      description: >
+        Server-assigned identity for an unverified participant-app stream.
+        Identifiers are not credentials. Every use requires participant
+        authentication and ownership checks. This is not provider attestation.
+      required:
+        - id
+        - registrationID
+        - kind
+        - eventIdentifierSystem
+        - pseudonymousIdentifierSystems
+        - producerInstance
+        - participantIdentifier
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        registrationID:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - participant-app
+        eventIdentifierSystem:
+          type: string
+          format: uri
+          description: Immutable namespace for event identifiers only, not HMAC identifiers.
+        pseudonymousIdentifierSystems:
+          $ref: '#/components/schemas/PseudonymousIdentifierSystems'
+        producerInstance:
+          type: string
+          format: uuid
+          description: The durable producer stream identity used in Grove event values.
+        participantIdentifier:
+          type: object
+          additionalProperties: false
+          description: Complete FHIR Patient business identifier assigned to this participant.
+          required:
+            - system
+            - value
+          properties:
+            system:
+              type: string
+              format: uri
+            value:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          description: Present only after permanent revocation; never cleared.
 
     LocalizationKey:
       type: string
@@ -1493,6 +2411,13 @@ components:
       type: object
       description: Partial update for a study. All fields are optional.
       properties:
+        collectionRequirements:
+          type: array
+          maxItems: 1
+          uniqueItems: true
+          description: Empty disables backend collection in the next publication; existing publications are unchanged.
+          items:
+            $ref: '#/components/schemas/CollectionRequirement'
         locales:
           type: array
           uniqueItems: true
@@ -1522,6 +2447,7 @@ components:
       type: object
       description: Full study response
       required:
+        - collectionRequirements
         - id
         - locales
         - icon
@@ -1531,6 +2457,12 @@ components:
         - visibility
         - enrollmentConditions
       properties:
+        collectionRequirements:
+          type: array
+          maxItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/CollectionRequirement'
         id:
           type: string
           format: uuid
@@ -2264,6 +3196,7 @@ components:
         - studyId
         - participantId
         - currentRevision
+        - stateVersion
         - enrolledAt
       properties:
         id:
@@ -2277,6 +3210,11 @@ components:
           format: uuid
         currentRevision:
           type: integer
+        stateVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Monotonic enrollment concurrency version; independent of the adopted study revision.
         enrolledAt:
           type: string
           format: date-time
@@ -2322,17 +3260,6 @@ components:
         invitationCode:
           type: string
           description: Optional invitation code for studies that require one
-
-    EnrollmentUpgradeInput:
-      type: object
-      description: Request body for upgrading an enrollment to a specific published revision
-      required:
-        - revision
-      properties:
-        revision:
-          type: integer
-          minimum: 1
-          description: Target published revision to upgrade the enrollment to
 
     # ── Consent Schemas ──────────────────────────────────────────────────
 
@@ -2406,6 +3333,49 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/SignatureData'
 
+    ConsentPresentationReference:
+      type: object
+      description: Identity of the exact localized Markdown reviewed by the participant, not a claim that the client rendered or understood it.
+      required:
+        - presentationId
+        - locale
+        - digest
+      properties:
+        presentationId:
+          type: string
+          format: uuid
+        locale:
+          type: string
+        digest:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: SHA-256 of the exact UTF-8 Markdown returned by the server.
+
+    ConsentPresentationResponse:
+      type: object
+      required:
+        - presentation
+        - revision
+        - markdown
+        - enrollmentStateVersion
+        - enrollmentETag
+      properties:
+        presentation:
+          $ref: '#/components/schemas/ConsentPresentationReference'
+        revision:
+          type: integer
+          minimum: 1
+        markdown:
+          type: string
+          description: Exact retained Markdown; clients must not substitute a current draft or another locale.
+        enrollmentStateVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        enrollmentETag:
+          type: string
+          description: Strong enrollment state tag to submit unchanged as If-Match.
+
     ConsentRecordResponse:
       type: object
       description: A submitted consent record
@@ -2426,6 +3396,13 @@ components:
           type: integer
         userResponses:
           $ref: '#/components/schemas/UserResponses'
+        presentation:
+          $ref: '#/components/schemas/ConsentPresentationReference'
+        acceptedEnrollmentVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Immutable version at acceptance, not the current enrollment state. Absent for historical records.
         createdAt:
           type: string
           format: date-time
@@ -2481,21 +3458,6 @@ components:
         phoneNumber:
           type: string
           maxLength: 30
-
-    FHIRResource:
-      type: object
-      description: >
-        A FHIR R4 resource of any type. The `resourceType` field acts as the
-        discriminator and the remainder of the payload is preserved verbatim.
-      required:
-        - resourceType
-      properties:
-        resourceType:
-          type: string
-          description: FHIR resource type (e.g. `Observation`, `Patient`, `Bundle`).
-          examples:
-            - Observation
-      additionalProperties: true
 
     ParticipantProfileInput:
       type: object

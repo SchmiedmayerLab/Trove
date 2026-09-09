@@ -19,6 +19,7 @@ final class ProfileService: Module, @unchecked Sendable {
         let context = try authorizationService.checkIsParticipant()
 
         let participant = Participant(
+            identityProviderIssuer: context.issuer,
             identityProviderId: context.subject,
             firstName: input.firstName,
             lastName: input.lastName,
@@ -40,7 +41,7 @@ final class ProfileService: Module, @unchecked Sendable {
     func getProfile() async throws -> Participant {
         let context = try authorizationService.checkIsParticipant()
 
-        guard let participant = try await repository.findByIdentityProviderId(context.subject) else {
+        guard let participant = try await repository.findByIdentity(issuer: context.issuer, subject: context.subject) else {
             throw ServerError.notFound(resource: "Participant", identifier: context.subject)
         }
 
@@ -50,7 +51,7 @@ final class ProfileService: Module, @unchecked Sendable {
     func updateProfile(input: ParticipantProfileInput) async throws -> Participant {
         let context = try authorizationService.checkIsParticipant()
 
-        guard let participant = try await repository.findByIdentityProviderId(context.subject) else {
+        guard let participant = try await repository.findByIdentity(issuer: context.issuer, subject: context.subject) else {
             throw ServerError.notFound(resource: "Participant", identifier: context.subject)
         }
 

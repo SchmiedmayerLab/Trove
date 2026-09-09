@@ -20,10 +20,6 @@ spec:
       maxUnavailable: 0
   template:
     spec:
-      initContainers:
-        - name: trove-server-migrate
-          image: ghcr.io/schmiedmayerlab/trove-server:main
-          imagePullPolicy: Always
       containers:
         - name: trove-server-container
           image: ghcr.io/schmiedmayerlab/trove-server:main

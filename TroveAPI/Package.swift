@@ -24,33 +24,58 @@ let package = Package(
     products: [
         .library(name: "TroveAPITypes", targets: ["TroveAPITypes"]),
         .library(name: "TroveAPIClient", targets: ["TroveAPIClient"]),
+        .library(name: "TroveHealthKit", targets: ["TroveHealthKit"]),
         .library(name: "TroveAPIServer", targets: ["TroveAPIServer"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.7.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"5.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.10.0"),
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.6")
+        // Use the immutable PR revision until its products are available in a tagged release.
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "53d2d475571d634371b58871fc1ad749259f401b")
     ] + swiftLintPackage(),
     targets: [
+        .systemLibrary(name: "CTroveDeliverySQLite", pkgConfig: "sqlite3", providers: [.apt(["libsqlite3-dev"])]),
         .target(
             name: "TroveAPITypes",
             dependencies: [
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
                 .product(name: "GroveLocalization", package: "Grove"),
                 .product(name: "GroveHealthKit", package: "Grove"),
                 .product(name: "GroveStudyDefinition", package: "Grove")
             ],
+            exclude: ["Generated/Types.swift.license"],
             plugins: [] + swiftLintPlugin()
         ),
         .target(
             name: "TroveAPIClient",
             dependencies: [
+                .target(name: "CTroveDeliverySQLite"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
                 .target(name: "TroveAPITypes"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
+            ],
+            exclude: ["Generated/Client.swift.license"],
+            plugins: [] + swiftLintPlugin()
+        ),
+        .target(
+            name: "TroveHealthKit",
+            dependencies: [
+                .target(name: "TroveAPIClient"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(
+                    name: "GroveHealthKit", package: "Grove", condition: .when(platforms: [.iOS, .macOS, .watchOS, .visionOS, .macCatalyst])
+                ),
+                .product(
+                    name: "GroveHealthKitFHIR", package: "Grove", condition: .when(platforms: [.iOS, .macOS, .watchOS, .visionOS, .macCatalyst])
+                )
             ],
             plugins: [] + swiftLintPlugin()
         ),
@@ -60,6 +85,7 @@ let package = Package(
                 .target(name: "TroveAPITypes"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")
             ],
+            exclude: ["Generated/Server.swift.license"],
             plugins: [] + swiftLintPlugin()
         ),
         .executableTarget(
@@ -72,6 +98,7 @@ let package = Package(
         .testTarget(
             name: "TroveAPITests",
             dependencies: [
+                .target(name: "TroveHealthKit"),
                 .target(name: "TroveAPITypes"),
                 .target(name: "TroveAPIClient"),
                 .target(name: "TroveAPIServer")

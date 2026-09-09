@@ -9,7 +9,23 @@
 **/.build
 **/node_modules
 **/dist
+**/coverage
+**/coverage-e2e
+**/test-results
+**/playwright-report
+**/eslint_report.json
 **/DerivedData
 **/.git
 .git
 **/.DS_Store
+# Local configuration and planning are never part of a publishable build context.
+**/.env
+**/.env.*
+!**/.env.example
+**/.swiftpm
+**/*.xcresult
+planning
+.local-repositories
+TroveServer/Packages
+TroveAPI/Packages
+Trove.code-workspace

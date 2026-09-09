@@ -10,6 +10,8 @@ import Vapor
 
 
 public struct KeycloakConfiguration: Sendable {
+    public var issuer: String
+    public var apiAudience: String
     public var url: String
     public var realm: String
     public var clientId: String
@@ -21,12 +23,39 @@ public struct KeycloakConfiguration: Sendable {
         "\(url)/realms/\(realm)/protocol/openid-connect/certs"
     }
 
+    var tokenPolicy: KeycloakTokenPolicy {
+        get throws { try KeycloakTokenPolicy(issuer: issuer, apiAudience: apiAudience) }
+    }
+
     public init() {
+        self.issuer = Environment.Keycloak.issuer
+        self.apiAudience = Environment.Keycloak.apiAudience
         self.url = Environment.Keycloak.url
         self.realm = Environment.Keycloak.realm
         self.clientId = Environment.Keycloak.clientId
         self.clientSecret = Environment.Keycloak.clientSecret
         self.researcherRole = Environment.Keycloak.researcherRole
         self.participantRole = Environment.Keycloak.participantRole
+    }
+
+    /// Explicit configuration supports isolated deployments and tests without changing process state.
+    init(
+        issuer: String,
+        apiAudience: String,
+        url: String,
+        realm: String,
+        clientId: String,
+        clientSecret: String,
+        researcherRole: String,
+        participantRole: String
+    ) {
+        self.issuer = issuer
+        self.apiAudience = apiAudience
+        self.url = url
+        self.realm = realm
+        self.clientId = clientId
+        self.clientSecret = clientSecret
+        self.researcherRole = researcherRole
+        self.participantRole = participantRole
     }
 }

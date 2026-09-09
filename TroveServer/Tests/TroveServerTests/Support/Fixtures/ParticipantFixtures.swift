@@ -28,15 +28,17 @@ enum ParticipantFixtures {
     static func createParticipant(
         on database: any Database,
         identityProviderId: String = "test-participant",
+        identityProviderIssuer: String = TestApp.issuer,
         id: UUID? = nil
     ) async throws -> Participant {
         let participant = Participant(
+            identityProviderIssuer: identityProviderIssuer,
             identityProviderId: identityProviderId,
             firstName: "Jane",
             lastName: "Doe",
             email: "jane@example.com",
             gender: .female,
-            dateOfBirth: DateComponents(calendar: .current, year: 2000, month: 1, day: 15).date!, // swiftlint:disable:this force_unwrapping
+            dateOfBirth: Date(timeIntervalSince1970: 947_894_400), // 2000-01-15, Gregorian UTC.
             region: "US",
             language: "en",
             phoneNumber: "+1234567890",

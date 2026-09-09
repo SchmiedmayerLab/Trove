@@ -7,14 +7,18 @@
 #
 
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: trove-timescale
   namespace: trove
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
+  serviceName: trove-timescale
   replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: trove-timescale
@@ -25,11 +29,15 @@ spec:
     spec:
       containers:
         - name: timescale
-          image: timescale/timescaledb:latest-pg17
+          image: timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c
           ports:
             - name: postgres
               containerPort: 5432
           env:
+            - name: PGDATA
+              value: /pgdata/data
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256
             - name: POSTGRES_DB
               value: trove
             - name: POSTGRES_USER
@@ -42,21 +50,31 @@ spec:
                 secretKeyRef:
                   name: trove-postgres-credentials
                   key: password
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+                - pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t 2
             periodSeconds: 5
+            timeoutSeconds: 3
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-            initialDelaySeconds: 30
+                - pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t 2
             periodSeconds: 10
+            timeoutSeconds: 3
           resources:
             requests:
               cpu: 100m
@@ -66,10 +84,15 @@ spec:
               memory: 512Mi
           volumeMounts:
             - name: data
-              mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: data
-          emptyDir: {}
+              mountPath: /pgdata
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 4Gi
 ---
 apiVersion: v1
 kind: Service

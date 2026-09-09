@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+# Optional overlay for ../docker/docker-compose.yml. Build and pin the image first.
+services:
+  server:
+    networks: [default, fhir-validation]
+    environment:
+      FHIR_VALIDATOR_URL: http://fhir-validator:8080/validate
+      FHIR_VALIDATOR_IDENTITY: ${FHIR_VALIDATOR_IDENTITY:?Set the expected manifest SHA-256 identity}
+  fhir-validator:
+    image: ${FHIR_VALIDATOR_IMAGE:?Set a built, digest-pinned validator image}
+    networks: [fhir-validation]
+    read_only: true
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 4g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=2g,mode=1777,noexec,nosuid,nodev
+    ulimits:
+      fsize: 268435456
+      nofile: 256
+    stop_grace_period: 5s
+networks:
+  fhir-validation:
+    internal: true

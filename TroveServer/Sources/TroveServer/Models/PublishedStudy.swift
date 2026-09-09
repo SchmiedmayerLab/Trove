@@ -28,6 +28,17 @@ final class PublishedStudy: Model, @unchecked Sendable {
 
     @Field(key: "metadata") var metadata: StudyDefinition.Metadata
 
+    @Field(key: "bundle_key") var bundleKey: String
+
+    @Field(key: "bundle_digest") var bundleDigest: String
+
+    @Field(key: "artifact_id") var artifactID: UUID
+
+    /// Exact localized Markdown included in the archive, never regenerated from an editable draft.
+    @Field(key: "consent_snapshot") var consentSnapshot: LocalizationsDictionary<String>
+
+    @Field(key: "collection_policy") var collectionPolicy: PublishedCollectionPolicy
+
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
@@ -40,6 +51,11 @@ final class PublishedStudy: Model, @unchecked Sendable {
         visibility: StudyVisibility,
         enrollmentCondition: EnrollmentConditions,
         metadata: StudyDefinition.Metadata,
+        bundleKey: String,
+        bundleDigest: String,
+        artifactID: UUID,
+        consentSnapshot: LocalizationsDictionary<String>,
+        collectionPolicy: PublishedCollectionPolicy,
         id: UUID? = nil
     ) {
         self.id = id
@@ -48,5 +64,10 @@ final class PublishedStudy: Model, @unchecked Sendable {
         self.visibility = visibility
         self.enrollmentCondition = enrollmentCondition
         self.metadata = metadata
+        self.bundleKey = bundleKey
+        self.bundleDigest = bundleDigest
+        self.artifactID = artifactID
+        self.consentSnapshot = consentSnapshot
+        self.collectionPolicy = collectionPolicy
     }
 }

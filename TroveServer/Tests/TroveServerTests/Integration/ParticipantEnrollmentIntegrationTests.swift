@@ -200,18 +200,16 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
         }
     }
 
-    // MARK: - Upgrade
+    // MARK: - Retired Consent-Free Upgrade
 
-    @Test
-    func upgradeUsesExplicitRevisionFromBody() async throws {
+    @Test(arguments: [1, 2, 3])
+    func retiredUpgradeRouteCannotChangeEnrollment(revision: Int) async throws {
         try await TestApp.withApp(token: .participant(subject: Self.participantSubject)) { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
             try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 1)
             try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 2)
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 3)
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 5)
 
             let participant = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
             let enrollment = Enrollment(
@@ -224,66 +222,15 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
 
             try await app.test(.PATCH, "\(apiBasePath)/participant/enrollments/\(enrollmentId)", beforeRequest: { req in
                 req.bearerAuth(token)
-                try req.encodeJSONBody(["revision": 2] as [String: Int])
-            }) { response in
-                #expect(response.status == .ok)
-                let updated = try response.content.decode(Components.Schemas.EnrollmentResponse.self)
-                #expect(updated.currentRevision == 2)
-            }
-        }
-    }
-
-    @Test
-    func upgradeRejectsRevisionNotEqualToCurrentOrLower() async throws {
-        try await TestApp.withApp(token: .participant(subject: Self.participantSubject)) { app, token in
-            let group = try await GroupFixtures.createGroup(on: app.db)
-            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
-            let studyId = try study.requireId()
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 1)
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 2)
-
-            let participant = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
-            let enrollment = Enrollment(
-                participantId: try participant.requireId(),
-                studyId: studyId,
-                currentRevision: 2
-            )
-            try await enrollment.save(on: app.db)
-            let enrollmentId = try enrollment.requireId().uuidString
-
-            try await app.test(.PATCH, "\(apiBasePath)/participant/enrollments/\(enrollmentId)", beforeRequest: { req in
-                req.bearerAuth(token)
-                try req.encodeJSONBody(["revision": 2] as [String: Int])
-            }) { response in
-                #expect(response.status == .conflict)
-            }
-        }
-    }
-
-    @Test
-    func upgradeRejectsUnpublishedRevision() async throws {
-        try await TestApp.withApp(token: .participant(subject: Self.participantSubject)) { app, token in
-            let group = try await GroupFixtures.createGroup(on: app.db)
-            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
-            let studyId = try study.requireId()
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 1)
-            try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId, revision: 3)
-
-            let participant = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
-            let enrollment = Enrollment(
-                participantId: try participant.requireId(),
-                studyId: studyId,
-                currentRevision: 1
-            )
-            try await enrollment.save(on: app.db)
-            let enrollmentId = try enrollment.requireId().uuidString
-
-            try await app.test(.PATCH, "\(apiBasePath)/participant/enrollments/\(enrollmentId)", beforeRequest: { req in
-                req.bearerAuth(token)
-                try req.encodeJSONBody(["revision": 2] as [String: Int])
+                try req.encodeJSONBody(["revision": revision])
             }) { response in
                 #expect(response.status == .notFound)
             }
+            let unchanged = try #require(try await Enrollment.find(try enrollment.requireId(), on: app.db))
+            #expect(unchanged.currentRevision == 1)
+            #expect(unchanged.stateVersion == 1)
+            #expect(unchanged.withdrawnAt == nil)
+            #expect(try await EnrollmentConsent.query(on: app.db).count() == 0)
         }
     }
 
@@ -399,6 +346,26 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
         }
     }
 
+    @Test
+    func otherParticipantCannotReadConsentPresentation() async throws {
+        let otherSubject = "other-participant"
+        try await TestApp.withApp(token: .participant(subject: otherSubject)) { app, token in
+            let (studyId, _) = try await setUpPublishedStudy(on: app)
+            let owner = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
+            let enrollment = Enrollment(participantId: try owner.requireId(), studyId: studyId, currentRevision: 1)
+            try await enrollment.save(on: app.db)
+            try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: otherSubject)
+            let enrollmentID = try enrollment.requireId()
+            try await app.test(
+                .GET,
+                "\(apiBasePath)/participant/enrollments/\(enrollmentID)/consent-presentation?locale=en-US",
+                beforeRequest: { $0.bearerAuth(token) }
+            ) { response in
+                #expect(response.status == .notFound)
+            }
+        }
+    }
+
     // MARK: - Consents
 
     @Test
@@ -442,13 +409,18 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
                 enrollmentId = enrollment.id
             }
 
+            let presentation = try await ConsentRequestFixtures.presentation(on: app, enrollmentID: enrollmentId, token: token)
             try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(enrollmentId)/consents", beforeRequest: { req in
                 req.bearerAuth(token)
-                try req.encodeMultipartConsentBody(consentData: consentDataJSON(
-                    toggles: ["agree_data_use": true],
-                    givenName: "Jane",
-                    familyName: "Doe"
-                ))
+                try req.encodeMultipartConsentBody(
+                    commandID: UUID(),
+                    enrollmentETag: presentation.enrollmentETag,
+                    consentData: consentDataJSON(
+                        toggles: ["agree_data_use": true],
+                        givenName: "Jane",
+                        familyName: "Doe"
+                    ), presentation: presentation.presentation
+                )
             }) { response in
                 #expect(response.status == .created)
 
@@ -461,33 +433,43 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
     }
 
     @Test
-    func duplicateConsentReturnsConflict() async throws {
+    func identicalConsentReturnsOriginalReceipt() async throws {
+        let commandID = UUID()
         try await TestApp.withApp(token: .participant(subject: Self.participantSubject)) { app, token in
             let (studyId, _) = try await setUpPublishedStudy(on: app)
             try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
 
-            var enrollmentId: String = ""
-            try await app.test(.POST, "\(apiBasePath)/participant/studies/\(studyId)/enrollments", beforeRequest: { req in
-                req.bearerAuth(token)
-                try req.encodeJSONBody([String: String]())
-                            }) { response in
-                let enrollment = try response.content.decode(Components.Schemas.EnrollmentResponse.self)
-                enrollmentId = enrollment.id
-            }
+            let enrollmentId = try await enroll(on: app, studyID: studyId, token: token)
 
+            let presentation = try await ConsentRequestFixtures.presentation(on: app, enrollmentID: enrollmentId, token: token)
             try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(enrollmentId)/consents", beforeRequest: { req in
                 req.bearerAuth(token)
-                try req.encodeMultipartConsentBody(consentData: consentDataJSON())
+                try req.encodeMultipartConsentBody(
+                    commandID: commandID,
+                    enrollmentETag: presentation.enrollmentETag,
+                    consentData: consentDataJSON(),
+                    presentation: presentation.presentation
+                )
             }) { response in
                 #expect(response.status == .created)
             }
 
+            let original = try #require(try await EnrollmentConsent.query(on: app.db).first())
+
             try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(enrollmentId)/consents", beforeRequest: { req in
                 req.bearerAuth(token)
-                try req.encodeMultipartConsentBody(consentData: consentDataJSON())
+                try req.encodeMultipartConsentBody(
+                    commandID: commandID,
+                    enrollmentETag: presentation.enrollmentETag,
+                    consentData: consentDataJSON(),
+                    presentation: presentation.presentation
+                )
             }) { response in
-                #expect(response.status == .conflict)
+                #expect(response.status == .created)
+                let receipt = try response.content.decode(Components.Schemas.ConsentRecordResponse.self)
+                #expect(receipt.id == original.id?.uuidString)
             }
+            #expect(try await EnrollmentConsent.query(on: app.db).count() == 1)
         }
     }
 
@@ -506,9 +488,15 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
                 enrollmentId = enrollment.id
             }
 
+            let presentation = try await ConsentRequestFixtures.presentation(on: app, enrollmentID: enrollmentId, token: token)
             try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(enrollmentId)/consents", beforeRequest: { req in
                 req.bearerAuth(token)
-                try req.encodeMultipartConsentBody(consentData: consentDataJSON())
+                try req.encodeMultipartConsentBody(
+                    commandID: UUID(),
+                    enrollmentETag: presentation.enrollmentETag,
+                    consentData: consentDataJSON(),
+                    presentation: presentation.presentation
+                )
             }) { _ in }
 
             try await app.test(.GET, "\(apiBasePath)/participant/enrollments/\(enrollmentId)/consents", beforeRequest: { req in
@@ -523,6 +511,18 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
     }
 
     // MARK: - Helpers
+
+    private func enroll(on app: Application, studyID: UUID, token: String?) async throws -> String {
+        var result: String?
+        try await app.test(.POST, "\(apiBasePath)/participant/studies/\(studyID)/enrollments", beforeRequest: { request in
+            request.bearerAuth(token)
+            try request.encodeJSONBody([String: String]())
+        }) { response in
+            try #require(response.status == .created)
+            result = try response.content.decode(Components.Schemas.EnrollmentResponse.self).id
+        }
+        return try #require(result)
+    }
 
     @discardableResult
     private func setUpPublishedStudy(
@@ -539,13 +539,19 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
         try await PublishedStudyFixtures.createPublishedStudy(
             on: app.db,
             studyId: studyId,
-            enrollmentCondition: enrollmentCondition
+            enrollmentCondition: enrollmentCondition,
+            consentSnapshot: .init([
+                .enUS: """
+                <toggle id="agree_data_use" expected-value="true">I agree to data use.</toggle>
+                <signature id="primary" />
+                """
+            ])
         )
         return (studyId, study)
     }
 
     private func consentDataJSON(
-        toggles: [String: Bool] = [:],
+        toggles: [String: Bool] = ["agree_data_use": true],
         selects: [String: String] = [:],
         givenName: String = "Jane",
         familyName: String = "Doe"
@@ -556,8 +562,8 @@ struct ParticipantEnrollmentIntegrationTests { // swiftlint:disable:this type_bo
             "signatures": [
                 "primary": [
                     "name": ["givenName": givenName, "familyName": familyName],
-                    "signature": "",
-                    "size": [0, 0]
+                    "signature": "synthetic-signature-evidence",
+                    "size": [120, 40]
                 ] as [String: Any]
             ] as [String: Any]
         ] as [String: Any]

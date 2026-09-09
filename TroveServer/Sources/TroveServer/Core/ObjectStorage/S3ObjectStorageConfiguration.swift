@@ -23,4 +23,12 @@ public struct S3ObjectStorageConfiguration: Sendable {
         self.bucket = Environment.ObjectStore.bucket
         self.region = Environment.ObjectStore.region
     }
+
+    init(endpoint: String, accessKeyId: String, secretAccessKey: String, bucket: String, region: String) {
+        self.endpoint = endpoint
+        self.accessKeyId = accessKeyId
+        self.secretAccessKey = secretAccessKey
+        self.bucket = bucket
+        self.region = region
+    }
 }

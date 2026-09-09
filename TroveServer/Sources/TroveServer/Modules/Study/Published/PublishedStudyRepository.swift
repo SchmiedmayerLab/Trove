@@ -31,9 +31,18 @@ final class PublishedStudyRepository: Module, Sendable {
             .max(\.$revision)
     }
 
-    func create(_ publishedStudy: PublishedStudy) async throws -> PublishedStudy {
+    func create(_ publishedStudy: PublishedStudy, on database: any Database) async throws -> PublishedStudy {
         try await publishedStudy.save(on: database)
         return publishedStudy
+    }
+
+    func find(studyId: UUID, revision: Int, on transaction: (any Database)? = nil) async throws -> PublishedStudy? {
+        // Fluent filters construct SQL, not an in-memory collection predicate.
+        // swiftlint:disable:next first_where
+        try await PublishedStudy.query(on: transaction ?? database)
+            .filter(\.$study.$id == studyId)
+            .filter(\.$revision == revision)
+            .first()
     }
 
     /// Returns the latest revision of each study, but only if that revision is public.

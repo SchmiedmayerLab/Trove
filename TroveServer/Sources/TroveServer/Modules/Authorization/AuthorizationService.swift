@@ -52,15 +52,23 @@ final class AuthorizationService: Module, @unchecked Sendable {
     func checkResearcherHasStudyAccess(_ studyId: UUID, role: AuthContext.GroupRole) async throws -> Study {
         try AuthContext.checkIsResearcher()
 
-        guard let groupName = try await studyRepository.findGroupName(forStudyId: studyId) else {
-            throw ServerError.notFound(resource: "Study", identifier: studyId.uuidString)
-        }
-
-        try AuthContext.checkHasAccess(groupName: groupName, role: role)
-
         guard let study = try await studyRepository.find(id: studyId) else {
             throw ServerError.notFound(resource: "Study", identifier: studyId.uuidString)
         }
+        // Authorize the group belonging to this exact study snapshot, not a group
+        // from an earlier lookup followed by a second potentially changed study.
+        try await checkResearcherHasGroupAccess(study.$group.id, role: role)
+        return study
+    }
+
+    /// Audit visibility is an explicit capability in addition to group administration.
+    func checkResearcherHasStudyAuditAccess(_ studyId: UUID) async throws -> Study {
+        try AuthContext.checkIsResearcher()
+        guard let study = try await studyRepository.find(id: studyId) else {
+            throw ServerError.notFound(resource: "Study", identifier: studyId.uuidString)
+        }
+        let group = try await checkResearcherHasGroupAccess(study.$group.id, role: .admin)
+        try AuthContext.checkHasAuditAccess(groupName: group.name)
         return study
     }
 
@@ -92,7 +100,7 @@ final class AuthorizationService: Module, @unchecked Sendable {
 
     private func currentParticipantId() async throws -> UUID {
         let context = try AuthContext.checkIsParticipant()
-        guard let participant = try await profileRepository.findByIdentityProviderId(context.subject) else {
+        guard let participant = try await profileRepository.findByIdentity(issuer: context.issuer, subject: context.subject) else {
             throw ServerError.notFound(resource: "Participant", identifier: context.subject)
         }
         return try participant.requireId()

@@ -10,8 +10,7 @@ import Fluent
 import Vapor
 
 
-/// Registers all database migrations across every database.
+/// Registers one migration history on the authoritative default database.
 public func configureMigrations(for app: Application) {
     configurePostgresMigrations(for: app)
-    configureTimescaleMigrations(for: app)
 }

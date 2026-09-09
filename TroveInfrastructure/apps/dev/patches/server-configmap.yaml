@@ -12,6 +12,9 @@ metadata:
   name: trove-server-config
   namespace: trove
 data:
+  DATABASE_HOST: trove-timescale
+  PGSSLMODE: disable
+  KEYCLOAK_ISSUER: https://localhost/auth/realms/trove
   APP_ENVIRONMENT: development
   S3_ENDPOINT: http://seaweedfs.trove.svc.cluster.local:8333
   S3_ACCESS_KEY: admin

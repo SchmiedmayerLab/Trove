@@ -25,6 +25,10 @@
         {
           "name": "researcher",
           "subGroups": []
+        },
+        {
+          "name": "audit-reader",
+          "subGroups": []
         }
       ]
     }
@@ -127,6 +131,27 @@
           }
         }
       ]
+    },
+    {
+      "name": "trove-api",
+      "description": "Intended audience for the Trove API",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "Trove API audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "trove-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "clients": [
@@ -179,7 +204,8 @@
         "acr",
         "profile",
         "email",
-        "groups"
+        "groups",
+        "trove-api"
       ],
       "optionalClientScopes": [
         "address",
@@ -246,7 +272,8 @@
         "acr",
         "profile",
         "email",
-        "groups"
+        "groups",
+        "trove-api"
       ],
       "optionalClientScopes": [
         "address",
@@ -273,7 +300,8 @@
         "acr",
         "profile",
         "email",
-        "groups"
+        "groups",
+        "trove-api"
       ],
       "optionalClientScopes": [
         "address",

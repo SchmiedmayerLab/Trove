@@ -122,8 +122,10 @@ spec:
   ingress:
     - from:
         - podSelector:
-            matchLabels:
-              app: trove-server
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [trove-server, trove-database-operator]
       ports:
         - protocol: TCP
           port: 5432
@@ -229,8 +231,10 @@ metadata:
   namespace: trove
 spec:
   podSelector:
-    matchLabels:
-      app: trove-server
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [trove-server, trove-database-operator]
   policyTypes:
     - Egress
   egress:

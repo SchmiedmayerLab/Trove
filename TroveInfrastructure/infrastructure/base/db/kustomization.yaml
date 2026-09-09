@@ -12,4 +12,5 @@ resources:
   - cluster.yaml
   - keycloak-cluster.yaml
   - db-credentials-es.yaml
+  - runtime-credentials-es.yaml
   - keycloak-db-credentials-es.yaml

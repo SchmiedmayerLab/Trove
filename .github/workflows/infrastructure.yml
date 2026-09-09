@@ -73,7 +73,8 @@ jobs:
   kind-smoke-test:
     name: KIND Smoke Test
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Include cold image compilation and bounded integration checks.
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: TroveInfrastructure
@@ -94,7 +95,16 @@ jobs:
         working-directory: .
         run: |
           docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
+          # Release Swift build cache before the web image needs its own workspace.
+          if [ "${{ runner.environment }}" = "github-hosted" ]; then
+            docker builder prune --all --force
+          fi
           docker build -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+          # This runner is ephemeral; never prune a shared development host.
+          if [ "${{ runner.environment }}" = "github-hosted" ]; then
+            docker builder prune --all --force
+          fi
+          df -h /
           kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-server:main
           kind load docker-image --name trove ghcr.io/schmiedmayerlab/trove-web:main
       - name: Bootstrap ArgoCD and applications

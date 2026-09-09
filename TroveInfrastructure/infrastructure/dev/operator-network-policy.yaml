@@ -1,0 +1,22 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operator-to-timescale
+  namespace: trove
+spec:
+  podSelector:
+    matchLabels:
+      app: trove-database-operator
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: trove-timescale
+      ports:
+        - protocol: TCP
+          port: 5432

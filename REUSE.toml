@@ -6,6 +6,8 @@ version = 1
 [[annotations]]
 path = [
     "TroveServer/tools/bruno/**",
+    "TroveAPI/Package.resolved",
+    "TroveServer/Package.resolved",
 ]
 SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
 SPDX-License-Identifier = "MIT"
@@ -15,6 +17,7 @@ SPDX-License-Identifier = "MIT"
 path = [
     "TroveiOS/Trove.xcodeproj/**",
     "TroveiOS/Trove/Assets.xcassets/**",
+    "TroveiOS/Trove/*.xcstrings",
 ]
 SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
 SPDX-License-Identifier = "MIT"

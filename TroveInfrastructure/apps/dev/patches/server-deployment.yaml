@@ -17,13 +17,8 @@ spec:
     type: Recreate
   template:
     spec:
-      initContainers:
-        - name: trove-server-migrate
-          image: ghcr.io/schmiedmayerlab/trove-server:main
-          imagePullPolicy: IfNotPresent
       containers:
         - name: trove-server-container
-          image: ghcr.io/schmiedmayerlab/trove-server:main
           imagePullPolicy: IfNotPresent
           resources:
             requests:

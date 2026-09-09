@@ -33,7 +33,8 @@ extension StudyPatch {
             participationCriterion: schema.participationCriterion.map { .init($0) },
             consent: schema.consent,
             visibility: schema.visibility,
-            enrollmentCondition: schema.enrollmentConditions
+            enrollmentCondition: schema.enrollmentConditions,
+            collectionRequirements: schema.collectionRequirements?.map(CollectionRequirement.init)
         )
     }
 }
@@ -51,6 +52,7 @@ extension Components.Schemas.StudyListItem {
 extension Components.Schemas.StudyResponse {
     init(_ model: Study) throws {
         self.init(
+            collectionRequirements: model.collectionRequirements.map(Components.Schemas.CollectionRequirement.init),
             id: try model.requireId().uuidString,
             locales: model.locales.sorted(using: KeyPathComparator(\.description)),
             icon: model.icon,
@@ -64,6 +66,22 @@ extension Components.Schemas.StudyResponse {
 }
 
 // MARK: - ParticipationCriterion Mapping
+
+extension CollectionRequirement {
+    init(_ schema: Components.Schemas.CollectionRequirement) {
+        switch schema.sourceKind {
+        case .participantApp: self.init(profile: schema.profile, sourceKind: .participantApp)
+        }
+    }
+}
+
+extension Components.Schemas.CollectionRequirement {
+    init(_ model: CollectionRequirement) {
+        switch model.sourceKind {
+        case .participantApp: self.init(profile: model.profile, sourceKind: .participantApp)
+        }
+    }
+}
 
 extension Components.Schemas.ParticipationCriterion {
     init(_ model: StudyDefinition.ParticipationCriterion) throws {

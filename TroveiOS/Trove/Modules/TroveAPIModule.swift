@@ -21,6 +21,7 @@ final class TroveAPIModule: Module, EnvironmentAccessible {
     func configure() {
         client = Client(
             serverURL: Config.apiBaseURL,
+            configuration: .trove,
             transport: URLSessionTransport(),
             middlewares: [
                 BearerAuthMiddleware { [weak self] in

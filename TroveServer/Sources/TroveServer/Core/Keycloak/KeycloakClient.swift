@@ -18,30 +18,42 @@ struct KeycloakGroup: Decodable, Sendable {
 }
 
 enum KeycloakError: Error, CustomStringConvertible {
-    case failedToAuthenticate(statusCode: Int, body: String)
-    case failedToFetchGroups(statusCode: Int, body: String)
+    case failedToAuthenticate(statusCode: Int)
+    case failedToFetchGroups(statusCode: Int)
 
     var description: String {
         switch self {
-        case let .failedToAuthenticate(statusCode, body):
-            "Failed to authenticate with Keycloak (HTTP \(statusCode)): \(body)"
-        case let .failedToFetchGroups(statusCode, body):
-            "Failed to fetch groups from Keycloak (HTTP \(statusCode)): \(body)"
+        case let .failedToAuthenticate(statusCode):
+            "Failed to authenticate with Keycloak (HTTP \(statusCode))"
+        case let .failedToFetchGroups(statusCode):
+            "Failed to fetch groups from Keycloak (HTTP \(statusCode))"
         }
     }
 }
 
-struct KeycloakClient {
+struct KeycloakClient: Sendable {
     private struct TokenResponse: Decodable {
         let access_token: String // swiftlint:disable:this identifier_name
     }
 
     let client: any Client
     let config: KeycloakConfiguration
+    private let jwksBody: @Sendable () async throws -> ByteBuffer
 
-    init(client: any Client, config: KeycloakConfiguration) {
-        self.client = client
+    init(application: Application, config: KeycloakConfiguration) throws {
+        let transport = try application.outboundTransport
+        try transport.validateEndpoint(config.url)
+        try transport.validateEndpoint(config.issuer)
+        let httpClient = application.http.client.shared
+        self.client = application.client
         self.config = config
+        self.jwksBody = {
+            let response = try await httpClient.execute(.init(url: config.jwksURL), timeout: .seconds(5))
+            guard response.status == .ok else {
+                throw KeycloakSigningKeys.RefreshError.unavailable
+            }
+            return try await response.body.collect(upTo: 65_536)
+        }
     }
 
     func fetchGroups() async throws -> [KeycloakGroup] {
@@ -52,22 +64,15 @@ struct KeycloakClient {
         }
 
         guard response.status == .ok else {
-            let body = response.body.map { String(buffer: $0) } ?? ""
-            throw KeycloakError.failedToFetchGroups(statusCode: Int(response.status.code), body: body)
+            throw KeycloakError.failedToFetchGroups(statusCode: Int(response.status.code))
         }
 
         return try response.content.decode([KeycloakGroup].self)
     }
 
     func fetchJWKS() async throws -> JWKS {
-        let response = try await client.get(URI(string: config.jwksURL))
-
-        guard response.status == .ok else {
-            let body = response.body.map { String(buffer: $0) } ?? ""
-            throw KeycloakError.failedToAuthenticate(statusCode: Int(response.status.code), body: body)
-        }
-
-        return try response.content.decode(JWKS.self)
+        let body = try await jwksBody()
+        return try JSONDecoder().decode(JWKS.self, from: Data(body.readableBytesView))
     }
 
     private func fetchAccessToken() async throws -> String {
@@ -81,8 +86,7 @@ struct KeycloakClient {
         }
 
         guard response.status == .ok else {
-            let body = response.body.map { String(buffer: $0) } ?? ""
-            throw KeycloakError.failedToAuthenticate(statusCode: Int(response.status.code), body: body)
+            throw KeycloakError.failedToAuthenticate(statusCode: Int(response.status.code))
         }
 
         let tokenResponse = try response.content.decode(TokenResponse.self)

@@ -49,7 +49,7 @@ wait_for_response() {
 
 echo "== backing services"
 services=$(docker compose ps --services --filter status=running)
-for required in server-db server-timescale keycloak seaweedfs; do
+for required in server-db keycloak seaweedfs; do
     echo "$services" | grep -qx "$required" || fail "$required is not running"
 done
 

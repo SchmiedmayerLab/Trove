@@ -61,6 +61,8 @@ spec:
               until vault status >/dev/null 2>&1; do echo "Waiting for Vault..."; sleep 2; done
               vault kv get secret/server-db-credentials >/dev/null 2>&1 || \
                 vault kv put secret/server-db-credentials username=trove password=trove
+              vault kv get secret/server-runtime-db-credentials >/dev/null 2>&1 || \
+                vault kv put secret/server-runtime-db-credentials username=trove_runtime password=dev-runtime-password-change-me
 ---
 apiVersion: batch/v1
 kind: Job

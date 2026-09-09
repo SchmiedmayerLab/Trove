@@ -17,6 +17,12 @@ extension Components.Schemas.ConsentRecordResponse {
             enrollmentId: model.$enrollment.id.uuidString,
             revision: model.revision,
             userResponses: .init(model.userResponses),
+            presentation: .init(
+                presentationId: model.presentationProof.presentationID.uuidString,
+                locale: model.presentationProof.locale,
+                digest: model.presentationProof.digest
+            ),
+            acceptedEnrollmentVersion: model.acceptedEnrollmentVersion,
             createdAt: model.createdAt!  // swiftlint:disable:this force_unwrapping
         )
     }

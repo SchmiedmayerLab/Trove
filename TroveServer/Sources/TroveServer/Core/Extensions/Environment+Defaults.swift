@@ -24,15 +24,9 @@ extension Environment {
         static var name: String { Environment.require("DATABASE_NAME") }
     }
 
-    enum Timescale {
-        static var host: String { Environment.require("TIMESCALE_HOST") }
-        static var port: Int { Environment.requireInt("TIMESCALE_PORT") }
-        static var username: String { Environment.require("TIMESCALE_USERNAME") }
-        static var password: String { Environment.require("TIMESCALE_PASSWORD") }
-        static var name: String { Environment.require("TIMESCALE_NAME") }
-    }
-
     enum Keycloak {
+        static var issuer: String { Environment.require("KEYCLOAK_ISSUER") }
+        static var apiAudience: String { Environment.require("KEYCLOAK_API_AUDIENCE") }
         static var url: String { Environment.require("KEYCLOAK_URL") }
         static var realm: String { Environment.require("KEYCLOAK_REALM") }
         static var clientId: String { Environment.require("KEYCLOAK_CLIENT_ID") }

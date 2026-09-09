@@ -19,6 +19,7 @@ let package = Package(
     dependencies: [
         // 💧 A server-side Swift web framework.
         .package(url: "https://github.com/vapor/vapor.git", from: "4.115.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.26.0"),
         // 🗄 An ORM for SQL and NoSQL databases.
         .package(url: "https://github.com/vapor/fluent.git", from: "4.9.0"),
         // 🐘 Fluent driver for Postgres.
@@ -33,9 +34,11 @@ let package = Package(
         // Shared API types, client, and server stubs (inlined in this monorepo)
         .package(path: "../TroveAPI"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
+        .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.4"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        // SchmiedmayerLab/Grove pinned to pre-release 0.3.0-beta.6 (Grove framework). GroveVapor is a local target below.
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.6"),
+        // Match the API's immutable Grove revision until the shared products have a tagged release.
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "53d2d475571d634371b58871fc1ad749259f401b"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),
@@ -47,6 +50,7 @@ let package = Package(
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "Vapor", package: "vapor"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
@@ -56,8 +60,11 @@ let package = Package(
                 .product(name: "GroveHealthKit", package: "Grove"),
                 .product(name: "GroveHealthKitBulkExport", package: "Grove"),
                 .product(name: "Grove", package: "Grove"),
+                .product(name: "GroveFoundation", package: "Grove"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
                 .target(name: "GroveVapor"),
                 .product(name: "JWTKit", package: "jwt-kit"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "GroveLocalization", package: "Grove"),
                 .product(name: "SotoS3", package: "soto"),
@@ -79,11 +86,17 @@ let package = Package(
             name: "TroveServerTests",
             dependencies: [
                 .target(name: "TroveServer"),
+                .product(name: "TroveAPIClient", package: "TroveAPI"),
                 .product(name: "VaporTesting", package: "vapor"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "CryptoExtras", package: "swift-crypto"),
+                .product(name: "X509", package: "swift-certificates"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "JWTKit", package: "jwt-kit")
             ],
+            exclude: ["Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license"],
+            resources: [.copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json")],
             swiftSettings: swiftSettings,
             plugins: [] + swiftLintPlugin()
         )
