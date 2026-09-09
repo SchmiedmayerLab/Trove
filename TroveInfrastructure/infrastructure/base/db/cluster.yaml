@@ -14,7 +14,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2-2-bullseye
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie@sha256:5c389b0268d9e637ca55efa41a7fafa3996332b5ea3c6099d0861c5f31acb00e
   instances: 1
   storage:
     size: 1Gi

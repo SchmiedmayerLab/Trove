@@ -15,10 +15,12 @@ Works for both dev (KIND) and prod (real cluster).
 Usage:
     python tools/setup.py                    # dev, current git branch
     python tools/setup.py --branch feature   # dev, specific branch
+    python tools/setup.py --revision SHA     # dev, exact clean checkout (CI)
     python tools/setup.py --env prod         # prod, main branch
 """
 
 import argparse
+import ipaddress
 import json
 import os
 import subprocess
@@ -30,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ARGOCD_CHART_VERSION = "9.5.1"
 APPLICATION_SYNC_TIMEOUT = int(os.environ.get("APPLICATION_SYNC_TIMEOUT", "1200"))
 TARGET_REVISION_PLACEHOLDER = '"__TARGET_REVISION__"'
+KIND_API_CIDR_PLACEHOLDER = '"__KIND_API_CIDR__"'
 
 
 # ---------------------------------------------------------------------------
@@ -70,8 +73,53 @@ def branch_exists_on_remote(branch: str) -> bool:
     return branch in result.stdout
 
 
+def commit_revision(value: str) -> str:
+    if len(value) != 40 or any(character not in "0123456789abcdefABCDEF" for character in value):
+        raise argparse.ArgumentTypeError("revision must be a full 40-character commit SHA")
+    return value.lower()
+
+
+def verify_checkout_revision(revision: str) -> None:
+    """Exact-revision deployment must describe the source used to build the images."""
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        capture_output=True, text=True, check=True, cwd=ROOT,
+    ).stdout.strip()
+    if head != revision:
+        raise ValueError("The deployment revision does not match the checked-out commit")
+    changes = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True, text=True, check=True, cwd=ROOT,
+    ).stdout.strip()
+    if changes:
+        raise ValueError("Exact-revision deployment requires a clean checkout; local changes are not in the remote commit")
+
+
 def header(msg: str):
     print(f"\n{'=' * 60}\n  {msg}\n{'=' * 60}\n")
+
+
+def kind_api_cidr() -> str:
+    """Allow only the actual single-node KIND API endpoint after Service DNAT."""
+    result = kubectl(
+        "get", "endpointslices", "-n", "default",
+        "-l", "kubernetes.io/service-name=kubernetes", "-o", "json",
+        capture_output=True, text=True,
+    )
+    slices = json.loads(result.stdout)["items"]
+    addresses = set()
+    for item in slices:
+        if item.get("addressType") != "IPv4" or item.get("ports") != [
+            {"name": "https", "port": 6443, "protocol": "TCP"}
+        ]:
+            raise ValueError("Expected the single-node KIND IPv4 API on TCP port 6443")
+        for endpoint in item["endpoints"]:
+            if endpoint.get("conditions", {}).get("ready") is not True:
+                raise ValueError("The KIND API endpoint is not ready")
+            addresses.update(ipaddress.IPv4Address(value) for value in endpoint["addresses"])
+    if len(addresses) != 1:
+        raise ValueError("Expected exactly one KIND API address")
+    return f"{addresses.pop()}/32"
 
 
 # ---------------------------------------------------------------------------
@@ -107,26 +155,27 @@ def step_configure_repository():
     repository_url = os.environ.get(
         "REPOSITORY_URL", "https://github.com/SchmiedmayerLab/Trove.git"
     ).strip()
-    manifest = subprocess.run(
-        [
-            "kubectl", "create", "secret", "generic", "trove-repository",
-            "--namespace", "argocd",
-            "--from-literal=type=git",
-            f"--from-literal=url={repository_url}",
-            "--from-literal=username=x-access-token",
-            f"--from-literal=password={token}",
-            "--dry-run=client", "-o", "yaml",
-        ],
-        capture_output=True, text=True, check=True,
-    ).stdout
-    kubectl("apply", "-f", "-", input=manifest, text=True)
-    kubectl(
-        "label", "secret", "trove-repository", "-n", "argocd",
-        "argocd.argoproj.io/secret-type=repository", "--overwrite",
-    )
+    # Keep credentials out of process arguments, printed commands and exception text.
+    # Server-side apply also avoids copying stringData into a last-applied annotation.
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": "trove-repository",
+            "namespace": "argocd",
+            "labels": {"argocd.argoproj.io/secret-type": "repository"},
+        },
+        "stringData": {
+            "type": "git",
+            "url": repository_url,
+            "username": "x-access-token",
+            "password": token,
+        },
+    }
+    kubectl("apply", "--server-side", "-f", "-", input=json.dumps(manifest), text=True)
 
 
-def wait_for_application(name: str):
+def wait_for_application(name: str, revision: str):
     """Wait for ArgoCD to reconcile the root Application and all its children."""
     deadline = time.monotonic() + APPLICATION_SYNC_TIMEOUT
     while time.monotonic() < deadline:
@@ -141,7 +190,8 @@ def wait_for_application(name: str):
         sync = status.get("sync", {}).get("status", "Unknown")
         health = status.get("health", {}).get("status", "Unknown")
         print(f"  {name}={sync}/{health}")
-        if sync == "Synced" and health == "Healthy":
+        compared_revision = status.get("sync", {}).get("comparedTo", {}).get("source", {}).get("targetRevision")
+        if sync == "Synced" and health == "Healthy" and compared_revision == revision:
             return
         time.sleep(15)
     raise TimeoutError(
@@ -150,7 +200,7 @@ def wait_for_application(name: str):
     )
 
 
-def step_apply_root_application(env: str, branch: str):
+def step_apply_root_application(env: str, revision: str):
     """Create the root Application and let ArgoCD orchestrate every child."""
     header("Step 3/3: Apply root Application")
 
@@ -163,13 +213,16 @@ def step_apply_root_application(env: str, branch: str):
             )
         # JSON strings are valid YAML scalars and safely quote any valid Git ref.
         root_yaml = root_yaml.replace(
-            TARGET_REVISION_PLACEHOLDER, json.dumps(branch)
+            TARGET_REVISION_PLACEHOLDER, json.dumps(revision)
         )
+        if KIND_API_CIDR_PLACEHOLDER not in root_yaml:
+            raise ValueError(f"{root_path} is missing the KIND API address placeholder")
+        root_yaml = root_yaml.replace(KIND_API_CIDR_PLACEHOLDER, json.dumps(kind_api_cidr()))
 
     root_name = f"root-{env}"
     kubectl("apply", "-f", "-", input=root_yaml, text=True)
     print("\nWaiting for ArgoCD to sync the application tree...")
-    wait_for_application(root_name)
+    wait_for_application(root_name, revision)
 
 
 # ---------------------------------------------------------------------------
@@ -183,26 +236,32 @@ def main():
     parser.add_argument(
         "--env", choices=["dev", "prod"], default="dev",
         help="Target environment (default: dev)")
-    parser.add_argument(
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
         "--branch",
         help="Git branch for ArgoCD to track (dev only, default: current branch)")
+    selection.add_argument(
+        "--revision", type=commit_revision,
+        help="Exact commit used for images and manifests; requires a clean matching checkout (dev only)")
     args = parser.parse_args()
 
-    if args.env == "prod" and args.branch:
-        parser.error("--branch is supported only for the dev environment")
+    if args.env == "prod" and (args.branch or args.revision):
+        parser.error("--branch and --revision are supported only for the dev environment")
 
-    branch = (args.branch or get_current_branch()) if args.env == "dev" else "main"
-
-    if args.env == "dev":
-        if not branch_exists_on_remote(branch):
-            print(f"\nError: Branch '{branch}' not found on remote 'origin'.")
+    if args.revision:
+        verify_checkout_revision(args.revision)
+        revision = args.revision
+    else:
+        revision = (args.branch or get_current_branch()) if args.env == "dev" else "main"
+        if args.env == "dev" and not branch_exists_on_remote(revision):
+            print(f"\nError: Branch '{revision}' not found on remote 'origin'.")
             print("Push your branch first: git push -u origin HEAD")
             sys.exit(1)
-        print(f"  Branch: {branch}")
+    print(f"  Revision: {revision}")
 
     step_install_argocd(args.env)
     step_configure_repository()
-    step_apply_root_application(args.env, branch)
+    step_apply_root_application(args.env, revision)
 
     domain = "localhost" if args.env == "dev" else "console.troveplatform.org"
     print(f"""

@@ -1,0 +1,63 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-keycloak
+  namespace: trove
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+# Identity clients use the same verified public endpoint as the browser.
+# Keep this /32 aligned with argocd-apps/prod/traefik-values.yaml; do not allow
+# arbitrary internet egress to work around an incorrect load-balancer address.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-keycloak-egress
+  namespace: trove
+spec:
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 34.182.76.103/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-config-cli-to-keycloak-egress
+  namespace: trove
+spec:
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 34.182.76.103/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-keycloak
+  namespace: trove
+$patch: delete
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-config-cli-to-keycloak
+  namespace: trove
+$patch: delete

@@ -22,8 +22,23 @@ spec:
     spec:
       containers:
         - name: trove-server-container
-          image: ghcr.io/schmiedmayerlab/trove-server:main
           imagePullPolicy: Always
+          volumeMounts:
+            - name: serving-identity
+              mountPath: /run/secrets/https
+              readOnly: true
+            - name: database-ca
+              mountPath: /run/secrets/database
+              readOnly: true
+          startupProbe:
+            httpGet:
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+          livenessProbe:
+            httpGet:
+              scheme: HTTPS
           resources:
             requests:
               memory: 512Mi
@@ -31,3 +46,18 @@ spec:
             limits:
               memory: 2Gi
               cpu: "1"
+      volumes:
+        - name: serving-identity
+          secret:
+            secretName: trove-main-tls-secret
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        - name: database-ca
+          secret:
+            secretName: trove-db-ca
+            items:
+              - key: ca.crt
+                path: ca.crt

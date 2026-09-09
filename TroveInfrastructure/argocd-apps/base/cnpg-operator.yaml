@@ -18,7 +18,11 @@ spec:
   source:
     repoURL: https://cloudnative-pg.github.io/charts
     chart: cloudnative-pg
-    targetRevision: 0.23.0
+    targetRevision: 0.29.0
+    helm:
+      valuesObject:
+        image:
+          tag: 1.30.0@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb
   destination:
     server: https://kubernetes.default.svc
     namespace: cnpg-system

@@ -1,0 +1,7 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+PyYAML==6.0.3
+cffi==2.1.1
+cryptography==50.0.1
+pycparser==3.0

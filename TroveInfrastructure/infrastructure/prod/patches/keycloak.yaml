@@ -21,4 +21,51 @@ spec:
             - name: KC_HOSTNAME
               value: https://console.troveplatform.org/auth
             - name: KC_HOSTNAME_STRICT
+              value: "true"
+            - name: KC_HTTP_ENABLED
               value: "false"
+            - name: KC_HTTPS_CERTIFICATE_FILE
+              value: /run/secrets/https/tls.crt
+            - name: KC_HTTPS_CERTIFICATE_KEY_FILE
+              value: /run/secrets/https/tls.key
+            - name: KC_DB_TLS_MODE
+              value: verify-server
+            - name: KC_DB_TLS_TRUST_STORE_FILE
+              value: /run/secrets/database/ca.crt
+          ports:
+            - $patch: replace
+            - name: https
+              containerPort: 8443
+          startupProbe:
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+          volumeMounts:
+            - name: https
+              mountPath: /run/secrets/https
+              readOnly: true
+            - name: database-ca
+              mountPath: /run/secrets/database
+              readOnly: true
+      volumes:
+        - name: https
+          secret:
+            secretName: trove-main-tls-secret
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        - name: database-ca
+          secret:
+            secretName: keycloak-db-ca
+            items:
+              - key: ca.crt
+                path: ca.crt

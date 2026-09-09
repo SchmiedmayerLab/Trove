@@ -22,6 +22,7 @@ resources:
   - dev-network-policies.yaml
   - operator-network-policy.yaml
 patches:
+  - path: patches/api-network.yaml
   - path: patches/db-cluster.yaml
   - path: patches/keycloak-db-cluster.yaml
   - path: patches/main-ingress.yaml

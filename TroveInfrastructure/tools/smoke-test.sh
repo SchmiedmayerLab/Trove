@@ -33,6 +33,19 @@ while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
     echo ""
     echo "All applications are Synced and Healthy!"
     kubectl get applications -n argocd
+    # Pod readiness alone does not prove that NodePort and ingress policies agree.
+    # Trust only this disposable cluster's self-signed certificate, never disable TLS checks.
+    certificate=$(mktemp)
+    trap 'rm -f "$certificate"' EXIT
+    kubectl get secret trove-main-tls-secret -n trove -o jsonpath='{.data.tls\.crt}' \
+      | base64 --decode > "$certificate"
+    for path in / /api/v0/health /auth/realms/trove/.well-known/openid-configuration; do
+      curl --fail --silent --show-error --max-time 15 \
+        --retry 6 --retry-all-errors --retry-delay 5 --retry-max-time 120 \
+        --cacert "$certificate" --resolve localhost:443:127.0.0.1 \
+        "https://localhost$path" > /dev/null
+    done
+    echo "PASS: web, API health and identity discovery are reachable through verified local TLS."
     exit 0
   fi
 

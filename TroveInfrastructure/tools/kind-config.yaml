@@ -8,10 +8,13 @@
 
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  # Keep the API service address aligned with the development egress policy.
+  serviceSubnet: "10.96.0.0/12"
 nodes:
-# The CloudNativePG operator is pinned, so pin the cluster too: an unpinned KIND tracks the
-# newest Kubernetes release, which the operator does not support.
-- image: kindest/node:v1.32.2
+# Keep local verification on the PostgreSQL extension's Kubernetes 1.35+ baseline.
+# Pin the tested node image rather than following a moving Kubernetes release.
+- image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
   role: control-plane
   kubeadmConfigPatches:
   - |

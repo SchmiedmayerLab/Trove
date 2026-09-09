@@ -24,6 +24,19 @@ spec:
         - name: trove-web-container
           image: ghcr.io/schmiedmayerlab/trove-web:main
           imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: serving-identity
+              mountPath: /run/secrets/https
+              readOnly: true
+          startupProbe:
+            httpGet:
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+          livenessProbe:
+            httpGet:
+              scheme: HTTPS
           resources:
             requests:
               memory: 128Mi
@@ -31,3 +44,12 @@ spec:
             limits:
               memory: 1Gi
               cpu: 100m
+      volumes:
+        - name: serving-identity
+          secret:
+            secretName: trove-main-tls-secret
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
