@@ -40,6 +40,10 @@ Publishing creates an immutable revision. Stage content under unique immutable a
 
 Enrollment links a participant to a study and its adopted revision. Consent records the exact approved content presented, the applicable acknowledgements or signatures and the participant's action. A reference to “the latest consent document” is insufficient because the latest document can change.
 
+The first supported adoption rule requires fresh consent for every explicitly selected forward revision, even when the wording is unchanged. Omitting a revision selects the enrollment's current revision, not the newest publication. The server rechecks the exact published presentation and target participation criteria before committing consent, revision adoption, enrollment state and audit together. A newly invitation-restricted revision requires retained invitation evidence for the same study; an already redeemed code is not consumed again.
+
+Exact command retries return the original consent receipt without adopting again, including after later adoption or withdrawal. They do not restore participation. Downgrades and consent-free upgrade routes are rejected. Researcher-configurable exceptions and institutional approval lifecycles are separate capabilities; this initial server rule does not establish institutional approval or legal validity of a signature.
+
 The study lifecycle distinguishes preparation, publication, recruitment, active participation, pause, closure and archive. These states have operational effects: pausing a study is not the same as completing its tasks, and closing recruitment is not the same as ending collection for enrolled participants.
 
 Required approvals have scope and validity. Changes to that validity can stop affected enrollment, task execution, collection or communication. Previously admitted work follows its declared policy; historical records are not rewritten to make them appear newly authorized.
@@ -72,6 +76,28 @@ GroveScheduler provides local scheduling and presentation. Its integration impor
 FHIR Questionnaire JSON is the instrument source, paired with QuestionnaireResponse for results. Exact canonical identity, version and item identifiers are retained throughout authoring, administration and export.
 
 The first authoring path is deliberately straightforward: authorized manual import or editing, validation against pinned packages, and a bounded web preview. Assisted document conversion can be added without making ordinary questionnaire use depend on inference.
+
+The dashboard provides a simple question/section editor, participant preview and
+branching graph over that same FHIR draft. Researchers edit answer choices and
+typed conditions without writing JSON; import/export preserves stable item IDs
+and unsupported fields rather than silently simplifying an instrument. Published
+versions remain immutable. The optional authoring assistant proposes changes
+through the same revision-checked editing and validation operations.
+
+The graph shows both the questionnaire hierarchy and labeled conditional
+dependencies, clearly distinguished from display order. An all-branches view
+supports collaborator review; synthetic-answer walkthroughs highlight enabled,
+disabled and not-evaluated items and explain why. Selecting a node focuses its
+editor and preview. Collapsible sections, search, a keyboard-accessible rule list
+and a versioned printable overview keep larger instruments understandable.
+
+Use FHIR's enablement rules, not a separate navigation/workflow schema. Graph and
+participant preview share evaluation of the supported condition subset, including
+ancestor gating and repeat context. Missing references and unsupported expressions
+remain visible; an opaque expression cannot be shown as a fully analyzed branch.
+Named synthetic scenarios help review but do not prove exhaustive path coverage
+or scientific validity. Preview and exported diagrams contain no participant data;
+private instrument access and licensing restrictions still apply.
 
 There are three separate questions:
 

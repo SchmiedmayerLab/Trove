@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+# Documentation is prepared for the separate wiki, not the application repository.
+/README.md
+/.local/
