@@ -7,7 +7,18 @@ SPDX-License-Identifier: MIT
 
 This worker validates one exchange Bundle against the pinned Grove FHIR 0.6.0 contract. It runs the IG's own profile, graph and identity checks, then the official FHIR Validator against the complete local package closure. Trove separately authorizes the participant, source, supported output shape, consent and study attribution. A valid FHIR graph is not permission to store or disclose it.
 
-`manifest.json` records the exact source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are locally built 0.6.0 artifacts; this setup does not assume that a matching public release download exists. Rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
+`manifest.json` records the exact companion source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are the checksum-verified assets of the published Grove FHIR 0.6.0 release identified by `guideRelease`; rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
+
+The runtime companion contract remains at `444e06fb25680c3af29e5d3ccbebeb0249be7318`.
+The published packages were built from release revision
+`83668d2d33325d2c1c9d42638fdc7557314f3d88`, not that earlier commit. All ten guide
+directories, catalogs, producer validators, Questionnaire companion and build-tool
+locks are identical at both revisions. The only source differences add an offline
+CI job and recognize one narrowly scoped BCP 47 Publisher QA warning in
+`Scripts/check-guide-qa.py`. These are compatible published package assets, not a
+new exchange contract. Their `ci-build`/`notForPublication` metadata remains an
+upstream preview designation; use here does not establish deployment approval or
+online terminology validation.
 
 Run `bash scripts/check validator-pin` to compare the locked Java tool with its
 official GitHub release asset. This online check is separate from offline context
@@ -40,6 +51,15 @@ the checkout's cache or change package pins. Download an updated tool separately
 and check `validator-pin` before preparing it. Never repin to make changed bytes
 pass.
 
+To reconstruct the locked inventory, download the named release assets
+`<packageId>-0.6.0.tgz` from the repository and release ID in `guideRelease`.
+Verify their SHA-256 against both the GitHub asset digest and each manifest entry,
+then place them under `packages/<file>` in the artifact directory. Keep the
+checksum-pinned validator JAR and bootstrap packages beside them. Preparation
+rechecks every byte; a matching version label alone is insufficient. Retain this
+inventory durably with its manifest, outside the source repository and temporary
+CI artifact retention. Do not rely on regenerating byte-identical archives.
+
 ## Deployment Boundary
 
 Use `compose.yaml` as an overlay for `../docker/docker-compose.yml`. Set `FHIR_VALIDATOR_IMAGE` to the built image's immutable digest and `FHIR_VALIDATOR_IDENTITY` to `sha256:` followed by the manifest's SHA-256. The server must compare the expected identity, contract revision and digest of the exact submitted bytes; it must never learn its expected identity from a response.
@@ -49,6 +69,26 @@ Only the server joins both the normal application network and the internal valid
 The worker processes one request at a time, with a two-connection backlog and one reusable official validator engine. It loads the pinned packages before accepting requests. The engine listens only on loopback inside the container; the worker forwards only raw FHIR bytes to its fixed validation route, without query parameters. Engine administration, package loading and transformation routes are not exposed. No validation results are cached: every event, including a retry, passes both validation layers.
 
 A timeout, dead process or malformed engine response is never an admission result. An interrupted validation returns unavailable and discards its engine; a later request can start a replacement within the same deadline. The worker does not add a process pool, durable queue or general execution API. Measure throughput before increasing concurrency.
+
+## Questionnaire Authoring
+
+`POST /validate/questionnaire` validates one Questionnaire against the same pinned
+package closure. It requires the Grove Questionnaire profile claim, runs the IG's
+`validate_questionnaire` companion rules, then the official validator. It accepts
+no caller-selected packages, profiles, terminology servers or executable code.
+Its response adds `"purpose": "questionnaire"`; consumers must verify this field
+as well as the exact input digest, contract revision and configured identity.
+The existing `/validate` route remains restricted to exchange/retraction Bundles.
+
+Both routes use the same bounds and unavailable semantics below. For offline
+synthetic checks, use `--stdin --questionnaire`. IG validity does not establish
+that a study client can execute every retained feature: the server must separately
+check its supported execution capabilities before publication. Exact original
+Questionnaire bytes, not a rewritten or simplified resource, are validated.
+Run `smoke.py` with `--questionnaire` and a synthetic IG-conformant Questionnaire
+fixture to exercise this route, including official rejection, timeout recovery,
+CLI framing and private-network HTTP. Run the existing exchange smoke separately;
+a Questionnaire result does not replace exchange-admission evidence.
 
 ## Request and Result
 

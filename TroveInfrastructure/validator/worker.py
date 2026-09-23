@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import http.client
 import http.server
+import importlib
 import json
 import os
 from pathlib import Path
@@ -207,6 +208,7 @@ class Validator:
             sys.path.insert(0, str(assets / "grove-fhir"))
             from Scripts.producer_validation.context import ADAPTER_PACKAGE_PROFILES
             self.adapter_profiles = set().union(*ADAPTER_PACKAGE_PROFILES.values())
+            self.questionnaire_rules = importlib.import_module("Scripts.validate-questionnaire").validate_questionnaire
             self.engine.start()
         except BaseException:
             self.close()
@@ -256,6 +258,37 @@ class Validator:
         except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
             return 503, self.response(raw, code="validator_unavailable")
 
+    def validate_questionnaire(self, raw):
+        """Validate authoring content without broadening the exchange admission route."""
+        from Scripts.producer_validation.external_validator import reject_validator_errors
+        from Scripts.producer_validation.diagnostics import ProducerValidationError
+
+        def response(**fields):
+            return dict(self.response(raw, **fields), purpose="questionnaire")
+
+        try:
+            resource = strict_json(raw)
+        except (ValueError, UnicodeError, RecursionError):
+            return 422, response(code="invalid_json")
+        try:
+            profile = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"
+            profiles = resource.get("meta", {}).get("profile", []) if isinstance(resource, dict) else []
+            if not isinstance(profiles, list) or profile not in profiles:
+                raise ProducerValidationError("questionnaire profile required")
+            if any(issue.severity == "error" for issue in self.questionnaire_rules(resource)):
+                raise ProducerValidationError("questionnaire contract failed")
+        except (ProducerValidationError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
+            return 422, response(code="invalid_fhir")
+        try:
+            outcome = self.engine.validate(raw)
+            try:
+                reject_validator_errors(outcome, "questionnaire")
+            except ProducerValidationError:
+                return 422, response(code="invalid_fhir")
+            return 200, response(valid=True)
+        except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
+            return 503, response(code="validator_unavailable")
+
 
 class Handler(http.server.BaseHTTPRequestHandler):
     # Deliberately single-process/single-request: no unbounded threads or Java processes.
@@ -294,7 +327,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         lengths = self.headers.get_all("Content-Length", [])
-        if self.path != "/validate" or self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
+        if self.path not in ("/validate", "/validate/questionnaire") or self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
             self.send_result(400, {"code": "invalid_request"})
             return
         if len(lengths[0]) > 7 or not lengths[0].isascii() or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= MAX_BODY:
@@ -322,7 +355,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_result(400, {"code": "invalid_request"})
             return
         signal.alarm(0)
-        self.send_result(*self.server.validator.validate(raw))
+        validate = self.server.validator.validate_questionnaire if self.path == "/validate/questionnaire" else self.server.validator.validate
+        self.send_result(*validate(raw))
 
     def do_GET(self):
         ready = self.path == "/health" and self.server.validator.engine.ready
@@ -340,7 +374,10 @@ class Server(http.server.HTTPServer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--stdin", action="store_true")
+    parser.add_argument("--questionnaire", action="store_true", help="validate a Questionnaire in stdin mode")
     arguments = parser.parse_args()
+    if arguments.questionnaire and not arguments.stdin:
+        parser.error("--questionnaire requires --stdin")
     # Applies to stdin mode as well as the HTTP handler.
     signal.signal(signal.SIGALRM, Handler.read_timeout)
     try:
@@ -350,7 +387,8 @@ def main():
         return 2
     try:
         if arguments.stdin:
-            status, result = validator.validate(sys.stdin.buffer.read(MAX_BODY + 1))
+            validate = validator.validate_questionnaire if arguments.questionnaire else validator.validate
+            status, result = validate(sys.stdin.buffer.read(MAX_BODY + 1))
             print(json.dumps(result, separators=(",", ":")))
             return 0 if status == 200 else 1 if status == 422 else 2
         with Server(("0.0.0.0", 8080), Handler) as server:
