@@ -14,13 +14,17 @@ The integration boundary is a versioned contract and a scoped identity—not sha
 
 ## Swift Where It Helps, Native Clients Where They Matter
 
-Swift is the preferred language for the server and iOS application. Grove provides reusable definitions, conversion, questionnaire, scheduling and inference foundations.
+Swift is the implementation language for the server, iOS application, researcher CLI, hosted authoring orchestration, workers and optional MCP and researcher-voice services. Grove provides reusable definitions, conversion, questionnaire, scheduling and inference foundations.
 
-The web dashboard and browser experiences use TypeScript, while Android retains native Kotlin integration, including platform-specific health collection. Shared formats and conformance fixtures are more important than forcing every implementation into one language.
+The existing TypeScript browser presentation and native Kotlin Android integration are explicit retained clients. This iteration does not rewrite those interfaces. New platform services and tooling are Swift, not additional TypeScript backends. Established FHIR validators and document-processing tools may run behind bounded Swift orchestration; language consistency does not justify reimplementing specialist tools.
 
 A portable Swift library may be useful on Android or WebAssembly when it reduces repeated domain logic. Adoption should depend on measurable benefits in maintenance, packaging, performance and dependency support. It is not a prerequisite for Android participation or browser questionnaires.
 
 This approach separates stable shared meaning from operating-system behavior. Background collection, permissions, notifications and user interfaces remain native responsibilities where necessary.
+
+## Questionnaire Presentation
+
+GroveStudy resolves a Questionnaire by exact artifact identity, not a locale-specific filename. Rendering selects the task session's admitted language from the one multilingual FHIR resource; retain the original resource rather than exporting a lossy single-language rendering. Shared conversion must distinguish language/script/region tags and localize supported answer displays without changing their values. Localized-file lookup remains useful for standalone Markdown/PDF documents. Trove tracks this coordinated shared-library work in [definitions #23](https://github.com/SchmiedmayerLab/Trove/issues/23) and [client integration #32](https://github.com/SchmiedmayerLab/Trove/issues/32), without moving server approval authority into Grove.
 
 ## Scheduler Synchronization
 
@@ -81,7 +85,7 @@ The same principle applies to task outcomes. Durable local import preserves the 
 
 ### Share Mechanisms After Proving Them
 
-Incubate delivery changes in Trove, then extract a small Grove adapter once two configurations demonstrate the boundary. Keep source-specific collection policy, assessment UI, scoring, routing and study-specific delays in their owning application. Conversion remains a pure mapping layer, separate from OAuth, polling and authorization.
+Keep the durable journal in TroveAPIClient and acquisition policy in TroveHealthKit and the app. A second concrete client need may justify extracting a small Grove adapter in M5; synthetic two-configuration tests alone do not require a shared package. Keep source-specific collection policy, assessment UI, scoring, routing and study-specific delays in their owning application. Conversion remains a pure mapping layer, separate from OAuth, polling and authorization.
 
 Existing MHC and Plainly deployments stay pinned until their owners approve adoption. A migration preserves identities, queues, consent and historical outcomes, rehearses cutover and documents rollback limits. Offline output comparison is preferable to duplicate live collection. Provider-neutral inference receipts and explicit history modes belong in GroveLLM; distributed reservations, credentials and task authority belong in Trove.
 
@@ -116,6 +120,23 @@ The initial rule is participant Finish after at least one durable participant/as
 A generated answer, quota exhaustion or leaving the screen does not by itself complete the task. Accepted completion can enable an exact-version follow-up questionnaire.
 
 This rule records participation, not scientific adequacy or intervention success. Researchers determine suitability. Optional example-question previews and technical rehearsals use synthetic context and separate budgets; they are not clinical validation services.
+
+### Human Conversation Review
+
+M4 includes [study-scoped human review](https://github.com/SchmiedmayerLab/Trove/issues/86).
+Investigators publish versioned scoring criteria for complete conversations and
+individual messages, including safety, accuracy and other protocol-specific
+questions. Authorized reviewers inspect context, save drafts and submit
+attributable assessments against an exact transcript snapshot and rubric version.
+Multiple reviewers retain independent assessments; corrections preserve submitted
+history rather than overwriting it.
+
+Transcript disclosure, scoring and export require explicit study review access
+and mandatory audit persistence. General dashboard access is insufficient.
+Missing scores and not-assessable ratings remain distinct. Human review is separate
+from participant task completion and does not itself certify clinical safety,
+trigger an intervention or provide real-time monitoring. The first implementation
+does not require automated scoring or a general annotation framework.
 
 ## Study-Scoped Retrieval
 
@@ -157,9 +178,25 @@ When multiple applications need the same assessment mechanism, it can move into 
 
 ## One API for Dashboards, Command-Line Tools and Assistance
 
-Dashboard operations and command-line operations are peers over one authorized application API. The command line provides structured results, explicit revisions and bounded commands suitable for human use or delegated automation.
+Agent-operated study management is a core M3 capability. The visual workspace remains useful for editing, source comparison, branching inspection and reviewing changes. It is not the only way to operate a study.
 
-Generated proposals use the same draft, validate, preview and apply operations as manual changes. Publishing, participant contact, allocation, data release and credential management remain separately authorized actions. Documents, model output and task instructions cannot broaden a caller's scope.
+The researcher CLI uses Swift Argument Parser and the existing generated Swift OpenAPI client. Support macOS and Linux, typed asynchronous commands, shell completion, stable JSON/exit codes and secure login or protected headless credentials. Adopt current stable packages through a verified, pinned toolchain update. Keep business rules and permissions on the server; avoid pulling mobile-only dependencies into the executable.
+
+Hosted assistance calls curated typed API operations directly, not a shell or the CLI executable. Candidate content uses the existing study/instrument inputs and revision-checked updates. No editing language, generic patch engine, separate proposal-application API or agent-owned study state is required. Dashboard and command-line operations are peers; documents and tool output cannot broaden a caller's scope.
+
+Questionnaire import/export in the Swift CLI carries the entire multilingual JSON. A language option selects preview or diagnostics, not a separate stored instrument. Hosted tools, future MCP/voice adapters and custom clients use that same API and shared draft revision. Missing required text, unsupported rendering and absent approval are distinct structured results. Authoring examples pin the IG and renderer versions and preserve untouched translations; assisted translation cannot approve its own output. See [CLI #52](https://github.com/SchmiedmayerLab/Trove/issues/52) and [document authoring #88](https://github.com/SchmiedmayerLab/Trove/issues/88).
+
+### Scoped Delegation
+
+Extend the existing authorization service and identity provider with study-scoped, expiring, revocable grants for registered clients. Start with clear Inspect Study and Edit Study Draft presets. Effective access is the intersection of current grantor authority, client restrictions and the grant; further delegation is disabled by default. Record the verified initiating researcher and executing client separately. Never accept actor authority from document content or request fields.
+
+Recheck grants when admitting and executing jobs, applying changes and disclosing results. Unavailable authority fails closed. Routine draft edits can proceed within the grant without repeated confirmation; publishing, activation, participant access, contact, export and credential administration retain separate permissions. Where approval is required, bind it to the exact action and revision. A confirmation flag cannot grant authority.
+
+### Optional MCP and Researcher Voice
+
+An optional Swift MCP adapter exposes a curated subset of the same API using the official Swift SDK. It has no shell, arbitrary database access or independent authorization model. Select a transport for a concrete client and verify its authentication; remote MCP and downstream API audiences remain separate, with no arbitrary token passthrough.
+
+Researcher voice is an optional interaction layer over the authoring tools, not a participant channel. Begin with navigation, explanation and draft edits; clarify ambiguous targets and recover accepted results through operation receipts after interruption. Keep text/visual alternatives, approved speech egress and bounded audio retention. Initial voice tools cannot publish, contact participants, export data or change credentials. This work is independent of participant conversation tasks and M6 phone delivery.
 
 ## Participation Channels
 

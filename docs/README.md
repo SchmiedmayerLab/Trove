@@ -43,6 +43,8 @@ These are different uses of common study infrastructure, not separate products w
 
 **Researcher judgment remains essential.** The platform can check technical consistency, preserve evidence and reduce repetitive work. It does not decide scientific validity, institutional approval or the suitability of an intervention.
 
+**Agent-ready operations, shared visual review.** A Swift CLI and hosted researcher tools use the same typed, authorized API as the dashboard. Researchers can author a Grove-conformant Questionnaire from source documents, then inspect or edit the same FHIR draft visually. Scoped delegation permits routine draft work without granting publication or participant-data access. Optional MCP and researcher voice are interaction adapters, not new study authorities.
+
 **A focused path to useful releases.** The first objective is one complete study workflow. Conversations, custom-client reuse and additional research capabilities build on that foundation as their requirements become concrete.
 
 Implementation work is tracked in the [Trove project](https://github.com/orgs/SchmiedmayerLab/projects/4). Repository issues own acceptance criteria; the project tracks priority and delivery status.

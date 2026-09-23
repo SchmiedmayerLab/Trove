@@ -75,14 +75,20 @@ GroveScheduler provides local scheduling and presentation. Its integration impor
 
 FHIR Questionnaire JSON is the instrument source, paired with QuestionnaireResponse for results. Exact canonical identity, version and item identifiers are retained throughout authoring, administration and export.
 
-The first authoring path is deliberately straightforward: authorized manual import or editing, validation against pinned packages, and a bounded web preview. Assisted document conversion can be added without making ordinary questionnaire use depend on inference.
+Each instrument version is **one multilingual JSON resource**, not one file per language. `Questionnaire.language` identifies the source language; translations use the [FHIR translation mechanism](https://hl7.org/fhir/R4/extension-translation.html) at locations supported by the pinned Grove IG. Do not introduce translation sidecars or a second localization schema. Translation presence, renderer completeness and approval for administration are separate facts.
 
-The dashboard provides a simple question/section editor, participant preview and
+The editor provides a language selector, side-by-side source/translation fields, missing-text filters and language-specific diagnostics. Review indicators reflect actual digest-bound evidence, not successful parsing. Language selection changes graph labels and preview wording, never identifiers, conditions, scoring or stored answer values. Preserve unsaved edits when switching language; all languages share one draft revision, so concurrent edits cannot silently overwrite each other. Import/export retains untouched translations and unsupported fields; unsupported required semantics block administration rather than disappearing on save.
+
+M3 delivers a shared authoring foundation: authorized import/editing, pinned-package validation, synthetic scenarios and visual preview, followed by document-assisted Questionnaire creation. Manual import and editing remain fully usable without inference; the assistant consumes the same instrument API rather than a separate authoring contract.
+
+The dashboard provides a simple drag-and-drop question/section editor with keyboard alternatives, participant preview and
 branching graph over that same FHIR draft. Researchers edit answer choices and
 typed conditions without writing JSON; import/export preserves stable item IDs
 and unsupported fields rather than silently simplifying an instrument. Published
 versions remain immutable. The optional authoring assistant proposes changes
 through the same revision-checked editing and validation operations.
+
+Moving an item between groups can change condition or repetition context even when its identifier stays the same. Surface these effects before accepting the move. Candidate content is ordinary FHIR JSON plus its base revision, source mapping and diagnostics, not an editing language. The Swift service owns validation/scenario operations; the existing browser presentation and mobile clients use shared expected-result fixtures. Profile conformance and actual renderer support remain separate checks.
 
 The graph shows both the questionnaire hierarchy and labeled conditional
 dependencies, clearly distinguished from display order. An all-branches view
@@ -127,6 +133,18 @@ User-interface language, approved administration language, site jurisdiction and
 
 Reviewed content variants retain their source version, language, approval scope and exact content identity. Ordinary interface text may fall back to another language. Required consent or instrument wording cannot silently fall back when an approved variant is missing.
 
+| Content | Representation |
+| --- | --- |
+| Questionnaire | One versioned FHIR JSON resource containing all translations |
+| Study titles, descriptions and explanations | Language-keyed values with an explicit source language |
+| Standalone Markdown, PDF and media | Separate language-tagged artifacts linked to the source version |
+
+Questionnaire language approval references the same artifact version/digest plus the administration language and applicability. Document approval references the particular translated artifact. Any content edit initially invalidates whole-artifact validation and requires approval for the changed digest; there is no per-language version engine or automatic approval carry-forward. Historical publications, signed consent and accepted responses remain immutable. Assisted translation produces drafts, not approval or proof of scientific equivalence.
+
+Use language tags that support language-only, script and region distinctions; never require a region or collapse distinct variants by language family alone. Select an admitted administration language at task-session start and retain it with the exact instrument in server state and pending offline work. UI-language changes cannot switch an active instrument. A missing required translation or approval blocks that administration path. Response language follows the pinned IG; study/site applicability is not inferred from device locale.
+
+Implementation ownership: [portable definitions #23](https://github.com/SchmiedmayerLab/Trove/issues/23), [editor/validation #53](https://github.com/SchmiedmayerLab/Trove/issues/53), [publication #31](https://github.com/SchmiedmayerLab/Trove/issues/31), [task state #37](https://github.com/SchmiedmayerLab/Trove/issues/37), [GroveStudy/client integration #32](https://github.com/SchmiedmayerLab/Trove/issues/32) and [reviewed variants #67](https://github.com/SchmiedmayerLab/Trove/issues/67). The representation and bilingual synthetic verification belong to M3; additional languages/sites in an actual study remain selected capabilities.
+
 Accessibility and internationalization apply from the first supported workflow: assistive technology, text scaling, right-to-left layout, locale-aware dates and numbers, non-US contact formats and explicit time-zone behavior. Source measurements and canonical units remain distinct from display formatting.
 
 Site operations add scoped staff roles, delegation and transfer history. Staff-entered responses identify both the subject and the actual staff actor; they do not impersonate participant-only actions. Site transfer changes applicable future work without relabeling historical records.
@@ -157,13 +175,15 @@ The same approach supports later translation review, amendment comparisons, tech
 
 ### Safe Document and Questionnaire Authoring
 
-Document processing reuses governed artifacts and a restricted parser worker without core-database or inference-secret credentials. DOCX, PDF and text inputs have bounded expansion, processing time, memory and output. Macros, embedded network fetches and instructions inside documents do not execute.
+Swift authoring orchestration reuses governed artifacts and a restricted parser worker without core-database or inference-secret credentials. DOCX, PDF and text inputs have bounded expansion, processing time, memory and output. Established parsers may be invoked behind that boundary. Macros, embedded network fetches and instructions inside documents do not execute. Unsupported scanned input and ambiguous extraction remain explicit rather than guessed.
 
 Proposed fields distinguish extracted evidence from suggestions and retain source locations. Applying a proposal requires the current draft revision and normal validation. Questionnaire diagnostics identify severity, rule, element path, exact content digest and validator/package versions. Invalid, unavailable and not fully evaluated are distinct outcomes. Missing terminology or expression support cannot become a pass.
 
 A shipped authoring kit contains a concise AGENTS.md, pinned package and CLI versions, supported renderer capabilities and synthetic examples. It directs authoring tools to preserve canonical identity, linkIds, referenced terminology, wording and unresolved questions. Repair has explicit attempt/time/cost limits; it cannot delete required behavior just to satisfy a validator. Dependencies resolve through approved pinned packages, not URLs embedded in an uploaded instrument.
 
 The output is a reviewable draft, source mapping and diagnostics. Manual entry remains available. Publication, participant contact, allocation and dataset release require separate authorized commands; neither a document nor generated text can grant that authority.
+
+M3 Questionnaire authoring (#88) owns the common restricted extraction, hosted tool loop and bounded jobs. Later study/grant drafting (#44), institutional preparation and amendments reuse those mechanisms. Jobs retain candidate references and verified actions, not a second study store or private model reasoning. Applying accepted content uses ordinary typed updates with the expected revision; revoked source access or delegation prevents later disclosure/application. Unknown provider outcomes require usage reconciliation, not blind redispatch.
 
 ## Data Review and Closeout
 

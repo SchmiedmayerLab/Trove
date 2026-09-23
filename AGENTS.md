@@ -29,6 +29,14 @@ SPDX-License-Identifier: MIT
 
 ## Verification
 
+For M3 Questionnaire work, follow the
+[localization contract](docs/Study-Model-and-Research-Workflows.md#localization-sites-and-accessibility):
+one multilingual FHIR JSON per instrument version, not locale-specific files.
+Keep standalone translated documents separate. Preserve translation extensions
+and answer identities, bind administration language to the session, and test
+bilingual round-trips with the pinned IG/renderer fixtures. Draft translation is
+not approval; required wording must not silently fall back.
+
 Start with focused regressions, then run the affected component's shared CI command
 once the implementation is stable. Follow dependency edges: API changes can affect
 server, web and iOS; a server-only change does not require the Grove or app matrix.
