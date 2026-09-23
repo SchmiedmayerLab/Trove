@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SwiftDiagnosticTests(unittest.TestCase):
-    def run_check(self, stage, diagnostic, status=0, sqlite_status=0, package="TroveAPI", report_mode="passed"):
+    def run_check(self, stage, diagnostic, status=0, sqlite_status=0, package="TroveAPI", report_mode="passed", platform="Linux"):
         with tempfile.TemporaryDirectory(prefix="trove-swift-diagnostics-") as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -36,18 +36,30 @@ class SwiftDiagnosticTests(unittest.TestCase):
                 '<testcase classname="Fixture" name="stale" /></testsuite></testsuites>'
             )
             programs = {
-                "uname": "echo Linux\n",
+                "uname": 'echo "$FIXTURE_PLATFORM"\n',
+                "xcrun": '[[ "$1" == llvm-cov ]]\nshift\nexec llvm-cov "$@"\n',
                 "pkg-config": 'if [[ "$1" == --exists ]]; then exit "$SQLITE_STATUS"; fi\necho 3.45.1\n',
-                "swift": '''case "$*" in
-  --version) echo 'Swift version 6.3.0 (test fixture)' ;;
+                "swift": '''if [[ "$1" == build || "$1" == test ]]; then
+  [[ " $* " == *" --build-system $EXPECTED_BUILD_SYSTEM "* ]]
+fi
+case "$*" in
+  --version) echo 'Swift version 6.4.0 (test fixture)' ;;
   *--show-bin-path) echo "$PWD/.build/debug" ;;
+  'package describe --type json')
+    if [[ "$REPORT_MODE" == multitarget* ]]; then
+      printf '{"name":"Fixture","targets":[{"name":"FixtureTests","type":"test"},{"name":"CLITests","type":"test"}]}'
+    else
+      printf '{"name":"Fixture","targets":[{"name":"FixtureTests","type":"test"}]}'
+    fi ;;
   *)
     echo "$1" >> "$COMMAND_TRACE"
     [[ "$*" == *--enable-code-coverage* ]]
     if [[ "$1" == build ]]; then
       [[ "$*" == *--build-tests* && "${LLVM_PROFILE_FILE:-}" == /dev/null ]]
       mkdir -p .build/debug/codecov
-      touch .build/debug/codecov/test.profdata .build/debug/Test.xctest
+      touch .build/debug/codecov/test.profdata .build/debug/FixtureTests.xctest
+      if [[ "$REPORT_MODE" == multitarget* ]]; then touch .build/debug/CLITests.xctest; fi
+      if [[ "$REPORT_MODE" == stale-bundle ]]; then touch .build/debug/StaleTests.xctest; fi
     else
       [[ "$1" == test && "$*" == *--skip-build* && -z "${LLVM_PROFILE_FILE+x}" ]]
       arguments=("$@")
@@ -57,7 +69,8 @@ class SwiftDiagnosticTests(unittest.TestCase):
       done
       [[ -n "$report" ]]
       case "$REPORT_MODE" in
-        passed) printf '<testsuites><testsuite tests="1" skipped="0" failures="0" errors="0"><testcase classname="Fixture" name="executed" /></testsuite></testsuites>' > "${report%.xml}-swift-testing.xml" ;;
+        passed|stale-bundle|multitarget-missing) printf '<testsuites><testsuite tests="1" skipped="0" failures="0" errors="0"><testcase classname="FixtureTests.Fixture" name="executed" /></testsuite></testsuites>' > "${report%.xml}-swift-testing.xml" ;;
+        multitarget) printf '<testsuites><testsuite tests="1" skipped="0" failures="0" errors="0"><testcase classname="FixtureTests.Fixture" name="executed" /></testsuite><testsuite tests="1" skipped="0" failures="0" errors="0"><testcase classname="CLITests.Fixture" name="executed" /></testsuite></testsuites>' > "${report%.xml}-swift-testing.xml" ;;
         empty) printf '<testsuites><testsuite tests="0" skipped="0" failures="0" errors="0" /></testsuites>' > "${report%.xml}-swift-testing.xml" ;;
         skipped) printf '<testsuites><testsuite tests="0" skipped="1" failures="0" errors="0"><testcase classname="Fixture" name="disabled"><skipped /></testcase></testsuite></testsuites>' > "${report%.xml}-swift-testing.xml" ;;
         malformed) printf '<testsuites>' > "${report%.xml}-swift-testing.xml" ;;
@@ -73,6 +86,8 @@ class SwiftDiagnosticTests(unittest.TestCase):
 esac
 ''',
                 "llvm-cov": '''if [[ "$1" == --version ]]; then echo 'coverage test fixture'; exit 0; fi
+[[ "$*" == *"--object $PWD/.build/debug/FixtureTests.xctest"* ]]
+if [[ "$REPORT_MODE" == multitarget ]]; then [[ "$*" == *"--object $PWD/.build/debug/CLITests.xctest"* ]]; fi
 echo coverage >> "$COMMAND_TRACE"
 printf 'SF:/fixture.swift\\nDA:1,1\\nend_of_record\\n'
 ''',
@@ -83,11 +98,13 @@ printf 'SF:/fixture.swift\\nDA:1,1\\nend_of_record\\n'
                 path.chmod(0o755)
             trace = root / "trace"
             result = subprocess.run(
-                ["bash", str(root / "scripts/check"), "swift", package],
+                ["/bin/bash", str(root / "scripts/check"), "swift", package],
                 env={**os.environ, "PATH": str(tools) + os.pathsep + os.environ["PATH"],
                      "COMMAND_TRACE": str(trace), "DIAGNOSTIC_STAGE": stage,
                      "DIAGNOSTIC_TEXT": diagnostic, "DIAGNOSTIC_STATUS": str(status),
                      "SQLITE_STATUS": str(sqlite_status),
+                     "FIXTURE_PLATFORM": platform,
+                     "EXPECTED_BUILD_SYSTEM": "swiftbuild" if platform == "Darwin" else "native",
                      "REPORT_MODE": report_mode,
                      "LLVM_PROFILE_FILE": "/caller/profile-must-not-control-test-coverage"},
                 capture_output=True, text=True, check=False, timeout=15,
@@ -129,12 +146,29 @@ printf 'SF:/fixture.swift\\nDA:1,1\\nend_of_record\\n'
                     self.assertEqual(trace, ["build", "test", "coverage"])
 
     def test_no_execution_or_report_cannot_reach_coverage_even_with_stale_evidence(self):
-        for mode in ("empty", "skipped", "malformed", "missing"):
+        for mode in ("empty", "skipped", "malformed", "missing", "multitarget-missing", "stale-bundle"):
             with self.subTest(mode=mode):
                 result, trace, _ = self.run_check("build", "Build complete!", report_mode=mode)
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn("Swift test execution check failed", result.stderr)
                 self.assertEqual(trace, ["build", "test"])
+
+    def test_every_declared_target_binary_is_exported_together(self):
+        result, trace, _ = self.run_check("build", "Build complete!", report_mode="multitarget")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("2 executed, 0 skipped", result.stderr)
+        self.assertEqual(trace, ["build", "test", "coverage"])
+
+    def test_platform_backend_is_consistent_under_strict_system_bash(self):
+        # macOS /bin/bash is 3.2: an empty array under nounset is not portable.
+        # The swift fixture also checks output-directory discovery, preventing
+        # coverage from silently reading artifacts produced by another backend.
+        for platform in ("Darwin", "Linux"):
+            for package in ("TroveAPI", "TroveServer"):
+                with self.subTest(platform=platform, package=package):
+                    result, trace, _ = self.run_check("build", "Build complete!", platform=platform, package=package)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(trace, ["build", "test", "coverage"])
 
 
 if __name__ == "__main__":

@@ -76,9 +76,23 @@ docker compose -f TroveServer/Benchmarks/docker-compose.yml down -v
 ```
 
 The JSON output retains every timing sample and the Markdown companion is ready
-for a GitHub Actions job summary. The scheduled workflow uploads both files so
-runs can be compared over time. It intentionally has no `pull_request` or
-`push` trigger.
+for a GitHub Actions job summary. The scheduled workflow uses a bounded hosted
+regression profile: **10 participants over 30 days**, or 561,900 rows per table.
+It uploads both files and records the workload dimensions so comparisons do not
+mix different scales. This run checks the harness; it does not establish acceptance
+of the full 200-participant historical workload or application ingestion capacity.
+The workflow intentionally has no `pull_request` or `push` trigger.
+
+The command-line default remains the full 200-participant, 30-day profile. Manual
+workflow dispatch accepts the same participant/day inputs, but the standard hosted
+runner may not have enough storage for that profile. Use an adequately sized local
+host for a full run. Before replacing its synthetic tables or generating data, the
+harness checks both temporary storage and the Docker database volume. Its conservative
+combined budget covers two table copies, indexes, WAL, compression workspace and the
+fixture; it is a planning guard, not a storage prediction. The default full profile
+requires at least 163 GiB free by this guard; the hosted regression requires 11 GiB.
+Insufficient or unreadable capacity fails explicitly without shrinking the workload
+or deleting unrelated files. Full-scale evidence must still be collected separately.
 
 To check the deterministic generator without a database:
 

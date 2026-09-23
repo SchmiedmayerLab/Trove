@@ -9,7 +9,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4 AS build
+FROM swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9 AS build
 ARG TARGETARCH
 
 # Install OS updates
@@ -41,15 +41,17 @@ RUN mkdir /staging
 
 # Build the application, with optimizations, with static linking, and using jemalloc
 # N.B.: The static version of jemalloc is incompatible with the static Swift runtime.
+# Swift 6.4 SwiftBuild omits Foundation static-link dependencies, including for host macros.
+# Keep this native-backend workaround scoped to the static release image build.
 RUN --mount=type=cache,id=trove-server-${TARGETARCH},target=/build/TroveServer/.build,sharing=locked \
-    swift build -c release --force-resolved-versions --jobs 4 \
+    swift build --build-system native -c release --force-resolved-versions --jobs 4 \
         --product TroveServer \
         --static-swift-stdlib \
         -Xlinker -ljemalloc && \
     # Copy main executable to staging area
-    cp "$(swift build -c release --show-bin-path)/TroveServer" /staging && \
+    cp "$(swift build --build-system native -c release --show-bin-path)/TroveServer" /staging && \
     # Copy resources bundled by SPM to staging area
-    find -L "$(swift build -c release --show-bin-path)" -regex '.*\.resources$' -exec cp -Ra {} /staging \;
+    find -L "$(swift build --build-system native -c release --show-bin-path)" -regex '.*\.resources$' -exec cp -Ra {} /staging \;
 
 
 # Switch to the staging area
@@ -66,11 +68,12 @@ RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources
 # ================================
 # Run image
 # ================================
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:918a593b8268c222afd4e2c4f06860ac984e60719b4697e4c71d796bc8fcd042
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:1d95114038f76513a9ace6fca107d5582b08c65981f81f61cb56bf7fd2ef216d
 
 # Keep the Swift toolchain in the build stage. The serving image needs only the
 # binary's dynamic libraries, certificate roots and time-zone data.
-RUN apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
     && addgroup -S -g 999 vapor \
     && adduser -S -D -H -u 999 -G vapor -h /app vapor
 

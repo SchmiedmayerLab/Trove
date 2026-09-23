@@ -16,7 +16,7 @@ on:
       participants:
         description: Number of participants
         required: true
-        default: "200"
+        default: "10"
         type: string
       days:
         description: Days per participant
@@ -34,7 +34,9 @@ jobs:
     timeout-minutes: 360
     env:
       COMPOSE_PROJECT_NAME: trove-benchmark-${{ github.run_id }}
-      BENCHMARK_PARTICIPANTS: ${{ inputs.participants || '200' }}
+      # Hosted regression profile; the 200-participant historical profile remains
+      # available through dispatch or the local CLI on adequately sized storage.
+      BENCHMARK_PARTICIPANTS: ${{ inputs.participants || '10' }}
       BENCHMARK_DAYS: ${{ inputs.days || '30' }}
     steps:
       - uses: actions/checkout@v7

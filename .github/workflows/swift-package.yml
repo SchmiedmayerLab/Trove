@@ -28,7 +28,7 @@ jobs:
     name: Swift Test
     runs-on: ubuntu-24.04
     container:
-      image: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
+      image: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
     steps:
       - uses: actions/checkout@v7
       - name: Install verification and client journal build dependencies
@@ -66,10 +66,12 @@ jobs:
       SWIFT_CONTAINER: trove-test-swift-${{ github.run_id }}-${{ github.run_attempt }}
       # Exercise supported PG17 here; the development stack and native checks use PG18.
       TIMESCALE_IMAGE: timescale/timescaledb:latest-pg17@sha256:bc8527e62f70f0766b29515077965025872fabb5349db421565f69ee273baf2d
-      SWIFT_IMAGE: swift:6.3.0-noble@sha256:9949aac363e63fe96c44d08e3d00878fecbad7f50cb5450067c702012d6990e4
+      SWIFT_IMAGE: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
       STORAGE_IMAGE: chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6
     steps:
       - uses: actions/checkout@v7
+      - name: Prepare hosted runner disk capacity
+        run: bash scripts/prepare-hosted-disk.sh
       - name: Start an isolated test database
         shell: bash
         run: |
@@ -98,12 +100,17 @@ jobs:
           set -euo pipefail
           docker run --detach --name "$STORAGE_CONTAINER" \
             --publish 127.0.0.1:18333:8333 \
+            --tmpfs /data:rw,size=2g \
             --health-cmd 'wget -qO- http://127.0.0.1:8333/ || exit 1' \
             --health-interval 2s --health-timeout 5s --health-retries 60 \
             "$STORAGE_IMAGE" server -s3 -dir=/data -master.volumeSizeLimitMB=100 \
             -volume.port=8081 -volume.max=32 -master.telemetry=false
           for _ in $(seq 1 60); do
-            if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$STORAGE_CONTAINER")" == healthy ]]; then
+            # Test objects are tiny and disposable. Keep their storage independent
+            # of the cold Swift build, and require allocation, not just HTTP health.
+            if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$STORAGE_CONTAINER")" == healthy ]] && \
+                docker exec "$STORAGE_CONTAINER" wget -T 5 -qO- http://127.0.0.1:9333/dir/assign | \
+                jq --exit-status '.count == 1 and (.fid | type == "string" and length > 0)' >/dev/null; then
               exit 0
             fi
             sleep 2
