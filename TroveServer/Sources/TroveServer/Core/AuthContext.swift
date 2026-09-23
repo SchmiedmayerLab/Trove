@@ -34,6 +34,10 @@ struct AuthContext: Sendable {
     let roles: [String]
     let researcherRole: String
     let participantRole: String
+    let executingClientID: String?
+    let clientAccess: KeycloakClientPolicy.Access
+    let delegationID: UUID?
+    let tokenExpiresAt: Date?
     /// Capture once at the trusted boundary and carry explicitly across database callbacks.
     let auditContext: AuditEvent.Context
 
@@ -50,7 +54,11 @@ struct AuthContext: Sendable {
         groups: [String],
         researcherRole: String,
         participantRole: String,
-        auditConfiguration: AuditConfiguration? = nil
+        auditConfiguration: AuditConfiguration? = nil,
+        executingClientID: String? = nil,
+        clientAccess: KeycloakClientPolicy.Access = .interactive,
+        delegationID: UUID? = nil,
+        tokenExpiresAt: Date? = nil
     ) {
         self.issuer = issuer
         self.subject = subject
@@ -58,7 +66,16 @@ struct AuthContext: Sendable {
         self.roles = roles
         self.researcherRole = researcherRole
         self.participantRole = participantRole
-        self.auditContext = .init(actor: .init(issuer: issuer, subject: subject), applicationRevision: auditConfiguration?.applicationRevision)
+        self.executingClientID = executingClientID
+        self.clientAccess = clientAccess
+        self.delegationID = delegationID
+        self.tokenExpiresAt = tokenExpiresAt
+        self.auditContext = .init(
+            actor: .init(issuer: issuer, subject: subject),
+            executingClientID: executingClientID,
+            delegationID: delegationID,
+            applicationRevision: auditConfiguration?.applicationRevision
+        )
 
         var memberships: [String: GroupRole] = [:]
         var auditReaders: Set<String> = []
@@ -82,7 +99,7 @@ struct AuthContext: Sendable {
     @discardableResult
     static func checkIsResearcher() throws -> AuthContext {
         let context = try requireCurrent()
-        guard context.roles.contains(context.researcherRole) else {
+        guard context.clientAccess == .interactive, context.roles.contains(context.researcherRole) else {
             throw ServerError.forbidden
         }
         return context
@@ -91,7 +108,7 @@ struct AuthContext: Sendable {
     @discardableResult
     static func checkIsParticipant() throws -> AuthContext {
         let context = try requireCurrent()
-        guard context.roles.contains(context.participantRole) else {
+        guard context.clientAccess == .interactive, context.roles.contains(context.participantRole) else {
             throw ServerError.forbidden
         }
         return context
@@ -111,7 +128,7 @@ struct AuthContext: Sendable {
         guard context.auditReaderGroups.contains(groupName) else { throw ServerError.forbidden }
     }
 
-    private static func requireCurrent() throws -> AuthContext {
+    static func requireCurrent() throws -> AuthContext {
         guard let context = current else {
             throw ServerError.missingToken
         }

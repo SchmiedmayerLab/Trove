@@ -9,7 +9,6 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
 import type {
   QuestionnaireComponentData,
@@ -19,6 +18,7 @@ import type {
 } from "@/lib/api/generated/types.gen";
 import { zQuestionnaireContent } from "@/lib/api/generated/zod.gen";
 import { questionnaireRetrieveQueryOptions } from "@/lib/queries/component";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 
 const questionnaireSchema = zQuestionnaireContent.extend({
   name: z.string().min(1, "Name is required"),
@@ -67,15 +67,15 @@ const transformQuestionnaireFormToInput = (
 
 export const useQuestionnaireForm = (locale: string) => {
   const params = useParams({ strict: false });
-  const isEditing = !!params.component && !!params.study;
 
-  const { data: componentResponse } = useQuery({
+  const { data: snapshot } = useQuery({
     ...questionnaireRetrieveQueryOptions({
       studyId: params.study ?? "",
       componentId: params.component ?? "",
     }),
-    enabled: isEditing,
+    enabled: !!params.study,
   });
+  const componentResponse = snapshot?.value;
 
   const formValues =
     componentResponse ?
@@ -87,24 +87,31 @@ export const useQuestionnaireForm = (locale: string) => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) {
-      form.reset(formValues);
-    } else if (componentResponse) {
-      form.reset({ ...defaultValues, name: componentResponse.name });
-    }
-    // form.reset identity changes every render; including it would cause an infinite loop
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [componentResponse, locale]);
+  const getSnapshot = useDraftFormSnapshot(
+    snapshot,
+    `${params.study}:${params.component}:${locale}`,
+    form.formState.isDirty,
+    (loaded) =>
+      form.reset(
+        loaded.value ?
+          transformResponseToForm(loaded.value, locale)
+        : defaultValues,
+      ),
+  );
 
   const toInput = (formData: z.infer<typeof questionnaireSchema>) =>
     transformQuestionnaireFormToInput(
       formData,
       locale,
-      componentResponse?.data,
+      getSnapshot().value?.data,
     );
 
-  return { form, componentData: componentResponse, toInput };
+  return {
+    form,
+    componentData: componentResponse,
+    toInput,
+    getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
+  };
 };
 
 export type QuestionnaireForm = ReturnType<typeof useQuestionnaireForm>["form"];

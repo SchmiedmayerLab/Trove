@@ -9,10 +9,10 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
 import type { ParticipationCriterion } from "@/lib/api/generated/types.gen";
 import { zParticipationCriterion } from "@/lib/api/generated/zod.gen";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
 
 const participationFormSchema = z.object({
@@ -50,15 +50,18 @@ export const useParticipationForm = () => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) {
-      form.reset(formValues);
-    }
-    // form.reset identity changes every render; including it would cause an infinite loop
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [study]);
+  const getSnapshot = useDraftFormSnapshot(
+    study,
+    params.study,
+    form.formState.isDirty,
+    (loaded) =>
+      form.reset({ participationCriterion: loaded.participationCriterion }),
+  );
 
-  return { form };
+  return {
+    form,
+    getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
+  };
 };
 
 export type ParticipationForm = ReturnType<typeof useParticipationForm>["form"];

@@ -80,9 +80,11 @@ struct ComponentIntegrationTests {
                 studyId: studyId
             )
             let componentId = try component.requireId()
+            let draftRevision = study.draftRevision
 
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyId)/components/\(componentId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
             }) { response in
                 #expect(response.status == .noContent)
             }
@@ -103,9 +105,11 @@ struct ComponentIntegrationTests {
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
             let nonExistentId = UUID()
+            let draftRevision = study.draftRevision
 
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyId)/components/\(nonExistentId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
             }) { response in
                 #expect(response.status == .notFound)
             }
@@ -120,9 +124,11 @@ struct ComponentIntegrationTests {
             let studyId = try study.requireId()
 
             try await ComponentFixtures.createHealthDataComponent(on: app.db, studyId: studyId)
+            let draftRevision = study.draftRevision
 
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
             }) { response in
                 #expect(response.status == .noContent)
             }

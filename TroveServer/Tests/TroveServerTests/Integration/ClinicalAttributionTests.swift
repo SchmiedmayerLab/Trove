@@ -147,7 +147,7 @@ struct ClinicalAttributionTests {
 extension ClinicalAttributionTests {
     private static func publishNextRevision(_ fixture: ClinicalEventStoreTests.Fixture, on app: Application) async throws {
         try await AuthContext.$current.withValue(ClinicalEventStoreTests.researcher) {
-            _ = try await app.grove[PublishedStudyService.self].publish(studyId: fixture.studyIDs[0])
+            try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: fixture.studyIDs[0])
         }
     }
 

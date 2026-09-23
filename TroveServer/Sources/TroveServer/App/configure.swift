@@ -49,23 +49,35 @@ private func configureDevelopmentCORS(for app: Application) {
         CORSMiddleware(configuration: .init(
             allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
             allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
+            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch, "Trove-Delegation-ID"]
         )),
         at: .beginning
     )
 }
 
-private func configureObjectStorage(for app: Application, ephemeral: Bool) async throws {
+private func configureObjectStorage(for app: Application, ephemeral: Bool, keycloak: KeycloakClient) async throws {
     if ephemeral {
         app.logger.info("Configuring ephemeral UI-test object storage...")
-        try await configureServices(for: app, storageProvider: InMemoryObjectStorageProvider(), validator: FHIRValidationClient(application: app))
+        try await configureServices(
+            for: app,
+            storageProvider: InMemoryObjectStorageProvider(),
+            validator: FHIRValidationClient(application: app),
+            grantorAuthority: keycloak.authorityProvider,
+            clientPolicy: keycloak.config.clientPolicy
+        )
         return
     }
 
     app.logger.info("Connecting to S3 object storage...")
     let validator = try FHIRValidationClient(application: app)
     let storageProvider = try S3ObjectStorageProvider(application: app, config: S3ObjectStorageConfiguration())
-    await configureServices(for: app, storageProvider: storageProvider, validator: validator)
+    await configureServices(
+        for: app,
+        storageProvider: storageProvider,
+        validator: validator,
+        grantorAuthority: keycloak.authorityProvider,
+        clientPolicy: keycloak.config.clientPolicy
+    )
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
     try await storageService.ensureBucketExists()
@@ -107,13 +119,12 @@ public func configure(_ app: Application) async throws {
     }
 
     configureDevelopmentCORS(for: app)
-    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices)
+    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices, keycloak: keycloak)
 
     logger.info("Fetching groups from Keycloak")
     let groups = try await keycloak.fetchGroups()
     let groupService = app.grove[GroupService.self]
     try await groupService.syncGroups(from: groups)
-    logger.info("Synced Keycloak groups to database.")
 
     let jwks = try await keycloak.fetchJWKS()
     let signingKeys = try await KeycloakSigningKeys(initialJWKS: jwks) {
@@ -128,23 +139,32 @@ public func configure(_ app: Application) async throws {
             researcherRole: keycloakConfig.researcherRole,
             participantRole: keycloakConfig.participantRole,
             logger: app.logger,
-            auditConfiguration: auditConfiguration
+            auditConfiguration: auditConfiguration,
+            clientPolicy: keycloakConfig.clientPolicy
         )
     ])
     logger.info("Server configuration complete.")
 }
 
 /// Configures services and repositories.
-func configureServices(for app: Application, storageProvider: any ObjectStorageProvider, validator: FHIRValidationClient) async {
+func configureServices(
+    for app: Application,
+    storageProvider: any ObjectStorageProvider,
+    validator: FHIRValidationClient,
+    grantorAuthority: GrantorAuthorityProvider = .unavailable,
+    clientPolicy: KeycloakClientPolicy = .production
+) async {
     await app.grove.configure {
         ObjectStorageService(provider: storageProvider)
 
-        AuthorizationService()
+        AuthorizationService(grantorAuthority: grantorAuthority)
+        DelegationService(clientPolicy: clientPolicy)
         GroupService()
         StudyService()
         ComponentService()
         ComponentScheduleService()
         StudyBundleService()
+        StudyValidationService(validator: validator)
         InvitationCodeService()
         ProfileService()
         SourceBindingService(database: app.db(.psql))

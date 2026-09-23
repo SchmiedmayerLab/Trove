@@ -106,6 +106,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 try req.encodeJSONBody(patchBody)
             }) { response in
                 #expect(response.status == .ok)
@@ -139,6 +140,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 try req.encodeJSONBody(patchBody)
             }) { response in
                 #expect(response.status == .ok)
@@ -173,6 +175,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 try req.encodeJSONBody(patchBody)
             }) { response in
                 #expect(response.status == .ok)
@@ -207,6 +210,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             }) { response in
                 #expect(response.status == .noContent)
             }
@@ -226,6 +230,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(nonExistentId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(UUID())\"")
             }) { response in
                 #expect(response.status == .notFound)
             }
@@ -278,6 +283,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 try req.encodeJSONBody(patchBody)
             }) { response in
                 #expect(response.status == .ok)
@@ -303,6 +309,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 try req.encodeJSONBody(patchBody)
             }) { response in
                 #expect(response.status == .badRequest)

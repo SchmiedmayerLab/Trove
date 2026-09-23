@@ -53,31 +53,33 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func terminalRevisionCannotOverflowOrUploadAnotherArchive() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
             try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyID, revision: Int.max)
-            try await Self.publish(studyID, app: app, token: token, expected: .conflict)
+            #expect(try await PublicationWorkflowFixtures.validate(studyID, app: app, token: token).status == .conflict)
             #expect(try await PublishedStudy.query(on: app.db).count() == 1)
             #expect(await storage.uploads.isEmpty)
         }
     }
 
     @Test
-    func deletionDuringUploadCannotLeaveAnAcceptedPublication() async throws {
+    func deletionDuringValidationUploadCannotLeaveAnAcceptedPublication() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
             await storage.afterNextUpload {
                 try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
                     request.bearerAuth(token)
+                    request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
                 }) { response in
                     #expect(response.status == .noContent)
                 }
             }
-            try await Self.publish(studyID, app: app, token: token, expected: .conflict)
+            #expect(try await PublicationWorkflowFixtures.validate(studyID, app: app, token: token).status == .notFound)
             #expect(try await Study.find(studyID, on: app.db) == nil)
+            #expect(try await StudyPublicationCandidate.query(on: app.db).count() == 0)
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
             #expect(try await StoredArtifact.query(on: app.db).filter(\.$state == .retained).count() == 0)
             let store = ArtifactStore(database: app.db, storage: app.grove[ObjectStorageService.self])
@@ -88,15 +90,17 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func auditFailureCannotActivatePublication() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let sql = try #require(app.db as? any SQLDatabase)
             try await sql.raw("DROP TABLE audit_events").run()
-            try await Self.publish(study.requireId(), app: app, token: token, expected: .internalServerError)
+            #expect(try await PublicationWorkflowFixtures.validate(study.requireId(), app: app, token: token).status == .internalServerError)
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
-            #expect(await storage.uploads.count == 1)
+            #expect(try await StudyPublicationCandidate.query(on: app.db).count() == 0)
+            #expect(try await StoredArtifact.query(on: app.db).count() == 0)
+            #expect(await storage.uploads.isEmpty)
             let verificationReads = await storage.downloads
-            #expect(verificationReads.count == 1)
+            #expect(verificationReads.isEmpty)
             let participantToken = try await Self.enroll(on: app, studyID: study.requireId())
             try await Self.download(study.requireId(), app: app, token: participantToken) { response in
                 #expect(response.status == .notFound)
@@ -108,11 +112,11 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func malformedConsentCannotBePublished() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             study.consent[.enUS] = ConsentContent(title: "Consent", content: "<toggle id=\"agree\" expected-value=\"maybe\">Agree</toggle>")
             try await study.save(on: app.db)
-            try await Self.publish(study.requireId(), app: app, token: token, expected: .badRequest)
+            #expect(try await PublicationWorkflowFixtures.validate(study.requireId(), app: app, token: token).status == .badRequest)
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
             #expect(await storage.uploads.isEmpty)
         }
@@ -121,7 +125,7 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func publicationRetainsConsentAndArchiveAfterDraftEdit() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
             try await Self.publish(studyID, app: app, token: token, expected: .created)
@@ -156,18 +160,20 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func competingPublicationCannotOverwriteAcceptedArchive() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
-            // Pause the first request after upload. A second publisher wins revision 1
-            // before the first inserts its receipt: deterministic collision, no sleeps.
+            // Pause validation after upload. An edited draft is validated and published
+            // before the first candidate is recorded: deterministic collision, no sleeps.
             await storage.afterNextUpload {
                 study.consent[.enUS] = ConsentContent(title: "Second", content: "Winning publication")
+                study.draftRevision = UUID()
                 try await study.save(on: app.db)
                 try await Self.publish(studyID, app: app, token: token, expected: .created)
             }
-            try await Self.publish(studyID, app: app, token: token, expected: .conflict)
+            #expect(try await PublicationWorkflowFixtures.validate(studyID, app: app, token: token).status == .preconditionFailed)
             #expect(try await PublishedStudy.query(on: app.db).count() == 1)
+            #expect(try await StudyPublicationCandidate.query(on: app.db).count() == 1)
             let winner = try #require(try await PublishedStudy.query(on: app.db).first())
             let key = winner.bundleKey
             #expect(winner.consentSnapshot[.enUS] == "---\ntitle: Second\nversion: 1.0.0\n---\nWinning publication")
@@ -188,10 +194,10 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func failedStorageDoesNotPublishRevision() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             await storage.afterNextUpload { throw ServerError.internalServerError("Synthetic storage interruption") }
-            try await Self.publish(study.requireId(), app: app, token: token, expected: .internalServerError)
+            #expect(try await PublicationWorkflowFixtures.validate(study.requireId(), app: app, token: token).status == .internalServerError)
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
         }
     }
@@ -199,7 +205,7 @@ struct PublicationSnapshotIntegrationTests {
     @Test
     func corruptedPublishedArchiveIsNotDisclosed() async throws {
         let storage = PublicationStorage()
-        try await TestApp.withApp(storageProvider: storage) { app, token in
+        try await PublicationWorkflowFixtures.withApp(storageProvider: storage) { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
             try await Self.publish(studyID, app: app, token: token, expected: .created)
@@ -216,7 +222,7 @@ struct PublicationSnapshotIntegrationTests {
 
     @Test(arguments: ["bundle_key", "bundle_digest", "consent_snapshot", "artifact_id", "collection_policy"])
     func publishedArchiveRequiresCompleteEvidence(column: String) async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let study = try await Self.study(on: app)
             let studyID = try study.requireId()
             try await Self.publish(studyID, app: app, token: token, expected: .created)
@@ -270,9 +276,7 @@ extension PublicationSnapshotIntegrationTests {
     }
 
     private static func publish(_ id: UUID, app: Application, token: String?, expected: HTTPStatus) async throws {
-        try await app.test(.POST, "\(apiBasePath)/studies/\(id)/publish", beforeRequest: { $0.bearerAuth(token) }) {
-            #expect($0.status == expected)
-        }
+        #expect(try await PublicationWorkflowFixtures.publish(id, app: app, token: token).status == expected)
     }
 
     private static func enroll(on app: Application, studyID: UUID) async throws -> String {

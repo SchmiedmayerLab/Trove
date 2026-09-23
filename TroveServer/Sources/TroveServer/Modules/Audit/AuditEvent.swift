@@ -41,7 +41,15 @@ struct AuditEvent: Sendable {
         case collectionPlanDisclosure = "collection.plan.disclosure"
         case enrollmentWithdrawn = "enrollment.withdrawn"
         case studyPublished = "study.published"
+        case studyPublicationDisclosure = "study.publication.disclosure"
         case studyDraftDeleted = "study.draft.deleted"
+        case studyDraftCreated = "study.draft.created"
+        case studyDraftEdited = "study.draft.edited"
+        case studyDraftValidated = "study.draft.validated"
+        case studyDraftDisclosure = "study.draft.disclosure"
+        case delegationCreated = "delegation.created"
+        case delegationRevoked = "delegation.revoked"
+        case delegationDisclosure = "delegation.disclosure"
         case studyBundleDisclosure = "study.bundle.disclosure"
         case artifactDiscardScheduled = "artifact.discard.scheduled"
         case sourceRegistered = "source.registered"
@@ -57,17 +65,20 @@ struct AuditEvent: Sendable {
             case .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
-                 .studyPublished, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
-                 .studyDataGranted, .studyAuditDisclosure: .study
+                 .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
+                 .studyDataGranted, .studyAuditDisclosure, .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
+                 .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure: .study
             }
         }
 
         var isDisclosure: Bool {
             switch self {
             case .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .studyBundleDisclosure,
-                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure: true
+                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDraftDisclosure,
+                 .delegationDisclosure, .studyPublicationDisclosure: true
             case .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
-                 .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted: false
+                 .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
+                 .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
             }
         }
     }
@@ -75,6 +86,8 @@ struct AuditEvent: Sendable {
     struct Context: Sendable {
         let actor: AuditActor
         var initiator: AuditActor?
+        var executingClientID: String?
+        var delegationID: UUID?
         var correlationID = UUID()
         /// Actual deployment revision when available; absence is not fabricated evidence.
         var applicationRevision: String?
@@ -117,7 +130,9 @@ struct AuditEvent: Sendable {
         guard actors.allSatisfy({ !$0.issuer.isEmpty && $0.issuer.utf8.count <= 2048
             && !$0.subject.isEmpty && $0.subject.utf8.count <= 255 }),
             target.version.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true,
-            context.applicationRevision.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true else {
+            context.applicationRevision.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true,
+            context.executingClientID.map({ !$0.isEmpty && $0.utf8.count <= 255 }) ?? true,
+            context.delegationID == nil || (context.initiator != nil && context.executingClientID != nil) else {
             throw AuditError.invalidMetadata
         }
     }

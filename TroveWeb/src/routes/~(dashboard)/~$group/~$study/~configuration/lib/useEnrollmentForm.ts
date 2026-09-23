@@ -9,8 +9,8 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
 
 export const enrollmentFormSchema = z.object({
@@ -44,13 +44,22 @@ export const useEnrollmentForm = () => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) form.reset(formValues);
-    // form.reset identity changes every render
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [studyResponse]);
+  const getSnapshot = useDraftFormSnapshot(
+    studyResponse,
+    params.study,
+    form.formState.isDirty,
+    (loaded) =>
+      form.reset({
+        enrollmentConditions: loaded.enrollmentConditions,
+        visibility: loaded.visibility,
+      }),
+  );
 
-  return { form, studyResponse };
+  return {
+    form,
+    studyResponse,
+    getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
+  };
 };
 
 export type EnrollmentForm = ReturnType<typeof useEnrollmentForm>["form"];

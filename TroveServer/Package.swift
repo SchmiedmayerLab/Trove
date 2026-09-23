@@ -29,7 +29,7 @@ let package = Package(
         // 🔵 Non-blocking, event-driven networking for Swift. Used for custom executors
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         // OpenAPI runtime & transport
-        .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.12.1"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor.git", from: "1.0.0"),
         // Shared API types, client, and server stubs (inlined in this monorepo)
         .package(path: "../TroveAPI"),

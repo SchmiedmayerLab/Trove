@@ -123,27 +123,38 @@ export const ScheduleDialog = () => {
 
   const setTime = ({ hours, minutes }: TimeSelectValue) => {
     if (scheduleDefinition.type === "once") {
-      form.setValue("scheduleDefinition.pattern.time", {
-        hour: hours,
-        minute: minutes,
-        second: 0,
-      });
+      form.setValue(
+        "scheduleDefinition.pattern.time",
+        {
+          hour: hours,
+          minute: minutes,
+          second: 0,
+        },
+        { shouldDirty: true },
+      );
     } else {
-      form.setValue("scheduleDefinition.pattern.hour", hours);
-      form.setValue("scheduleDefinition.pattern.minute", minutes);
+      form.setValue("scheduleDefinition.pattern.hour", hours, {
+        shouldDirty: true,
+      });
+      form.setValue("scheduleDefinition.pattern.minute", minutes, {
+        shouldDirty: true,
+      });
     }
   };
 
   const switchScheduleType = (scheduleType: string) => {
     switch (scheduleType) {
       case "once": {
-        form.setValue("scheduleDefinition", makeOnceDefinition(hour, minute));
+        form.setValue("scheduleDefinition", makeOnceDefinition(hour, minute), {
+          shouldDirty: true,
+        });
         return;
       }
       case "repeated": {
         form.setValue(
           "scheduleDefinition",
           makeRepeatedDefinition("daily", hour, minute),
+          { shouldDirty: true },
         );
         return;
       }
@@ -151,10 +162,14 @@ export const ScheduleDialog = () => {
   };
 
   const switchEventType = (eventType: string) => {
-    form.setValue("scheduleDefinition.pattern.event", {
-      type: eventType,
-      ...(eventType === "completedTask" && { componentId: "" }),
-    } as StudyLifecycleEvent);
+    form.setValue(
+      "scheduleDefinition.pattern.event",
+      {
+        type: eventType,
+        ...(eventType === "completedTask" && { componentId: "" }),
+      } as StudyLifecycleEvent,
+      { shouldDirty: true },
+    );
   };
 
   const switchRepeatPattern = (repeatPatternType: string) => {
@@ -165,6 +180,7 @@ export const ScheduleDialog = () => {
         hour,
         minute,
       ),
+      { shouldDirty: true },
     );
   };
 

@@ -10,6 +10,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { normalizeComponentType } from "@/lib/api/types";
 import { useLocale } from "@/lib/locale";
 import {
+  loadComponentDraft,
   useCreateInformationalMutation,
   useCreateQuestionnaireMutation,
   useCreateHealthDataMutation,
@@ -37,13 +38,14 @@ const NewInformationPage = () => {
   const params = Route.useParams();
   const navigateToList = useNavigateToComponentList();
   const { locale } = useLocale();
-  const { form, toInput } = useInformationForm(locale);
+  const { form, toInput, getDraftHeaders } = useInformationForm(locale);
   const mutation = useCreateInformationalMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -72,13 +74,14 @@ const NewQuestionnairePage = () => {
   const params = Route.useParams();
   const navigateToList = useNavigateToComponentList();
   const { locale } = useLocale();
-  const { form, toInput } = useQuestionnaireForm(locale);
+  const { form, toInput, getDraftHeaders } = useQuestionnaireForm(locale);
   const mutation = useCreateQuestionnaireMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -106,13 +109,14 @@ const NewQuestionnairePage = () => {
 const NewHealthDataPage = () => {
   const params = Route.useParams();
   const navigateToList = useNavigateToComponentList();
-  const { form, toInput } = useHealthDataForm();
+  const { form, toInput, getDraftHeaders } = useHealthDataForm();
   const mutation = useCreateHealthDataMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -158,5 +162,11 @@ const NewComponentRoute = () => {
 export const Route = createFileRoute(
   "/(dashboard)/$group/$study/configuration/components/$componentType/new",
 )({
+  beforeLoad: ({ context: { queryClient }, params }) =>
+    loadComponentDraft(
+      queryClient,
+      { studyId: params.study, componentId: "" },
+      normalizeComponentType(params.componentType),
+    ),
   component: NewComponentRoute,
 });

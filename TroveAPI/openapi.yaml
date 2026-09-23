@@ -114,6 +114,8 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /studies/{studyId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Studies
@@ -140,6 +142,7 @@ paths:
       summary: Partially update a study
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
       requestBody:
         required: true
         content:
@@ -161,6 +164,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
     delete:
       tags:
@@ -168,6 +175,7 @@ paths:
       summary: Delete an unpublished study without enrollment records
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
       responses:
         '204':
           description: Study deleted
@@ -181,6 +189,93 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/delegations:
+    post:
+      operationId: createStudyDelegation
+      tags: [Studies]
+      summary: Grant a registered client scoped draft access
+      description: >
+        The grantor is the authenticated researcher. This first version binds the
+        delegated OAuth client to that same subject and never grants publication,
+        participant data, credentials or onward delegation. Grant metadata is not
+        a credential. Expiry must be within the next 24 hours.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyDelegationInput'
+      responses:
+        '201':
+          description: Committed and audited grant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDelegation'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+    get:
+      operationId: listStudyDelegations
+      tags: [Studies]
+      summary: List a bounded page of visible study grants
+      description: Administrators can inspect all study grants; other researchers can inspect only their own.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Authorized page after committed disclosure intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDelegationPage'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/delegations/{delegationId}/revoke:
+    post:
+      operationId: revokeStudyDelegation
+      tags: [Studies]
+      summary: Revoke a study grant
+      description: >
+        Revocation and protected draft operations use the same database ordering
+        boundary. Later operations are denied. A retry returns the original
+        revocation time. This does not retract data already delivered.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: delegationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Revoked grant with stable revocation time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDelegation'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   /studies/{studyId}/audit-events:
     get:
@@ -232,16 +327,59 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /studies/{studyId}/draft/validations:
+    post:
+      operationId: validateStudyDraft
+      tags: [Studies]
+      summary: Validate an exact study draft for publication
+      description: >
+        Captures the complete draft, validates every localized Questionnaire against
+        the pinned Grove FHIR IG and execution capabilities, and stages the exact
+        publication archive. The returned validation ID identifies a single immutable
+        candidate and is also its future publication ID. Candidates expire within one
+        hour, or earlier when Questionnaire eligibility ends. This operation does not
+        publish. Changes during validation reject the result without accepting a candidate.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
+        - $ref: '#/components/parameters/DelegationId'
+      responses:
+        '201':
+          description: Exact draft validated and staged for explicit review and publication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDraftValidation'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+
   /studies/{studyId}/publish:
     post:
       tags:
         - Studies
       summary: Publish a study
       description: >
-        Builds the study bundle, increments the study revision, and creates
-        a published study record. Returns the published study metadata.
+        Accepts only the immutable candidate selected by validationId and its original
+        If-Match draft revision. Requires fresh interactive administrator authority;
+        delegated clients cannot publish. First acceptance checks current draft,
+        candidate lifetime, validator identity, capabilities and next publication revision.
+        It retains the previously validated archive without rebuilding it. An exact
+        authorized retry returns the same publication even if the draft later changes
+        or the candidate expires. A different If-Match never aliases an accepted request.
+        An unavailable validator blocks new validation; an unexpired proof with unchanged
+        pins remains usable without a second validator request. All candidates, including
+        studies without Questionnaires, require a configured pinned validator identity.
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudyPublicationInput'
       responses:
         '201':
           description: Study published successfully
@@ -257,6 +395,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
 
   /studies/{studyId}/published:
     get:
@@ -378,6 +520,8 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /studies/{studyId}/components:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Components
@@ -401,12 +545,15 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /studies/{studyId}/components/{componentId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     delete:
       tags:
         - Components
       summary: Remove a component
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
       responses:
         '204':
@@ -417,16 +564,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   # ── Informational Components ──
 
   /studies/{studyId}/components/informational:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     post:
       tags:
         - Components
       summary: Add an informational component to a study
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
       requestBody:
         required: true
         content:
@@ -448,8 +602,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   /studies/{studyId}/components/informational/{componentId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Components
@@ -477,6 +637,7 @@ paths:
       summary: Replace an informational component
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
       requestBody:
         required: true
@@ -499,16 +660,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   # ── Questionnaire Components ──
 
   /studies/{studyId}/components/questionnaire:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     post:
       tags:
         - Components
       summary: Add a questionnaire component to a study
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
       requestBody:
         required: true
         content:
@@ -530,8 +698,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   /studies/{studyId}/components/questionnaire/{componentId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Components
@@ -559,6 +733,7 @@ paths:
       summary: Replace a questionnaire component
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
       requestBody:
         required: true
@@ -581,16 +756,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   # ── Health Data Components ──
 
   /studies/{studyId}/components/health-data:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     post:
       tags:
         - Components
       summary: Add a health data component to a study
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
       requestBody:
         required: true
         content:
@@ -612,8 +794,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   /studies/{studyId}/components/health-data/{componentId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Components
@@ -641,6 +829,7 @@ paths:
       summary: Replace a health data component
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
       requestBody:
         required: true
@@ -663,10 +852,16 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   # ── Schedules ──
 
   /studies/{studyId}/components/{componentId}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Schedules
@@ -696,6 +891,7 @@ paths:
       summary: Add a schedule to a component
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
       requestBody:
         required: true
@@ -720,8 +916,14 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   /studies/{studyId}/components/{componentId}/schedules/{scheduleId}:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
     get:
       tags:
         - Schedules
@@ -750,6 +952,7 @@ paths:
       summary: Replace a schedule
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
         - $ref: '#/components/parameters/ScheduleId'
       requestBody:
@@ -775,6 +978,10 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
     delete:
       tags:
@@ -782,6 +989,7 @@ paths:
       summary: Remove a schedule
       parameters:
         - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/ComponentId'
         - $ref: '#/components/parameters/ScheduleId'
       responses:
@@ -793,6 +1001,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
 
   # ── Participant ──────────────────────────────────────────────────────
 
@@ -1581,6 +1793,26 @@ paths:
 
 components:
   parameters:
+    DelegationId:
+      name: Trove-Delegation-ID
+      in: header
+      description: >
+        Selects a server-side grant for a registered draft-only OAuth client. It
+        cannot authorize a request by itself. Interactive clients must omit it.
+      schema:
+        type: string
+        format: uuid
+    DraftIfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: >
+        The draftRevision returned by the study read, enclosed in double quotes.
+        One strong revision covers metadata, components and schedules. A stale
+        revision returns 412 without changing the draft; clients must reload and
+        review the conflict rather than automatically replaying an edit.
+      schema:
+        type: string
     GroupId:
       name: groupId
       in: path
@@ -1638,6 +1870,12 @@ components:
         type: integer
         minimum: 1
   responses:
+    OperationFailure:
+      description: Operation denied or unavailable; no protected change or disclosure was accepted.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
     BadRequest:
       description: Bad request
       content:
@@ -1669,7 +1907,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
     PreconditionFailed:
-      description: Enrollment state no longer matches the submitted precondition
+      description: Resource state no longer matches the submitted precondition
       content:
         application/problem+json:
           schema:
@@ -1716,11 +1954,135 @@ components:
         - collection.plan.disclosure
         - enrollment.withdrawn
         - study.published
+        - study.publication.disclosure
         - study.draft.deleted
+        - study.draft.created
+        - study.draft.edited
+        - study.draft.validated
+        - study.draft.disclosure
+        - delegation.created
+        - delegation.revoked
+        - delegation.disclosure
         - study.bundle.disclosure
         - artifact.discard.scheduled
         - study.data.granted
         - study.audit.disclosure
+
+    StudyPublicationInput:
+      type: object
+      additionalProperties: false
+      required: [validationId]
+      properties:
+        validationId:
+          type: string
+          format: uuid
+          description: Server-issued immutable candidate ID and natural publication retry identity.
+
+    StudyDraftValidation:
+      type: object
+      additionalProperties: false
+      required: [id, draftRevision, publicationRevision, bundleSha256, validatorIdentity, contractRevision, executionCapability, createdAt, expiresAt, questionnaires]
+      properties:
+        id:
+          type: string
+          format: uuid
+        draftRevision:
+          type: string
+          format: uuid
+        publicationRevision:
+          type: integer
+          minimum: 1
+        bundleSha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        validatorIdentity:
+          type: string
+        contractRevision:
+          type: string
+        executionCapability:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        questionnaires:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyQuestionnaireValidation'
+
+    StudyQuestionnaireValidation:
+      type: object
+      additionalProperties: false
+      required: [componentId, locale, sha256]
+      properties:
+        componentId:
+          type: string
+          format: uuid
+        locale:
+          type: string
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+
+    StudyDelegationPreset:
+      type: string
+      enum: [inspectStudy, editStudyDraft]
+
+    StudyDelegationInput:
+      type: object
+      additionalProperties: false
+      required: [clientId, preset, expiresAt]
+      properties:
+        clientId:
+          type: string
+          minLength: 1
+          maxLength: 255
+        preset:
+          $ref: '#/components/schemas/StudyDelegationPreset'
+        expiresAt:
+          type: string
+          format: date-time
+
+    StudyDelegation:
+      type: object
+      additionalProperties: false
+      required: [id, studyId, clientId, preset, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+        preset:
+          $ref: '#/components/schemas/StudyDelegationPreset'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+
+    StudyDelegationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/StudyDelegation'
+        nextBefore:
+          type: string
+          format: uuid
 
     AuditActor:
       type: object
@@ -1747,6 +2109,13 @@ components:
           $ref: '#/components/schemas/AuditActor'
         initiator:
           $ref: '#/components/schemas/AuditActor'
+        executingClientId:
+          type: string
+          description: Registered OAuth client from verified authentication.
+        delegationId:
+          type: string
+          format: uuid
+          description: Server-authorized application grant, not a credential.
         action:
           $ref: '#/components/schemas/StudyAuditAction'
         targetId:
@@ -2448,6 +2817,7 @@ components:
       description: Full study response
       required:
         - collectionRequirements
+        - draftRevision
         - id
         - locales
         - icon
@@ -2457,6 +2827,10 @@ components:
         - visibility
         - enrollmentConditions
       properties:
+        draftRevision:
+          type: string
+          format: uuid
+          description: Opaque revision of the complete editable study draft.
         collectionRequirements:
           type: array
           maxItems: 1

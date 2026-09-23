@@ -12,9 +12,14 @@ import {
   useOpenState,
 } from "@schmiedmayerlab/grove-design-system";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { RouteHeader, RouteHeaderBackLink } from "@/components/ui/RouteHeader";
-import { useDeleteComponentMutation } from "@/lib/queries/component";
+import {
+  readComponentDeletionSnapshot,
+  useDeleteComponentMutation,
+} from "@/lib/queries/component";
+import { draftHeaders } from "@/lib/queries/draft";
+import { onMutationError } from "@/lib/queries/mutationCallbacks";
 import { ScheduleDialog } from "./ScheduleDialog";
 
 interface EditComponentLayoutProps {
@@ -34,9 +39,13 @@ export const EditComponentLayout = ({
   const navigate = useNavigate();
   const deleteDialog = useOpenState();
   const deleteComponent = useDeleteComponentMutation();
+  const [deletion, setDeletion] =
+    useState<Awaited<ReturnType<typeof readComponentDeletionSnapshot>>>();
 
   const handleDelete = async () => {
+    if (!deletion) return;
     await deleteComponent.mutateAsync({
+      headers: draftHeaders(deletion.draftRevision),
       path: {
         studyId: params.study,
         componentId: params.component,
@@ -67,7 +76,19 @@ export const EditComponentLayout = ({
                 variant="ghost"
                 size="sm"
                 className="text-sm"
-                onClick={deleteDialog.open}
+                onClick={() => {
+                  void readComponentDeletionSnapshot(
+                    params.study,
+                    params.component,
+                  )
+                    .then((snapshot) => {
+                      setDeletion(snapshot);
+                      deleteDialog.open();
+                    })
+                    .catch(
+                      onMutationError("Error loading component for deletion"),
+                    );
+                }}
               >
                 Delete
               </Button>
@@ -82,6 +103,7 @@ export const EditComponentLayout = ({
         open={deleteDialog.isOpen}
         onOpenChange={deleteDialog.setIsOpen}
         entityName="component"
+        itemName={deletion?.name}
         onDelete={handleDelete}
       />
     </>

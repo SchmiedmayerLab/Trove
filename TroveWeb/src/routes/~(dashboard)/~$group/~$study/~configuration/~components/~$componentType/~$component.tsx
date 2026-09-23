@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { normalizeComponentType } from "@/lib/api/types";
 import { useLocale } from "@/lib/locale";
 import {
+  loadComponentDraft,
   useUpdateInformationalMutation,
   useUpdateQuestionnaireMutation,
   useUpdateHealthDataMutation,
@@ -27,13 +28,14 @@ import { QuestionnaireComponentForm } from "../components/QuestionnaireComponent
 const EditInformationPage = () => {
   const params = Route.useParams();
   const { locale } = useLocale();
-  const { form, toInput } = useInformationForm(locale);
+  const { form, toInput, getDraftHeaders } = useInformationForm(locale);
   const mutation = useUpdateInformationalMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study, componentId: params.component },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -59,13 +61,14 @@ const EditInformationPage = () => {
 const EditQuestionnairePage = () => {
   const params = Route.useParams();
   const { locale } = useLocale();
-  const { form, toInput } = useQuestionnaireForm(locale);
+  const { form, toInput, getDraftHeaders } = useQuestionnaireForm(locale);
   const mutation = useUpdateQuestionnaireMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study, componentId: params.component },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -95,13 +98,14 @@ const HealthDataEditLayout = (props: {
 
 const EditHealthDataPage = () => {
   const params = Route.useParams();
-  const { form, toInput } = useHealthDataForm();
+  const { form, toInput, getDraftHeaders } = useHealthDataForm();
   const mutation = useUpdateHealthDataMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     mutation.mutate(
       {
         path: { studyId: params.study, componentId: params.component },
+        headers: getDraftHeaders(),
         body: toInput(data),
       },
       {
@@ -145,5 +149,11 @@ const EditComponentRoute = () => {
 export const Route = createFileRoute(
   "/(dashboard)/$group/$study/configuration/components/$componentType/$component",
 )({
+  beforeLoad: ({ context: { queryClient }, params }) =>
+    loadComponentDraft(
+      queryClient,
+      { studyId: params.study, componentId: params.component },
+      normalizeComponentType(params.componentType),
+    ),
   component: EditComponentRoute,
 });

@@ -38,12 +38,18 @@ enum TestApp {
         token tokenConfig: Token = .researcher(),
         storageProvider: any ObjectStorageProvider = InMemoryObjectStorageProvider(),
         validator: FHIRValidationClient? = nil,
+        grantorAuthority: GrantorAuthorityProvider = .unavailable,
         _ test: @escaping @Sendable (Application, String?) async throws -> Void
     ) async throws {
         let app = try await makeApplication()
 
         do {
-            let keys = try await configureTesting(app, storageProvider: storageProvider, validator: validator)
+            let keys = try await configureTesting(
+                app,
+                storageProvider: storageProvider,
+                validator: validator,
+                grantorAuthority: grantorAuthority
+            )
             let token: String? = switch tokenConfig {
             case .none:
                 nil
@@ -97,12 +103,18 @@ enum TestApp {
     static func configureTesting(
         _ app: Application,
         storageProvider: any ObjectStorageProvider = InMemoryObjectStorageProvider(),
-        validator: FHIRValidationClient? = nil
+        validator: FHIRValidationClient? = nil,
+        grantorAuthority: GrantorAuthorityProvider = .unavailable
     ) async throws -> JWTKeyCollection {
         try await TestDatabase.configure(for: app)
         configureMigrations(for: app)
         try await app.autoMigrate()
-        try await configureServices(for: app, storageProvider: storageProvider, validator: validator ?? FHIRValidationClient(application: app))
+        try await configureServices(
+            for: app,
+            storageProvider: storageProvider,
+            validator: validator ?? FHIRValidationClient(application: app),
+            grantorAuthority: grantorAuthority
+        )
 
         return try await configureTransport(for: app)
     }
@@ -135,7 +147,8 @@ enum TestApp {
         email: String = "test@example.com", // swiftlint:disable:this function_default_parameter_at_end
         roles: [String],
         groups: [String],
-        expiration: Date = Date().addingTimeInterval(3600)
+        expiration: Date = Date().addingTimeInterval(3600),
+        clientID: String? = "trove-web"
     ) async throws -> String {
         let payload = KeycloakJWTPayload(
             iss: .init(value: issuer),
@@ -145,7 +158,8 @@ enum TestApp {
             nbf: nil,
             email: email,
             roles: roles,
-            groups: groups
+            groups: groups,
+            azp: clientID
         )
         return try await keys.sign(payload, kid: "test-key")
     }

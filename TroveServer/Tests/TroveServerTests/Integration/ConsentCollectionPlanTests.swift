@@ -73,7 +73,7 @@ struct ConsentCollectionPlanTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let before = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.researcher) {
-                _ = try await app.grove[PublishedStudyService.self].publish(studyId: fixture.studyIDs[0])
+                try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: fixture.studyIDs[0])
             }
             let published = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
             #expect(published.windows == before.windows && published.stateVersion == before.stateVersion)

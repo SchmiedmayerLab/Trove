@@ -9,6 +9,11 @@
 generate:
   - client
 accessModifier: public
+additionalFileComments:
+  - |-
+    SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+  - |-
+    SPDX-License-Identifier: MIT
 namingStrategy: idiomatic
 additionalImports:
   - TroveAPITypes

@@ -13,3 +13,13 @@ get {
 params:path {
   studyId: {{studyId}}
 }
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    const body = res.getBody();
+    if (body.id !== bru.getVar("studyId") || typeof body.draftRevision !== "string") {
+      throw new Error("Missing matching study draft revision");
+    }
+    bru.setVar("draftRevision", body.draftRevision);
+  }
+}

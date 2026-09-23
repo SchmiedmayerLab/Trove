@@ -9,9 +9,10 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
+import type { StudyDetailContent } from "@/lib/api/generated/types.gen";
 import { zStudyDetailContent } from "@/lib/api/generated/zod.gen";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
 
 // Extend the generated StudyDetailContent schema with icon and form-specific
@@ -62,15 +63,28 @@ export const useGeneralForm = (locale: string) => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) {
-      form.reset(formValues);
-    }
-    // form.reset identity changes every render; including it would cause an infinite loop
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [studyResponse, locale]);
+  const getStudySnapshot = useDraftFormSnapshot(
+    studyResponse,
+    `${params.study}:${locale}`,
+    form.formState.isDirty,
+    (loaded) => {
+      const details = loaded.details[locale] as StudyDetailContent | undefined;
+      form.reset({
+        title: details?.title ?? "",
+        shortTitle: details?.shortTitle ?? null,
+        icon: loaded.icon,
+        explanationText: details?.explanationText ?? null,
+        shortExplanationText: details?.shortExplanationText ?? null,
+      });
+    },
+  );
 
-  return { form, studyResponse };
+  return {
+    form,
+    studyResponse,
+    getStudySnapshot,
+    getDraftHeaders: () => draftHeaders(getStudySnapshot().draftRevision),
+  };
 };
 
 export type GeneralForm = ReturnType<typeof useGeneralForm>["form"];

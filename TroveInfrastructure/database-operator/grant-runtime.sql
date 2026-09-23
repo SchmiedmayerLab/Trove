@@ -43,6 +43,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
     public.participants, public.invitation_codes, public.enrollments, public.stored_artifacts
 TO :"runtime_name";
 GRANT SELECT, INSERT ON public.published_studies, public.enrollment_consents TO :"runtime_name";
+GRANT SELECT, INSERT ON public.study_delegations, public.study_publication_candidates TO :"runtime_name";
+GRANT UPDATE (revoked_at) ON public.study_delegations TO :"runtime_name";
 GRANT SELECT, INSERT ON public.source_bindings TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.source_bindings TO :"runtime_name";
 GRANT SELECT, INSERT ON public.audit_events TO :"runtime_name";

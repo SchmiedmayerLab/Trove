@@ -18,13 +18,14 @@ import { useEnrollmentForm } from "./lib/useEnrollmentForm";
 
 const EnrollmentRouteComponent = () => {
   const params = Route.useParams();
-  const { form, studyResponse } = useEnrollmentForm();
+  const { form, studyResponse, getDraftHeaders } = useEnrollmentForm();
   const updateStudy = useUpdateStudyMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     updateStudy.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: {
           enrollmentConditions: data.enrollmentConditions,
           visibility: data.visibility,

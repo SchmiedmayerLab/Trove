@@ -156,6 +156,36 @@
   ],
   "clients": [
     {
+      "clientId": "trove-cli",
+      "name": "Trove CLI",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256", "access.token.lifespan": "300" },
+      "redirectUris": ["http://127.0.0.1:8765/oauth/callback"],
+      "webOrigins": [],
+      "defaultClientScopes": ["profile", "email", "groups", "trove-api"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "trove-draft-editor",
+      "name": "Trove Delegated Draft Editor",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256", "access.token.lifespan": "300" },
+      "redirectUris": ["http://127.0.0.1:8765/oauth/callback"],
+      "webOrigins": [],
+      "defaultClientScopes": ["profile", "email", "groups", "trove-api"],
+      "optionalClientScopes": []
+    },
+    {
       "clientId": "argocd",
       "name": "ArgoCD",
       "enabled": true,

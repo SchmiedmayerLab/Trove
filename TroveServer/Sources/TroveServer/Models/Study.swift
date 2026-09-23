@@ -38,6 +38,10 @@ final class Study: Model, @unchecked Sendable {
 
     @Parent(key: "group_id") var group: Group
 
+    /// One revision covers the study and all of its components and schedules.
+    /// It changes only in the same transaction as an accepted draft mutation.
+    @Field(key: "draft_revision") var draftRevision: UUID
+
     @Field(key: "locales") var locales: Set<LocalizationKey>
 
     @Field(key: "icon") var icon: String
@@ -87,6 +91,7 @@ final class Study: Model, @unchecked Sendable {
     ) {
         self.id = id
         self.$group.id = groupId
+        self.draftRevision = UUID()
         self.locales = locales
         self.icon = icon
         self.details = details
@@ -95,6 +100,12 @@ final class Study: Model, @unchecked Sendable {
         self.visibility = visibility
         self.enrollmentCondition = enrollmentCondition
         self.collectionRequirements = collectionRequirements
+    }
+
+    func requireDraftRevision(_ expectedRevision: UUID) throws {
+        guard draftRevision == expectedRevision else {
+            throw ServerError.preconditionFailed("The study draft changed; reload it before applying this operation")
+        }
     }
 
     func apply(_ patch: StudyPatch) throws {

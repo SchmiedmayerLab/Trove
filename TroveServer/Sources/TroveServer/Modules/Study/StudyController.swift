@@ -44,13 +44,15 @@ extension Controller {
         }
 
         let studyId = try input.path.studyId.requireId()
-        let study = try await studyService.patchStudy(id: studyId, patch: StudyPatch(schema))
+        let study = try await studyService.patchStudy(
+            id: studyId, expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch), patch: StudyPatch(schema)
+        )
         return .ok(.init(body: .json(try .init(study))))
     }
 
     func deleteStudiesStudyId(_ input: Operations.DeleteStudiesStudyId.Input) async throws -> Operations.DeleteStudiesStudyId.Output {
         let studyId = try input.path.studyId.requireId()
-        try await studyService.deleteStudy(id: studyId)
+        try await studyService.deleteStudy(id: studyId, expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch))
         return .noContent(.init())
     }
 }

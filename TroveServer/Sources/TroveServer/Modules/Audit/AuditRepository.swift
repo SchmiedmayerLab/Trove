@@ -24,6 +24,15 @@ enum AuditRepository {
         return try await append(event, outcome: "succeeded", on: transaction)
     }
 
+    /// Commit this receipt with the authorization fence before releasing the captured data.
+    /// The caller owns the transaction; this method never implies it has already committed.
+    @discardableResult
+    static func recordDisclosureIntent(_ event: AuditEvent, on transaction: any Database) async throws -> AuditReceipt {
+        guard transaction.inTransaction else { throw AuditError.transactionRequired }
+        guard event.action.isDisclosure else { throw AuditError.invalidAction }
+        return try await append(event, outcome: "disclosure_intent", on: transaction)
+    }
+
     /// The caller must finish authorization before entering this gate. Receipt means intent,
     /// not successful delivery: an interrupted response must not be reported as delivered.
     static func disclose<Value: Sendable>(
@@ -39,7 +48,7 @@ enum AuditRepository {
             throw AuditError.invalidAction
         }
         let receipt = try await database.transaction { transaction in
-            try await append(event, outcome: "disclosure_intent", on: transaction)
+            try await recordDisclosureIntent(event, on: transaction)
         }
         return try await release(receipt)
     }
@@ -64,11 +73,13 @@ enum AuditRepository {
         try await sql.raw("""
             INSERT INTO audit_events (
                 id, occurred_at, actor_issuer, actor_subject, initiator_issuer, initiator_subject,
+                executing_client_id, delegation_id,
                 action, scope_kind, study_id, group_id, participant_id, source_binding_id,
                 target_id, target_version, outcome, correlation_id, application_revision
             ) VALUES (
                 \(bind: event.id), \(bind: event.occurredAt), \(bind: event.context.actor.issuer), \(bind: event.context.actor.subject),
                 \(bind: event.context.initiator?.issuer), \(bind: event.context.initiator?.subject),
+                \(bind: event.context.executingClientID), \(bind: event.context.delegationID),
                 \(bind: event.action.rawValue), \(bind: event.scope.kind.rawValue), \(bind: studyID), \(bind: groupID),
                 \(bind: participantID), \(bind: sourceBindingID),
                 \(bind: event.target.id), \(bind: event.target.version), \(bind: outcome),

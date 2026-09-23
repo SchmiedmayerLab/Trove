@@ -31,6 +31,7 @@ struct StudyRetentionTests {
             let studyID = try study.requireId()
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
                 request.bearerAuth(token)
+                request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             }) { response in
                 #expect(response.status == .forbidden)
             }
@@ -77,6 +78,7 @@ struct StudyRetentionTests {
             }
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
                 request.bearerAuth(token)
+                request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             }) { response in
                 #expect(response.status == .conflict)
             }
@@ -158,6 +160,7 @@ struct StudyRetentionTests {
             let studyID = try study.requireId()
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
                 request.bearerAuth(token)
+                request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             }) { response in
                 #expect(response.status == .noContent)
             }
@@ -180,6 +183,7 @@ struct StudyRetentionTests {
             try await sql.raw("DROP TABLE audit_events").run()
             try await app.test(.DELETE, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
                 request.bearerAuth(token)
+                request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             }) { response in
                 #expect(response.status == .internalServerError)
             }

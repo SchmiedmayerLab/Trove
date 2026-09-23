@@ -15,6 +15,7 @@ params:path {
 }
 
 headers {
+  If-Match: "{{draftRevision}}"
   Content-Type: application/json
 }
 
@@ -23,7 +24,7 @@ body:json {
     "name": "Daily Survey",
     "data": {
       "en-US": {
-        "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey\",\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}]}"
+        "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey\",\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}],\"meta\":{\"profile\":[\"https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire\"]},\"url\":\"https://example.org/fhir/Questionnaire/daily-survey\",\"version\":\"1.0.0\",\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm\",\"valueCoding\":{\"system\":\"http://hl7.org/fhir/version-algorithm\",\"code\":\"semver\"}}],\"subjectType\":[\"Patient\"]}"
       }
     }
   }

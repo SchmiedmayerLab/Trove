@@ -17,6 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { useState } from "react";
+import { getStudiesByStudyId } from "@/lib/api/generated/sdk.gen";
+import { draftHeaders } from "@/lib/queries/draft";
+import { onMutationError } from "@/lib/queries/mutationCallbacks";
 import {
   studyListQueryOptions,
   useDeleteStudyMutation,
@@ -43,6 +46,7 @@ export const StudySelector = () => {
   const [pendingDelete, setPendingDelete] = useState<{
     id: string;
     title: string;
+    draftRevision: string;
   }>();
   const deleteStudy = useDeleteStudyMutation();
 
@@ -61,7 +65,10 @@ export const StudySelector = () => {
   const handleDelete = async () => {
     if (!pendingDelete) return;
     const removingActive = pendingDelete.id === studyId;
-    await deleteStudy.mutateAsync({ path: { studyId: pendingDelete.id } });
+    await deleteStudy.mutateAsync({
+      path: { studyId: pendingDelete.id },
+      headers: draftHeaders(pendingDelete.draftRevision),
+    });
     deleteDialog.close();
     setPendingDelete(undefined);
     if (removingActive) {
@@ -92,8 +99,20 @@ export const StudySelector = () => {
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                setPendingDelete({ id: study.id, title: study.title });
-                deleteDialog.open();
+                void getStudiesByStudyId({
+                  path: { studyId: study.id },
+                  throwOnError: true,
+                })
+                  .then(({ data }) => {
+                    setPendingDelete({
+                      id: data.id,
+                      title:
+                        Object.values(data.details).at(0)?.title ?? study.title,
+                      draftRevision: data.draftRevision,
+                    });
+                    deleteDialog.open();
+                  })
+                  .catch(onMutationError("Error loading study for deletion"));
               }}
             >
               <X className="size-3.5" />

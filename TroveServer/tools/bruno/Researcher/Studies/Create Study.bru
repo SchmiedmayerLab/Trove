@@ -27,5 +27,9 @@ body:json {
 
 script:post-response {
   const body = res.getBody();
+  if (res.getStatus() !== 201 || typeof body.id !== "string" || typeof body.draftRevision !== "string") {
+    throw new Error("Study creation did not return a draft identity");
+  }
   bru.setVar("studyId", body.id);
+  bru.setVar("draftRevision", body.draftRevision);
 }

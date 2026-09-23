@@ -1,13 +1,17 @@
 meta {
   name: Delete Study
   type: http
-  seq: 8
+  seq: 9
 }
 
 delete {
   url: {{baseUrl}}/studies/:studyId
   body: none
   auth: inherit
+}
+
+headers {
+  If-Match: "{{draftRevision}}"
 }
 
 params:path {

@@ -80,6 +80,43 @@ The [disposable rotation check](../TroveInfrastructure/validator/README.md#signi
 exercises real provider rollover, key retirement and outage expiry with the normal
 cache settings. It does not replace deployment-wide rotation or recovery acceptance.
 
+## Delegated Draft Access
+
+The public `trove-cli` and `trove-draft-editor` identity-provider clients use
+authorization code with S256 PKCE, the registered loopback callback
+`http://127.0.0.1:8765/oauth/callback`, and five-minute access tokens. They have no
+client secret, password grant, or service-account flow. The existing development
+password client remains a local fixture and is not accepted by production policy.
+
+The server classifies clients from the verified token's `azp` claim. A draft-editor
+client cannot acquire ordinary researcher or participant access by omitting its
+`Trove-Delegation-ID` header or receiving additional identity-provider roles. The
+header selects a persisted grant; it conveys no authority by itself. Grants bind
+one study, researcher identity, registered client, preset, and expiry of at most
+24 hours. Inspect grants allow draft reads; edit grants additionally allow edits
+and validation. Neither preset permits publication, participant-data access,
+invitations, audit access, credential management, or further delegation.
+
+This first flow binds the delegated token's subject to the grantor. It does not
+support unattended service-account delegation. Before delegated work, the server
+reads the grantor's current enabled status, effective roles, and complete group
+memberships from Keycloak. Missing, unavailable, oversized, or incomplete responses
+fail closed. These reads are not cached and happen outside database locks. A
+prepared decision expires after 30 seconds; validation completion and queued work
+must obtain fresh authority.
+
+Application-grant checks, protected effects, and mandatory audit persistence use
+the same study-locked transaction as revocation. An operation ordered before
+revocation may complete; subsequent operations cannot use the grant. Result
+disclosure requires a committed authorization and audit decision. Already sent
+bytes or dispatched external requests cannot be retracted. Identity-provider
+permission changes are observed on the next live check, not atomically committed
+with the application database.
+
+Grant lists are cursor-paginated (default 50, maximum 100). Researchers see their
+own grants; study administrators can inspect and revoke all grants for that study.
+Returned metadata never includes OAuth credentials.
+
 ## Study Audit Access
 
 `GET /api/v0/studies/{studyId}/audit-events?limit=50&before={auditEventId}`

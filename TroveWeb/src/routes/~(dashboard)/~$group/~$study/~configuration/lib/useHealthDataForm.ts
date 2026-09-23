@@ -9,7 +9,6 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
 import type {
   HealthDataComponentInput,
@@ -17,6 +16,7 @@ import type {
 } from "@/lib/api/generated/types.gen";
 import { zSampleTypesCollection } from "@/lib/api/generated/zod.gen";
 import { healthDataRetrieveQueryOptions } from "@/lib/queries/component";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 
 const healthDataSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -47,15 +47,15 @@ const transformHealthDataFormToInput = (
 
 export const useHealthDataForm = () => {
   const params = useParams({ strict: false });
-  const isEditing = !!params.component && !!params.study;
 
-  const { data: componentResponse } = useQuery({
+  const { data: snapshot } = useQuery({
     ...healthDataRetrieveQueryOptions({
       studyId: params.study ?? "",
       componentId: params.component ?? "",
     }),
-    enabled: isEditing,
+    enabled: !!params.study,
   });
+  const componentResponse = snapshot?.value;
 
   const formValues =
     componentResponse ? transformResponseToForm(componentResponse) : undefined;
@@ -65,16 +65,21 @@ export const useHealthDataForm = () => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) form.reset(formValues);
-    // form.reset identity changes every render; including it would cause an infinite loop
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [componentResponse]);
+  const getSnapshot = useDraftFormSnapshot(
+    snapshot,
+    `${params.study}:${params.component}`,
+    form.formState.isDirty,
+    (loaded) =>
+      form.reset(
+        loaded.value ? transformResponseToForm(loaded.value) : defaultValues,
+      ),
+  );
 
   return {
     form,
     componentData: componentResponse,
     toInput: transformHealthDataFormToInput,
+    getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
   };
 };
 

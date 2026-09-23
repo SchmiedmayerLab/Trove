@@ -17,9 +17,15 @@ import {
 } from "@schmiedmayerlab/grove-design-system";
 import { Link, useParams } from "@tanstack/react-router";
 import { Edit, Ellipsis, Trash } from "lucide-react";
+import { useState } from "react";
 import { FeaturedIconContainer } from "@/components/ui/FeaturedIconContainer";
 import type { ComponentType } from "@/lib/api/types";
-import { useDeleteComponentMutation } from "@/lib/queries/component";
+import {
+  readComponentDeletionSnapshot,
+  useDeleteComponentMutation,
+} from "@/lib/queries/component";
+import { draftHeaders } from "@/lib/queries/draft";
+import { onMutationError } from "@/lib/queries/mutationCallbacks";
 import { cn } from "@/utils/cn";
 import type { getComponentLabel } from "../../lib/formatComponent";
 
@@ -79,6 +85,8 @@ export const ComponentsCardRowActions = ({
   const { group, study } = useParams({ strict: false });
   const deleteDialog = useOpenState();
   const deleteComponent = useDeleteComponentMutation();
+  const [deletion, setDeletion] =
+    useState<Awaited<ReturnType<typeof readComponentDeletionSnapshot>>>();
 
   if (!group || !study) return null;
 
@@ -112,7 +120,16 @@ export const ComponentsCardRowActions = ({
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={deleteComponent.isPending}
-              onClick={deleteDialog.open}
+              onClick={() => {
+                void readComponentDeletionSnapshot(study, componentId)
+                  .then((snapshot) => {
+                    setDeletion(snapshot);
+                    deleteDialog.open();
+                  })
+                  .catch(
+                    onMutationError("Error loading component for deletion"),
+                  );
+              }}
             >
               <Trash className="size-3.5 opacity-80" />
               Delete
@@ -124,8 +141,11 @@ export const ComponentsCardRowActions = ({
         open={deleteDialog.isOpen}
         onOpenChange={deleteDialog.setIsOpen}
         entityName="component"
+        itemName={deletion?.name}
         onDelete={async () => {
+          if (!deletion) return;
           await deleteComponent.mutateAsync({
+            headers: draftHeaders(deletion.draftRevision),
             path: {
               studyId: study,
               componentId,

@@ -14,8 +14,10 @@ script:post-response {
   await bru.runRequest("Researcher/Studies/List Groups")
   await bru.runRequest("Researcher/Studies/Create Study")
   await bru.runRequest("Researcher/Components/Create Questionnaire Component")
+  await bru.runRequest("Researcher/Studies/Get Study")
   await bru.runRequest("Researcher/Components/Create Informational Component")
+  await bru.runRequest("Researcher/Studies/Get Study")
   await bru.runRequest("Researcher/Schedules/Create Schedule (Once)")
-  
+  await bru.runRequest("Researcher/Studies/Get Study")
   await bru.runRequest("Researcher/Components/Create Health Data Component")
 }

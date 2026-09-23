@@ -52,6 +52,7 @@ extension Components.Schemas.StudyListItem {
 extension Components.Schemas.StudyResponse {
     init(_ model: Study) throws {
         self.init(
+            draftRevision: model.draftRevision.uuidString,
             collectionRequirements: model.collectionRequirements.map(Components.Schemas.CollectionRequirement.init),
             id: try model.requireId().uuidString,
             locales: model.locales.sorted(using: KeyPathComparator(\.description)),

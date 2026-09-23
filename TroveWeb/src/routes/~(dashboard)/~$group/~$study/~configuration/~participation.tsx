@@ -18,13 +18,14 @@ import { useParticipationForm } from "./lib/useParticipationForm";
 
 const ParticipationRouteComponent = () => {
   const params = Route.useParams();
-  const { form } = useParticipationForm();
+  const { form, getDraftHeaders } = useParticipationForm();
   const updateStudy = useUpdateStudyMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
     updateStudy.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: {
           participationCriterion: data.participationCriterion ?? undefined,
         },

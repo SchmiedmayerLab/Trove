@@ -108,7 +108,8 @@ enum SigningKeyFixtures {
                 nbf: nil,
                 email: "fixture@example.test",
                 roles: [TestApp.participantRole],
-                groups: []
+                groups: [],
+                azp: "trove-app"
             )
             return try await collection.sign(payload, kid: .init(string: identifier))
         }

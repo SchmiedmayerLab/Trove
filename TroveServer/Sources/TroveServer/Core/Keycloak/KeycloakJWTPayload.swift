@@ -18,6 +18,7 @@ struct KeycloakJWTPayload: JWTPayload {
     var email: String
     var roles: [String]
     var groups: [String]? // swiftlint:disable:this discouraged_optional_collection
+    var azp: String?
 
     func verify(using algorithm: some JWTAlgorithm) async throws {
         try exp.verifyNotExpired()

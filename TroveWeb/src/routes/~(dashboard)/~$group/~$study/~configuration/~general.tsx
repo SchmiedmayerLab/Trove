@@ -24,7 +24,7 @@ import { useGeneralForm } from "./lib/useGeneralForm";
 const GeneralRouteComponent = () => {
   const params = Route.useParams();
   const { locale } = useLocale();
-  const { form, studyResponse } = useGeneralForm(locale);
+  const { form, getStudySnapshot, getDraftHeaders } = useGeneralForm(locale);
   const updateStudy = useUpdateStudyMutation();
 
   const [highlightedField, setHighlightedField] = useState<
@@ -49,9 +49,10 @@ const GeneralRouteComponent = () => {
     updateStudy.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: {
           ...(icon != null && { icon }),
-          details: { ...studyResponse?.details, [locale]: localeContent },
+          details: { ...getStudySnapshot().details, [locale]: localeContent },
         },
       },
       {

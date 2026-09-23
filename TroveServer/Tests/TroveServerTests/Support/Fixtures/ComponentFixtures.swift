@@ -54,6 +54,14 @@ enum ComponentFixtures {
             {
               "resourceType": "Questionnaire",
               "id": "\(componentId.uuidString)",
+              "meta": {"profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]},
+              "extension": [{
+                "url": "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm",
+                "valueCoding": {"system": "http://hl7.org/fhir/version-algorithm", "code": "semver"}
+              }],
+              "url": "https://example.test/fhir/Questionnaire/\(componentId.uuidString)",
+              "version": "1.0.0",
+              "subjectType": ["Patient"],
               "status": "active",
               "language": "en-US",
               "title": "\(name)",

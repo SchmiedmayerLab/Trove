@@ -156,31 +156,18 @@ class VerificationInputTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn(b"absolute path to an executable", result.stderr)
 
-    def test_ui_stack_rejects_occupied_ports_before_creating_runtime(self):
-        for port in (8080, 8180, 9000):
-            with self.subTest(port=port):
-                result, runtime_exists = self.run_ui_preflight(
-                    '#!/bin/bash\nfor argument; do\n'
-                    f'  if [[ "$argument" == "-iTCP:{port}" ]]; then exit 0; fi\n'
-                    'done\nexit 1\n'
-                )
-                self.assertEqual(result.returncode, 1)
-                self.assertIn(f"port {port} is already in use".encode(), result.stderr)
+    def test_ui_stack_stops_before_runtime_creation_when_port_preflight_fails(self):
+        for status in (1, 2):
+            with self.subTest(status=status):
+                result, runtime_exists = self.run_ui_preflight(f'#!/bin/bash\nexit {status}\n')
+                self.assertEqual(result.returncode, status)
                 self.assertFalse(runtime_exists)
 
-    def test_ui_stack_fails_closed_if_port_inspection_is_denied(self):
-        for failure in ('echo "Permission denied" >&2\nexit 1', 'exit 2'):
-            with self.subTest(failure=failure):
-                result, runtime_exists = self.run_ui_preflight('#!/bin/bash\n' + failure + '\n')
-                self.assertEqual(result.returncode, 1)
-                self.assertIn(b"Unable to inspect native test port", result.stderr)
-                self.assertFalse(runtime_exists)
-
-    def run_ui_preflight(self, lsof_script):
+    def run_ui_preflight(self, python_script):
         with tempfile.TemporaryDirectory(prefix="trove-port-test-") as directory:
             temporary = pathlib.Path(directory)
-            executable = temporary / "lsof"
-            executable.write_text(lsof_script)
+            executable = temporary / "python3"
+            executable.write_text(python_script)
             executable.chmod(0o755)
             runtime = temporary / "runtime"
             result = subprocess.run(
@@ -204,6 +191,7 @@ class VerificationInputTests(unittest.TestCase):
         for dependency in (
             "TroveiOS/**", "TroveAPI/**", "TroveServer/**",
             "TroveInfrastructure/docker/keycloak/realm.json",
+            "TroveInfrastructure/validator/manifest.json",
         ):
             self.assertIn(f'"{dependency}"', match.group(1))
         self.assertIn("if: needs.changes.outputs.ios_ui == 'true'", workflow)
