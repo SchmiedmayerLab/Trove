@@ -15,7 +15,6 @@ import { ComponentsCard } from "./components/ComponentsCard/ComponentsCard";
 import { ConsentCard } from "./components/ConsentCard";
 import { EnrollmentCard } from "./components/EnrollmentCard";
 import { GeneralCard } from "./components/GeneralCard";
-import { ParticipationCriteriaCard } from "./components/ParticipationCriteriaCard";
 
 const StudyConfigurationRoute = () => {
   const params = Route.useParams();
@@ -33,10 +32,6 @@ const StudyConfigurationRoute = () => {
       />
       <div className="flex max-w-7xl flex-col gap-14 p-6 pb-12">
         <GeneralCard study={study} isLoading={studyQuery.isLoading} />
-        <ParticipationCriteriaCard
-          study={study}
-          isLoading={studyQuery.isLoading}
-        />
         <EnrollmentCard study={study} isLoading={studyQuery.isLoading} />
         <ConsentCard study={study} isLoading={studyQuery.isLoading} />
         <ComponentsCard

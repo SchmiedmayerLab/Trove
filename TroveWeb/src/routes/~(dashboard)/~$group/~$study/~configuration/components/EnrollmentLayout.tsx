@@ -22,7 +22,7 @@ export const EnrollmentLayout = ({
     <div>
       <RouteHeader
         title="Enrollment"
-        description="Choose who can enroll in your study and manage invitation codes."
+        description="Set participation criteria, enrollment access, and study visibility."
         accessoryLeft={<RouteHeaderBackLink />}
         accessoryRight={saveButton}
       />

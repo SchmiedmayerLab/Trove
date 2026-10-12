@@ -19,7 +19,7 @@ export const ConsentLayout = ({ children, saveButton }: ConsentLayoutProps) => {
     <div>
       <RouteHeader
         title="Consent"
-        description="Author the consent document participants must accept before enrolling."
+        description="Author the consent document participants review before sharing study data."
         accessoryLeft={<RouteHeaderBackLink />}
         accessoryRight={saveButton}
       />

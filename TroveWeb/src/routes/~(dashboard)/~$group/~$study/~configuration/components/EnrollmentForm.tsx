@@ -7,6 +7,7 @@
 //
 
 import { Field, RadioGroup } from "@schmiedmayerlab/grove-design-system";
+import { CriteriaTreeBuilder } from "@/components/interfaces/CriteriaTreeBuilder";
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { EnrollmentForm as EnrollmentFormType } from "../lib/useEnrollmentForm";
 
@@ -30,6 +31,21 @@ interface EnrollmentFormProps {
 export const EnrollmentForm = ({ form, onSubmit }: EnrollmentFormProps) => {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-8">
+      <Card>
+        <CardHeader
+          title="Participation criteria"
+          description="Define who is eligible to enroll. These criteria apply to both open and invitation-only enrollment."
+        />
+        <div className="p-(--card-padding)">
+          <Field
+            control={form.control}
+            name="participationCriterion"
+            render={({ field: { value, onChange } }) => (
+              <CriteriaTreeBuilder value={value} onChange={onChange} />
+            )}
+          />
+        </div>
+      </Card>
       <Card>
         <CardHeader
           title="Enrollment mode"

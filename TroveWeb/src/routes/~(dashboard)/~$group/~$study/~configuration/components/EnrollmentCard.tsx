@@ -8,6 +8,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
+import { CriteriaDisplay } from "@/components/interfaces/CriteriaTreeBuilder";
 import { KeyValueCard } from "@/components/interfaces/KeyValueCard";
 import { EditButtonLink } from "@/components/ui/EditButton";
 import type { StudyResponse } from "@/lib/api/generated/types.gen";
@@ -58,6 +59,15 @@ export const EnrollmentCard = ({ study, isLoading }: EnrollmentCardProps) => {
       }
       isLoading={isLoading}
       items={[
+        {
+          key: "Participation criteria",
+          value: (
+            <CriteriaDisplay
+              criterion={study?.participationCriterion}
+              isLoading={isLoading}
+            />
+          ),
+        },
         {
           key: "Mode",
           tooltip:
