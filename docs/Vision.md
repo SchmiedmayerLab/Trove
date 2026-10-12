@@ -6,65 +6,73 @@ SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTR
 SPDX-License-Identifier: MIT
 -->
 
-# A Shared Foundation for Digital Studies
+# Project Scope
 
-Digital studies often need the same foundations—participant identity, consent, scheduled activities, reliable data collection and a way to return results—while differing substantially in their scientific questions and participant experience.
+Trove provides study management for digital health research: study definitions,
+participant enrollment and consent, and collection of health data. The aim is to
+let studies share these services while retaining their own participant interfaces
+and specialized procedures.
 
-Trove's goal is to provide those foundations once. Researchers should be able to describe a study in a structured form, run it through supported applications and services, and retain a clear record of what participants agreed to, what was assigned and what data was received. A study-specific application should be able to use the same backend without giving up its own interface or domain logic.
+Trove is in beta and is being actively tested and used at Stanford.
+The [platform tour](Platform-Tour.md) shows the current interfaces.
+The design pages describe both implemented contracts and planned extensions;
+[GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
+[issues](https://github.com/SchmiedmayerLab/Trove/issues) track delivery.
 
-This documentation describes the platform's target architecture and development direction. It explains design decisions, not a guarantee that every described capability is available in a released version. The [roadmap](Roadmap-and-Engineering-Principles.md) distinguishes the initial delivery from later capabilities.
+## Study Definitions
 
-## The Core Idea
+A study definition describes participant-facing content, activities, collection
+requirements and execution rules. Collection requirements identify the data needed
+and permitted sources, rather than the internals of one operating system.
+Applications report the capabilities they support.
 
-For a visual walkthrough of the current development build, see the
-[Platform Tour](Platform-Tour.md), with synthetic study data and reproducible captures.
+Published revisions preserve the content a participant accepted. The server owns
+enrollment, consent and accepted results. Clients can cache state and queue work,
+but they cannot independently establish consent or task completion.
 
-A study definition connects the scientific protocol to the software that carries it out. It identifies approved content, activities, collection requirements, supported sources and execution rules. Trove connects that definition to participant consent, assigned task occurrences and governed data access.
+[Grove](https://github.com/SchmiedmayerLab/Grove) supplies reusable application
+components. The [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/)
+define exchange profiles. Trove adds study management and storage around them.
 
-The definition should describe *what the study needs*, rather than encode the internals of one mobile operating system. Applications report which requirements they can support. The backend owns shared state and authorization; clients provide the appropriate experience.
+## Storage and Access
 
-The shared foundations are [Grove](https://github.com/SchmiedmayerLab/Grove) for reusable application components and the [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/) for interoperable exchange. Trove adds the study backend and researcher workflows around those contracts.
+One measurement can be relevant to several studies. Trove stores its source event
+once and records each study's authorization separately. Withdrawal from one study
+does not change another study's evidence or grant it additional access.
 
-This separation makes several kinds of study possible within one architecture:
+FHIR is the exchange format, not a requirement to represent every database row as
+a FHIR resource. PostgreSQL and TimescaleDB provide transactional and time-series
+storage; object storage holds larger artifacts.
 
-- A mobile study collecting wearable data and scheduled questionnaires.
-- A study with a protocol-defined conversational intervention and follow-up activities.
-- A custom application with specialized assessments, using shared enrollment and data services.
-- Future browser or communication-channel participation where the protocol can be represented faithfully.
+## Researcher Interfaces
 
-These are different uses of common study infrastructure, not separate products with independent consent and completion records.
+The dashboard, Swift CLI and planned authoring assistants use the same typed API
+and permission checks. Visual editing is useful for reviewing consent wording,
+questionnaire structure and branching. Command-line and assisted workflows reduce
+repetitive configuration without introducing a separate study model.
 
-## Design Principles
+Assistance produces reviewable drafts. Publication, participant contact and access
+to study data require their own permissions. Scientific validity, institutional
+approval and intervention suitability remain research responsibilities.
 
-**One authority for study participation.** Enrollment, consent, adopted study revision, assignments and accepted task completion belong to the core backend. A client cache, external service or generated response cannot establish those facts independently.
+## Scope Limits
 
-**Shared data without shared permission.** A source measurement can be relevant to more than one study without being stored repeatedly. Access remains specific to each study's authorized purpose and exact data versions.
+Trove is not a general clinical-trial management suite, statistical analysis
+environment or arbitrary application-hosting service. Research analysis uses
+authorized exports in separate tools.
 
-**Interoperability at the boundaries.** Grove FHIR profiles provide the clinical and study-exchange vocabulary. The database can use efficient relational, time-series and object storage rather than storing every internal operation as FHIR JSON.
+Specialized assessments, such as a six-minute walk test or guided ECG capture,
+remain in study applications. They can use Trove's configuration and result
+contracts without moving their acquisition UI or scoring into the core platform.
+A component can move into Grove when multiple applications need the same behavior.
 
-**Extensibility through clear contracts.** Study-specific interfaces, assessment procedures and computation stay outside the core. They integrate through versioned configuration, scoped APIs and explicit result contracts.
+## Design Documents
 
-**Researcher judgment remains essential.** The platform can check technical consistency, preserve evidence and reduce repetitive work. It does not decide scientific validity, institutional approval or the suitability of an intervention.
-
-**Agent-ready operations, shared visual review.** A Swift CLI and hosted researcher tools use the same typed, authorized API as the dashboard. Researchers can author a Grove-conformant Questionnaire from source documents, then inspect or edit the same FHIR draft visually. Scoped delegation permits routine draft work without granting publication or participant-data access. Optional MCP and researcher voice are interaction adapters, not new study authorities.
-
-**A focused path to useful releases.** The first objective is one complete study workflow. Conversations, custom-client reuse and additional research capabilities build on that foundation as their requirements become concrete.
-
-Implementation work is tracked in the [Trove project](https://github.com/orgs/SchmiedmayerLab/projects/4). Repository issues own acceptance criteria; the project tracks priority and delivery status.
-
-## Read the Design
-
-| Page | Questions it answers |
-|---|---|
-| [Study Model and Research Workflows](Study-Model-and-Research-Workflows.md) | How are studies defined, consented, executed and closed? How do research operations fit? |
-| [Data and Platform Architecture](Data-and-Platform-Architecture.md) | How are data stored once, linked, authorized, synchronized and exported? |
-| [Applications and Integrations](Applications-and-Integrations.md) | How do mobile apps, wearables, conversations and custom services share the platform? |
-| [Roadmap and Engineering Principles](Roadmap-and-Engineering-Principles.md) | What comes first, what remains conditional, and how is quality maintained? |
-
-## What Trove Is Not
-
-Trove is not intended to become a general electronic data-capture suite, a clinical-trial management system, a statistical analysis environment or an unrestricted application-hosting platform.
-
-It also does not need to implement every active assessment. Procedures such as a six-minute walk test or guided ECG capture can remain in specialized applications, with Trove providing configuration, authorized result exchange and optional shared task tracking. A reusable assessment may later justify a shared package when multiple applications need it.
-
-Keeping these boundaries explicit allows the common infrastructure to improve without forcing every study into the same participant interface or introducing a new subsystem for each research project.
+- [Study Model and Research Workflows](Study-Model-and-Research-Workflows.md):
+  definitions, publication, consent, tasks and research operations.
+- [Data and Platform Architecture](Data-and-Platform-Architecture.md):
+  components, storage, authorization and synchronization.
+- [Applications and Integrations](Applications-and-Integrations.md):
+  mobile clients, wearables, conversation tasks and custom services.
+- [Engineering and Verification](Engineering-and-Verification.md):
+  implementation, testing and deployment requirements.

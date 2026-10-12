@@ -7,8 +7,8 @@ SPDX-License-Identifier: MIT
 
 Trove connects researcher-authored study definitions with participant identity,
 enrollment, reviewed consent and health-data collection. These screenshots show
-a development build with a synthetic **Daily Activity Study**, not an active study
-or evidence of production readiness. [Capture details and reproduction](images/README.md).
+the beta application with a fictional **Daily Activity Study** and synthetic accounts.
+[Capture details and reproduction](images/README.md).
 
 ## Study Authoring
 
@@ -26,12 +26,10 @@ participation criteria, then consent. Study components have their own top-level 
 
 Consent documents combine Markdown with native agreement and signature controls.
 Researchers can switch between a readable preview, a visual editor and Markdown.
-The visual editor exposes agreement, selection and signature fields, including
-editable field and option IDs. Renaming an option updates its default and required
-response references; duplicate IDs are rejected. Deletion requires confirmation
-and affects the current draft only. Unsupported constructs remain available in Markdown.
-The participant reviews the document attached to their study revision; the web
-preview does not collect responses or replace publication validation.
+Agreement, selection and signature fields have editable IDs and options. The
+editor checks duplicate IDs and keeps response references consistent when options
+are renamed. Constructs outside the visual editor's supported set remain editable
+in Markdown. The preview shows the document without collecting participant responses.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="images/web/consent~dark.png"><img src="images/web/consent.png" alt="Consent document authoring"></picture>
 
@@ -52,8 +50,7 @@ this editor does not establish server-driven task execution or reminders.
 
 Publication is an explicit review step. Validation produces an exact, expiring
 candidate; the researcher publishes that candidate rather than an unseen newer
-draft. This example contains **no Questionnaires** and makes no claim of
-Questionnaire validation coverage.
+draft. The illustrated study does not contain a Questionnaire.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="images/web/publication~dark.png"><img src="images/web/publication.png" alt="Review of an immutable publication candidate"></picture>
 
@@ -83,14 +80,13 @@ the setup screen, not authorized collection or successful sample delivery.
 
 </details>
 
-## Scope of This Demonstration
+## Current Scope
 
-This walkthrough covers study authoring, publication, authenticated discovery,
-eligibility presentation, enrollment and consent review. It does not demonstrate
-randomization, intervention allocation, automated follow-up, outcome analysis,
-cross-platform task completion, or an operational clinical deployment. The
-[roadmap](Roadmap-and-Engineering-Principles.md) tracks those capabilities.
+The screenshots cover study authoring, publication, discovery, enrollment and
+consent review. The [Swift CLI guide](https://github.com/SchmiedmayerLab/Trove/blob/4273560d0c3e6454219995b649d56dce1e234135/TroveAPI/CLI.md)
+documents the command-line authoring operations.
 
-The questionnaire branching graph, assisted authoring and researcher CLI should
-be documented through their working interfaces as they mature—not illustrated
-as features already present in these screenshots.
+Randomization, automated follow-up, questionnaire branching previews and hosted
+authoring are tracked in [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones).
+Trove is in beta and is being actively tested and used at Stanford.
+The illustrated study and accounts are synthetic.

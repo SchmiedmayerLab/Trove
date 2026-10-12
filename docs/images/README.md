@@ -59,10 +59,6 @@ the test waits for the design system to apply the requested color scheme.
 
 `scripts/frame-screenshot.swift` adds Safari-style chrome with a generic `trove`
 address, matching light/dark controls, rounded window corners and a subtle shadow.
-The frame is calibrated for the 1440-pixel capture width. SF Symbols retain their
-configured point sizes; the 72-pixel transparent margin allows the window shadow
-to fade without clipping. Traffic lights and control surfaces use appearance-specific
-gradients rather than accent colors inherited from the rendering machine.
 The surrounding canvas is transparent. There are no footer labels or overlays on
 the page content. This is a presentation frame, not a capture of Safari itself.
 The underlying page capture is unchanged, with the taller viewports keeping longer
@@ -121,17 +117,12 @@ PNG is not proof that the app is on the correct screen.
 The simulator demonstrates interface behavior only. It does not establish physical
 device background delivery, HealthKit authorization, or data-protection behavior.
 
-## Before Sharing
+## Image Review and Licensing
 
-For a short study-management introduction, use `web/enrollment.png` and
-`web/consent.png`: together they show eligibility and enrollment configuration,
-then consent authoring with agreement and signature fields. The mobile consent
-capture is an alternative when the participant experience is more relevant.
-These views do not demonstrate randomization, automated protocol execution,
-follow-up or integration with a clinical analytics system.
+Review the [Platform Tour](../Platform-Tour.md) against the captures. Screenshots
+must show the documented revision, synthetic data and the named view without
+clipping or stale branding. Planned features should not appear as working UI.
 
-Review the [Platform Tour](../Platform-Tour.md) against the captures. Keep its capability
-limitations accurate; do not illustrate planned features as if they already work.
-Retain the source revision, local dependency revisions and test results with the review.
-Local dependency overrides and temporary evidence must not be committed as a release.
-The image license is recorded centrally in `REUSE.toml`.
+Record the source and dependency revisions with test results when updating images.
+Raw captures and temporary evidence stay outside the committed documentation.
+The image license is recorded in `REUSE.toml`.

@@ -14,12 +14,11 @@ SPDX-License-Identifier: MIT
 
 <div class="trove-hero" markdown>
 
-<p class="trove-eyebrow">Open-source digital health research</p>
+# Study management for digital health research
 
-# From study design to participant experience.
-
-Trove brings study authoring, enrollment, consent, and health-data collection
-together. Build on a shared foundation, with room for the experience your study needs.
+Configure studies in the web dashboard, publish reviewed revisions, and enroll
+participants through the iOS app. Trove supports study information, consent,
+and health-data collection, with a Swift server and command-line client.
 
 [Explore the Platform](Platform-Tour.md){ .md-button .md-button--primary }
 [Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#running-it-locally){ .md-button }
@@ -35,22 +34,13 @@ together. Build on a shared foundation, with room for the experience your study 
 
 <section class="trove-section" markdown>
 
-<p class="trove-eyebrow">For research teams</p>
-
-## One study definition. A connected workflow.
+## Configure and Publish a Study
 
 Configure eligibility and enrollment, write consent documents, and organize study
 components. Review a publication candidate before making that exact revision
 available to participants. Later draft edits stay separate from published content.
 
-<ol class="trove-workflow">
-  <li><strong>Define</strong><span>Study information, eligibility, and components.</span></li>
-  <li><strong>Review</strong><span>Consent wording and the publication candidate.</span></li>
-  <li><strong>Enroll</strong><span>Authenticated discovery and participation.</span></li>
-  <li><strong>Collect</strong><span>Health-data delivery with study-specific authorization.</span></li>
-</ol>
-
-[See the Authoring Workflow →](Platform-Tour.md#study-authoring)
+[Study authoring walkthrough](Platform-Tour.md#study-authoring)
 
 </section>
 
@@ -58,15 +48,13 @@ available to participants. Later draft edits stay separate from published conten
 
 <div markdown>
 
-<p class="trove-eyebrow">Consent, made readable</p>
-
-## Clear documents. Explicit agreement.
+## Edit Consent Documents
 
 Write consent in Markdown or use the visual editor for agreement, selection, and
 signature fields. Participants review the document attached to their study revision
 in the native app before authorizing collection.
 
-[Explore Consent and Enrollment →](Study-Model-and-Research-Workflows.md)
+[Consent and enrollment model](Study-Model-and-Research-Workflows.md#enrollment-consent-and-lifecycle)
 
 </div>
 
@@ -76,13 +64,11 @@ in the native app before authorizing collection.
 
 <section class="trove-section" markdown>
 
-<p class="trove-eyebrow">For participants</p>
-
-## A study they can understand. An app they can use.
+## Participant App
 
 Discover published studies, review the details, and provide consent in the iOS app.
-The platform's direction is a shared backend that also supports study-specific
-applications without prescribing their interface.
+Study-specific apps can integrate through the API rather than adopting Trove's
+participant interface.
 
 <div class="trove-phones">
   <figure><picture><source media="(prefers-color-scheme: dark)" srcset="images/mobile/studies~dark.png"><img src="images/mobile/studies.png" alt="Study discovery in the Trove iOS app" loading="lazy" width="260"></picture><figcaption>Discover a study</figcaption></figure>
@@ -94,9 +80,7 @@ applications without prescribing their interface.
 
 <section class="trove-section trove-foundation" markdown>
 
-<p class="trove-eyebrow">A foundation you can build on</p>
-
-## Shared data does not mean shared permission.
+## Architecture
 
 Trove stores an event once and authorizes access independently for each study.
 Swift powers the server, CLI, and iOS app; the web dashboard uses the same typed API.
@@ -105,20 +89,20 @@ components, and the [Grove FHIR implementation guides](https://schmiedmayerlab.g
 define the exchange contracts.
 
 [Read the Architecture](Data-and-Platform-Architecture.md){ .md-button }
-[Understand the Vision](Vision.md){ .md-button }
+[Project Scope](Vision.md){ .md-button }
 
 </section>
 
 <section class="trove-section" markdown>
 
-## Explore what is here. Help shape what comes next.
+## Beta Release
 
-Trove is under active development. The tour shows implemented development flows,
-not a production-ready clinical service. Randomization, automated follow-up,
-conversational studies, and assisted authoring remain roadmap work; they are not
-capabilities demonstrated by these screenshots.
+Trove is in beta and is being actively tested and used at Stanford.
+The [tour](Platform-Tour.md) documents the current interfaces. GitHub milestones
+track planned work and delivery status; issues contain the implementation details
+and acceptance criteria.
 
-[Follow the Roadmap](Roadmap-and-Engineering-Principles.md){ .md-button .md-button--primary }
+[GitHub Milestones](https://github.com/SchmiedmayerLab/Trove/milestones){ .md-button .md-button--primary }
 [Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button }
 
 </section>

@@ -3,7 +3,7 @@
 
 [project]
 site_name = "Trove"
-site_description = "An open-source foundation for digital health studies. Design studies, review consent, and connect participants with research."
+site_description = "Open-source study management: study authoring, enrollment, consent, and health-data collection. Built with Swift and Grove."
 site_url = "https://schmiedmayerlab.github.io/Trove/"
 repo_url = "https://github.com/SchmiedmayerLab/Trove"
 repo_name = "SchmiedmayerLab/Trove"
@@ -17,16 +17,17 @@ nav = [
   { "Home" = "README.md" },
   { "Platform Tour" = "Platform-Tour.md" },
   { "Design" = [
-    { "Vision and Scope" = "Vision.md" },
+    { "Project Scope" = "Vision.md" },
     { "Study Model and Workflows" = "Study-Model-and-Research-Workflows.md" },
     { "Data and Architecture" = "Data-and-Platform-Architecture.md" },
     { "Applications and Integrations" = "Applications-and-Integrations.md" },
   ] },
-  { "Roadmap" = "Roadmap-and-Engineering-Principles.md" },
   { "Contribute" = [
+    { "Engineering and Verification" = "Engineering-and-Verification.md" },
     { "Documentation Site" = "Documentation-Site.md" },
     { "Reproduce the Screenshots" = "images/README.md" },
   ] },
+  { "Milestones" = "https://github.com/SchmiedmayerLab/Trove/milestones" },
 ]
 
 [project.validation]

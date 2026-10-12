@@ -8,11 +8,17 @@ SPDX-License-Identifier: MIT
 
 # Study Model and Research Workflows
 
-Trove's study model is designed to preserve the relationship between a research protocol, the participant's agreement and the software that executes it. The model covers the common structure of a digital study while leaving specialized procedures to applications.
+A study definition specifies content, activities and collection requirements.
+Published revisions connect that definition to enrollment, consent and results.
+Specialized procedures remain in study applications.
 
-This page describes the target design. Initial and later capabilities are separated in the [roadmap](Roadmap-and-Engineering-Principles.md).
+Study revisions, enrollment and consent are implemented. Server-assigned tasks,
+multilingual questionnaire authoring, randomization and the research operations
+below describe the intended design, not currently available end-to-end workflows.
+[GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
+[issues](https://github.com/SchmiedmayerLab/Trove/issues) track implementation.
 
-## A Portable, Versioned Study Definition
+## Study Definitions and Revisions
 
 A study definition contains reusable components: participant-facing content, questionnaires, collection requirements and, where supported, conversational or custom activities. Each component identifies the content and rules necessary to interpret its execution.
 
@@ -34,25 +40,25 @@ The study-definition schema, the FHIR package set and the published study revisi
 
 A change to one does not silently update the others. This distinction lets software evolve while preserving the meaning of historical consent, assignments and collected data.
 
-Publishing creates an immutable revision. Stage content under unique immutable artifact identities, then commit the revision, artifact references and publication receipt together. Concurrent publishers must not upload into the same guessed next-revision key or overwrite the winner's bytes. A participant continues under the revision they adopted until an explicit transition is permitted. Changes requiring renewed consent cannot be treated as a routine content refresh; history retains the versions that actually applied.
+Publishing creates an immutable revision. Artifacts have unique identities; the revision, references and publication receipt commit together. Concurrent publication cannot overwrite an accepted artifact. A participant continues under the revision they adopted until an explicit transition is permitted. Changes requiring renewed consent cannot be treated as a routine content refresh; history retains the versions that actually applied.
 
 ## Enrollment, Consent and Lifecycle
 
 Enrollment links a participant to a study and its adopted revision. Consent records the exact approved content presented, the applicable acknowledgements or signatures and the participant's action. A reference to “the latest consent document” is insufficient because the latest document can change.
 
-The first supported adoption rule requires fresh consent for every explicitly selected forward revision, even when the wording is unchanged. Omitting a revision selects the enrollment's current revision, not the newest publication. The server rechecks the exact published presentation and target participation criteria before committing consent, revision adoption, enrollment state and audit together. A newly invitation-restricted revision requires retained invitation evidence for the same study; an already redeemed code is not consumed again.
+The current revision-adoption rule requires fresh consent for every explicitly selected forward revision, even when the wording is unchanged. Omitting a revision selects the enrollment's current revision, not the newest publication. The server rechecks the exact published presentation and target participation criteria before committing consent, revision adoption, enrollment state and audit together. A newly invitation-restricted revision requires retained invitation evidence for the same study; an already redeemed code is not consumed again.
 
 Exact command retries return the original consent receipt without adopting again, including after later adoption or withdrawal. They do not restore participation. Downgrades and consent-free upgrade routes are rejected. Researcher-configurable exceptions and institutional approval lifecycles are separate capabilities; this initial server rule does not establish institutional approval or legal validity of a signature.
 
-The study lifecycle distinguishes preparation, publication, recruitment, active participation, pause, closure and archive. These states have operational effects: pausing a study is not the same as completing its tasks, and closing recruitment is not the same as ending collection for enrolled participants.
+The planned lifecycle extends publication and enrollment with explicit recruitment, pause, closure and archive controls. These states have operational effects: pausing a study is not the same as completing its tasks, and closing recruitment is not the same as ending collection for enrolled participants.
 
 Required approvals have scope and validity. Changes to that validity can stop affected enrollment, task execution, collection or communication. Previously admitted work follows its declared policy; historical records are not rewritten to make them appear newly authorized.
 
 Withdrawal, account deletion, source-data retraction and erasure are separate operations. Withdrawal ends the affected participation and access that is no longer authorized. Retention or erasure then follows the remaining permitted purposes and applicable requirements. Account administration must not become an uncontrolled deletion of research history.
 
-These distinctions are necessary for both participant autonomy and an interpretable scientific record. Software enforces the configured rules; the responsible research and institutional teams determine their applicability.
+## Tasks and Occurrences
 
-## A Task Is an Assigned Occurrence
+Server-assigned occurrences and cross-device completion synchronization are planned.
 
 A recurring questionnaire definition is not the same object as the questionnaire assigned for a particular day. Each assigned occurrence has a stable identity, enrollment, component version, intended window and accepted result references.
 
@@ -71,24 +77,29 @@ Reinstall or a second device restores server-acknowledged state. Work that never
 
 GroveScheduler provides local scheduling and presentation. Its integration imports acknowledged outcomes without replaying the side effects of completing a task again.
 
-## Questionnaires as Shared Instruments
+## Questionnaires
+
+Questionnaire components exist today; the multilingual editor, branching preview
+and administration model below are planned extensions.
 
 FHIR Questionnaire JSON is the instrument source, paired with QuestionnaireResponse for results. Exact canonical identity, version and item identifiers are retained throughout authoring, administration and export.
 
-Each instrument version is **one multilingual JSON resource**, not one file per language. `Questionnaire.language` identifies the source language; translations use the [FHIR translation mechanism](https://hl7.org/fhir/R4/extension-translation.html) at locations supported by the pinned Grove IG. Do not introduce translation sidecars or a second localization schema. Translation presence, renderer completeness and approval for administration are separate facts.
+Each instrument version is **one multilingual JSON resource**, not one file per language. `Questionnaire.language` identifies the source language; translations use the [FHIR translation mechanism](https://hl7.org/fhir/R4/extension-translation.html) at locations supported by the pinned Grove IG. There are no translation sidecars or separate localization schemas in this model. Translation presence, renderer completeness and approval for administration are separate facts.
 
-The editor provides a language selector, side-by-side source/translation fields, missing-text filters and language-specific diagnostics. Review indicators reflect actual digest-bound evidence, not successful parsing. Language selection changes graph labels and preview wording, never identifiers, conditions, scoring or stored answer values. Preserve unsaved edits when switching language; all languages share one draft revision, so concurrent edits cannot silently overwrite each other. Import/export retains untouched translations and unsupported fields; unsupported required semantics block administration rather than disappearing on save.
+The planned editor provides a language selector, side-by-side source/translation fields, missing-text filters and language-specific diagnostics. Review indicators reflect actual digest-bound evidence, not successful parsing. Language selection changes graph labels and preview wording, never identifiers, conditions, scoring or stored answer values. Language switching preserves unsaved edits. All languages share one draft revision, with conflict detection for concurrent edits. Import/export retains untouched translations and unsupported fields; unsupported required semantics block administration rather than disappearing on save.
 
-M3 delivers a shared authoring foundation: authorized import/editing, pinned-package validation, synthetic scenarios and visual preview, followed by document-assisted Questionnaire creation. Manual import and editing remain fully usable without inference; the assistant consumes the same instrument API rather than a separate authoring contract.
+Authoring combines import and editing, validation against pinned packages,
+synthetic scenarios and visual preview. Document-assisted creation uses the same
+instrument API. Manual authoring remains usable without inference.
 
-The dashboard provides a simple drag-and-drop question/section editor with keyboard alternatives, participant preview and
+The planned dashboard editor combines drag-and-drop question/section editor with keyboard alternatives, participant preview and
 branching graph over that same FHIR draft. Researchers edit answer choices and
 typed conditions without writing JSON; import/export preserves stable item IDs
 and unsupported fields rather than silently simplifying an instrument. Published
 versions remain immutable. The optional authoring assistant proposes changes
 through the same revision-checked editing and validation operations.
 
-Moving an item between groups can change condition or repetition context even when its identifier stays the same. Surface these effects before accepting the move. Candidate content is ordinary FHIR JSON plus its base revision, source mapping and diagnostics, not an editing language. The Swift service owns validation/scenario operations; the existing browser presentation and mobile clients use shared expected-result fixtures. Profile conformance and actual renderer support remain separate checks.
+Moving an item between groups can change condition or repetition context even when its identifier stays the same. The editor must show these effects before accepting the move. Candidate content is ordinary FHIR JSON plus its base revision, source mapping and diagnostics, not an editing language. The Swift service owns validation/scenario operations; the existing browser presentation and mobile clients use shared expected-result fixtures. Profile conformance and actual renderer support remain separate checks.
 
 The graph shows both the questionnaire hierarchy and labeled conditional
 dependencies, clearly distinguished from display order. An all-branches view
@@ -97,7 +108,7 @@ disabled and not-evaluated items and explain why. Selecting a node focuses its
 editor and preview. Collapsible sections, search, a keyboard-accessible rule list
 and a versioned printable overview keep larger instruments understandable.
 
-Use FHIR's enablement rules, not a separate navigation/workflow schema. Graph and
+The graph derives from FHIR enablement rules rather than a separate workflow schema. Graph and
 participant preview share evaluation of the supported condition subset, including
 ancestor gating and repeat context. Missing references and unsupported expressions
 remain visible; an opaque expression cannot be shown as a fully analyzed branch.
@@ -115,7 +126,9 @@ A validator addresses the first, capability checks address the second, and resea
 
 Source wording, answer options, units, branching and scoring must not change accidentally during translation, import or automated repair. A published instrument remains pinned even if a catalog later offers a newer version.
 
-## Arms, Periods and Scientific History
+## Study Arms and Protocol History
+
+Randomization and arm-specific execution are planned capabilities.
 
 A study can have shared components, arm-specific activities and periods such as baseline, intervention and follow-up. Arms, observational cohorts, sites and the organization operating the study are distinct concepts.
 
@@ -141,9 +154,11 @@ Reviewed content variants retain their source version, language, approval scope 
 
 Questionnaire language approval references the same artifact version/digest plus the administration language and applicability. Document approval references the particular translated artifact. Any content edit initially invalidates whole-artifact validation and requires approval for the changed digest; there is no per-language version engine or automatic approval carry-forward. Historical publications, signed consent and accepted responses remain immutable. Assisted translation produces drafts, not approval or proof of scientific equivalence.
 
-Use language tags that support language-only, script and region distinctions; never require a region or collapse distinct variants by language family alone. Select an admitted administration language at task-session start and retain it with the exact instrument in server state and pending offline work. UI-language changes cannot switch an active instrument. A missing required translation or approval blocks that administration path. Response language follows the pinned IG; study/site applicability is not inferred from device locale.
+Language tags retain language, script and region distinctions without requiring a region. Administration selects an admitted language at session start and records it with the exact instrument in server state and pending offline work. UI-language changes cannot switch an active instrument. A missing required translation or approval blocks that administration path. Response language follows the pinned IG; study/site applicability is not inferred from device locale.
 
-Implementation ownership: [portable definitions #23](https://github.com/SchmiedmayerLab/Trove/issues/23), [editor/validation #53](https://github.com/SchmiedmayerLab/Trove/issues/53), [publication #31](https://github.com/SchmiedmayerLab/Trove/issues/31), [task state #37](https://github.com/SchmiedmayerLab/Trove/issues/37), [GroveStudy/client integration #32](https://github.com/SchmiedmayerLab/Trove/issues/32) and [reviewed variants #67](https://github.com/SchmiedmayerLab/Trove/issues/67). The representation and bilingual synthetic verification belong to M3; additional languages/sites in an actual study remain selected capabilities.
+The acceptance case is a bilingual import, edit, validation, publication,
+administration and export round-trip. Enabling another language also requires
+the study's approved wording and applicability.
 
 Accessibility and internationalization apply from the first supported workflow: assistive technology, text scaling, right-to-left layout, locale-aware dates and numbers, non-US contact formats and explicit time-zone behavior. Source measurements and canonical units remain distinct from display formatting.
 
@@ -151,7 +166,9 @@ Site operations add scoped staff roles, delegation and transfer history. Staff-e
 
 Guardian, proxy, witness or signature requirements must be explicitly supported before a study relies on them. Custom configuration is not a substitute for a missing core consent capability.
 
-## Recruitment, Communication and Participant Value
+## Recruitment and Participant Communication
+
+Roster import, outreach and automated follow-up are planned extensions to enrollment.
 
 Recruitment begins with prospective contacts, not fabricated enrollments. Importing a roster does not establish consent or permission for unrestricted outreach. Invitations connect a verified person to the appropriate study and application through an explicit handoff.
 
@@ -163,15 +180,19 @@ The participant experience should continue beyond data submission. Reviewed stud
 
 Any protocol-required human support or concern-reporting route must be available. A conversational task or technical status screen is not an emergency or clinical-monitoring service.
 
-## Researcher Assistance from One Set of Facts
+## Assisted Study Preparation
 
-The same structured facts should support configuration, consent representations, institutional drafts and participant communication. This reduces re-entry and exposes inconsistencies when a protocol changes.
+Planned authoring assistance will reuse study-definition fields in consent
+documents, institutional forms and participant communications. Researchers review
+the extracted facts and proposed wording before applying them.
 
 A source document can produce proposed fields with citations and unresolved questions. It cannot silently invent endpoints, sample sizes, eligibility or approval. Researchers review the proposed differences through the same operations used for manual editing.
 
 Institutional templates are adapters over those facts. Stanford IRB and data-risk-assessment preparation are initial targets, but the underlying study model is not tied to one institution. Consent documents and the application's Markdown presentation derive from the same reviewed section model; edits made during institutional review must be reconciled before either representation is published. Generated documents remain drafts; formal decisions and approved revisions remain distinct.
 
-The same approach supports later translation review, amendment comparisons, technical rehearsal and methods summaries. Deterministic validation should explain concrete missing requirements before generated assistance is involved.
+The same source references support translation review, amendment comparisons and
+methods summaries. Validation reports missing required fields before a researcher
+requests generated assistance.
 
 ### Safe Document and Questionnaire Authoring
 
@@ -179,18 +200,20 @@ Swift authoring orchestration reuses governed artifacts and a restricted parser 
 
 Proposed fields distinguish extracted evidence from suggestions and retain source locations. Applying a proposal requires the current draft revision and normal validation. Questionnaire diagnostics identify severity, rule, element path, exact content digest and validator/package versions. Invalid, unavailable and not fully evaluated are distinct outcomes. Missing terminology or expression support cannot become a pass.
 
-A shipped authoring kit contains a concise AGENTS.md, pinned package and CLI versions, supported renderer capabilities and synthetic examples. It directs authoring tools to preserve canonical identity, linkIds, referenced terminology, wording and unresolved questions. Repair has explicit attempt/time/cost limits; it cannot delete required behavior just to satisfy a validator. Dependencies resolve through approved pinned packages, not URLs embedded in an uploaded instrument.
+The planned authoring kit includes a concise AGENTS.md, pinned package and CLI versions, supported renderer capabilities and synthetic examples. It directs authoring tools to preserve canonical identity, linkIds, referenced terminology, wording and unresolved questions. Repair has explicit attempt/time/cost limits; it cannot delete required behavior just to satisfy a validator. Dependencies resolve through approved pinned packages, not URLs embedded in an uploaded instrument.
 
 The output is a reviewable draft, source mapping and diagnostics. Manual entry remains available. Publication, participant contact, allocation and dataset release require separate authorized commands; neither a document nor generated text can grant that authority.
 
-M3 Questionnaire authoring (#88) owns the common restricted extraction, hosted tool loop and bounded jobs. Later study/grant drafting (#44), institutional preparation and amendments reuse those mechanisms. Jobs retain candidate references and verified actions, not a second study store or private model reasoning. Applying accepted content uses ordinary typed updates with the expected revision; revoked source access or delegation prevents later disclosure/application. Unknown provider outcomes require usage reconciliation, not blind redispatch.
+Authoring jobs retain candidate references and executed actions. Applying content
+uses typed updates with the expected revision and current source access. An
+uncertain provider outcome requires usage reconciliation before another request.
 
 ## Data Review and Closeout
+
+Formal dataset review, freezing and closeout are planned research operations.
 
 Operational exports are useful before a full scientific-finalization workflow exists. As studies require formal review, dataset snapshots add exact membership, data versions, codebooks, unresolved items and reviewer decisions.
 
 A frozen dataset is a versioned selection, not a command to stop the shared ingestion store. Reopening creates a new selection with a reason. Current disclosure and erasure requirements still apply; freezing does not grant permanent access.
 
 The [data architecture](Data-and-Platform-Architecture.md) explains how this history is preserved without duplicating every measurement for every study.
-
-[Platform Overview](README.md) · [Implementation Project](https://github.com/orgs/SchmiedmayerLab/projects/4)

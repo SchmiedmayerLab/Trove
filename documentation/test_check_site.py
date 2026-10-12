@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -9,6 +10,15 @@ from check_site import check
 
 
 class SiteCheckTests(unittest.TestCase):
+    def test_readme_and_architecture_share_the_component_diagram(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        diagrams = [
+            re.findall(r"```mermaid\n(.*?)```", (root / path).read_text(), re.DOTALL)
+            for path in ("README.md", "docs/Data-and-Platform-Architecture.md")
+        ]
+        self.assertEqual(len(diagrams[0]), 1)
+        self.assertEqual(diagrams[0], diagrams[1])
+
     def setUp(self) -> None:
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

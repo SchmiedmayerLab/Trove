@@ -19,7 +19,7 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Roadmap](docs/Roadmap-and-Engineering-Principles.md)
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
 
 ## For Research Teams
 
@@ -48,10 +48,11 @@ document before authorizing health-data collection.
   </tr>
 </table>
 
-Trove is under active development. These screenshots use a fictional Daily Activity
+Trove is in beta and is being actively tested and used at Stanford.
+These screenshots use a fictional Daily Activity
 Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
-current flows; the [roadmap](docs/Roadmap-and-Engineering-Principles.md) covers planned
-features, including randomization and automated follow-up.
+current flows; [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
+track planned features and implementation status.
 
 Health-data exchange follows the Grove FHIR implementation guide. See the
 [event-admission contract](TroveServer/README.md#event-admission) for supported data
@@ -60,26 +61,26 @@ and validation requirements.
 ## How it fits together
 
 ```mermaid
-flowchart LR
-    R([Researcher]) --> W["Web portal<br/><i>React, TypeScript</i>"]
-    P([Participant]) --> I["iOS app<br/><i>Swift, SwiftUI</i>"]
-
-    W -->|study management| S["Server<br/><i>Swift, Vapor</i>"]
-    I -->|enrolment, reviewed consent| S
-
-    W -.->|OIDC| K[Keycloak]
-    I -.->|OIDC| K
-    S -.->|token validation| K
-
-    S --> PG[("PostgreSQL + TimescaleDB<br/>one core and clinical authority")]
-    S --> OS[("S3 object store<br/>bundles, consent PDFs")]
-
-    API[/"OpenAPI contract"/] -.-> W
-    API -.-> I
-    API -.-> S
+flowchart TB
+    accTitle: Trove Components
+    accDescr: The researcher dashboard, Swift CLI and participant app send requests to the Trove server. The server validates identity with Keycloak and stores data in PostgreSQL with TimescaleDB and S3-compatible storage.
+    W["Researcher dashboard<br/>React, TypeScript"] --> S
+    C["Researcher CLI<br/>Swift"] --> S
+    I["Participant app<br/>Swift, SwiftUI"] --> S
+    S["Trove server<br/>HTTPS API · Swift, Vapor"]
+    S --> K["Keycloak<br/>Identity and authentication"]
+    S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
+    S --> OS[("S3-compatible storage<br/>Bundles and consent PDFs")]
 ```
 
-One OpenAPI contract in [`TroveAPI/`](TroveAPI) is the source of truth: the server conforms to the generated `APIProtocol`, iOS consumes the generated Swift client, and the web portal generates its TypeScript client from the same spec. A change to the contract that breaks a consumer breaks the build.
+[`TroveAPI/openapi.yaml`](TroveAPI/openapi.yaml) defines the HTTP contract.
+The server conforms to its generated `APIProtocol`; the iOS app and CLI use the
+generated Swift client, and the dashboard uses the generated TypeScript client.
+The [CLI](TroveAPI/CLI.md) currently accepts an already-issued token rather than
+providing its own login flow.
+
+See [Data and Platform Architecture](docs/Data-and-Platform-Architecture.md)
+for storage, authorization and synchronization details.
 
 | Path | What it is | Stack |
 |------|-----------|-------|
@@ -100,7 +101,7 @@ audit and the clinical data boundary. Repositories participating in one accepted
 share its explicit transaction; two separate database pools cannot provide that guarantee.
 **S3-compatible object storage** holds immutable study bundles and signed consent PDFs.
 
-Trove is in early development: schema changes target a fresh database, with no upgrade
+During the beta, schema changes target fresh development databases, with no upgrade
 or legacy-data import path. Recreate disposable development databases when their schema
 changes; do not attach an old PostgreSQL data directory to a different engine image.
 The IG receiver retains event custody separately from independently authorized
@@ -194,9 +195,12 @@ identity/withdrawal reconciliation and deployment approval remain separate relea
 gates. A failed publication can leave partial candidate uploads, but produces no
 successful candidate record and does not deploy them.
 
-## Platform Design and Roadmap
+## Design Documentation
 
-The [design documentation](docs/README.md) describes the target architecture, study model, integrations and delivery sequence. These plans are distinct from currently released functionality. Implementation priorities and status are tracked in the [Trove project](https://github.com/orgs/SchmiedmayerLab/projects/4).
+The [design documentation](docs/Vision.md) explains the architecture, study model
+and integration contracts. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
+define delivery scope; the [project board](https://github.com/orgs/SchmiedmayerLab/projects/4)
+tracks implementation. The documentation does not maintain a separate roadmap.
 
 ## Contributing
 

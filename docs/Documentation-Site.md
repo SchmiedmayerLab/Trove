@@ -5,8 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Documentation Site
 
-The website renders the Markdown in `docs/` with Zensical, the same generator used
-by HeartWood. Edit those files directly; there is no separate copy of the design
+The website renders the Markdown in `docs/` with Zensical. Edit those files directly; there is no separate copy of the design
 documentation. `docs/README.md` is the landing page, `zensical.toml` defines the
 navigation, and `docs/stylesheets/trove.css` adds the homepage layout.
 
@@ -45,8 +44,13 @@ it does not bypass the independent candidate-image approval boundary.
 
 ## Maintaining Content
 
-- Keep implemented flows in the [tour](Platform-Tour.md), and planned capabilities
-  in the [roadmap](Roadmap-and-Engineering-Principles.md).
+- Document working interfaces in the [tour](Platform-Tour.md), design decisions
+  in the design pages, and delivery scope and status in
+  [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and issues.
+  Do not copy milestone checklists or progress reports into the site.
+- Describe supported behavior and identify planned capabilities explicitly.
+  Keep API instructions aligned with the documented revision.
+- Keep the component diagrams in the root README and architecture page identical.
 - Use only synthetic study and participant data. Follow the
   [capture instructions](images/README.md) when refreshing screenshots.
 - Keep light and dark screenshots together. Do not replace them with fabricated UI.
