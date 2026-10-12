@@ -22,6 +22,13 @@ unversioned observation upload endpoint is retired. See the server's
 [event-admission contract](TroveServer/README.md#event-admission) for the supported
 capabilities and required validator setup.
 
+## Platform Tour
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/web/study-details~dark.png"><img src="docs/images/web/study-details.png" alt="Study details and participant preview"></picture>
+
+The [platform tour](docs/Platform-Tour.md) shows current authoring and participant
+flows with synthetic data, alongside the capabilities still on the roadmap.
+
 ## How it fits together
 
 ```mermaid

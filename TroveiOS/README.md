@@ -12,6 +12,11 @@ The participant-facing app. It fetches the study definitions authored in the web
 
 ## Getting started
 
+See the [platform tour](../docs/Platform-Tour.md#participant-app) for current
+RocketSim captures of study discovery, eligibility and consent, in light and dark
+appearance. The [capture guide](../docs/images/README.md#mobile-captures) describes
+the synthetic fixture and reproduction steps.
+
 Open `Trove.xcodeproj` in Xcode and run the `Trove` scheme. The Swift package dependencies resolve on the first build.
 
 ## Native UI Test Boundary
