@@ -90,6 +90,14 @@ test("combines enrollment settings and preserves consent through visual editing"
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(source).toHaveValue(document);
 
+  // Focusing a table must not serialize a new trailing paragraph into the source.
+  await page
+    .getByRole("button", { name: "Visual editor", exact: true })
+    .click();
+  await page.getByRole("cell", { name: "Daily", exact: true }).click();
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(source).toHaveValue(document);
+
   await page
     .getByRole("button", { name: "Visual editor", exact: true })
     .click();

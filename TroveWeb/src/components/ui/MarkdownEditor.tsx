@@ -75,7 +75,12 @@ export const MarkdownEditor = ({
 }: MarkdownEditorProps) => {
   const currentValueRef = useRef(value ?? "");
   const editor = useEditor({
-    extensions: [StarterKit, TableKit, Markdown.configure({ html: false })],
+    extensions: [
+      // Automatic trailing paragraphs can mutate Markdown on focus alone.
+      StarterKit.configure({ trailingNode: false }),
+      TableKit,
+      Markdown.configure({ html: false }),
+    ],
     content: value,
     editable: !readOnly,
     onUpdate: ({ editor }) => {
