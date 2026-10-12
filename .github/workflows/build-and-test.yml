@@ -183,15 +183,29 @@ jobs:
             -onlyUsePackageVersionsFromResolvedFile \
             -derivedDataPath .derivedData \
           | xcbeautify
+      - name: Prepare an isolated UI-test simulator
+        id: simulator
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl create "Trove-UI-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
+            com.apple.CoreSimulator.SimRuntime.iOS-27-0)"
+          # Record ownership before boot so cleanup also runs after preparation failure.
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
       - name: Run the real-stack UI test
         working-directory: TroveiOS
+        env:
+          TROVE_UI_SIMULATOR: ${{ steps.simulator.outputs.udid }}
         run: |
           set -o pipefail
           xcodebuild test \
             -project Trove.xcodeproj \
             -scheme Trove \
             -onlyUsePackageVersionsFromResolvedFile \
-            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
+            -destination "platform=iOS Simulator,id=$TROVE_UI_SIMULATOR" \
             -only-testing:TroveUITests/TroveUITests/testParticipantCanSignInEnrollAndWithdraw \
             -parallel-testing-enabled NO \
             -enableCodeCoverage YES \
@@ -202,7 +216,7 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             -skipPackagePluginValidation \
             -skipMacroValidation \
-          | xcbeautify
+          2>&1 | tee "$RUNNER_TEMP/trove-ui-xcodebuild.log" | xcbeautify
           xcrun xcresulttool get test-results summary --path Trove-iOS-UI-Tests.xcresult \
             | jq --exit-status '
                 .result == "Passed" and .totalTestCount == 1 and .passedTests == 1
@@ -219,6 +233,13 @@ jobs:
           name: Trove-iOS-UI-Tests.xcresult
           path: TroveiOS/Trove-iOS-UI-Tests.xcresult
           if-no-files-found: warn
+      - name: Upload the raw UI-test log
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-iOS-UI-Test-Log
+          path: ${{ runner.temp }}/trove-ui-xcodebuild.log
+          if-no-files-found: warn
       - name: Collect stack diagnostics
         if: failure()
         run: |
@@ -228,6 +249,13 @@ jobs:
               tail -n 200 "$log"
             fi
           done
+      - name: Remove the job's UI-test simulator
+        if: always() && steps.simulator.outputs.udid != ''
+        env:
+          TROVE_UI_SIMULATOR: ${{ steps.simulator.outputs.udid }}
+        run: |
+          xcrun simctl shutdown "$TROVE_UI_SIMULATOR" || true
+          xcrun simctl delete "$TROVE_UI_SIMULATOR"
       - name: Tear down the native test stack
         if: always()
         run: |

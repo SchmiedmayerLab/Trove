@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 HERE = Path(__file__).resolve().parent
 
@@ -40,15 +41,20 @@ def fetch(manifest, output):
                 if hashlib.file_digest(stream, "sha256").hexdigest() != checksum:
                     raise ValueError("Cached artifact checksum mismatch: " + name)
             continue
-        subprocess.run([
-            "curl", "--fail", "--location", "--silent", "--show-error",
-            "--proto", "=https", "--proto-redir", "=https", "--retry", "3",
-            "--connect-timeout", "30", "--max-time", "300",
-            "--max-filesize", "536870912", "--output", str(destination), url,
-        ], check=True)
-        with destination.open("rb") as stream:
-            if hashlib.file_digest(stream, "sha256").hexdigest() != checksum:
-                raise ValueError("Pinned artifact checksum mismatch: " + name)
+        # Failed transfers must not poison the cache used by the next attempt.
+        with tempfile.TemporaryDirectory(prefix=".download-", dir=destination.parent) as staging:
+            candidate = Path(staging) / destination.name
+            subprocess.run([
+                "curl", "--fail", "--location", "--silent", "--show-error",
+                "--proto", "=https", "--proto-redir", "=https",
+                "--retry", "3", "--retry-all-errors", "--retry-max-time", "600",
+                "--connect-timeout", "30", "--max-time", "300",
+                "--max-filesize", "536870912", "--output", str(candidate), url,
+            ], check=True, timeout=930)
+            with candidate.open("rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != checksum:
+                    raise ValueError("Pinned artifact checksum mismatch: " + name)
+            candidate.replace(destination)
         print("Verified " + name, flush=True)
 
 

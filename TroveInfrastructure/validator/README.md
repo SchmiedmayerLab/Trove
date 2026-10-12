@@ -31,8 +31,11 @@ repeat the valid/invalid, lifecycle and receiver checks before accepting new byt
 
 To obtain the locked public artifacts, run `python3 TroveInfrastructure/validator/fetch.py --output /private/tmp/trove-validator-artifacts`.
 Pass that directory as `--artifacts` below. Downloads and cached files must match
-the manifest checksums; fetching never changes the pins. The Docker CI lane uses
-this path and waits for the isolated validator's health check before browser tests.
+the manifest checksums; fetching never changes the pins. Transfers use bounded
+retries and enter the cache only after verification, so interrupted downloads do
+not leave a partial cache entry. Docker CI revalidates the manifest-keyed cache
+before building application images and waits for the isolated validator's health
+check before browser tests.
 
 Prepare from a local Grove FHIR checkout containing the pinned commit, `.build/fhir-tools/`, and each guide's `output/package.tgz`. Preparation checks all archives and extracts the pinned source with `git archive`, ignoring working-tree modifications. It makes no network requests and requires a new output directory.
 

@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -49,6 +50,33 @@ class FetchTests(unittest.TestCase):
                     patch.object(fetch.subprocess, "run", side_effect=download):
                 with self.assertRaisesRegex(ValueError, "Pinned artifact checksum mismatch"):
                     fetch.fetch({}, output)
+            self.assertEqual(list(output.iterdir()), [])
+
+    def test_failed_transfer_does_not_poison_the_next_attempt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            checksum = hashlib.sha256(b"verified").hexdigest()
+
+            def interrupted(command, **_):
+                Path(command[command.index("--output") + 1]).write_bytes(b"partial")
+                raise subprocess.CalledProcessError(7, command)
+
+            def downloaded(command, **kwargs):
+                self.assertIn("--retry-all-errors", command)
+                self.assertEqual(command[command.index("--retry") + 1], "3")
+                self.assertEqual(command[command.index("--retry-max-time") + 1], "600")
+                self.assertEqual(kwargs["timeout"], 930)
+                Path(command[command.index("--output") + 1]).write_bytes(b"verified")
+
+            with patch.object(fetch, "artifacts", return_value=[("tool", checksum, "https://example.org/tool")]):
+                with patch.object(fetch.subprocess, "run", side_effect=interrupted):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        fetch.fetch({}, output)
+                self.assertEqual(list(output.iterdir()), [])
+                with patch.object(fetch.subprocess, "run", side_effect=downloaded):
+                    fetch.fetch({}, output)
+                self.assertEqual((output / "tool").read_bytes(), b"verified")
+                self.assertEqual(list(output.iterdir()), [output / "tool"])
 
 
 if __name__ == "__main__":

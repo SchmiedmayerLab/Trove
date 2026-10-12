@@ -196,7 +196,11 @@ class CIResultTests(unittest.TestCase):
                          "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0")
         ui_test = next(step["run"] for step in jobs["ios-ui"]["steps"]
                        if step.get("name") == "Run the real-stack UI test")
-        self.assertIn(jobs["ios"]["with"]["destination"], ui_test)
+        prepare = next(step["run"] for step in jobs["ios-ui"]["steps"]
+                       if step.get("id") == "simulator")
+        self.assertIn("com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro", prepare)
+        self.assertIn("com.apple.CoreSimulator.SimRuntime.iOS-27-0", prepare)
+        self.assertIn('platform=iOS Simulator,id=$TROVE_UI_SIMULATOR', ui_test)
         self.assertNotIn("--show-sdk-version", ui_test)
         for runner in (jobs["ios"]["with"]["runsonlabels"], jobs["ios-ui"]["runs-on"],
                        jobs["native-line-coverage"]["runs-on"], jobs["coverage"]["with"]["runs_on_labels"]):

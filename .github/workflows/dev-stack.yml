@@ -40,6 +40,14 @@ jobs:
       - uses: docker/setup-docker-action@v5
         with:
           daemon-config: '{"features":{"containerd-snapshotter":true}}'
+      - name: Restore pinned public validator artifacts
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/validator-artifacts
+          key: fhir-validator-artifacts-v1-${{ hashFiles('TroveInfrastructure/validator/manifest.json') }}
+      - name: Fetch and verify pinned validator artifacts
+        # Verify cache hits too, and detect upstream outages before expensive image builds.
+        run: python3 TroveInfrastructure/validator/fetch.py --output "$RUNNER_TEMP/validator-artifacts"
       # The compose file runs the published images. Building them here from the same
       # Dockerfiles the deployment uses keeps the local stack and production in step,
       # and means this job fails if either Dockerfile breaks.
@@ -87,7 +95,6 @@ jobs:
           git init "$source"
           git -C "$source" remote add origin https://github.com/SchmiedmayerLab/grove-fhir.git
           git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")"
-          python3 TroveInfrastructure/validator/fetch.py --output "$RUNNER_TEMP/validator-artifacts"
           python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
             --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context"
           docker build --network=none -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
