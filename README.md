@@ -147,13 +147,21 @@ known-vulnerable control. Web and development-stack jobs also scan their built
 application images by local image ID. Findings of any severity fail verification;
 reports, input identities and CycloneDX inventories are retained as artifacts.
 
-`static-analysis.yml` runs SwiftLint and, when repository access permits, Swift
-CodeQL analysis. `codeql.yml` covers JavaScript and TypeScript under the same access
-condition. A skipped CodeQL job is not security-analysis evidence.
+`static-analysis.yml` runs SwiftLint and Swift CodeQL analysis. `codeql.yml` covers
+JavaScript and TypeScript. Both scans run on every pull request, including stacks;
+GitHub's default CodeQL setup must remain disabled to avoid conflicting uploads.
 `repository-standards.yml` runs the organization checks; coverage is uploaded to
-Codecov. The proposed required checks are in
+Codecov. The required checks, signed commits and review requirements are in
 [`.github/rulesets/main.json`](.github/rulesets/main.json). This file does not apply
-branch protection: an administrator must configure and verify hosted enforcement.
+branch protection automatically; keep the hosted `main` ruleset synchronized with it.
+
+Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
+use GitHub-hosted Xcode 27 runners; Swift CodeQL also requires a hosted runner in
+the shared workflow. All external contributors' runs require maintainer approval.
+Before approving a fork, review workflow changes and the code that will execute:
+runner selection in a pull request is not an isolation boundary. Self-hosted
+runners must have no production credentials or access to study data. Workflow
+tokens default to read-only and cannot approve pull requests.
 
 ### Verified Image Candidates
 

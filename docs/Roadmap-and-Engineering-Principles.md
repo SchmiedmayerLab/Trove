@@ -94,7 +94,7 @@ promises. Re-estimate added M3 work against actual staffing before making a comm
 ### Localization Is a Shared M3 Contract
 
 This is remaining implementation work, not a capability supplied by the initial
-[M3 stack #101](https://github.com/SchmiedmayerLab/Trove/stack/101). That stack adds
+[M3 pull request stack](https://github.com/SchmiedmayerLab/Trove/pull/97). That stack adds
 validation, revision-bound authoring access and initial Swift CLI commands. The
 single-resource localization transition, visual editor, task execution and hosted
 document authoring retain their issue acceptance criteria below.

@@ -122,7 +122,9 @@ jobs:
       contents: read
     with:
       path: TroveiOS
-      runsonlabels: '["self-hosted", "macOS"]'
+      runsonlabels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
+      # Bind the runtime: OS:latest can select an installed runtime without this device.
+      destination: 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
       scheme: Trove
       resultBundle: Trove-iOS-Tests.xcresult
       artifactname: Trove-iOS-Tests.xcresult
@@ -131,7 +133,7 @@ jobs:
     name: iOS Real Stack UI
     needs: changes
     if: needs.changes.outputs.ios_ui == 'true'
-    runs-on: [self-hosted, macOS]
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]') }}
     concurrency:
       group: trove-ios-real-stack
       queue: max
@@ -309,7 +311,7 @@ jobs:
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled') &&
       (needs.ios.result == 'success' || needs.ios-ui.result == 'success')
-    runs-on: [self-hosted, macOS]
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]') }}
     timeout-minutes: 15
     permissions:
       actions: read
@@ -368,14 +370,13 @@ jobs:
         needs.web.result == 'success' ||
         needs.dev-stack.result == 'success'
       )
-    # Includes the merged GPG prerequisite fix, which is not yet in the v0.5 release tag.
-    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@515937b1588515b88149b73d18347008043d8289
+    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@v0.5
     permissions:
       actions: read
       contents: read
     with:
       # The shared collector requires a macOS toolchain even for LCOV-only inputs.
-      runs_on_labels: '["self-hosted", "macOS"]'
+      runs_on_labels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
       xcodeversion: latest-stable
       # The shared Swift jobs name the report after the artifact, while the local web jobs
       # upload their native lcov.info files inside named artifact directories.
