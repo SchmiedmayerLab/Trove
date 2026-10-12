@@ -5,6 +5,9 @@
 services:
   server:
     networks: [default, fhir-validation]
+    depends_on:
+      fhir-validator:
+        condition: service_healthy
     environment:
       FHIR_VALIDATOR_URL: http://fhir-validator:8080/validate
       FHIR_VALIDATOR_IDENTITY: ${FHIR_VALIDATOR_IDENTITY:?Set the expected manifest SHA-256 identity}
@@ -24,6 +27,12 @@ services:
       fsize: 268435456
       nofile: 256
     stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).close()"]
+      start_period: 120s
+      interval: 5s
+      timeout: 3s
+      retries: 12
 networks:
   fhir-validation:
     internal: true

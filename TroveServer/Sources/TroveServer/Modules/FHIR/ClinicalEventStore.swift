@@ -135,9 +135,11 @@ struct ClinicalEventStore: Sendable {
 
     private func validateSource(_ event: ValidatedExchangeEvent, source: SourceBinding) throws {
         let participant = ValidatedExchangeEvent.Identifier(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)
+        let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
         // Grove's durable ledger allocates producer instances. Authority is the authenticated,
         // owner-bound namespace, never a producer UUID supplied in the payload.
         guard event.eventIdentifierSystem == source.eventIdentifierSystem,
+              event.deploymentIdentifiers.matches(namespaces),
               event.retraction == nil ? event.participants == [participant] : event.participants.isEmpty else {
             throw ServerError.forbidden("Event identity does not match the registered participant source")
         }

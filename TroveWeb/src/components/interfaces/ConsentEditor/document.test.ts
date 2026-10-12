@@ -151,6 +151,10 @@ describe("consent editor projection", () => {
 
   it.each([
     '<toggle id="agree">Unclosed',
+    '<toggle id="agree" expected-value=perhaps>Agree</toggle>',
+    '<toggle id="agree" initial-value=yes>Agree</toggle>',
+    '<signature id="participant">Hidden wording</signature>',
+    "<!-- Unclosed comment",
     '<toggle id="agree" id="again">Repeated</toggle>',
     '<signature id="same" />\n<signature id="same" />',
     '<signature id="a" unsupported="yes" />',
@@ -162,6 +166,20 @@ describe("consent editor projection", () => {
       expect(() => consentBlocks(source)).toThrow();
     },
   );
+
+  it("preserves commented controls without projecting them as active fields", () => {
+    const source =
+      "<!--\n<toggle id=hidden>Hidden</toggle>\n-->\n<signature id=visible />";
+    const blocks = consentBlocks(source);
+    expect(
+      blocks
+        .filter((block) => block.kind === "control")
+        .map((block) => block.element.attributes.id),
+    ).toEqual(["visible"]);
+    expect(
+      blocks.map((block) => source.slice(block.start, block.end)).join(""),
+    ).toBe(source);
+  });
 
   it("creates distinct field identities on repeated insertions", () => {
     const first = newConsentField("", "toggle");

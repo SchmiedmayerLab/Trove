@@ -31,6 +31,7 @@ jobs:
       - name: Check verification scripts and coverage fixtures
         run: |
           shellcheck scripts/check TroveiOS/scripts/start-ui-test-stack.sh TroveiOS/scripts/seed-ui-test.sh TroveiOS/scripts/verify-ui-test-consent.sh
+          shellcheck TroveiOS/scripts/capture-documentation.sh
           shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
           shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
           python3 -m venv "$RUNNER_TEMP/trove-tooling"

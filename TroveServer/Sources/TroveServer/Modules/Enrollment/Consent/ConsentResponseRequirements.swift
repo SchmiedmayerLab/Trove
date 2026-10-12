@@ -10,29 +10,23 @@ import Foundation
 import GroveFoundation
 
 
-/// Compiles the existing Grove consent controls, not a separate study or form schema.
+/// Compiles Grove's validated control definitions into server-side response requirements.
 struct ConsentResponseRequirements: Sendable {
     enum ValidationError: Error, Equatable {
         case invalidDocument
         case invalidResponses
     }
 
-    private enum Selection: Sendable {
-        case optional
-        case required
-        case specific(String)
-    }
-
     private enum Requirement: Sendable {
         case toggle(expected: Bool?) // swiftlint:disable:this discouraged_optional_boolean - absent differs from required false
-        case select(options: Set<String>, expected: Selection)
+        case select(GroveFoundation.ConsentDocumentFormat.Selection)
         case signature
 
         var requiresExplicitResponse: Bool {
             switch self {
             case .toggle(let expected): expected != nil
-            case .select(_, .optional): false
-            case .select, .signature: true
+            case .select(let selection): selection.expectedSelection != .anything(allowEmptySelection: true)
+            case .signature: true
             }
         }
     }
@@ -49,18 +43,21 @@ struct ConsentResponseRequirements: Sendable {
     }
 
     init(markdown: String) throws {
-        let document: MarkdownDocument
+        let document: ConsentDocumentFormat.ParsedDocument
         do {
-            document = try ConsentDocumentFormat.parse(markdown)
+            document = try ConsentDocumentFormat.decode(markdown)
         } catch {
             throw ValidationError.invalidDocument
         }
         var controls: [String: Requirement] = [:]
-        for block in document.blocks {
-            guard case .customElement(let element) = block else { continue }
-            let id = try Self.identifier(of: element)
-            guard controls[id] == nil else { throw ValidationError.invalidDocument }
-            controls[id] = try Self.requirement(for: element)
+        for section in document.sections {
+            switch section {
+            case .markdown: break
+            case .toggle(let toggle): controls[toggle.id] = .toggle(expected: toggle.expectedValue)
+            case .select(let selection): controls[selection.id] = .select(selection)
+            case .signature(let signature): controls[signature.id] = .signature
+            case .custom: throw ValidationError.invalidDocument
+            }
         }
         self.controls = controls
     }
@@ -71,8 +68,8 @@ struct ConsentResponseRequirements: Sendable {
             switch requirement {
             case .toggle(let expected):
                 if let expected, responses.toggles[id] != expected { throw ValidationError.invalidResponses }
-            case let .select(options, expected):
-                try Self.validateSelection(responses.selects[id], options: options, expected: expected)
+            case .select(let selection):
+                try Self.validateSelection(responses.selects[id], definition: selection)
             case .signature:
                 try Self.validateSignature(responses.signatures[id])
             }
@@ -106,104 +103,15 @@ extension ConsentResponseRequirements {
         // Opaque evidence presence is not verification of handwriting or signer identity.
     }
 
-    private static func identifier(of element: MarkdownDocument.CustomElement) throws -> String {
-        guard let id = element[attribute: "id"], !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              Set(element.attributes.map(\.name)).count == element.attributes.count else {
-            throw ValidationError.invalidDocument
-        }
-        return id
-    }
-
-    private static func requirement(for element: MarkdownDocument.CustomElement) throws -> Requirement {
-        switch element.name {
-        case "toggle":
-            try validateAttributes(of: element, allowed: ["id", "initial-value", "expected-value"])
-            try validatePrompt(element.content)
-            _ = try booleanAttribute("initial-value", of: element)
-            return .toggle(expected: try booleanAttribute("expected-value", of: element))
-        case "select":
-            return try selectionRequirement(for: element)
-        case "signature":
-            try validateAttributes(of: element, allowed: ["id"])
-            guard element.content.isEmpty else { throw ValidationError.invalidDocument }
-            return .signature
-        default:
-            throw ValidationError.invalidDocument
-        }
-    }
-
-    private static func selectionRequirement(for element: MarkdownDocument.CustomElement) throws -> Requirement {
-        try validateAttributes(of: element, allowed: ["id", "initial-value", "expected-value"])
-        let options = try selectionOptions(in: element.content)
-        if let initial = element[attribute: "initial-value"], !initial.isEmpty, !options.contains(initial) {
-            throw ValidationError.invalidDocument
-        }
-        let expected: Selection
-        switch element[attribute: "expected-value"] {
-        case nil: expected = .optional
-        case "*": expected = .required
-        case .some(let id):
-            guard options.contains(id) else { throw ValidationError.invalidDocument }
-            expected = .specific(id)
-        }
-        return .select(options: options, expected: expected)
-    }
-
-    private static func selectionOptions(in contents: [MarkdownDocument.CustomElement.Content]) throws -> Set<String> {
-        var options: Set<String> = []
-        for content in contents {
-            guard case .element(let child) = content else { continue }
-            if child.name == "footnote" {
-                try validatePrompt(child.content)
-                continue
-            }
-            guard child.name == "option" else { throw ValidationError.invalidDocument }
-            let id = try identifier(of: child)
-            try validateAttributes(of: child, allowed: ["id"])
-            guard options.insert(id).inserted, case .text(let text) = child.content.first, !text.isEmpty else {
-                throw ValidationError.invalidDocument
-            }
-            guard child.content.allSatisfy({ if case .text = $0 { true } else { false } }) else {
-                throw ValidationError.invalidDocument
-            }
-        }
-        guard !options.isEmpty else { throw ValidationError.invalidDocument }
-        return options
-    }
-
-    private static func validateSelection(_ value: String?, options: Set<String>, expected: Selection) throws {
+    private static func validateSelection(_ value: String?, definition: ConsentDocumentFormat.Selection) throws {
         let value = value ?? ""
-        guard value.isEmpty || options.contains(value) else { throw ValidationError.invalidResponses }
-        switch expected {
-        case .optional: break
-        case .required:
+        guard value.isEmpty || definition.options.contains(where: { $0.id == value }) else { throw ValidationError.invalidResponses }
+        switch definition.expectedSelection {
+        case .anything(allowEmptySelection: true): break
+        case .anything(allowEmptySelection: false):
             guard !value.isEmpty else { throw ValidationError.invalidResponses }
-        case .specific(let id):
+        case .option(let id):
             guard value == id else { throw ValidationError.invalidResponses }
-        }
-    }
-
-    // swiftlint:disable:next discouraged_optional_boolean - absent differs from required false
-    private static func booleanAttribute(_ name: String, of element: MarkdownDocument.CustomElement) throws -> Bool? {
-        guard let raw = element[attribute: name] else {
-            return nil
-        }
-        guard let value = Bool(raw) else { throw ValidationError.invalidDocument }
-        return value
-    }
-
-    private static func validateAttributes(of element: MarkdownDocument.CustomElement, allowed: Set<String>) throws {
-        guard element.attributes.allSatisfy({ allowed.contains($0.name) }) else { throw ValidationError.invalidDocument }
-    }
-
-    private static func validatePrompt(_ contents: [MarkdownDocument.CustomElement.Content]) throws {
-        guard !contents.isEmpty else { throw ValidationError.invalidDocument }
-        for content in contents {
-            if case .element(let child) = content {
-                guard child.name == "footnote", child.content.allSatisfy({ if case .text = $0 { true } else { false } }) else {
-                    throw ValidationError.invalidDocument
-                }
-            }
         }
     }
 }

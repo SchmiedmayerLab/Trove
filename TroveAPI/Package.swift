@@ -36,7 +36,7 @@ let package = Package(
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.13.1"),
         // Use the immutable PR revision until its products are available in a tagged release.
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "4c7e418284ccd7cab454173367e0312685efa940")
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "8f3a68562b237c402a0a66df92f7fa805c169d8e")
     ] + swiftLintPackage(),
     targets: [
         .systemLibrary(name: "CTroveDeliverySQLite", pkgConfig: "sqlite3", providers: [.apt(["libsqlite3-dev"])]),

@@ -86,6 +86,7 @@ struct ValidatedExchangeEvent: Sendable {
     let eventIdentifierSystem: String
     let eventIdentifierValue: String
     let producerInstance: UUID
+    var deploymentIdentifiers: FHIRDeploymentIdentifiers
     let participants: Set<Identifier>
     let nodes: [Node]
     let outputs: [PointOutput]

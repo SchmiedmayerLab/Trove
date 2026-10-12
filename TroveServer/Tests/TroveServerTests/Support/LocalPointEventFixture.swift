@@ -27,11 +27,39 @@ enum LocalPointEventFixture {
         var document = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
         var entries = try #require(document["entry"] as? [[String: Any]])
         var replacements = try recordID.map { try recordReplacements(in: previous, source: source, recordID: $0) } ?? [:]
+        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+        let identifiers = try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: original)
+        for (role, oldSystems) in identifiers.systems {
+            for oldSystem in oldSystems {
+                replacements[oldSystem] = FHIRDeploymentIdentifiers.system(for: role, in: systems).rawValue
+            }
+        }
+        try rekeyEntries(&entries, event: event, systems: systems, replacements: &replacements)
+        document["identifier"] = try object(event.identifier.fhirIdentifier)
+        document["entry"] = entries
+        replacements["https://study.example.org/fhir/identifiers/participant"] = source.participantIdentifierSystem
+        replacements["participant-001"] = source.participantIdentifierValue
+        let timestamp = try TroveDateTranscoder().encode(Date())
+        let transformed = transform(document, replacements: replacements, timestamp: timestamp)
+        let bytes = try JSONSerialization.data(withJSONObject: transformed, options: [.sortedKeys, .withoutEscapingSlashes])
+        _ = try ExchangeGraph(validating: bytes, kind: .active)
+        return bytes
+    }
+
+    private static func rekeyEntries(
+        _ entries: inout [[String: Any]],
+        event: ExchangeEventIdentifier,
+        systems: DeploymentIdentifierSystems,
+        replacements: inout [String: String]
+    ) throws {
         for index in entries.indices {
             var extensions = try #require(entries[index]["extension"] as? [[String: Any]])
             try #require(extensions.count == 1)
             let identifierJSON = try #require(extensions[0]["valueIdentifier"])
-            let key = try RoledIdentifier(JSONDecoder().decode(Identifier.self, from: JSONSerialization.data(withJSONObject: identifierJSON)))
+            let originalKey = try RoledIdentifier(JSONDecoder().decode(Identifier.self, from: JSONSerialization.data(withJSONObject: identifierJSON)))
+            let key = RoledIdentifier(identifier: try BusinessIdentifier(
+                system: FHIRDeploymentIdentifiers.system(for: originalKey.role, in: systems), value: originalKey.identifier.value
+            ), role: originalKey.role)
             let newKey: RoledIdentifier
             switch key.role {
             case .entryNode:
@@ -59,15 +87,6 @@ enum LocalPointEventFixture {
             extensions[0]["valueIdentifier"] = try object(newKey.fhirIdentifier)
             entries[index]["extension"] = extensions
         }
-        document["identifier"] = try object(event.identifier.fhirIdentifier)
-        document["entry"] = entries
-        replacements["https://study.example.org/fhir/identifiers/participant"] = source.participantIdentifierSystem
-        replacements["participant-001"] = source.participantIdentifierValue
-        let timestamp = try TroveDateTranscoder().encode(Date())
-        let transformed = transform(document, replacements: replacements, timestamp: timestamp)
-        let bytes = try JSONSerialization.data(withJSONObject: transformed, options: [.sortedKeys, .withoutEscapingSlashes])
-        _ = try ExchangeGraph(validating: bytes, kind: .active)
-        return bytes
     }
 
     private static func object(_ identifier: Identifier) throws -> Any {

@@ -24,8 +24,7 @@ test.describe("colour scheme", () => {
     );
 
     const background = await page
-      .locator(".grid.h-svh")
-      .first()
+      .getByTestId("app-surface")
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(parseLightness(background)).toBeLessThan(0.5);
   });
@@ -38,8 +37,7 @@ test.describe("colour scheme", () => {
     await expect(themed).toHaveAttribute("data-grove-color-scheme", "light");
 
     const background = await page
-      .locator(".grid.h-svh")
-      .first()
+      .getByTestId("app-surface")
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(parseLightness(background)).toBeGreaterThan(0.5);
   });

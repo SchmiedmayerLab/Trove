@@ -217,6 +217,7 @@ extension ClinicalRecordStoreTests {
             eventIdentifierSystem: base.eventIdentifierSystem,
             eventIdentifierValue: base.eventIdentifierValue,
             producerInstance: base.producerInstance,
+            deploymentIdentifiers: base.deploymentIdentifiers,
             participants: base.participants,
             nodes: nodes,
             outputs: points

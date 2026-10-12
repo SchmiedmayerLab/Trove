@@ -8,7 +8,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 
 const OUTPUT_DIRECTORY = ".nyc_output";
 
@@ -37,12 +37,14 @@ export const signInResearcher = async (page: Page) => {
 
 export const openNewStudyDialog = async (page: Page) => {
   const firstStudyButton = page.getByRole("button", { name: "Create study" });
+  const studySelector = page.locator("[data-element='header-selector']").nth(1);
+  await expect(firstStudyButton.or(studySelector)).toBeVisible();
   if (await firstStudyButton.isVisible()) {
     await firstStudyButton.click();
     return;
   }
 
-  await page.locator("[data-element='header-selector']").nth(1).click();
+  await studySelector.click();
   await page.getByText("Add study", { exact: true }).click();
 };
 

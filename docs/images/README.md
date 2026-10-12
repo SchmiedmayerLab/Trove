@@ -82,6 +82,10 @@ are disabled. Raw captures remain in Playwright's ignored test output directory.
 
 ## Mobile Captures
 
+First run the web-capture workflow above against the same development stack.
+It seeds and publishes the synthetic Daily Activity Study used by the mobile
+captures. A fresh UI-test stack alone does not contain that published study.
+
 Build and install the same revision of the iOS app on a dedicated iPhone 17 Pro
 Simulator. Use the CI build settings and `xcbeautify`; do not take screenshots while
 automated tests own the simulator. Sign in as the synthetic Alice participant from

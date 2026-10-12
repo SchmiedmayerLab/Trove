@@ -29,6 +29,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # A cold hosted release build takes about 40 minutes before service and browser checks.
     timeout-minutes: 90
+    env:
+      COMPOSE_FILE: docker-compose.yml:../validator/compose.yaml
     steps:
       - uses: actions/checkout@v7
         with:
@@ -77,6 +79,20 @@ jobs:
         run: |
           docker builder prune --all --force
           df -h /
+      - name: Prepare the pinned offline FHIR validator
+        run: |
+          set -euo pipefail
+          manifest=TroveInfrastructure/validator/manifest.json
+          source="$RUNNER_TEMP/grove-fhir"
+          git init "$source"
+          git -C "$source" remote add origin https://github.com/SchmiedmayerLab/grove-fhir.git
+          git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")"
+          python3 TroveInfrastructure/validator/fetch.py --output "$RUNNER_TEMP/validator-artifacts"
+          python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
+            --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context"
+          docker build --network=none -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
+          echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect trove-fhir-validator:ci --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
       # migration has to run first. It starts the backing services it depends on.
       - name: Apply the migrations

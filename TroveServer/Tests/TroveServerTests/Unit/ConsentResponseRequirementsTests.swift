@@ -105,7 +105,9 @@ struct ConsentResponseRequirementsTests {
         "<select id=choice expected-value=missing><option id=one>One</option></select>",
         "<select id=choice><signature id=nested /></select>",
         "<signature id=sig>Unsupported signature content</signature>",
-        "<!-- An unclosed comment"
+        "<!-- An unclosed comment",
+        "<rating id=custom maximum=5 />",
+        "<toggle id=ack><unknown>Hidden wording</unknown></toggle>"
     ])
     func malformedOrAmbiguousDocumentIsRejected(markdown: String) {
         #expect(throws: ConsentResponseRequirements.ValidationError.invalidDocument) {
