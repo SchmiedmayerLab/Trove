@@ -25,7 +25,8 @@ let package = Package(
         .library(name: "TroveAPITypes", targets: ["TroveAPITypes"]),
         .library(name: "TroveAPIClient", targets: ["TroveAPIClient"]),
         .library(name: "TroveHealthKit", targets: ["TroveHealthKit"]),
-        .library(name: "TroveAPIServer", targets: ["TroveAPIServer"])
+        .library(name: "TroveAPIServer", targets: ["TroveAPIServer"]),
+        .executable(name: "trove", targets: ["TroveCLI"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.12.1"),
@@ -86,6 +87,21 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")
             ],
             exclude: ["Generated/Server.swift.license"],
+            plugins: [] + swiftLintPlugin()
+        ),
+        .executableTarget(
+            name: "TroveCLI",
+            dependencies: [
+                .target(name: "TroveAPIClient"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
+            ],
+            plugins: [] + swiftLintPlugin()
+        ),
+        .testTarget(
+            name: "TroveCLITests",
+            dependencies: [.target(name: "TroveCLI")],
             plugins: [] + swiftLintPlugin()
         ),
         .executableTarget(
