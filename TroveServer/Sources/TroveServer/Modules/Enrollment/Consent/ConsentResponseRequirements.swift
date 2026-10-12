@@ -37,8 +37,6 @@ struct ConsentResponseRequirements: Sendable {
         }
     }
 
-    private static let elementNames: Set<String> = ["toggle", "select", "signature", "option", "footnote"]
-
     private let controls: [String: Requirement]
 
     /// Publication policy decides whether a document-only presentation is appropriate.
@@ -51,18 +49,10 @@ struct ConsentResponseRequirements: Sendable {
     }
 
     init(markdown: String) throws {
-        try Self.rejectAmbiguousFencedControls(in: markdown)
-        // The pinned parser tolerates unexpected EOF. Verify complete consumption without
-        // persisting this marker or changing the approved presentation's bytes/digest.
-        // Follow-up: replace this guard with Grove's strict parsing API when available.
-        let marker = "TROVE_CONSENT_PARSE_END_\(UUID().uuidString)"
         let document: MarkdownDocument
         do {
-            document = try MarkdownDocument(processing: markdown + "\n\n" + marker, customElementNames: Self.elementNames)
+            document = try ConsentDocumentFormat.parse(markdown)
         } catch {
-            throw ValidationError.invalidDocument
-        }
-        guard case .markdown(_, let lastText) = document.blocks.last, lastText.hasSuffix(marker) else {
             throw ValidationError.invalidDocument
         }
         var controls: [String: Requirement] = [:]
@@ -213,32 +203,6 @@ extension ConsentResponseRequirements {
                 guard child.name == "footnote", child.content.allSatisfy({ if case .text = $0 { true } else { false } }) else {
                     throw ValidationError.invalidDocument
                 }
-            }
-        }
-    }
-
-    private static func rejectAmbiguousFencedControls(in markdown: String) throws {
-        // Grove's processor is not a full Markdown parser. Do not interpret an example
-        // inside a code fence as an actual consent control.
-        var fence: (character: Character, count: Int)?
-        for line in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
-            let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
-            if let first = trimmed.first, first == "`" || first == "~" {
-                let count = trimmed.prefix(while: { $0 == first }).count
-                if count >= 3 {
-                    if let active = fence {
-                        if first == active.character, count >= active.count,
-                           trimmed.dropFirst(count).allSatisfy(\.isWhitespace) {
-                            fence = nil
-                        }
-                    } else {
-                        fence = (first, count)
-                    }
-                    continue
-                }
-            }
-            if fence != nil, elementNames.contains(where: { line.contains("<\($0)") }) {
-                throw ValidationError.invalidDocument
             }
         }
     }
