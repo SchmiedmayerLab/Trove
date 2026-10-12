@@ -15,6 +15,8 @@ test.describe("colour scheme", () => {
   test("follows an operating system set to dark", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto("/");
+    // Authentication initializes after document load; wait for the app, not a theme change.
+    await page.getByTestId("app-surface").waitFor({ state: "visible" });
 
     const themed = page.locator("[data-grove-color-scheme]").first();
     await expect(themed).toHaveAttribute("data-grove-color-scheme", "dark");
@@ -32,6 +34,7 @@ test.describe("colour scheme", () => {
   test("follows an operating system set to light", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto("/");
+    await page.getByTestId("app-surface").waitFor({ state: "visible" });
 
     const themed = page.locator("[data-grove-color-scheme]").first();
     await expect(themed).toHaveAttribute("data-grove-color-scheme", "light");

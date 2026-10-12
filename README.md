@@ -174,7 +174,12 @@ Docker archives retain the tested image identities, build provenance and SBOMs.
 Artifacts bind their bytes and scan evidence to one clean source tree and workflow
 attempt. Local dirty-tree packages are useful for testing but cannot be published.
 
-After required verification succeeds on `main`, `publish-images.yml` consumes
+Candidate publication is disabled by default. After configuring the approval
+boundary below, an administrator can set the repository variable
+`TROVE_CANDIDATE_PUBLICATION_ENABLED=true` to enable it. Unset or false leaves
+verification and documentation deployment enabled without publishing images.
+
+After required verification succeeds on `main`, enabled publication consumes
 these archives without rebuilding. It requires the `candidate-publication`
 environment to have required reviewers, prevent self-review and allow only
 protected branches. An administrator must configure this environment and branch

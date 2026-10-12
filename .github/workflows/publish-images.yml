@@ -10,7 +10,9 @@ permissions:
 jobs:
   publish:
     name: Publish the Verified Candidate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      vars.TROVE_CANDIDATE_PUBLICATION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: candidate-publication
