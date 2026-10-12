@@ -51,15 +51,16 @@ struct ConsentExportBridgeTests {
     }
 
     @Test
-    func exportedPDFRetainsPlainConsentText() throws {
-        let text = "Review this study.\n\nParticipation is voluntary."
-        try ConsentContentPolicy.validate(markdown: text)
+    func exportedPDFRetainsStructuredConsentText() throws {
+        let text = "# Review this study.\n\nParticipation is **voluntary**.\n\n- Ask questions\n- Withdraw at any time"
         let document = try ConsentDocument(markdown: text)
         let exported = try ConsentExportBridge.export(document)
         let pdf = try #require(PDFDocument(data: exported.pdf))
         let contents = try #require(pdf.string)
         #expect(contents.contains("Review this study."))
         #expect(contents.contains("Participation is voluntary."))
+        #expect(contents.contains("Ask questions"))
+        #expect(!contents.contains("**"))
         #expect(pdf.pageCount > 0)
     }
 

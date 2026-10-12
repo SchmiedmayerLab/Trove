@@ -125,10 +125,10 @@ struct ConsentResponseRequirementsTests {
     }
 
     @Test(arguments: ["```", "~~~"])
-    func fencedControlExamplesAreRejectedAsAmbiguous(fence: String) {
-        #expect(throws: ConsentResponseRequirements.ValidationError.invalidDocument) {
-            try ConsentResponseRequirements(markdown: "\(fence)html\n<signature id=example />\n\(fence)")
-        }
+    func fencedControlExamplesAreNotAcknowledgements(fence: String) throws {
+        let requirements = try ConsentResponseRequirements(markdown: "\(fence)html\n<signature id=example />\n\(fence)")
+        #expect(!requirements.requiresExplicitResponse)
+        try requirements.validate(.init())
     }
 
     @Test
@@ -139,10 +139,10 @@ struct ConsentResponseRequirementsTests {
     }
 
     @Test
-    func fenceWithTrailingContentDoesNotEndCodeExample() {
-        #expect(throws: ConsentResponseRequirements.ValidationError.invalidDocument) {
-            try ConsentResponseRequirements(markdown: "```text\n```not-a-closing-fence\n<signature id=example />\n```")
-        }
+    func fenceWithTrailingContentDoesNotEndCodeExample() throws {
+        let requirements = try ConsentResponseRequirements(markdown: "```text\n```not-a-closing-fence\n<signature id=example />\n```")
+        #expect(!requirements.requiresExplicitResponse)
+        try requirements.validate(.init())
     }
 
     @Test(arguments: [

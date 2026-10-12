@@ -156,7 +156,6 @@ final class ConsentModel: Module, EnvironmentAccessible {
     }
 
     private func prepareReview(_ value: Components.Schemas.ConsentPresentationResponse) throws {
-        try ConsentContentPolicy.validate(markdown: value.markdown)
         storedDocument = try ConsentDocument(markdown: value.markdown)
         storedDate = Date()
         storedPresentation = value
