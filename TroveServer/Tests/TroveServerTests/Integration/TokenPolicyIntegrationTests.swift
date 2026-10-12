@@ -25,6 +25,7 @@ struct TokenPolicyIntegrationTests {
         var email = "test@example.com"
         var roles = [TestApp.researcherRole]
         var groups = ["/Test Group/admin"]
+        var azp: String? = "trove-web"
 
         // Signing invalid test claims is intentional; the server performs validation.
         func verify(using algorithm: some JWTAlgorithm) async throws {}

@@ -17,6 +17,30 @@ import TroveAPIServer
 enum PublishedStudyFixtures {
     static let requiredConsentMarkdown = "<toggle id=\"agree\" expected-value=\"true\">I agree.</toggle>"
 
+    /// Clinical-store tests start from accepted metadata; authoring acceptance is tested separately.
+    @discardableResult
+    static func createNextClinicalRevision(on database: any Database, studyId: UUID) async throws -> PublishedStudy {
+        guard let study = try await Study.find(studyId, on: database) else {
+            throw ServerError.notFound("Synthetic study not found")
+        }
+        let revision = (try await PublishedStudy.query(on: database).filter(\.$study.$id == studyId).max(\.$revision) ?? 0) + 1
+        var consent = LocalizationsDictionary<String>()
+        for (locale, content) in study.consent {
+            consent[locale] = ConsentPresentation.markdown(content: content)
+        }
+        return try await createPublishedStudy(
+            on: database,
+            studyId: studyId,
+            revision: revision,
+            visibility: study.visibility,
+            enrollmentCondition: study.enrollmentCondition,
+            title: study.details[.enUS]?.title ?? "Synthetic Study",
+            consentSnapshot: consent,
+            participationCriterion: study.participationCriterion,
+            collectionRequirements: study.collectionRequirements
+        )
+    }
+
     @discardableResult
     static func createPublishedStudy(
         on database: any Database,

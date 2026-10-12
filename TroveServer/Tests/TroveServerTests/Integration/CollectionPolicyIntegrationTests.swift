@@ -18,12 +18,12 @@ import ZIPFoundation
 struct CollectionPolicyIntegrationTests {
     @Test
     func publishedPolicyMatchesArchiveAndDoesNotFollowDraftChanges() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: group.requireId())
             let id = try study.requireId()
             let requirement = ["profile": CollectionRequirement.supportedProfile, "sourceKind": "participant-app"]
-            try await Self.patch([requirement], studyID: id, app: app, token: token, expected: .ok)
+            try await Self.patch([requirement], study: study, app: app, token: token, expected: .ok)
             try await Self.publish(studyID: id, app: app, token: token)
             // swiftlint:disable:next first_where - Fluent SQL query, not a collection
             let first = try #require(try await PublishedStudy.query(on: app.db).filter(\.$revision == 1).first())
@@ -39,7 +39,8 @@ struct CollectionPolicyIntegrationTests {
             encoder.outputFormatting = .sortedKeys
             #expect(archivedPolicy == (try encoder.encode(policy)))
             #expect(try JSONDecoder().decode(PublishedCollectionPolicy.self, from: archivedPolicy) == policy)
-            try await Self.patch([], studyID: id, app: app, token: token, expected: .ok)
+            let nextDraft = try #require(try await Study.find(id, on: app.db))
+            try await Self.patch([], study: nextDraft, app: app, token: token, expected: .ok)
             try await Self.publish(studyID: id, app: app, token: token)
             let retained = try #require(try await PublishedStudy.find(first.requireId(), on: app.db))
             // swiftlint:disable:next first_where - Fluent SQL query, not a collection
@@ -62,7 +63,7 @@ struct CollectionPolicyIntegrationTests {
             ]
             try await Self.patch(
                 failure == "duplicate" ? [requirement, requirement] : [requirement],
-                studyID: id,
+                study: study,
                 app: app,
                 token: token,
                 expected: .badRequest
@@ -76,10 +77,12 @@ struct CollectionPolicyIntegrationTests {
 
 extension CollectionPolicyIntegrationTests {
     private static func patch(
-        _ requirements: [[String: String]], studyID: UUID, app: Application, token: String?, expected: HTTPStatus
+        _ requirements: [[String: String]], study: Study, app: Application, token: String?, expected: HTTPStatus
     ) async throws {
+        let studyID = try study.requireId()
         try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
             request.bearerAuth(token)
+            request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             try request.encodeJSONBody(["collectionRequirements": requirements])
         }) { response in
             try #require(response.status == expected)
@@ -91,8 +94,7 @@ extension CollectionPolicyIntegrationTests {
     }
 
     private static func publish(studyID: UUID, app: Application, token: String?) async throws {
-        try await app.test(.POST, "\(apiBasePath)/studies/\(studyID)/publish", beforeRequest: { $0.bearerAuth(token) }) { response in
-            try #require(response.status == .created)
-        }
+        let response = try await PublicationWorkflowFixtures.publish(studyID, app: app, token: token)
+        try #require(response.status == .created)
     }
 }

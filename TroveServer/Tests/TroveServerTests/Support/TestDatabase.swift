@@ -28,6 +28,26 @@ enum TestDatabase {
 
     private static let adminID = DatabaseID(string: "test-admin")
 
+    static var expectedMigrationNames: [String] {
+        [
+            CreateGroups().name,
+            CreateStudy().name,
+            CreateStudyDelegations().name,
+            CreateComponents().name,
+            CreateComponentSchedules().name,
+            CreateStoredArtifacts().name,
+            CreatePublishedStudies().name,
+            CreateStudyPublicationCandidates().name,
+            CreateParticipants().name,
+            CreateSourceBindings().name,
+            CreateInvitationCodes().name,
+            CreateEnrollments().name,
+            CreateEnrollmentConsents().name,
+            CreateAuditEvents().name,
+            CreateClinicalEvents().name
+        ].sorted()
+    }
+
     static func configure(for app: Application) async throws {
         guard let rawPort = Environment.get("TROVE_TEST_POSTGRES_PORT") else {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("trove-test-\(UUID().uuidString)", isDirectory: true)

@@ -15,8 +15,33 @@ extension Controller {
         _ input: Operations.PostStudiesStudyIdPublish.Input
     ) async throws -> Operations.PostStudiesStudyIdPublish.Output {
         let studyId = try input.path.studyId.requireId()
-        let published = try await publishedStudyService.publish(studyId: studyId)
+        guard case .json(let request) = input.body else { throw ServerError.jsonBodyRequired }
+        let published = try await publishedStudyService.publish(
+            studyId: studyId,
+            validationID: request.validationId.requireId(),
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch)
+        )
         return .created(.init(body: .json(try .init(published))))
+    }
+
+    func validateStudyDraft(_ input: Operations.ValidateStudyDraft.Input) async throws -> Operations.ValidateStudyDraft.Output {
+        let candidate = try await studyValidationService.validate(
+            studyID: input.path.studyId.requireId(), expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch)
+        )
+        return .created(.init(body: .json(try .init(
+            id: candidate.requireId().uuidString,
+            draftRevision: candidate.draftRevision.uuidString,
+            publicationRevision: candidate.publicationRevision,
+            bundleSha256: candidate.bundleDigest,
+            validatorIdentity: candidate.validatorIdentity,
+            contractRevision: candidate.contractRevision,
+            executionCapability: candidate.executionCapability,
+            createdAt: candidate.createdAt,
+            expiresAt: candidate.expiresAt,
+            questionnaires: candidate.snapshot.questionnaires.map {
+                .init(componentId: $0.componentID.uuidString, locale: $0.locale, sha256: $0.validation.sha256)
+            }
+        ))))
     }
 
     func getStudiesStudyIdPublished(

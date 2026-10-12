@@ -22,6 +22,20 @@ enum StudyRevisionFixture {
         let revision: Int
     }
 
+    private struct Draft: Decodable {
+        let draftRevision: UUID
+    }
+
+    private struct Validation: Decodable {
+        let id: UUID
+        let draftRevision: UUID
+        let publicationRevision: Int
+    }
+
+    private struct PublicationInput: Encodable {
+        let validationId: UUID
+    }
+
     private struct Token: Decodable {
         enum CodingKeys: String, CodingKey {
             case accessToken = "access_token"
@@ -60,10 +74,31 @@ enum StudyRevisionFixture {
                 "en-US": ["title": "Study Consent — Revision 2", "content": consent]
             ]
         ])
-        _ = try await request("studies/\(study.id)", token: token, method: "PATCH", body: body)
+        let draft = try JSONDecoder().decode(Draft.self, from: await request("studies/\(study.id)", token: token))
+        let updated = try JSONDecoder().decode(Draft.self, from: await request(
+            "studies/\(study.id)", token: token, method: "PATCH", body: body, revision: draft.draftRevision
+        ))
+        try await publishValidatedRevision(studyID: study.id, token: token, revision: updated.draftRevision)
+    }
+
+    private static func publishValidatedRevision(studyID: String, token: String, revision: UUID) async throws {
+        let validation = try JSONDecoder().decode(Validation.self, from: await request(
+            "studies/\(studyID)/draft/validations", token: token, method: "POST", revision: revision, expectedStatus: 201
+        ))
+        guard validation.draftRevision == revision, validation.publicationRevision == 2 else {
+            XCTFail("Expected the captured draft's second publication candidate.")
+            throw URLError(.badServerResponse)
+        }
         let publication = try JSONDecoder().decode(
             Published.self,
-            from: await request("studies/\(study.id)/publish", token: token, method: "POST", expectedStatus: 201)
+            from: await request(
+                "studies/\(studyID)/publish",
+                token: token,
+                method: "POST",
+                body: JSONEncoder().encode(PublicationInput(validationId: validation.id)),
+                revision: validation.draftRevision,
+                expectedStatus: 201
+            )
         )
         XCTAssertEqual(publication.revision, 2, "The fixture must publish exactly the next revision.")
     }
@@ -73,11 +108,15 @@ enum StudyRevisionFixture {
         token: String,
         method: String = "GET",
         body: Data? = nil,
+        revision: UUID? = nil,
         expectedStatus: Int = 200
     ) async throws -> Data {
         var request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1:8080/api/v0/\(path)")))
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let revision {
+            request.setValue("\"\(revision.uuidString)\"", forHTTPHeaderField: "If-Match")
+        }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = body

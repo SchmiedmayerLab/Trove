@@ -352,7 +352,7 @@ extension ClinicalEventStoreTests {
                     study.collectionRequirements = [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)]
                 }
                 try await study.save(on: app.db)
-                _ = try await app.grove[PublishedStudyService.self].publish(studyId: study.requireId())
+                try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study.requireId())
                 ids.append(try study.requireId())
             }
             return ids

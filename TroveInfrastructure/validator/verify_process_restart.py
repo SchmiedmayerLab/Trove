@@ -70,6 +70,20 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def response_uuid(response: object, field: str) -> str:
+    """Require a server-issued identity without inventing a replacement value."""
+    if not isinstance(response, dict):
+        raise RuntimeError("Expected an object response")
+    value = response.get(field)
+    if not isinstance(value, str):
+        raise RuntimeError(f"Missing response field: {field}")
+    try:
+        uuid.UUID(value)
+    except ValueError as error:
+        raise RuntimeError(f"Invalid response field: {field}") from error
+    return value
+
+
 def request(url, method="GET", data=None, token=None, headers=None, expected=200):
     headers = dict(headers or {})
     if token:
@@ -331,8 +345,21 @@ class Checkpoint:
         return json.loads(request(self.kc_url + "/realms/trove/protocol/openid-connect/token", "POST", data,
                                   headers={"Content-Type": "application/x-www-form-urlencoded"}))["access_token"]
 
-    def api_json(self, path, token, method="GET", data=None, expected=200):
-        return json.loads(request(self.api + path, method, data, token, expected=expected))
+    def api_json(self, path, token, method="GET", data=None, expected=200, headers=None):
+        return json.loads(request(self.api + path, method, data, token, headers=headers, expected=expected))
+
+    def publish_draft(self, study: str, token: str, revision: str) -> None:
+        headers = {"If-Match": '"' + response_uuid({"draftRevision": revision}, "draftRevision") + '"'}
+        candidate = self.api_json(f"/studies/{study}/draft/validations", token, "POST", expected=201, headers=headers)
+        candidate_id = response_uuid(candidate, "id")
+        require(response_uuid(candidate, "draftRevision") == revision, "Validation selected a different draft")
+        publication_revision = candidate.get("publicationRevision")
+        require(type(publication_revision) is int and publication_revision > 0, "Invalid publication revision")
+        publication = self.api_json(f"/studies/{study}/publish", token, "POST", {"validationId": candidate_id},
+                                    expected=201, headers=headers)
+        require(response_uuid(publication, "id") == candidate_id and response_uuid(publication, "studyId") == study
+                and type(publication.get("revision")) is int and publication["revision"] == publication_revision,
+                "Publication does not match the reviewed validation")
 
     def consent(self, enrollment, token):
         path = f"/participant/enrollments/{enrollment}/consents"
@@ -361,11 +388,14 @@ class Checkpoint:
         group = self.api_json("/groups", researcher)[0]["id"]
         studies, enrollments, consents = [], [], []
         for label in ("A", "B"):
-            study = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "icon": "heart"}, 201)["id"]
-            self.api_json(f"/studies/{study}", researcher, "PATCH", {
+            created = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "icon": "heart"}, 201)
+            study = response_uuid(created, "id")
+            revision = response_uuid(created, "draftRevision")
+            edited = self.api_json(f"/studies/{study}", researcher, "PATCH", {
                 "consent": {"en-US": {"title": "Synthetic Consent", "content": '<toggle id="agree" expected-value="true">I agree.</toggle>'}},
-                "collectionRequirements": [{"profile": PROFILE, "sourceKind": "participant-app"}]})
-            self.api_json(f"/studies/{study}/publish", researcher, "POST", expected=201)
+                "collectionRequirements": [{"profile": PROFILE, "sourceKind": "participant-app"}]}, headers={"If-Match": '"' + revision + '"'})
+            require(response_uuid(edited, "id") == study, "Edit selected a different study")
+            self.publish_draft(study, researcher, response_uuid(edited, "draftRevision"))
             enrollment = self.api_json(f"/participant/studies/{study}/enrollments", participant, "POST", {}, 201)["id"]
             studies.append(study)
             enrollments.append(enrollment)

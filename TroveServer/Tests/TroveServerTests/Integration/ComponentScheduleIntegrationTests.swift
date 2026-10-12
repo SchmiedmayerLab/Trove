@@ -24,14 +24,14 @@ struct ComponentScheduleIntegrationTests {
         "\(basePath(studyId: studyId, componentId: componentId))/\(scheduleId)"
     }
 
-    private func createFixtures(on database: any FluentKit.Database) async throws -> (studyId: UUID, componentId: UUID) {
+    private func createFixtures(on database: any FluentKit.Database) async throws -> (study: Study, componentId: UUID) {
         let group = try await GroupFixtures.createGroup(on: database)
         let groupId = try group.requireId()
         let study = try await StudyFixtures.createStudy(on: database, groupId: groupId)
         let studyId = try study.requireId()
         let component = try await ComponentFixtures.createInformationalComponent(on: database, studyId: studyId)
         let componentId = try component.requireId()
-        return (studyId, componentId)
+        return (study, componentId)
     }
 
     private func scheduleBody() -> [String: Any] {
@@ -73,9 +73,11 @@ struct ComponentScheduleIntegrationTests {
             let studyId = try study.requireId()
             let component = try await ComponentFixtures.createInformationalComponent(on: app.db, studyId: studyId)
             let componentId = try component.requireId()
+            let draftRevision = study.draftRevision
 
             try await app.test(.POST, basePath(studyId: studyId, componentId: componentId), beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
                 try req.encodeJSONBody(scheduleBody())
             }) { response in
                 #expect(response.status == .created)
@@ -167,7 +169,9 @@ struct ComponentScheduleIntegrationTests {
     @Test
     func replaceSchedule() async throws {
         try await TestApp.withApp { app, token in
-            let (studyId, componentId) = try await createFixtures(on: app.db)
+            let (study, componentId) = try await createFixtures(on: app.db)
+            let studyId = try study.requireId()
+            let draftRevision = study.draftRevision
             let schedule = try await ComponentFixtures.createSchedule(on: app.db, componentId: componentId)
             let scheduleId = try schedule.requireId()
 
@@ -175,6 +179,7 @@ struct ComponentScheduleIntegrationTests {
 
             try await app.test(.PUT, schedulePath(studyId: studyId, componentId: componentId, scheduleId: scheduleId), beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
                 try req.encodeJSONBody(updatedBody)
             }) { response in
                 #expect(response.status == .ok)
@@ -209,9 +214,11 @@ struct ComponentScheduleIntegrationTests {
 
             let schedule = try await ComponentFixtures.createSchedule(on: app.db, componentId: componentId)
             let scheduleId = try schedule.requireId()
+            let draftRevision = study.draftRevision
 
             try await app.test(.DELETE, schedulePath(studyId: studyId, componentId: componentId, scheduleId: scheduleId), beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
             }) { response in
                 #expect(response.status == .noContent)
             }
@@ -235,8 +242,10 @@ struct ComponentScheduleIntegrationTests {
             let componentId = try component.requireId()
 
             let nonExistentId = UUID()
+            let draftRevision = study.draftRevision
             try await app.test(.DELETE, schedulePath(studyId: studyId, componentId: componentId, scheduleId: nonExistentId), beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
             }) { response in
                 #expect(response.status == .notFound)
             }

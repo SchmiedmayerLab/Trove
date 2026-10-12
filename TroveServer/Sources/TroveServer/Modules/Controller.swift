@@ -25,8 +25,16 @@ struct Controller: APIProtocol {
 // MARK: - Services
 
 extension Controller {
+    var delegationService: DelegationService {
+        grove[DelegationService.self]
+    }
+
     var studyService: StudyService {
         grove[StudyService.self]
+    }
+
+    var studyValidationService: StudyValidationService {
+        grove[StudyValidationService.self]
     }
 
     var componentService: ComponentService {

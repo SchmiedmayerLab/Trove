@@ -6,80 +6,78 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Fluent
 import Foundation
 import Grove
 import GroveStudyDefinition
 
 
 final class ComponentScheduleService: Module, @unchecked Sendable {
-    @Dependency(AuthorizationService.self) var authorizationService
-    @Dependency(ComponentRepository.self) var componentRepository
-    @Dependency(ComponentScheduleRepository.self) var repository
+    @Dependency(StudyService.self) var studyService
+
+    private static func requireSchedulableComponent(id: UUID, studyId: UUID, on transaction: any Database) async throws {
+        guard let component = try await ComponentRepository(database: transaction).find(id: id, studyId: studyId) else {
+            throw ServerError.notFound(resource: "Component", identifier: id.uuidString)
+        }
+        guard component.type.supportsSchedules else {
+            throw ServerError.conflict("Component type '\(component.type.rawValue)' does not support schedules")
+        }
+    }
 
     func listSchedules(studyId: UUID, componentId: UUID) async throws -> [ComponentSchedule] {
-        try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
-        try await requireSchedulableComponent(id: componentId, studyId: studyId)
-        return try await repository.findAll(componentId: componentId)
+        try await studyService.readDraft(id: studyId) { _, transaction in
+            try await Self.requireSchedulableComponent(id: componentId, studyId: studyId, on: transaction)
+            return try await ComponentScheduleRepository(database: transaction).findAll(componentId: componentId)
+        }
     }
 
     func getSchedule(studyId: UUID, componentId: UUID, scheduleId: UUID) async throws -> ComponentSchedule {
-        try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
-        try await requireSchedulableComponent(id: componentId, studyId: studyId)
-
-        guard let schedule = try await repository.find(id: scheduleId, componentId: componentId) else {
-            throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
+        try await studyService.readDraft(id: studyId) { _, transaction in
+            try await Self.requireSchedulableComponent(id: componentId, studyId: studyId, on: transaction)
+            guard let schedule = try await ComponentScheduleRepository(database: transaction).find(id: scheduleId, componentId: componentId) else {
+                throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
+            }
+            return schedule
         }
-
-        return schedule
     }
 
     func createSchedule(
         studyId: UUID,
         componentId: UUID,
+        expectedRevision: UUID,
         data: StudyDefinition.ComponentSchedule
     ) async throws -> ComponentSchedule {
-        try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
-        try await requireSchedulableComponent(id: componentId, studyId: studyId)
-
-        let schedule = ComponentSchedule(componentId: componentId, scheduleData: data)
-        return try await repository.create(schedule)
+        try await studyService.editDraft(id: studyId, expectedRevision: expectedRevision) { _, transaction in
+            try await Self.requireSchedulableComponent(id: componentId, studyId: studyId, on: transaction)
+            let repository = ComponentScheduleRepository(database: transaction)
+            return try await repository.create(ComponentSchedule(componentId: componentId, scheduleData: data))
+        }
     }
 
     func replaceSchedule(
         studyId: UUID,
         componentId: UUID,
         scheduleId: UUID,
+        expectedRevision: UUID,
         data: StudyDefinition.ComponentSchedule
     ) async throws -> ComponentSchedule {
-        try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
-        try await requireSchedulableComponent(id: componentId, studyId: studyId)
-
-        guard let schedule = try await repository.find(id: scheduleId, componentId: componentId) else {
-            throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
-        }
-
-        schedule.scheduleData = data
-        return try await repository.update(schedule)
-    }
-
-    func deleteSchedule(studyId: UUID, componentId: UUID, scheduleId: UUID) async throws {
-        try await authorizationService.checkResearcherHasStudyAccess(studyId, role: .researcher)
-        try await requireSchedulableComponent(id: componentId, studyId: studyId)
-
-        let deleted = try await repository.delete(id: scheduleId, componentId: componentId)
-        if !deleted {
-            throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
+        try await studyService.editDraft(id: studyId, expectedRevision: expectedRevision) { _, transaction in
+            try await Self.requireSchedulableComponent(id: componentId, studyId: studyId, on: transaction)
+            let repository = ComponentScheduleRepository(database: transaction)
+            guard let schedule = try await repository.find(id: scheduleId, componentId: componentId) else {
+                throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
+            }
+            schedule.scheduleData = data
+            return try await repository.update(schedule)
         }
     }
 
-    @discardableResult
-    private func requireSchedulableComponent(id: UUID, studyId: UUID) async throws -> Component {
-        guard let component = try await componentRepository.find(id: id, studyId: studyId) else {
-            throw ServerError.notFound(resource: "Component", identifier: id.uuidString)
+    func deleteSchedule(studyId: UUID, componentId: UUID, scheduleId: UUID, expectedRevision: UUID) async throws {
+        try await studyService.editDraft(id: studyId, expectedRevision: expectedRevision) { _, transaction in
+            try await Self.requireSchedulableComponent(id: componentId, studyId: studyId, on: transaction)
+            guard try await ComponentScheduleRepository(database: transaction).delete(id: scheduleId, componentId: componentId) else {
+                throw ServerError.notFound(resource: "ComponentSchedule", identifier: scheduleId.uuidString)
+            }
         }
-        guard component.type.supportsSchedules else {
-            throw ServerError.conflict("Component type '\(component.type.rawValue)' does not support schedules")
-        }
-        return component
     }
 }

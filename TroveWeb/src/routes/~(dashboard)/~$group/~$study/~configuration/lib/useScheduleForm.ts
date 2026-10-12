@@ -10,7 +10,6 @@ import { toast, useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { omit } from "es-toolkit";
-import { useEffect } from "react";
 import type { ComponentScheduleInput } from "@/lib/api/generated/types.gen";
 import { zComponentSchedule } from "@/lib/api/generated/zod.gen";
 import {
@@ -20,6 +19,7 @@ import {
   useDeleteScheduleMutation,
   useUpdateScheduleMutation,
 } from "@/lib/queries/component";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { SCHEDULE_DEFAULTS } from "./scheduleTransforms";
 
 export const useScheduleForm = () => {
@@ -32,13 +32,13 @@ export const useScheduleForm = () => {
     componentId: params.component,
   };
 
-  const { data: schedules } = useQuery(scheduleListQueryOptions(componentPath));
+  const { data: snapshot } = useQuery(scheduleListQueryOptions(componentPath));
 
   const { data: components } = useQuery(
     componentListQueryOptions({ studyId: params.study }),
   );
 
-  const existingSchedule = schedules?.[0];
+  const existingSchedule = snapshot?.value[0];
   const hasExistingSchedule = !!existingSchedule?.id;
 
   const form = useForm({
@@ -46,13 +46,15 @@ export const useScheduleForm = () => {
     defaultValues: SCHEDULE_DEFAULTS,
   });
 
-  useEffect(() => {
-    if (existingSchedule) {
-      form.reset(omit(existingSchedule, ["id"]));
-    }
-    // form.reset identity changes every render; including it would cause an infinite loop
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [existingSchedule]);
+  const getSnapshot = useDraftFormSnapshot(
+    snapshot,
+    `${params.study}:${params.component}`,
+    form.formState.isDirty,
+    (loaded) =>
+      form.reset(
+        loaded.value[0] ? omit(loaded.value[0], ["id"]) : SCHEDULE_DEFAULTS,
+      ),
+  );
 
   const createSchedule = useCreateScheduleMutation();
   const updateSchedule = useUpdateScheduleMutation();
@@ -62,24 +64,28 @@ export const useScheduleForm = () => {
     data: ComponentScheduleInput,
     onSuccess: () => void,
   ) => {
-    const scheduleId = existingSchedule?.id;
+    const loaded = getSnapshot();
+    const scheduleId = loaded.value[0]?.id;
+    const headers = draftHeaders(loaded.draftRevision);
 
     if (scheduleId) {
       updateSchedule.mutate(
-        { path: { ...componentPath, scheduleId }, body: data },
+        { path: { ...componentPath, scheduleId }, headers, body: data },
         {
           onSuccess: () => {
             toast.success("Schedule updated");
+            form.reset(data);
             onSuccess();
           },
         },
       );
     } else {
       createSchedule.mutate(
-        { path: componentPath, body: data },
+        { path: componentPath, headers, body: data },
         {
           onSuccess: () => {
             toast.success("Schedule created");
+            form.reset(data);
             onSuccess();
           },
         },
@@ -88,9 +94,14 @@ export const useScheduleForm = () => {
   };
 
   const removeSchedule = (onSuccess: () => void) => {
-    if (!existingSchedule?.id) return;
+    const loaded = getSnapshot();
+    const scheduleId = loaded.value[0]?.id;
+    if (!scheduleId) return;
     deleteSchedule.mutate(
-      { path: { ...componentPath, scheduleId: existingSchedule.id } },
+      {
+        path: { ...componentPath, scheduleId },
+        headers: draftHeaders(loaded.draftRevision),
+      },
       {
         onSuccess: () => {
           toast.success("Schedule deleted");

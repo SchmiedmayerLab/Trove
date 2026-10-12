@@ -1,12 +1,12 @@
 meta {
   name: Publish Study
   type: http
-  seq: 5
+  seq: 6
 }
 
 post {
   url: {{baseUrl}}/studies/:studyId/publish
-  body: none
+  body: json
   auth: inherit
 }
 
@@ -14,7 +14,27 @@ params:path {
   studyId: {{studyId}}
 }
 
+headers {
+  Content-Type: application/json
+  If-Match: "{{validatedDraftRevision}}"
+}
+
+body:json {
+  {
+    "validationId": "{{validationId}}"
+  }
+}
+
+script:pre-request {
+  if (bru.getVar("validatedStudyId") !== bru.getVar("studyId") || !bru.getVar("validationId") || !bru.getVar("validatedDraftRevision")) {
+    throw new Error("Review a validation candidate for this study before publication");
+  }
+}
+
 script:post-response {
   const body = res.getBody();
+  if (res.getStatus() !== 201 || body.id !== bru.getVar("validationId") || body.studyId !== bru.getVar("validatedStudyId")) {
+    throw new Error("Publication did not match the reviewed candidate");
+  }
   bru.setVar("revision", body.revision);
 }

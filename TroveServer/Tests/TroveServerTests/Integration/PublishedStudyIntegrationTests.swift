@@ -17,52 +17,40 @@ import VaporTesting
 struct PublishedStudyIntegrationTests {
     @Test
     func publishStudyReturnsCreated() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(token)
-            }) { response in
-                #expect(response.status == .created)
+            let response = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: token)
+            #expect(response.status == .created)
 
-                let published = try response.content.decode(Components.Schemas.PublishedStudyResponse.self)
-                #expect(published.studyId == studyId.uuidString)
-                #expect(published.revision == 1)
-                #expect(published.visibility == .public)
-            }
+            let published = try response.content.decode(Components.Schemas.PublishedStudyResponse.self)
+            #expect(published.studyId == studyId.uuidString)
+            #expect(published.revision == 1)
+            #expect(published.visibility == .public)
         }
     }
 
     @Test
     func publishStudyIncrementsRevision() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(token)
-            }) { response in
+            for revision in 1...2 {
+                let response = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: token)
                 #expect(response.status == .created)
                 let published = try response.content.decode(Components.Schemas.PublishedStudyResponse.self)
-                #expect(published.revision == 1)
-            }
-
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(token)
-            }) { response in
-                #expect(response.status == .created)
-                let published = try response.content.decode(Components.Schemas.PublishedStudyResponse.self)
-                #expect(published.revision == 2)
+                #expect(published.revision == revision)
             }
         }
     }
 
     @Test
     func listPublishedEmpty() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
@@ -80,18 +68,15 @@ struct PublishedStudyIntegrationTests {
 
     @Test
     func listPublishedReturnsAll() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(token)
-            }) { _ in }
-
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(token)
-            }) { _ in }
+            for _ in 1...2 {
+                let response = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: token)
+                try #require(response.status == .created)
+            }
 
             try await app.test(.GET, "\(apiBasePath)/studies/\(studyId)/published", beforeRequest: { req in
                 req.bearerAuth(token)
@@ -106,11 +91,13 @@ struct PublishedStudyIntegrationTests {
 
     @Test
     func publishStudyNotFound() async throws {
-        try await TestApp.withApp { app, token in
+        try await PublicationWorkflowFixtures.withApp { app, token in
             let randomId = UUID()
 
             try await app.test(.POST, "\(apiBasePath)/studies/\(randomId)/publish", beforeRequest: { req in
                 req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(UUID())\"")
+                try req.encodeJSONBody(Components.Schemas.StudyPublicationInput(validationId: UUID().uuidString))
             }) { response in
                 #expect(response.status == .notFound)
             }

@@ -9,8 +9,9 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { z } from "zod";
+import type { ConsentContent } from "@/lib/api/generated/types.gen";
+import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
 
 export const consentFormSchema = z.object({
@@ -46,13 +47,25 @@ export const useConsentForm = (locale: string) => {
     defaultValues: formValues ?? defaultValues,
   });
 
-  useEffect(() => {
-    if (formValues) form.reset(formValues);
-    // form.reset identity changes every render
-    // eslint-disable-next-line @eslint-react/exhaustive-deps
-  }, [studyResponse, locale]);
+  const getStudySnapshot = useDraftFormSnapshot(
+    studyResponse,
+    `${params.study}:${locale}`,
+    form.formState.isDirty,
+    (loaded) => {
+      const consent = loaded.consent[locale] as ConsentContent | undefined;
+      form.reset({
+        title: consent?.title ?? "",
+        content: consent?.content ?? "",
+      });
+    },
+  );
 
-  return { form, studyResponse };
+  return {
+    form,
+    studyResponse,
+    getStudySnapshot,
+    getDraftHeaders: () => draftHeaders(getStudySnapshot().draftRevision),
+  };
 };
 
 export type ConsentForm = ReturnType<typeof useConsentForm>["form"];

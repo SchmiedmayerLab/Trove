@@ -28,7 +28,9 @@ import { useState } from "react";
 import { z } from "zod";
 import { FeaturedIconContainer } from "@/components/ui/FeaturedIconContainer";
 import { FieldLabel } from "@/components/ui/FieldLabel";
+import type { StudyResponse } from "@/lib/api/generated/types.gen";
 import { useLocale } from "@/lib/locale";
+import { draftHeaders } from "@/lib/queries/draft";
 import {
   studyResponseQueryOptions,
   useUpdateStudyMutation,
@@ -51,12 +53,14 @@ const addLocaleSchema = z.object({
 interface AddLocaleDialogContentProps {
   studyId: string;
   existingLocales: string[];
+  draftRevision: string;
   onSuccess?: () => void;
 }
 
 const AddLocaleDialogContent = ({
   studyId,
   existingLocales,
+  draftRevision,
   onSuccess,
 }: AddLocaleDialogContentProps) => {
   const { setLocale } = useLocale();
@@ -73,6 +77,7 @@ const AddLocaleDialogContent = ({
     }
     await updateStudy.mutateAsync({
       path: { studyId },
+      headers: draftHeaders(draftRevision),
       body: { locales: [...existingLocales, locale] },
     });
     setLocale(locale);
@@ -122,7 +127,11 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
   const { locale: activeLocale, setLocale } = useLocale();
   const addLocaleDialog = useOpenState();
   const deleteDialog = useOpenState();
-  const [pendingDeleteLocale, setPendingDeleteLocale] = useState<string>();
+  const [pendingDeleteLocale, setPendingDeleteLocale] = useState<{
+    locale: string;
+    study: StudyResponse;
+  }>();
+  const [pendingAddStudy, setPendingAddStudy] = useState<StudyResponse>();
   const updateStudy = useUpdateStudyMutation();
 
   const { data: study } = useQuery({
@@ -134,17 +143,18 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
 
   const handleRemove = () => {
     if (!pendingDeleteLocale) return;
-    const newLocales = locales.filter(
-      (locale) => locale !== pendingDeleteLocale,
+    const newLocales = pendingDeleteLocale.study.locales.filter(
+      (locale) => locale !== pendingDeleteLocale.locale,
     );
     updateStudy.mutate(
       {
         path: { studyId },
+        headers: draftHeaders(pendingDeleteLocale.study.draftRevision),
         body: { locales: newLocales },
       },
       {
         onSuccess: () => {
-          if (activeLocale === pendingDeleteLocale) {
+          if (activeLocale === pendingDeleteLocale.locale) {
             setLocale(newLocales[0] ?? "en-US");
           }
           deleteDialog.close();
@@ -174,7 +184,8 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
                 className="text-text-tertiary hover:text-text -mr-1 rounded p-0.5"
                 onClick={(event) => {
                   event.stopPropagation();
-                  setPendingDeleteLocale(locale);
+                  if (!study) return;
+                  setPendingDeleteLocale({ locale, study });
                   deleteDialog.open();
                 }}
               >
@@ -187,7 +198,11 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
         <HeaderSelectorMenuItem
           icon="plus"
           className="text-text-tertiary"
-          onSelect={addLocaleDialog.open}
+          onSelect={() => {
+            if (!study) return;
+            setPendingAddStudy(study);
+            addLocaleDialog.open();
+          }}
         >
           Add locale
         </HeaderSelectorMenuItem>
@@ -196,17 +211,20 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
         open={addLocaleDialog.isOpen}
         onOpenChange={addLocaleDialog.setIsOpen}
       >
-        <AddLocaleDialogContent
-          studyId={studyId}
-          existingLocales={locales}
-          onSuccess={addLocaleDialog.close}
-        />
+        {pendingAddStudy && (
+          <AddLocaleDialogContent
+            studyId={studyId}
+            existingLocales={pendingAddStudy.locales}
+            draftRevision={pendingAddStudy.draftRevision}
+            onSuccess={addLocaleDialog.close}
+          />
+        )}
       </Dialog>
       <ConfirmDeleteDialog
         open={deleteDialog.isOpen}
         onOpenChange={deleteDialog.setIsOpen}
         entityName="locale"
-        itemName={pendingDeleteLocale}
+        itemName={pendingDeleteLocale?.locale}
         onDelete={handleRemove}
       />
     </>

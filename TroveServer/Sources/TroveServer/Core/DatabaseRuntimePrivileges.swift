@@ -28,12 +28,13 @@ enum DatabaseRuntimePrivileges {
                 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public'
                     AND c.relname IN ('audit_events', '_fluent_migrations', 'published_studies', 'enrollment_consents', 'source_bindings',
+                        'study_delegations', 'study_publication_candidates',
                         'clinical_events', 'clinical_source_records', 'clinical_record_events', 'clinical_output_bindings',
                         'clinical_output_retractions', 'clinical_questionnaire_contexts', 'clinical_point_derivations',
                         'clinical_event_nodes', 'clinical_point_facts', 'study_data_grants', 'clinical_attribution_commands')
             )
             SELECT
-                (SELECT count(*) FROM protected_relations) = 16
+                (SELECT count(*) FROM protected_relations) = 18
                 AND current_user = session_user
                 AND NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_auth_members membership
@@ -76,10 +77,10 @@ enum DatabaseRuntimePrivileges {
                             ELSE 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION' END)
                         OR pg_catalog.has_any_column_privilege(r.oid, p.oid,
                             CASE WHEN p.relname = '_fluent_migrations' THEN 'SELECT,INSERT,UPDATE,REFERENCES'
-                                WHEN p.relname = 'source_bindings'
+                                WHEN p.relname IN ('source_bindings', 'study_delegations')
                                 THEN 'REFERENCES,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION,UPDATE WITH GRANT OPTION'
                                 ELSE 'UPDATE,REFERENCES,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION' END)
-                        OR (p.relname = 'source_bindings' AND EXISTS (
+                        OR (p.relname IN ('source_bindings', 'study_delegations') AND EXISTS (
                             SELECT 1 FROM pg_catalog.pg_attribute column_info
                             WHERE column_info.attrelid = p.oid AND column_info.attnum > 0 AND NOT column_info.attisdropped
                                 AND column_info.attname <> 'revoked_at'

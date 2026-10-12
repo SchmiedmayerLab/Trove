@@ -80,6 +80,7 @@ jobs:
               - "TroveServer/**"
               - "scripts/native-line-coverage.py"
               - "TroveInfrastructure/docker/keycloak/realm.json"
+              - "TroveInfrastructure/validator/manifest.json"
               - ".github/workflows/build-and-test.yml"
             infrastructure:
               - "TroveInfrastructure/**"

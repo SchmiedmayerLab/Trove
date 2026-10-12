@@ -72,6 +72,67 @@ struct KeycloakTransportTests {
         }
     }
 
+    @Test
+    func authorityTokenRequestsNeverFollowRedirects() async throws {
+        try await withServer(configure: { app in
+            app.post("realms", "fixture", "protocol", "openid-connect", "token") { request in
+                request.redirect(to: "/credential-target", redirectType: .temporary)
+            }
+            app.post("credential-target") { _ in
+                Issue.record("Authority transport forwarded credentials through a redirect")
+                return "{}"
+            }
+        }) { client in
+            await #expect(throws: KeycloakError.self) {
+                try await client.fetchAuthority(for: .init(issuer: TestApp.issuer, subject: "grantor"))
+            }
+        }
+    }
+
+    @Test
+    func oversizedAuthorityTokenResponseIsRejectedBeforeDecoding() async throws {
+        try await withServer(configure: { app in
+            app.post("realms", "fixture", "protocol", "openid-connect", "token") { _ in
+                Self.chunkedJWKS(byteCount: 262_145)
+            }
+        }) { client in
+            await #expect(throws: NIOTooManyBytesError.self) {
+                try await client.fetchAuthority(for: .init(issuer: TestApp.issuer, subject: "grantor"))
+            }
+        }
+    }
+
+    @Test(arguments: [true, false])
+    func authorityPaginationRequiresACompleteResult(terminates: Bool) async throws {
+        try await withServer(configure: { app in
+            app.post("realms", "fixture", "protocol", "openid-connect", "token") { _ in
+                Response(status: .ok, body: .init(string: "{\"access_token\":\"synthetic-token\"}"))
+            }
+            app.get("admin", "realms", "fixture", "users", "grantor") { _ in
+                Response(status: .ok, body: .init(string: "{\"id\":\"grantor\",\"enabled\":true}"))
+            }
+            app.get("admin", "realms", "fixture", "users", "grantor", "role-mappings", "realm", "composite") { _ in
+                Response(status: .ok, body: .init(string: "[{\"name\":\"trove-researcher\"}]"))
+            }
+            app.get("admin", "realms", "fixture", "users", "grantor", "groups") { request in
+                let first = try request.query.get(Int.self, at: "first")
+                let paths = terminates && first == 100 ? ["/Test Group/admin"] : (0..<100).map { "/Group\(first + $0)/researcher" }
+                let body = try JSONEncoder().encode(paths.map { ["path": $0] })
+                return Response(status: .ok, body: .init(data: body))
+            }
+        }) { client in
+            if terminates {
+                let authority = try await client.fetchAuthority(for: .init(issuer: TestApp.issuer, subject: "grantor"))
+                #expect(authority.groups.count == 101)
+                #expect(authority.groups.last == "/Test Group/admin")
+            } else {
+                await #expect(throws: ServerError.self) {
+                    try await client.fetchAuthority(for: .init(issuer: TestApp.issuer, subject: "grantor"))
+                }
+            }
+        }
+    }
+
     @Test(arguments: [
         (true, "Failed to authenticate with Keycloak (HTTP 401)"),
         (false, "Failed to fetch groups from Keycloak (HTTP 503)")

@@ -56,8 +56,10 @@ struct DatabaseInitializationTests {
             let sql = try #require(app.db as? any SQLDatabase)
             let query: SQLQueryString = "SELECT jsonb_agg(to_jsonb(log) ORDER BY name)::text AS history FROM _fluent_migrations log"
             let first = try #require(try await sql.raw(query).first()).decode(column: "history", as: String.self)
-            let count = try #require(try await sql.raw("SELECT count(*) AS count FROM _fluent_migrations").first())
-            #expect(try count.decode(column: "count", as: Int.self) == 13)
+            let names = try await sql.raw("SELECT name FROM _fluent_migrations ORDER BY name").all().map {
+                try $0.decode(column: "name", as: String.self)
+            }
+            #expect(names == TestDatabase.expectedMigrationNames)
             try await DatabaseInitialization.prepare(on: app.db, migrations: app.migrations)
             let second = try #require(try await sql.raw(query).first()).decode(column: "history", as: String.self)
             #expect(first == second)

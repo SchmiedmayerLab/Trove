@@ -21,12 +21,14 @@ struct QuestionnaireComponentIntegrationTests {
             let group = try await GroupFixtures.createGroup(on: app.db)
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
             let studyId = try study.requireId()
+            let draftRevision = study.draftRevision
 
             try await app.test(
                 .POST,
                 "\(apiBasePath)/studies/\(studyId)/components/questionnaire",
                 beforeRequest: { req in
                     req.bearerAuth(token)
+                    req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
                     try req.encodeJSONBody(createRequestBody(name: "Test Questionnaire"))
                 }
             ) { response in
@@ -106,12 +108,14 @@ struct QuestionnaireComponentIntegrationTests {
                 name: "Original Name"
             )
             let componentId = try component.requireId()
+            let draftRevision = study.draftRevision
 
             try await app.test(
                 .PUT,
                 "\(apiBasePath)/studies/\(studyId)/components/questionnaire/\(componentId)",
                 beforeRequest: { req in
                     req.bearerAuth(token)
+                    req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
                     try req.encodeJSONBody(createRequestBody(name: "Updated Name"))
                 }
             ) { response in

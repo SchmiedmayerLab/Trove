@@ -15,6 +15,7 @@ import {
   postGroupsByGroupIdStudiesMutation,
   patchStudiesByStudyIdMutation,
   postStudiesByStudyIdPublishMutation,
+  validateStudyDraftMutation,
 } from "../api/generated/@tanstack/react-query.gen";
 
 // --- Queries ---
@@ -54,8 +55,14 @@ export const usePublishStudyMutation = createMutationHook(
   "getStudiesByStudyIdPublished",
 );
 
+export const useValidateStudyMutation = createMutationHook(
+  validateStudyDraftMutation,
+  "Error validating study",
+);
+
 export const useDeleteStudyMutation = createMutationHook(
   deleteStudiesByStudyIdMutation,
   "Error deleting study",
+  "getStudiesByStudyId",
   "getGroupsByGroupIdStudies",
 );

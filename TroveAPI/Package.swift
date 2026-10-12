@@ -28,12 +28,12 @@ let package = Package(
         .library(name: "TroveAPIServer", targets: ["TroveAPIServer"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.7.0"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.12.1"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.3.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"5.0.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
-        .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.10.0"),
+        .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.13.1"),
         // Use the immutable PR revision until its products are available in a tagged release.
         .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "53d2d475571d634371b58871fc1ad749259f401b")
     ] + swiftLintPackage(),

@@ -27,6 +27,8 @@ struct StudyAuditRecord: Sendable {
     let occurredAt: Date
     let actor: AuditActor
     let initiator: AuditActor?
+    let executingClientID: String?
+    let delegationID: UUID?
     let action: AuditEvent.Action
     let target: AuditEvent.Target
     let outcome: Outcome
@@ -45,6 +47,8 @@ struct StudyAuditRecord: Sendable {
         case (nil, nil): initiator = nil
         default: throw AuditError.invalidMetadata
         }
+        executingClientID = try row.decode(column: "executing_client_id", as: String?.self)
+        delegationID = try row.decode(column: "delegation_id", as: UUID?.self)
         action = try row.decode(column: "action", as: AuditEvent.Action.self)
         outcome = try row.decode(column: "outcome", as: Outcome.self)
         guard action.scopeKind == .study,

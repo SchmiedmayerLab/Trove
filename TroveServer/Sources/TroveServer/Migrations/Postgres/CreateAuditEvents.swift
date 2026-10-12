@@ -48,6 +48,8 @@ struct CreateAuditEvents: AsyncMigration {
                 .field("actor_subject", .string, .required)
                 .field("initiator_issuer", .string)
                 .field("initiator_subject", .string)
+                .field("executing_client_id", .string)
+                .field("delegation_id", .uuid)
                 .field("action", .string, .required)
                 .field("scope_kind", .string, .required)
                 .field("study_id", .uuid)

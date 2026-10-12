@@ -23,22 +23,11 @@ if [ -n "${TROVE_UI_TEST_SERVER_BINARY:-}" ]; then
 fi
 
 # Readiness must belong to the processes started below, never an existing local stack.
-if ! command -v lsof >/dev/null 2>&1; then
-    echo "lsof is required to verify that native test ports are available." >&2
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Python 3 is required to verify that native test ports are available." >&2
     exit 1
 fi
-for port in 8080 8180 9000; do
-    if port_diagnostic="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>&1)"; then
-        echo "Native test port $port is already in use; no services were started." >&2
-        exit 1
-    else
-        port_status=$?
-        if [ "$port_status" -ne 1 ] || [ -n "$port_diagnostic" ]; then
-            echo "Unable to inspect native test port $port; no services were started." >&2
-            exit 1
-        fi
-    fi
-done
+python3 TroveiOS/scripts/check-ui-test-ports.py
 
 runtime_directory="$RUNNER_TEMP/trove-ui-test-stack"
 server_client_secret="${TROVE_UI_TEST_SERVER_CLIENT_SECRET:-dev-server-secret}"
@@ -135,11 +124,15 @@ if ! grep --quiet 'id="username"' "$authorization_response"; then
 fi
 
 server_log="$runtime_directory/server.log"
+# This consent-only fixture has no Questionnaires. Pin publication evidence to the
+# real manifest, but do not configure a worker or claim FHIR-validation coverage.
+validator_identity="sha256:$(shasum --algorithm 256 TroveInfrastructure/validator/manifest.json | awk '{print $1}')"
 (
     cd TroveServer
-    exec env \
+    exec env -u FHIR_VALIDATOR_URL \
         APP_ENVIRONMENT=development \
         TROVE_UI_TEST_MODE=true \
+        FHIR_VALIDATOR_IDENTITY="$validator_identity" \
         KEYCLOAK_URL=http://127.0.0.1:8180 \
         KEYCLOAK_REALM=trove \
         KEYCLOAK_ISSUER=http://localhost:8180/realms/trove \

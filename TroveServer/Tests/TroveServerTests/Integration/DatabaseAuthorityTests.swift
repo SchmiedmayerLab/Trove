@@ -141,12 +141,7 @@ struct DatabaseAuthorityTests {
             #expect(!app.databases.ids().contains(DatabaseID(string: "timescale")))
             let sql = try #require(app.db as? any SQLDatabase)
             let before = try await migrationNames(on: sql)
-            let expectedCoreNames = [
-                "CreateGroups", "CreateStudy", "CreateComponents", "CreateComponentSchedules", "CreatePublishedStudies",
-                "CreateParticipants", "CreateInvitationCodes", "CreateEnrollments", "CreateEnrollmentConsents",
-                "CreateAuditEvents", "CreateStoredArtifacts", "CreateSourceBindings", "CreateClinicalEvents"
-            ].map { "TroveServer.\($0)" }
-            #expect(Set(expectedCoreNames) == Set(before))
+            #expect(before == TestDatabase.expectedMigrationNames)
             try await app.autoMigrate()
             #expect(try await migrationNames(on: sql) == before)
             #expect(try await sql.raw("SELECT COUNT(*) AS count FROM participants").first()?.decode(column: "count", as: Int.self) == 0)

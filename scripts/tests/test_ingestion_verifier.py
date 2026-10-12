@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 from pathlib import Path
+import re
 import subprocess
 import unittest
 
@@ -11,6 +12,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class IngestionVerifierTests(unittest.TestCase):
+    def test_authority_schema_matches_registered_migrations(self):
+        registration = (ROOT / "TroveServer/Sources/TroveServer/Migrations/Postgres/PostgresMigrations.swift").read_text()
+        expected = re.findall(r"app\.migrations\.add\((\w+)\(\)\)", registration)
+        self.assertTrue(expected)
+        script = (ROOT / "TroveInfrastructure/docker/verify-timescale.sh").read_text()
+        names = re.findall(r"'TroveServer\.(\w+)'", script)
+        self.assertCountEqual(names, expected)
+        self.assertEqual(re.findall(r"<> (\d+)", script), [str(len(expected))] * 2)
+
     def test_authority_sql_preserves_database_failures(self):
         script = (ROOT / "TroveInfrastructure/docker/verify-timescale.sh").read_text()
         query = script[script.index("docker compose exec"):script.index('\necho "Verified')]

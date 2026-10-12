@@ -21,7 +21,7 @@ import { useConsentForm } from "./lib/useConsentForm";
 const ConsentRouteComponent = () => {
   const params = Route.useParams();
   const { locale } = useLocale();
-  const { form, studyResponse } = useConsentForm(locale);
+  const { form, getStudySnapshot, getDraftHeaders } = useConsentForm(locale);
   const updateStudy = useUpdateStudyMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
@@ -33,8 +33,9 @@ const ConsentRouteComponent = () => {
     updateStudy.mutate(
       {
         path: { studyId: params.study },
+        headers: getDraftHeaders(),
         body: {
-          consent: { ...studyResponse?.consent, [locale]: localeContent },
+          consent: { ...getStudySnapshot().consent, [locale]: localeContent },
         },
       },
       {

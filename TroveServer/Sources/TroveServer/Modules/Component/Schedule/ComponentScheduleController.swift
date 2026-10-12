@@ -33,7 +33,9 @@ extension Controller {
         }
 
         let data = try StudyDefinition.ComponentSchedule(id: UUID(), componentId: componentId, schema)
-        let schedule = try await componentScheduleService.createSchedule(studyId: studyId, componentId: componentId, data: data)
+        let schedule = try await componentScheduleService.createSchedule(
+            studyId: studyId, componentId: componentId, expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch), data: data
+        )
 
         return .created(.init(body: .json(try .init(schedule))))
     }
@@ -66,6 +68,7 @@ extension Controller {
             studyId: studyId,
             componentId: componentId,
             scheduleId: scheduleId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             data: data
         )
 
@@ -79,7 +82,12 @@ extension Controller {
         let componentId = try input.path.componentId.requireId()
         let scheduleId = try input.path.scheduleId.requireId()
 
-        try await componentScheduleService.deleteSchedule(studyId: studyId, componentId: componentId, scheduleId: scheduleId)
+        try await componentScheduleService.deleteSchedule(
+            studyId: studyId,
+            componentId: componentId,
+            scheduleId: scheduleId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch)
+        )
 
         return .noContent(.init())
     }

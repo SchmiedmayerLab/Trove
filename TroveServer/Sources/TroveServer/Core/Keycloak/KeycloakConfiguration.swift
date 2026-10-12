@@ -18,6 +18,7 @@ public struct KeycloakConfiguration: Sendable {
     public var clientSecret: String
     public var researcherRole: String
     public var participantRole: String
+    var clientPolicy: KeycloakClientPolicy
 
     public var jwksURL: String {
         "\(url)/realms/\(realm)/protocol/openid-connect/certs"
@@ -36,6 +37,7 @@ public struct KeycloakConfiguration: Sendable {
         self.clientSecret = Environment.Keycloak.clientSecret
         self.researcherRole = Environment.Keycloak.researcherRole
         self.participantRole = Environment.Keycloak.participantRole
+        self.clientPolicy = Environment.appEnvironment == .development ? .development : .production
     }
 
     /// Explicit configuration supports isolated deployments and tests without changing process state.
@@ -47,7 +49,8 @@ public struct KeycloakConfiguration: Sendable {
         clientId: String,
         clientSecret: String,
         researcherRole: String,
-        participantRole: String
+        participantRole: String,
+        clientPolicy: KeycloakClientPolicy = .production
     ) {
         self.issuer = issuer
         self.apiAudience = apiAudience
@@ -57,5 +60,6 @@ public struct KeycloakConfiguration: Sendable {
         self.clientSecret = clientSecret
         self.researcherRole = researcherRole
         self.participantRole = participantRole
+        self.clientPolicy = clientPolicy
     }
 }

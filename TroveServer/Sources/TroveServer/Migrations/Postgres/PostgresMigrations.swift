@@ -15,10 +15,12 @@ import Vapor
 func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateGroups())
     app.migrations.add(CreateStudy())
+    app.migrations.add(CreateStudyDelegations())
     app.migrations.add(CreateComponents())
     app.migrations.add(CreateComponentSchedules())
     app.migrations.add(CreateStoredArtifacts())
     app.migrations.add(CreatePublishedStudies())
+    app.migrations.add(CreateStudyPublicationCandidates())
     app.migrations.add(CreateParticipants())
     app.migrations.add(CreateSourceBindings())
     app.migrations.add(CreateInvitationCodes())

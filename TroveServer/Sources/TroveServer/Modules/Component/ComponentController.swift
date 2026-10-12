@@ -27,7 +27,9 @@ extension Controller {
     ) async throws -> Operations.DeleteStudiesStudyIdComponentsComponentId.Output {
         let studyId = try input.path.studyId.requireId()
         let componentId = try input.path.componentId.requireId()
-        try await componentService.deleteComponent(studyId: studyId, componentId: componentId)
+        try await componentService.deleteComponent(
+            studyId: studyId, componentId: componentId, expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch)
+        )
         return .noContent(.init())
     }
 
@@ -41,10 +43,11 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.createInformationalComponent(
+        let component = try await componentService.createComponent(
             studyId: studyId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            content: schema.data
+            data: .informational(schema.data)
         )
 
         return .created(.init(body: .json(try .init(component))))
@@ -75,11 +78,12 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.updateInformationalComponent(
+        let component = try await componentService.replaceComponent(
             studyId: studyId,
             id: componentId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            content: schema.data
+            data: .informational(schema.data)
         )
 
         return .ok(.init(body: .json(try .init(component))))
@@ -95,10 +99,11 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.createQuestionnaireComponent(
+        let component = try await componentService.createComponent(
             studyId: studyId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            content: schema.data
+            data: .questionnaire(schema.data)
         )
 
         return .created(.init(body: .json(try .init(component))))
@@ -129,11 +134,12 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.updateQuestionnaireComponent(
+        let component = try await componentService.replaceComponent(
             studyId: studyId,
             id: componentId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            content: schema.data
+            data: .questionnaire(schema.data)
         )
 
         return .ok(.init(body: .json(try .init(component))))
@@ -151,10 +157,11 @@ extension Controller {
 
         let data = StudyDefinition.HealthDataCollectionComponent(schema.data)
 
-        let component = try await componentService.createHealthDataComponent(
+        let component = try await componentService.createComponent(
             studyId: studyId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            data: data
+            data: .healthDataCollection(data)
         )
 
         return .created(.init(body: .json(try .init(component))))
@@ -187,11 +194,12 @@ extension Controller {
 
         let data = StudyDefinition.HealthDataCollectionComponent(schema.data)
 
-        let component = try await componentService.updateHealthDataComponent(
+        let component = try await componentService.replaceComponent(
             studyId: studyId,
             id: componentId,
+            expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            data: data
+            data: .healthDataCollection(data)
         )
 
         return .ok(.init(body: .json(try .init(component))))

@@ -13,3 +13,13 @@ The participant-facing app. It fetches the study definitions authored in the web
 ## Getting started
 
 Open `Trove.xcodeproj` in Xcode and run the `Trove` scheme. The Swift package dependencies resolve on the first build.
+
+## Native UI Test Boundary
+
+The real-stack UI scenario exercises sign-in, enrollment, revised consent, device
+setup, withdrawal and restored participant state. Its synthetic study has no
+Questionnaires. The native launcher binds publication receipts to the checked-in
+validator manifest, but deliberately leaves the validator endpoint unconfigured.
+Adding a Questionnaire therefore requires a real pinned worker; it must fail
+closed without one. This scenario does not establish FHIR validation or clinical
+event admission. The separate validator and receiver checks cover those paths.

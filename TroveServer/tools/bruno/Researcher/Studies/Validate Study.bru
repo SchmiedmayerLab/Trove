@@ -1,0 +1,29 @@
+meta {
+  name: Validate Study
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/studies/:studyId/draft/validations
+  body: none
+  auth: inherit
+}
+
+params:path {
+  studyId: {{studyId}}
+}
+
+headers {
+  If-Match: "{{draftRevision}}"
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() !== 201 || typeof body.id !== "string" || body.draftRevision !== bru.getVar("draftRevision")) {
+    throw new Error("Validation did not match the selected draft");
+  }
+  bru.setVar("validationId", body.id);
+  bru.setVar("validatedDraftRevision", body.draftRevision);
+  bru.setVar("validatedStudyId", bru.getVar("studyId"));
+}

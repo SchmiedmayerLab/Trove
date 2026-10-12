@@ -22,20 +22,31 @@ import ZIPFoundation
 
 @Suite(.serialized)
 struct StudyBundleIntegrationTests {
+    private struct ValidationReply: Encodable {
+        let valid = true
+        let sha256: String
+        let contractRevision = FHIRValidationClient.contractRevision
+        let validatorIdentity = "sha256:" + String(repeating: "a", count: 64)
+        let purpose = "questionnaire"
+    }
+
     private static let participantSubject = "bundle-test-participant"
+    private static var validator: FHIRValidationClient {
+        .init(expectedIdentity: "sha256:" + String(repeating: "a", count: 64), sendForPurpose: { purpose, bytes in
+            #expect(purpose == .questionnaire)
+            return (200, try JSONEncoder().encode(ValidationReply(sha256: ArtifactStore.digest(bytes))))
+        })
+    }
 
     // MARK: - Comprehensive Component Types Test
 
     @Test("Enrolled participant downloads a published bundle containing all component types")
     func downloadPublishedBundleWithAllComponentTypes() async throws {
-        try await TestApp.withApp(token: .researcher()) { app, researcherToken in
+        try await PublicationWorkflowFixtures.withApp(validator: Self.validator) { app, researcherToken in
             let studyId = try await buildFullStudy(on: app.db)
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(researcherToken)
-            }) { response in
-                #expect(response.status == .created)
-            }
+            let publication = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: researcherToken)
+            try #require(publication.status == .created)
 
             let participantToken = try await Self.signParticipantToken(subject: Self.participantSubject)
             try await Self.createEnrollment(on: app.db, studyId: studyId, revision: 1)
@@ -61,17 +72,14 @@ struct StudyBundleIntegrationTests {
 
     @Test("Returns 404 when participant tries to download a bundle without an enrollment")
     func downloadPublishedBundleRequiresEnrollment() async throws {
-        try await TestApp.withApp(token: .researcher()) { app, researcherToken in
+        try await PublicationWorkflowFixtures.withApp(validator: Self.validator) { app, researcherToken in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let groupId = try group.requireId()
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: groupId, title: "Locked Study")
             let studyId = try study.requireId()
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(researcherToken)
-            }) { response in
-                #expect(response.status == .created)
-            }
+            let publication = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: researcherToken)
+            try #require(publication.status == .created)
 
             let participantToken = try await Self.signParticipantToken(subject: Self.participantSubject)
             try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: Self.participantSubject)
@@ -88,17 +96,14 @@ struct StudyBundleIntegrationTests {
 
     @Test("Forbids researcher tokens from downloading the participant bundle")
     func downloadPublishedBundleForbiddenForResearcher() async throws {
-        try await TestApp.withApp(token: .researcher()) { app, researcherToken in
+        try await PublicationWorkflowFixtures.withApp(validator: Self.validator) { app, researcherToken in
             let group = try await GroupFixtures.createGroup(on: app.db)
             let groupId = try group.requireId()
             let study = try await StudyFixtures.createStudy(on: app.db, groupId: groupId, title: "Researcher Locked")
             let studyId = try study.requireId()
 
-            try await app.test(.POST, "\(apiBasePath)/studies/\(studyId)/publish", beforeRequest: { req in
-                req.bearerAuth(researcherToken)
-            }) { response in
-                #expect(response.status == .created)
-            }
+            let publication = try await PublicationWorkflowFixtures.publish(studyId, app: app, token: researcherToken)
+            try #require(publication.status == .created)
 
             try await app.test(
                 .GET,
@@ -197,6 +202,14 @@ extension StudyBundleIntegrationTests {
               "resourceType": "Questionnaire",
               "id": "\(questionnaireId.uuidString)",
               "status": "active",
+              "meta": {"profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]},
+              "url": "https://example.org/fhir/Questionnaire/daily-survey",
+              "version": "1.0.0",
+              "subjectType": ["Patient"],
+              "extension": [{
+                "url": "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm",
+                "valueCoding": {"system": "http://hl7.org/fhir/version-algorithm", "code": "semver"}
+              }],
               "language": "en-US",
               "title": "Daily Survey",
               "item": [{"linkId": "mood", "text": "Rate your mood", "type": "integer"}]

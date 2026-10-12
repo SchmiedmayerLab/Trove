@@ -17,14 +17,6 @@ import Vapor
 
 @Suite(.enabled(if: Environment.get("TROVE_TEST_POSTGRES_PORT") != nil, "Requires an isolated PostgreSQL test database"))
 struct DatabaseRuntimePrivilegesTests {
-    private struct RuntimeFixture: Sendable {
-        let database: any Database
-        let operatorDatabase: any Database
-        let admin: any SQLDatabase
-        let role: String
-        let databaseName: String
-    }
-
     @Test
     func minimallyPrivilegedActualLoginIsAccepted() async throws {
         try await Self.withRuntime { fixture in
@@ -34,6 +26,15 @@ struct DatabaseRuntimePrivilegesTests {
             #expect(try row.decode(column: "effective", as: String.self) == fixture.role)
             #expect(try row.decode(column: "authenticated", as: String.self) == fixture.role)
             try await DatabaseRuntimePrivileges.validate(on: fixture.database)
+            for table in ["study_delegations", "study_publication_candidates"] {
+                let permissions = try #require(try await sql.raw("""
+                    SELECT has_table_privilege(current_user, \(bind: table), 'SELECT')
+                        AND has_table_privilege(current_user, \(bind: table), 'INSERT') AS allowed
+                    """)
+                    .first())
+                #expect(try permissions.decode(column: "allowed", as: Bool.self))
+            }
+            try await sql.raw("UPDATE study_delegations SET revoked_at = CURRENT_TIMESTAMP WHERE false").run()
             let groups = try await Group.query(on: fixture.database).count()
             #expect(groups == 0)
             let event = AuditEvent(
@@ -64,6 +65,10 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM enrollment_consents WHERE false", "TRUNCATE enrollment_consents",
         "UPDATE source_bindings SET participant_id = participant_id WHERE false",
         "DELETE FROM source_bindings WHERE false", "TRUNCATE source_bindings",
+        "UPDATE study_delegations SET client_id = client_id WHERE false",
+        "DELETE FROM study_delegations WHERE false", "TRUNCATE study_delegations",
+        "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
+        "DELETE FROM study_publication_candidates WHERE false", "TRUNCATE study_publication_candidates",
         "UPDATE clinical_events SET raw_sha256 = raw_sha256 WHERE false", "DELETE FROM clinical_events WHERE false", "TRUNCATE clinical_events",
         "UPDATE clinical_event_nodes SET ordinal = ordinal WHERE false",
         "DELETE FROM clinical_event_nodes WHERE false", "TRUNCATE clinical_event_nodes",
@@ -160,6 +165,10 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (evidence_digest) ON public.enrollment_consents", "UPDATE ON public.source_bindings",
         "DELETE ON public.source_bindings", "TRUNCATE ON public.source_bindings", "MAINTAIN ON public.source_bindings",
         "UPDATE (participant_id) ON public.source_bindings",
+        "UPDATE ON public.study_delegations", "UPDATE (client_id) ON public.study_delegations",
+        "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
+        "UPDATE (bundle_digest) ON public.study_publication_candidates",
+        "DELETE ON public.study_publication_candidates", "TRUNCATE ON public.study_publication_candidates",
         "UPDATE ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
         "TRUNCATE ON public.clinical_point_facts", "MAINTAIN ON public.study_data_grants",
         "UPDATE (raw_sha256) ON public.clinical_events", "UPDATE (ordinal) ON public.clinical_event_nodes",
@@ -183,6 +192,8 @@ struct DatabaseRuntimePrivilegesTests {
         "INSERT ON public.enrollment_consents", "SELECT (bundle_digest) ON public.published_studies",
         "INSERT (evidence_digest) ON public.enrollment_consents", "UPDATE (revoked_at) ON public.source_bindings",
         "SELECT ON public.source_bindings", "INSERT (participant_id) ON public.source_bindings",
+        "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
+        "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
         "SELECT (quantity_value) ON public.clinical_point_facts", "INSERT (consent_id) ON public.study_data_grants",
         "INSERT ON public.clinical_source_records", "SELECT ON public.clinical_record_events", "INSERT ON public.clinical_output_bindings",
@@ -209,6 +220,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE ON public.audit_events", "INSERT ON public._fluent_migrations",
         "UPDATE (actor_subject) ON public.audit_events", "CREATE ON SCHEMA public",
         "UPDATE (bundle_digest) ON public.published_studies", "DELETE ON public.enrollment_consents",
+        "UPDATE (client_id) ON public.study_delegations", "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "UPDATE (participant_id) ON public.source_bindings",
         "UPDATE (raw_sha256) ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "TRUNCATE ON public.study_data_grants"
@@ -251,6 +263,7 @@ struct DatabaseRuntimePrivilegesTests {
     @Test(arguments: [
         "public.audit_events", "public._fluent_migrations", "public.published_studies",
         "public.enrollment_consents", "public.source_bindings", "public.clinical_events",
+        "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_output_retractions",
         "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
@@ -269,6 +282,14 @@ struct DatabaseRuntimePrivilegesTests {
 
 
 extension DatabaseRuntimePrivilegesTests {
+    private struct RuntimeFixture: Sendable {
+        let database: any Database
+        let operatorDatabase: any Database
+        let admin: any SQLDatabase
+        let role: String
+        let databaseName: String
+    }
+
     private static func expectRejected(on database: any Database) async {
         await #expect {
             try await DatabaseRuntimePrivileges.validate(on: database)
@@ -322,6 +343,7 @@ extension DatabaseRuntimePrivilegesTests {
             .run()
         try await sql.raw("""
             GRANT SELECT, INSERT ON public.audit_events, public.published_studies,
+                public.study_delegations, public.study_publication_candidates,
                 public.enrollment_consents, public.source_bindings, public.clinical_events,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
@@ -331,6 +353,7 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
+        try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
     }
 
     /// SQL-role capability fixture, not a bypass of the production receiver's validation/authority checks.

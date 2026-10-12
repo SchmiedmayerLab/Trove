@@ -32,6 +32,7 @@ extension AuditRepository {
         }
         let rows = try await sql.raw("""
             SELECT id, occurred_at, actor_issuer, actor_subject, initiator_issuer, initiator_subject,
+                   executing_client_id, delegation_id,
                    action, target_id, target_version, outcome, correlation_id, application_revision
             FROM audit_events WHERE \(scope) \(boundary)
             ORDER BY occurred_at DESC, id DESC LIMIT \(bind: limit + 1)

@@ -36,6 +36,8 @@ extension Components.Schemas.StudyAuditRecord {
             occurredAt: record.occurredAt,
             actor: .init(issuer: record.actor.issuer, subject: record.actor.subject),
             initiator: record.initiator.map { .init(issuer: $0.issuer, subject: $0.subject) },
+            executingClientId: record.executingClientID,
+            delegationId: record.delegationID?.uuidString,
             action: .init(record.action),
             targetId: record.target.id.uuidString,
             targetVersion: record.target.version,
@@ -57,7 +59,15 @@ extension Components.Schemas.StudyAuditAction {
         case .collectionPlanDisclosure: self = .collection_plan_disclosure
         case .enrollmentWithdrawn: self = .enrollment_withdrawn
         case .studyPublished: self = .study_published
+        case .studyPublicationDisclosure: self = .study_publication_disclosure
         case .studyDraftDeleted: self = .study_draft_deleted
+        case .studyDraftCreated: self = .study_draft_created
+        case .studyDraftEdited: self = .study_draft_edited
+        case .studyDraftValidated: self = .study_draft_validated
+        case .studyDraftDisclosure: self = .study_draft_disclosure
+        case .delegationCreated: self = .delegation_created
+        case .delegationRevoked: self = .delegation_revoked
+        case .delegationDisclosure: self = .delegation_disclosure
         case .studyBundleDisclosure: self = .study_bundle_disclosure
         case .artifactDiscardScheduled: self = .artifact_discard_scheduled
         case .studyDataGranted: self = .study_data_granted

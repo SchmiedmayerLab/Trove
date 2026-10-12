@@ -26,6 +26,7 @@ struct AuthEndpoint: Sendable {
     let contentType: HTTPMediaType?
     let role: AuthEndpointRole
     let successStatus: HTTPStatus
+    var ifMatch: String?
 
     var isParticipant: Bool {
         if case .participant = role {

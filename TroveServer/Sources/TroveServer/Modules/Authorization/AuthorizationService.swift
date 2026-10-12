@@ -25,6 +25,11 @@ final class AuthorizationService: Module, @unchecked Sendable {
     @Dependency(EnrollmentRepository.self) var enrollmentRepository
     @Dependency(StudyRepository.self) var studyRepository
     @Dependency(GroupRepository.self) var groupRepository
+    let grantorAuthority: GrantorAuthorityProvider
+
+    init(grantorAuthority: GrantorAuthorityProvider = .unavailable) {
+        self.grantorAuthority = grantorAuthority
+    }
 
     @discardableResult
     func checkIsResearcher() throws -> AuthContext {

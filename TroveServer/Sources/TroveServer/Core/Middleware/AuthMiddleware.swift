@@ -20,6 +20,7 @@ struct AuthMiddleware: ServerMiddleware {
     let participantRole: String
     let logger: Logger
     let auditConfiguration: AuditConfiguration
+    var clientPolicy: KeycloakClientPolicy = .production
 
     func intercept(
         _ request: HTTPRequest,
@@ -66,7 +67,30 @@ struct AuthMiddleware: ServerMiddleware {
             throw ServerError.invalidToken
         }
 
-        let authContext = AuthContext(
+        let authContext = try makeContext(payload: payload, request: request, operationID: operationID)
+        var response = try await AuthContext.$current.withValue(authContext) {
+            try await next(request, body, metadata)
+        }
+        response.0.headerFields[.cacheControl] = "no-store"
+        return response
+    }
+
+    private func makeContext(payload: KeycloakJWTPayload, request: HTTPRequest, operationID: String) throws -> AuthContext {
+        guard let clientID = payload.azp else { throw ServerError.invalidToken }
+        let access = try clientPolicy.access(for: clientID)
+        let delegationID: UUID?
+        let delegationHeader = HTTPField.Name("Trove-Delegation-ID").flatMap { request.headerFields[$0] }
+        switch access {
+        case .interactive:
+            guard delegationHeader == nil else { throw ServerError.forbidden }
+            delegationID = nil
+        case .delegatedDraft:
+            guard let delegationHeader, let identifier = UUID(uuidString: delegationHeader),
+                  KeycloakClientPolicy.draftPermission(for: operationID) != nil else { throw ServerError.forbidden }
+            delegationID = identifier
+        }
+
+        return AuthContext(
             issuer: payload.iss.value,
             subject: payload.sub.value,
             email: payload.email,
@@ -74,11 +98,11 @@ struct AuthMiddleware: ServerMiddleware {
             groups: payload.groups ?? [],
             researcherRole: researcherRole,
             participantRole: participantRole,
-            auditConfiguration: auditConfiguration
+            auditConfiguration: auditConfiguration,
+            executingClientID: clientID,
+            clientAccess: access,
+            delegationID: delegationID,
+            tokenExpiresAt: payload.exp.value
         )
-
-        return try await AuthContext.$current.withValue(authContext) {
-            try await next(request, body, metadata)
-        }
     }
 }

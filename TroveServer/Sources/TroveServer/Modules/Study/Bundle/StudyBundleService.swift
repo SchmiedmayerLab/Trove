@@ -10,12 +10,18 @@ import Foundation
 import Grove
 import GroveFoundation
 import GroveLocalization
-import GroveStudyDefinition
+@_spi(APISupport) import GroveStudyDefinition
 import TroveAPIServer
 import ZIPFoundation
 
 
 final class StudyBundleService: Module, @unchecked Sendable {
+    struct QuestionnaireResource: Sendable {
+        let componentID: UUID
+        let locale: String
+        let bytes: Data
+    }
+
     struct Publication: Sendable {
         let metadata: StudyDefinition.Metadata
         let consent: LocalizationsDictionary<String>
@@ -24,6 +30,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
         let collectionPolicy: PublishedCollectionPolicy
         let groupID: UUID
         let bundle: Data
+        let questionnaires: [QuestionnaireResource]
     }
 
     @Dependency(AuthorizationService.self) var authorizationService
@@ -42,6 +49,19 @@ final class StudyBundleService: Module, @unchecked Sendable {
         guard let study = try await studyRepository.findWithComponentsAndSchedules(id: studyId) else {
             throw ServerError.notFound(resource: "Study", identifier: studyId.uuidString)
         }
+        return try preparePublication(from: study, revision: revision)
+    }
+
+    /// The caller captures and authorizes the entire draft before invoking this builder.
+    /// No database, authorization or external resource lookup occurs while building.
+    func preparePublication(from study: Study, revision: Int) throws -> Publication {
+        guard revision > 0 else { throw ServerError.badRequest("Study revision must be positive") }
+        let studyId = try study.requireId()
+        guard let capturedComponents = study.$components.value,
+              capturedComponents.allSatisfy({ $0.$schedules.value != nil }) else {
+            throw ServerError.internalServerError("Study draft snapshot is incomplete")
+        }
+        guard capturedComponents.count <= 256 else { throw Self.resourceLimitExceeded }
         let collectionPolicy = try PublishedCollectionPolicy.compile(studyID: studyId, revision: revision, requirements: study.collectionRequirements)
 
         var consentMarkdown = LocalizationsDictionary<String>()
@@ -54,15 +74,16 @@ final class StudyBundleService: Module, @unchecked Sendable {
             }
             consentMarkdown[locale] = markdown
         }
+        try checkResources(consent: consentMarkdown, components: capturedComponents)
 
-        let (metadata, consentFiles) = try await buildMetadata(from: study, consentMarkdown: consentMarkdown)
-        let (components, componentFiles) = try buildComponents(from: study.components)
-        let schedules = study.components.flatMap { $0.schedules.map(\.scheduleData) }
+        let (metadata, consentFiles) = try buildMetadata(from: study, consentMarkdown: consentMarkdown)
+        let components = try buildComponents(from: capturedComponents)
+        let schedules = capturedComponents.flatMap { $0.schedules.map(\.scheduleData) }
 
         let definition = StudyDefinition(
             studyRevision: UInt(revision),
             metadata: metadata,
-            components: components,
+            components: components.definitions,
             componentSchedules: schedules
         )
 
@@ -74,9 +95,25 @@ final class StudyBundleService: Module, @unchecked Sendable {
             collectionPolicy: collectionPolicy,
             groupID: study.$group.id,
             bundle: try writeBundleZip(
-                studyId: studyId, definition: definition, files: consentFiles + componentFiles, collectionPolicy: collectionPolicy
-            )
+                studyId: studyId, definition: definition, files: consentFiles + components.files, collectionPolicy: collectionPolicy
+            ),
+            questionnaires: components.questionnaires
         )
+    }
+}
+
+
+extension StudyBundleService {
+    private struct ComponentResources {
+        var definitions: [StudyDefinition.Component] = []
+        var files: [StudyBundle.FileResourceInput] = []
+        var questionnaires: [QuestionnaireResource] = []
+    }
+
+    private struct QuestionnaireFiles {
+        let definition: StudyDefinition.Component
+        let files: [StudyBundle.FileResourceInput]
+        let resources: [QuestionnaireResource]
     }
 
     // MARK: - Metadata
@@ -84,9 +121,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
     private func buildMetadata(
         from study: Study,
         consentMarkdown: LocalizationsDictionary<String>
-    ) async throws -> (StudyDefinition.Metadata, [StudyBundle.FileResourceInput]) {
-        try await authorizationService.checkResearcherHasStudyAccess(study.requireId(), role: .researcher)
-        
+    ) throws -> (StudyDefinition.Metadata, [StudyBundle.FileResourceInput]) {
         var titles = LocalizationsDictionary<String>()
         var shortTitles = LocalizationsDictionary<String>()
         var explanationTexts = LocalizationsDictionary<String>()
@@ -133,9 +168,8 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
     private func buildComponents(
         from components: [Component]
-    ) throws -> ([StudyDefinition.Component], [StudyBundle.FileResourceInput]) {
-        var definitions: [StudyDefinition.Component] = []
-        var files: [StudyBundle.FileResourceInput] = []
+    ) throws -> ComponentResources {
+        var result = ComponentResources()
 
         for component in components {
             let componentId = try component.requireId()
@@ -144,44 +178,37 @@ final class StudyBundleService: Module, @unchecked Sendable {
             case .informational(let content):
                 let (definition, componentFiles) = try buildInformational(
                     id: componentId,
-                    name: component.name,
                     content: content
                 )
-                definitions.append(definition)
-                files += componentFiles
+                result.definitions.append(definition)
+                result.files += componentFiles
 
             case .questionnaire(let content):
-                let (definition, componentFiles) = try buildQuestionnaire(
+                let questionnaire = buildQuestionnaire(
                     id: componentId,
-                    name: component.name,
                     content: content
                 )
-                definitions.append(definition)
-                files += componentFiles
+                result.definitions.append(questionnaire.definition)
+                result.files += questionnaire.files
+                result.questionnaires += questionnaire.resources
 
             case .healthDataCollection(let data):
-                definitions.append(.healthDataCollection(data))
+                result.definitions.append(.healthDataCollection(data))
             }
         }
 
-        return (definitions, files)
+        return result
     }
 
     private func buildInformational(
         id: UUID,
-        name: String,
         content: LocalizationsDictionary<InformationalContent>
     ) throws -> (StudyDefinition.Component, [StudyBundle.FileResourceInput]) {
-        let fileRef = StudyBundle.FileReference(category: .informationalArticle, filename: name, fileExtension: "md")
+        let fileRef = StudyBundle.FileReference(category: .informationalArticle, filename: id.uuidString.lowercased(), fileExtension: "md")
         let definition = StudyDefinition.Component.informational(.init(id: id, fileRef: fileRef))
 
         let files = try content.map { locale, item in
-            var markdown = "---\nid: \(id.uuidString)\ntitle: \(ConsentPresentation.yamlEscape(item.title))\n"
-            if let lede = item.lede {
-                markdown += "lede: \(ConsentPresentation.yamlEscape(lede))\n"
-            }
-            markdown += "---\n\(item.content)"
-            return try StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: markdown)
+            try StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: informationalMarkdown(id: id, content: item))
         }
 
         return (definition, files)
@@ -189,17 +216,80 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
     private func buildQuestionnaire(
         id: UUID,
-        name: String,
         content: LocalizationsDictionary<QuestionnaireContent>
-    ) throws -> (StudyDefinition.Component, [StudyBundle.FileResourceInput]) {
-        let fileRef = StudyBundle.FileReference(category: .questionnaire, filename: name, fileExtension: "json")
+    ) -> QuestionnaireFiles {
+        let fileRef = StudyBundle.FileReference(category: .questionnaire, filename: id.uuidString.lowercased(), fileExtension: "json")
         let definition = StudyDefinition.Component.questionnaire(.init(id: id, fileRef: fileRef))
 
-        let files = content.map { locale, item in
-            StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: Data(item.questionnaire.utf8))
+        var files: [StudyBundle.FileResourceInput] = []
+        var resources: [QuestionnaireResource] = []
+        for (locale, item) in content {
+            let bytes = Data(item.questionnaire.utf8)
+            files.append(StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: bytes))
+            resources.append(QuestionnaireResource(componentID: id, locale: locale.description, bytes: bytes))
         }
 
-        return (definition, files)
+        return QuestionnaireFiles(definition: definition, files: files, resources: resources)
+    }
+}
+
+
+extension StudyBundleService {
+    private static var resourceLimitExceeded: ServerError {
+        .init(
+            status: .contentTooLarge,
+            title: "Study Resource Limit Exceeded",
+            detail: "A study supports 256 components, 1024 localized files and 50 MiB of resource data"
+        )
+    }
+
+    private static var missingResource: ServerError {
+        .init(status: .unprocessableContent, title: "Invalid Study Bundle", detail: "Each document component must include a localized resource")
+    }
+
+    private func informationalMarkdown(id: UUID, content: InformationalContent) -> String {
+        var markdown = "---\nid: \(id.uuidString)\ntitle: \(ConsentPresentation.yamlEscape(content.title))\n"
+        if let lede = content.lede {
+            markdown += "lede: \(ConsentPresentation.yamlEscape(lede))\n"
+        }
+        return markdown + "---\n\(content.content)"
+    }
+
+    /// Bound uncompressed inputs before writing an archive or contacting the validator.
+    private func checkResources(consent: LocalizationsDictionary<String>, components: [Component]) throws {
+        var paths: Set<String> = []
+        var identifiers: Set<UUID> = []
+        var remainingBytes = ArtifactReference.Purpose.publication.maximumBytes
+        func register(_ category: String, _ filename: String, _ locale: LocalizationKey, _ content: String) throws {
+            let key = locale.description
+            guard !key.isEmpty, key.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 }),
+                  paths.insert("\(category)/\(filename)+\(key)".lowercased()).inserted else {
+                throw ServerError.badRequest("Study resource locations must be unique and use supported locale identifiers")
+            }
+            let bytes = content.utf8.count
+            guard paths.count <= 1024, bytes <= remainingBytes else { throw Self.resourceLimitExceeded }
+            remainingBytes -= bytes
+        }
+        for (locale, content) in consent {
+            try register("consent", "Consent", locale, content)
+        }
+        for component in components {
+            let identifier = try component.requireId()
+            guard identifiers.insert(identifier).inserted else { throw ServerError.badRequest("Study component identifiers must be unique") }
+            switch component.data {
+            case .informational(let content):
+                guard !content.isEmpty else { throw Self.missingResource }
+                for (locale, item) in content {
+                    try register("article", identifier.uuidString, locale, informationalMarkdown(id: identifier, content: item))
+                }
+            case .questionnaire(let content):
+                guard !content.isEmpty else { throw Self.missingResource }
+                for (locale, item) in content {
+                    try register("questionnaire", identifier.uuidString, locale, item.questionnaire)
+                }
+            case .healthDataCollection: break
+            }
+        }
     }
 
     // MARK: - Bundle Writing
@@ -225,10 +315,24 @@ final class StudyBundleService: Module, @unchecked Sendable {
         try encoder.encode(collectionPolicy).write(to: policyURL, options: .atomic)
         let policyFile = StudyBundle.FileResourceInput(pathInBundle: PublishedCollectionPolicy.filename, contentsOf: policyURL)
 
+        let bundle: StudyBundle
         do {
-            _ = try StudyBundle.writeToDisk(at: bundleURL, definition: definition, files: files + [policyFile])
+            bundle = try StudyBundle.writeToDisk(at: bundleURL, definition: definition, files: files + [policyFile])
+        } catch StudyBundle.CreateBundleError.failedValidation {
+            throw ServerError(
+                status: .unprocessableContent, title: "Invalid Study Bundle", detail: "Study resources do not satisfy bundle requirements"
+            )
+        } catch is DecodingError {
+            throw ServerError(status: .unprocessableContent, title: "Invalid Study Bundle", detail: "Study resources contain invalid structured data")
         } catch {
-            throw ServerError.internalServerError("Failed to build study bundle: \(error)")
+            throw ServerError.internalServerError("Failed to build study bundle")
+        }
+        guard definition.validate(in: bundle) else {
+            throw ServerError(
+                status: .unprocessableContent,
+                title: "Invalid Study Bundle",
+                detail: "Study schedules and resources must reference existing components"
+            )
         }
 
         return try zipDirectory(at: bundleURL)
