@@ -26,7 +26,7 @@ swift run --package-path TroveAPI TroveAPIGenerator --package-path TroveAPI --ty
 
 ## Local Verification
 
-Run `bash scripts/check swift TroveAPI` from the repository root with Swift 6.3.x.
+Run `bash scripts/check swift TroveAPI` from the repository root with Swift 6.4.x.
 Linux builds of `TroveAPIClient` require SQLite development files; on Ubuntu,
 install `libsqlite3-dev` and `pkg-config`. The shared CI workflow installs these dependencies before
 running the same check. Apple platforms use their system SQLite library.

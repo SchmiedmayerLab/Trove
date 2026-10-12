@@ -14,7 +14,9 @@ from __future__ import annotations
 import argparse
 from datetime import timedelta
 import json
+import math
 from pathlib import Path
+import shutil
 import statistics
 import subprocess
 import sys
@@ -25,6 +27,28 @@ from workload import LOINC_SYSTEM, PROFILES, expected_row_count, parse_start, pa
 
 
 COLUMNS = "participant_id,resource_type,time,external_id,code,code_system,value,value_code,value_system,resource"
+
+
+def required_disk_bytes(participants: int, days: int, payload_bytes: int) -> tuple[int, int]:
+    """Conservative planning bounds, not predictions of measured relation sizes."""
+    payload = expected_row_count(participants, days) * payload_bytes
+    # The generated CSV and its gzip output use host temporary storage. Both
+    # uncompressed tables, indexes, WAL and compression workspace use the volume.
+    return payload * 2 + 2**30, payload * 4 + 2**30
+
+
+def available_volume_bytes(output: str) -> int:
+    """Read portable df output from the database container, failing closed."""
+    lines = output.strip().splitlines()
+    if len(lines) != 2:
+        raise ValueError("Expected one filesystem from database disk inspection")
+    columns = lines[1].split()
+    if len(columns) < 6:
+        raise ValueError("Incomplete database disk inspection")
+    blocks = int(columns[3])
+    if blocks < 0:
+        raise ValueError("Negative database disk availability")
+    return blocks * 1024
 
 
 class Benchmark:
@@ -93,6 +117,34 @@ class Benchmark:
             check=True,
             text=True,
         )
+
+    def check_disk_capacity(self) -> None:
+        """Reject an undersized run before replacing tables or generating data."""
+        fixture_required, database_required = required_disk_bytes(
+            self.args.participants, self.args.days, self.args.payload_bytes
+        )
+        # Docker Desktop stores the database on a different filesystem from the
+        # caller; inspecting only /tmp does not establish volume capacity.
+        result = subprocess.run(
+            [*self.compose, "exec", "-T", "benchmark-db", "df", "-Pk", "/pgdata"],
+            check=True, capture_output=True, text=True, timeout=10,
+        )
+        database_available = available_volume_bytes(result.stdout)
+        fixture_available = shutil.disk_usage(tempfile.gettempdir()).free
+        # On hosted Linux runners the Docker volume and temporary directory may
+        # share a filesystem. Require their combined budget on both rather than
+        # incorrectly treating those free-byte figures as independent capacity.
+        required = fixture_required + database_required
+        available = min(fixture_available, database_available)
+        if available < required:
+            raise RuntimeError(
+                f"Benchmark disk preflight requires at least {math.ceil(required / 2**30)} GiB "
+                f"free for the selected workload; host temporary storage has "
+                f"{fixture_available / 2**30:.1f} GiB and the database volume has "
+                f"{database_available / 2**30:.1f} GiB. Use smaller explicit participant/day "
+                "inputs for a regression run, or provision more storage for the full profile. "
+                "No benchmark tables have been replaced."
+            )
 
     def generator_command(self) -> list[str]:
         return [
@@ -227,6 +279,7 @@ class Benchmark:
 
     def run(self) -> dict[str, object]:
         self.wait_for_readiness()
+        self.check_disk_capacity()
         self.prepare()
         expected = expected_row_count(self.args.participants, self.args.days)
         ingestion: dict[str, object] = {}

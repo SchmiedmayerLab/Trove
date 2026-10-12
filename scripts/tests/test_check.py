@@ -26,13 +26,13 @@ class VerificationInputTests(unittest.TestCase):
         match = re.search(r'if \[\[ ! "\$swift_version" =~ (.+) ]]; then', source)
         self.assertIsNotNone(match)
         for version, accepted in (
-            ("Swift version 6.3 (swift-6.3-RELEASE)", True),
-            ("Swift version 6.3.0 (swift-6.3-RELEASE)", True),
-            ("Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3)", True),
-            ("Swift version 6.30 (swift-6.30-RELEASE)", False),
-            ("Swift version 6.3garbage", False),
+            ("Swift version 6.4 (swift-6.4-RELEASE)", True),
+            ("Swift version 6.4.0 (swift-6.4-RELEASE)", True),
+            ("Apple Swift version 6.4 (swiftlang-6.4.0.34.1)", True),
+            ("Swift version 6.40 (swift-6.40-RELEASE)", False),
+            ("Swift version 6.4garbage", False),
             ("Swift version 6.2.3 (swift-6.2.3-RELEASE)", False),
-            ("Swift version 6.4 (swift-6.4-RELEASE)", False),
+            ("Swift version 6.3.3 (swift-6.3.3-RELEASE)", False),
         ):
             with self.subTest(version=version):
                 result = subprocess.run(
@@ -58,7 +58,26 @@ class VerificationInputTests(unittest.TestCase):
 
     def test_release_build_bounds_compiler_parallelism(self):
         dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
-        self.assertIn("swift build -c release --force-resolved-versions --jobs 4", dockerfile)
+        self.assertIn("swift build --build-system native -c release --force-resolved-versions --jobs 4", dockerfile)
+
+    def test_static_release_uses_matching_native_artifact_paths(self):
+        dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
+        self.assertEqual(dockerfile.count("swift build --build-system native"), 3)
+        self.assertEqual(dockerfile.count("swift build --build-system native -c release --show-bin-path"), 2)
+        self.assertIn("--static-swift-stdlib", dockerfile)
+
+    def test_linux_verification_and_release_use_the_same_pinned_swift_image(self):
+        dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
+        workflow = (ROOT / ".github/workflows/swift-package.yml").read_text()
+        image_pattern = r"swift:6\.4\.0-noble@sha256:[a-f0-9]{64}"
+        build_images = re.findall(image_pattern, dockerfile)
+        self.assertEqual(len(build_images), 1)
+        self.assertEqual(re.findall(image_pattern, workflow), build_images * 2)
+
+    def test_runtime_updates_installed_base_packages_before_adding_libraries(self):
+        dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
+        runtime = dockerfile.split("# Run image", 1)[1]
+        self.assertLess(runtime.index("apk upgrade --no-cache"), runtime.index("apk add --no-cache"))
 
     def test_database_probes_require_final_tcp_server_not_initialization_socket(self):
         for relative_path, expected_count in (

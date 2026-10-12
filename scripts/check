@@ -46,14 +46,18 @@ case "${1:-}" in
         require_tool mktemp
         swift_version="$(swift --version)"
         echo "$swift_version"
-        if [[ ! "$swift_version" =~ Swift\ version\ 6\.3(\.[0-9]+)?[[:space:]] ]]; then
-            echo "CI parity requires Swift 6.3.x; run with the pinned workflow container/toolchain." >&2
+        if [[ ! "$swift_version" =~ Swift\ version\ 6\.4(\.[0-9]+)?[[:space:]] ]]; then
+            echo "CI parity requires Swift 6.4.x; run with the pinned workflow container/toolchain." >&2
             exit 1
         fi
+        build_system_args=(--build-system swiftbuild)
         if [[ "$(uname -s)" == Darwin ]]; then
             require_tool xcrun
             coverage_tool=(xcrun llvm-cov)
         else
+            # Swift 6.4 SwiftBuild includes Apple-only conditional dependencies on Linux.
+            # Keep the pinned toolchain and use its supported native backend there.
+            build_system_args=(--build-system native)
             require_tool llvm-cov
             coverage_tool=(llvm-cov)
             # Both packages exercise the client journal, including receiver recovery tests.
@@ -69,7 +73,7 @@ case "${1:-}" in
         mkdir -p .build/verification
         # Bound compiler fan-out consistently on hosted runners and larger local hosts.
         # This changes build concurrency, not which tests execute.
-        build_args=(--force-resolved-versions --enable-code-coverage --jobs 4)
+        build_args=("${build_system_args[@]}" --force-resolved-versions --enable-code-coverage --jobs 4)
         # Compiler macros execute inside a read-only sandbox. Their own process
         # profiles are not application test coverage. Build all instrumented test
         # products first; only discard host-tool profiles during this build step.
@@ -88,20 +92,22 @@ case "${1:-}" in
         env -u LLVM_PROFILE_FILE swift test --skip-build "${test_args[@]}" \
             --xunit-output "$execution_reports/tests.xml" 2>&1 | tee .build/verification/test.log
         verify_swift_diagnostics .build/verification/test.log
-        python3 "$repository_root/scripts/check-swift-test-report.py" "$execution_reports/tests-swift-testing.xml"
-        binary_path="$(swift build --force-resolved-versions --show-bin-path)"
+        binary_path="$(swift build "${build_system_args[@]}" --force-resolved-versions --show-bin-path)"
+        swift package describe --type json > "$execution_reports/package.json"
+        python3 "$repository_root/scripts/check-swift-test-report.py" "$execution_reports/tests-swift-testing.xml" \
+            --package-description "$execution_reports/package.json" --binary-path "$binary_path" \
+            > "$execution_reports/coverage-objects.txt"
         shopt -s nullglob
         profiles=("$binary_path"/codecov/*.profdata)
-        bundles=("$binary_path"/*.xctest)
-        if [[ "${#profiles[@]}" -ne 1 || "${#bundles[@]}" -ne 1 ]]; then
-            echo "Expected exactly one coverage profile and test bundle; refusing ambiguous or missing coverage." >&2
+        if [[ "${#profiles[@]}" -ne 1 ]]; then
+            echo "Expected exactly one coverage profile; refusing ambiguous or missing coverage." >&2
             exit 1
         fi
-        test_binary="${bundles[0]}"
-        if [[ -d "$test_binary" ]]; then
-            test_binary="$test_binary/Contents/MacOS/$(basename "$test_binary" .xctest)"
-        fi
-        "${coverage_tool[@]}" export "$test_binary" \
+        coverage_objects=()
+        while IFS= read -r test_binary; do
+            coverage_objects+=(--object "$test_binary")
+        done < "$execution_reports/coverage-objects.txt"
+        "${coverage_tool[@]}" export "${coverage_objects[@]}" \
             --instr-profile="${profiles[0]}" --format=lcov > .build/verification/raw.lcov
         awk -f "$repository_root/scripts/line-coverage.awk" \
             .build/verification/raw.lcov > .build/verification/coverage.lcov
@@ -156,6 +162,7 @@ case "${1:-}" in
         shellcheck scripts/check TroveiOS/scripts/start-ui-test-stack.sh TroveiOS/scripts/seed-ui-test.sh TroveiOS/scripts/verify-ui-test-consent.sh
         shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
         shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
+        shellcheck scripts/prepare-hosted-disk.sh
         shellcheck TroveWeb/docker-entrypoint.sh
         python3 -B -m unittest discover -s scripts/tests -v
         python3 -B -m unittest discover -s TroveServer/Benchmarks -v

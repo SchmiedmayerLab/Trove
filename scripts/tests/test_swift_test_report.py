@@ -6,9 +6,10 @@
 # SPDX-License-Identifier: MIT
 #
 
-"""Verify execution evidence using the format emitted by Swift 6.3's test runner."""
+"""Verify execution evidence using the Swift Testing xUnit report format."""
 
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -90,6 +91,68 @@ class SwiftTestReportTests(unittest.TestCase):
                      '<testcase classname="Fixture" name="test"><skipped/><skipped/></testcase>'):
             with self.subTest(case=case), self.assertRaises(ValueError):
                 self.check(document(case))
+
+    def test_multiple_target_suites_require_execution_from_every_declared_target(self) -> None:
+        first = document(PASSED.replace('classname="Fixture"', 'classname="APITests.Fixture"'))
+        second = document(PASSED.replace('classname="Fixture"', 'classname="CLITests.Fixture"'))
+        combined = first.replace("</testsuites>", "") + second.replace("<testsuites>", "")
+        self.path.write_text(combined)
+        self.assertEqual(REPORT.verify(self.path, {"APITests", "CLITests"}), (2, 0))
+        for targets in ({"APITests"}, {"APITests", "CLITests", "MissingTests"}):
+            with self.subTest(targets=targets), self.assertRaisesRegex(ValueError, "Every declared"):
+                REPORT.verify(self.path, targets)
+        duplicate = first.replace("</testsuites>", "") + first.replace("<testsuites>", "")
+        with self.assertRaisesRegex(ValueError, "Duplicate"):
+            self.check(duplicate)
+        empty = document("", tests="0")
+        with self.assertRaisesRegex(ValueError, "No tests executed"):
+            self.check(first.replace("</testsuites>", "") + empty.replace("<testsuites>", ""))
+
+    def test_an_all_skipped_target_cannot_hide_in_a_unified_suite(self) -> None:
+        self.path.write_text(document(
+            PASSED.replace('classname="Fixture"', 'classname="APITests.Fixture"')
+            + SKIPPED.replace('classname="Fixture"', 'classname="CLITests.Fixture"'), skipped="1"))
+        with self.assertRaisesRegex(ValueError, "Every declared"):
+            REPORT.verify(self.path, {"APITests", "CLITests"})
+
+    def test_coverage_accepts_only_complete_declared_or_unified_bundle_sets(self) -> None:
+        directory = self.path.parent / "bin"
+        directory.mkdir()
+        targets = {"APITests", "CLITests"}
+        with self.assertRaisesRegex(ValueError, "Test bundles"):
+            REPORT.coverage_objects(directory, "Example", targets)
+        api = directory / "APITests.xctest"
+        api.touch()
+        with self.assertRaisesRegex(ValueError, "Test bundles"):
+            REPORT.coverage_objects(directory, "Example", targets)
+        cli = directory / "CLITests.xctest"
+        binary = cli / "Contents/MacOS/CLITests"
+        binary.parent.mkdir(parents=True)
+        with self.assertRaisesRegex(ValueError, "no coverage binary"):
+            REPORT.coverage_objects(directory, "Example", targets)
+        binary.touch()
+        self.assertEqual(REPORT.coverage_objects(directory, "Example", targets), [api, binary])
+        stale = directory / "ExamplePackageTests.xctest"
+        stale.touch()
+        with self.assertRaisesRegex(ValueError, "Test bundles"):
+            REPORT.coverage_objects(directory, "Example", targets)
+        api.unlink()
+        binary.unlink()
+        binary.parent.rmdir()
+        (cli / "Contents").rmdir()
+        cli.rmdir()
+        self.assertEqual(REPORT.coverage_objects(directory, "Example", targets), [stale])
+
+    def test_package_targets_come_from_manifest_metadata(self) -> None:
+        package = {"name": "Example", "targets": [
+            {"name": "API", "type": "library"}, {"name": "APITests", "type": "test"}]}
+        self.path.write_text(json.dumps(package))
+        self.assertEqual(REPORT.package_targets(self.path), ("Example", {"APITests"}))
+        for name in ("../outside", "", None):
+            package["name"] = name
+            self.path.write_text(json.dumps(package))
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                REPORT.package_targets(self.path)
 
 
 if __name__ == "__main__":

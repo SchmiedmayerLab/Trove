@@ -25,7 +25,7 @@ and operator setup have completed:
 swift run TroveServer serve
 ```
 
-Container builds use the pinned Swift 6.3 Ubuntu toolchain and a separate, digest-pinned
+Container builds use the pinned Swift 6.4 Ubuntu toolchain and a separate, digest-pinned
 Wolfi runtime with glibc, the binary's dynamic libraries, certificate roots and time-zone
 data. The server runs as UID/GID 999, matching the Kubernetes security context. Both
 architectures must pass the exact-image vulnerability scan and real-store checks;

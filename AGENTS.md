@@ -44,7 +44,7 @@ bash scripts/check tooling
 bash scripts/check secrets /private/tmp/trove-secret-evidence
 ```
 
-Choose only the applicable commands. Swift checks require the CI-pinned Swift 6.3.x
+Choose only the applicable commands. Swift checks require the CI-pinned Swift 6.4.x
 toolchain; Linux also needs Python 3, pkg-config and SQLite development headers.
 Tooling checks require Python 3, kubectl, actionlint and ShellCheck. Web setup and
 generation are part of its shared command. Missing dependencies are not a reason
