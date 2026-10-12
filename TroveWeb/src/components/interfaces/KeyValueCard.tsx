@@ -72,7 +72,14 @@ export const KeyValueCard = ({
             <div className="flex flex-1 items-center text-sm">
               {isLoading ?
                 <Skeleton className="h-4 w-full" />
-              : <div>{item.value ?? "---"}</div>}
+              : <div
+                  className={
+                    typeof item.value === "string" ? "line-clamp-2" : undefined
+                  }
+                >
+                  {item.value ?? "---"}
+                </div>
+              }
             </div>
           </li>
         ))}

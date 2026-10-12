@@ -15,6 +15,7 @@ extension DeliveryJournal {
         let url: URL
         let scope: Scope
         let sourceID: UUID
+        let checkpointRevision: UUID
         let limits: Limits
 
         func transaction<Result>(_ body: (any ExchangeProducer.Transaction) throws -> Result) throws -> Result {
@@ -27,16 +28,17 @@ extension DeliveryJournal {
             )
             return try database.transaction {
                 let bindings = try database.query(
-                    "SELECT local_id, binding FROM source_state WHERE source_id = ?", [.text(sourceID.uuidString.lowercased())]
+                    "SELECT local_id, binding, checkpoint_revision FROM source_state WHERE source_id = ?", [.text(sourceID.uuidString.lowercased())]
                 ) { statement in
-                    (try DeliverySQLite.text(statement, 0), try DeliverySQLite.blob(statement, 1))
+                    (try DeliverySQLite.text(statement, 0), try DeliverySQLite.blob(statement, 1), try DeliverySQLite.text(statement, 2))
                 }
-                guard let (localID, bytes) = bindings.first, let localID = UUID(uuidString: localID) else {
+                guard let (localID, bytes, revision) = bindings.first, let localID = UUID(uuidString: localID) else {
                     throw JournalError.unknownSource
                 }
                 let binding = try JSONDecoder().decode(Contract.SourceBinding.self, from: bytes)
                 let source = try Contract.source(binding, localID: localID, scope: scope)
                 guard source.id == sourceID, source.revokedAt == nil else { throw JournalError.sourceRevoked }
+                guard revision == checkpointRevision.uuidString.lowercased() else { throw JournalError.staleCheckpoint }
                 let transaction = ProducerTransaction(database: database, sourceID: sourceID.uuidString.lowercased())
                 defer { transaction.isOpen = false }
                 let result = try body(transaction)
@@ -94,10 +96,13 @@ extension DeliveryJournal {
         }
     }
 
-    /// Grove's ledger shares the protected journal, but has no authority to change its queue or anchor.
-    /// Each synchronous transaction owns a connection; no connection crosses an isolation boundary.
-    public func producerStorage(for sourceID: UUID) throws -> some ExchangeProducer.Storage {
-        _ = try activeSource(sourceID)
-        return ProducerStorage(url: url, scope: scope, sourceID: sourceID, limits: limits)
+    /// Grove's ledger belongs to one query checkpoint. Successful staging atomically retires it
+    /// with the cursor; the next checkpoint receives a new producer instance. Failed staging and
+    /// process restarts preserve the original ledger for byte-exact retries. Old handles cannot
+    /// mutate a subsequent checkpoint. SQLite contention fails retriably without blocking a task.
+    public func producerStorage(from expected: Checkpoint) throws -> some ExchangeProducer.Storage {
+        _ = try activeSource(expected.sourceID)
+        guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
+        return ProducerStorage(url: url, scope: scope, sourceID: expected.sourceID, checkpointRevision: expected.revision, limits: limits)
     }
 }

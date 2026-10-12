@@ -11,6 +11,7 @@ import Fluent
 import FluentPostgresDriver
 import FluentSQLiteDriver
 import Foundation
+import GroveFHIRContract
 import GroveLocalization
 import SQLKit
 import Testing
@@ -41,6 +42,22 @@ struct ClinicalEventStoreTests {
 
         func targets(for event: ValidatedExchangeEvent, studies: [Int] = [0, 1]) -> [ClinicalEventTarget] {
             studies.map { .init(consentID: consentIDs[$0], outputFullURLs: event.outputs.map(\.fullURL)) }
+        }
+    }
+
+    @Test(arguments: GroveIdentifierRole.allCases)
+    func rejectsForeignDeploymentNamespacesBeforePersisting(role: GroveIdentifierRole) async throws {
+        try await TestApp.withApp { app, _ in
+            let fixture = try await Self.prepare(on: app)
+            var event = Self.event(source: fixture.source)
+            event.deploymentIdentifiers.systems[role] = ["https://foreign.example/identity"]
+            let candidate = event
+            try await AuthContext.$current.withValue(Self.participant) {
+                await #expect {
+                    try await ClinicalEventStore(database: app.db).accept(candidate, sourceID: fixture.source.id, targets: fixture.targets)
+                } throws: { ($0 as? ServerError)?.status.code == 403 }
+                try await Self.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
+            }
         }
     }
 
@@ -398,6 +415,7 @@ extension ClinicalEventStoreTests {
             eventIdentifierSystem: source.eventIdentifierSystem,
             eventIdentifierValue: "e0:\(source.id.uuidString.lowercased()):\(sequence)",
             producerInstance: source.id,
+            deploymentIdentifiers: .init(systems: [.event: [source.eventIdentifierSystem]]),
             participants: [.init(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)],
             nodes: [
                 .init(ordinal: 0, fullURL: "urn:uuid:patient", resourceType: "Patient"),

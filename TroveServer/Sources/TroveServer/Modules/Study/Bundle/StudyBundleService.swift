@@ -113,6 +113,7 @@ extension StudyBundleService {
         let entries = archive.filter { $0.path.contains("/questionnaire/") && $0.type == .file }
         let components = Dictionary(grouping: inputs, by: \.componentID)
         guard entries.count == components.count else { throw Self.missingResource }
+        var remainingBytes = ArtifactReference.Purpose.publication.maximumBytes
         return try components.keys.sorted(by: { $0.uuidString < $1.uuidString }).map { id in
             let candidates = (components[id] ?? []).compactMap { input -> (QuestionnaireResource, Entry)? in
                 let suffix = "/questionnaire/\(id.uuidString.lowercased())+\(input.locale).json"
@@ -124,9 +125,10 @@ extension StudyBundleService {
             guard candidates.count == 1, let (input, entry) = candidates.first else { throw Self.missingResource }
             var content = Data()
             _ = try archive.extract(entry) { chunk in
-                guard chunk.count <= ArtifactReference.Purpose.publication.maximumBytes - content.count else {
+                guard chunk.count <= remainingBytes else {
                     throw Self.resourceLimitExceeded
                 }
+                remainingBytes -= chunk.count
                 content.append(chunk)
             }
             return QuestionnaireResource(componentID: id, locale: input.locale, bytes: content)

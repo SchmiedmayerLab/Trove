@@ -409,6 +409,7 @@ class Checkpoint:
         event = self.run([sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
                           "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
                           "--event-system", source["eventIdentifierSystem"], "--producer-instance", source["id"],
+                          "--identifier-root", source["identifierRoot"], "--registration-id", source["registrationID"],
                           "--participant-system", source["participantIdentifier"]["system"], "--participant-value", source["participantIdentifier"]["value"],
                           "--effective-at", datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")])
         (self.evidence / "event.json").write_bytes(event)

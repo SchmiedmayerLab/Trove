@@ -37,7 +37,6 @@
     "test:e2e:coverage": "COVERAGE=true playwright test; test_status=$?; nyc report --reporter=lcov --reporter=text-summary --report-dir coverage-e2e; coverage_status=$?; if [ \"$test_status\" -ne 0 ]; then exit \"$test_status\"; fi; exit \"$coverage_status\""
   },
   "dependencies": {
-    "@hey-api/client-fetch": "^0.13.1",
     "@schmiedmayerlab/grove-design-system": "^0.1.1",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.90.21",
@@ -65,7 +64,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.97.3",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@playwright/test": "^1.58.2",
     "@schmiedmayerlab/grove-configurations": "^0.1.1",
     "@tanstack/router-plugin": "^1.161.0",

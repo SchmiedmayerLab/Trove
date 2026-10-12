@@ -32,7 +32,10 @@ const RootComponent = () => {
       <GroveProvider router={routerProps} colorScheme="system">
         {/* The colour-scheme tokens live on the provider's element, which sits inside body,
             so the app paints its own background rather than inheriting body's light default. */}
-        <div className="bg-bg text-text grid min-h-svh grid-rows-[1fr]">
+        <div
+          data-testid="app-surface"
+          className="bg-bg text-text grid min-h-svh grid-rows-[1fr]"
+        >
           <Outlet />
         </div>
         <Toaster position="top-center" />

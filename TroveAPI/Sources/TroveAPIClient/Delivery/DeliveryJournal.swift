@@ -181,6 +181,10 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
                 deliveryIDs.append(id)
             }
             try retireDeletionDetections(observedDeletions, sourceID: expected.sourceID)
+            // Retire this checkpoint's opaque ledger only after all payloads are durable.
+            // A crash after COMMIT cannot strand reservations behind the advanced cursor.
+            // The new checkpoint mints a fresh producer instance, never reusing its counter.
+            try database.execute("DELETE FROM producer_ledger WHERE source_id = ?", [.text(expected.sourceID.lowercase)])
             try database.execute(
                 "UPDATE source_state SET cursor = ?, checkpoint_revision = ? WHERE source_id = ?",
                 [.blob(nextCursor), .text(UUID().lowercase), .text(expected.sourceID.lowercase)]

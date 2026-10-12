@@ -300,7 +300,7 @@ extension HeartRateAcquisitionTests {
             privacy: journal.identityScope(for: fixture.sourceID),
             application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
             host: .init(operatingSystemVersion: "26.0"),
-            storage: journal.producerStorage(for: fixture.sourceID)
+            storage: journal.producerStorage(from: checkpoint)
         )
         // Dropping the unreleased receipts models interruption before the cursor commit.
         return try await HeartRateAcquisition.prepare(delta, exporter: exporter, snapshot: snapshot, detections: detections).payloads

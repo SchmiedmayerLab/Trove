@@ -27,6 +27,7 @@ struct FHIRPointProjectionTests {
         #expect(event.outputs.count == 1)
         #expect(point.quantityValue == "73")
         #expect(point.quantityCode == "/min")
+        #expect(Set(event.deploymentIdentifiers.systems.keys) == [.event, .entryNode, .sourceRecord, .sourceOutput, .deviceSnapshot])
     }
 
     @Test

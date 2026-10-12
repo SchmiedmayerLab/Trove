@@ -252,6 +252,7 @@ extension ClinicalRetractionTests {
             eventIdentifierSystem: base.eventIdentifierSystem,
             eventIdentifierValue: base.eventIdentifierValue,
             producerInstance: base.producerInstance,
+            deploymentIdentifiers: base.deploymentIdentifiers,
             participants: [],
             nodes: [.init(ordinal: 0, fullURL: "urn:uuid:retraction", resourceType: "Provenance")],
             outputs: [],

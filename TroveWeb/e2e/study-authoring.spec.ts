@@ -88,6 +88,42 @@ const reviewPublicationCandidate = async (page: Page) => {
 };
 
 test.describe("study authoring", () => {
+  test("persists enrollment settings together with participation criteria", async ({
+    researcherPage: page,
+  }) => {
+    const title = `Enrollment E2E ${Date.now()}`;
+    await openNewStudyDialog(page);
+    await page.getByLabel("Study title").fill(title);
+    await page.getByRole("button", { name: "Create study" }).click();
+    await expect(page).toHaveURL(/\/configuration$/);
+    await page.getByTestId("edit-enrollment").click();
+    const addCriterion = page.getByRole("button", {
+      name: "Add participation criterion",
+    });
+    if (await addCriterion.isVisible()) await addCriterion.click();
+    await page.getByRole("button", { name: "Add rule", exact: true }).click();
+    await page.getByRole("spinbutton", { name: "Minimum age" }).fill("21");
+    await page
+      .getByRole("radio", { name: /^Requires invitation code/ })
+      .check();
+    await page.getByRole("radio", { name: /^Unlisted/ }).check();
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        /\/studies\/[^/]+$/.test(response.url()),
+    );
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    expect((await saved).status()).toBe(200);
+    await page.reload();
+    await expect(
+      page.getByRole("spinbutton", { name: "Minimum age" }),
+    ).toHaveValue("21");
+    await expect(
+      page.getByRole("radio", { name: /^Requires invitation code/ }),
+    ).toBeChecked();
+    await expect(page.getByRole("radio", { name: /^Unlisted/ })).toBeChecked();
+  });
+
   test("preserves unsaved work and rejects a stale draft from another tab", async ({
     researcherPage: page,
   }, testInfo) => {
@@ -97,6 +133,7 @@ test.describe("study authoring", () => {
     await openNewStudyDialog(page);
     await page.getByLabel("Study title").fill(original);
     await page.getByRole("button", { name: "Create study" }).click();
+    await expect(page).toHaveURL(/\/configuration$/);
     await expect(
       page.getByRole("button", { name: original, exact: true }),
     ).toBeVisible();
@@ -136,9 +173,10 @@ test.describe("study authoring", () => {
       page.once("dialog", (dialog) => {
         void dialog.accept();
       });
-      await page
-        .getByRole("button", { name: "Reload draft", exact: true })
-        .click();
+      await Promise.all([
+        page.waitForEvent("domcontentloaded"),
+        page.getByRole("button", { name: "Reload draft", exact: true }).click(),
+      ]);
       await expect(title).toHaveValue(`${original} newer`);
 
       const candidate = await reviewPublicationCandidate(page);

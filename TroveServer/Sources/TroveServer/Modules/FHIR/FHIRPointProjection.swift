@@ -64,6 +64,7 @@ enum FHIRPointProjection {
             eventIdentifierSystem: event.system.rawValue,
             eventIdentifierValue: event.value,
             producerInstance: graph.eventIdentifier.producerInstance,
+            deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
             participants: participants,
             nodes: nodes,
             outputs: outputs

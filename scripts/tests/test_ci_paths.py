@@ -19,6 +19,34 @@ SELECTORS = {"api", "server", "web", "ios", "ios_ui", "infrastructure", "devstac
 
 
 class CIPathTests(unittest.TestCase):
+    def test_validator_cache_is_verified_before_image_builds(self) -> None:
+        workflow = yaml.safe_load((ROOT / ".github/workflows/dev-stack.yml").read_text())
+        steps = workflow["jobs"]["smoke-test"]["steps"]
+        cache = next(step for step in steps if step.get("name") == "Restore pinned public validator artifacts")
+        self.assertIn("hashFiles('TroveInfrastructure/validator/manifest.json')", cache["with"]["key"])
+        fetch = next(step for step in steps if step.get("name") == "Fetch and verify pinned validator artifacts")
+        self.assertNotIn("if", fetch)
+        self.assertIn("validator/fetch.py", fetch["run"])
+        build = next(step for step in steps if step.get("name") == "Build the server and web images")
+        self.assertLess(steps.index(fetch), steps.index(build))
+
+    def test_ui_test_owns_its_simulator_and_retains_raw_logs(self) -> None:
+        workflow = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())
+        steps = workflow["jobs"]["ios-ui"]["steps"]
+        prepare = next(step for step in steps if step.get("id") == "simulator")
+        self.assertEqual(prepare["timeout-minutes"], 5)
+        self.assertIn("xcrun simctl create", prepare["run"])
+        self.assertLess(prepare["run"].index('echo "udid='), prepare["run"].index("xcrun simctl boot"))
+        self.assertIn('xcrun simctl bootstatus "$udid" -b', prepare["run"])
+        test = next(step for step in steps if step.get("name") == "Run the real-stack UI test")
+        self.assertEqual(test["env"]["TROVE_UI_SIMULATOR"], "${{ steps.simulator.outputs.udid }}")
+        self.assertIn('-destination "platform=iOS Simulator,id=$TROVE_UI_SIMULATOR"', test["run"])
+        self.assertIn('tee "$RUNNER_TEMP/trove-ui-xcodebuild.log" | xcbeautify', test["run"])
+        cleanup = next(step for step in steps if step.get("name") == "Remove the job's UI-test simulator")
+        self.assertEqual(cleanup["if"], "always() && steps.simulator.outputs.udid != ''")
+        self.assertIn('xcrun simctl delete "$TROVE_UI_SIMULATOR"', cleanup["run"])
+        self.assertNotIn("delete all", cleanup["run"])
+
     def test_ui_checks_queue_without_replacing_other_pull_requests(self) -> None:
         workflow = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())
         self.assertEqual(workflow["jobs"]["ios-ui"]["concurrency"], {

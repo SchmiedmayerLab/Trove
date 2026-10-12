@@ -95,6 +95,11 @@ extension DeliveryJournal {
                 "UPDATE source_state SET source_id = ?, producer_system = ?, binding = ? WHERE local_id = ?",
                 [.text(source.id.uuidString.lowercased()), .text(source.eventSystem), .blob(bytes), .text(expected.localID.uuidString.lowercased())]
             )
+            if source.revokedAt != nil {
+                // No future query may use this checkpoint. Retain custody payloads and receipts,
+                // but release auxiliary deletion bounds that can no longer be staged.
+                try database.execute("DELETE FROM deletion_detection WHERE source_id = ?", [.text(source.id.uuidString.lowercased())])
+            }
             try checkByteLimit()
             try Task.checkCancellation()
             return try sourceSetup(for: expected.localID)

@@ -47,6 +47,7 @@ enum FHIRRetractionProjection {
             eventIdentifierSystem: identity.system.rawValue,
             eventIdentifierValue: identity.value,
             producerInstance: graph.eventIdentifier.producerInstance,
+            deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
             participants: [],
             nodes: [.init(ordinal: 0, fullURL: fullURL, resourceType: "Provenance")],
             outputs: [],

@@ -68,10 +68,11 @@ RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources
 # ================================
 # Run image
 # ================================
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:1d95114038f76513a9ace6fca107d5582b08c65981f81f61cb56bf7fd2ef216d
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
 
 # Keep the Swift toolchain in the build stage. The serving image needs only the
 # binary's dynamic libraries, certificate roots and time-zone data.
+# Refresh the base digest for security fixes: apk upgrade preserves its exact world pins.
 RUN apk upgrade --no-cache \
     && apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
     && addgroup -S -g 999 vapor \

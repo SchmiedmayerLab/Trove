@@ -78,6 +78,7 @@ extension ClinicalRecordRevisionTests {
             eventIdentifierSystem: "urn:event",
             eventIdentifierValue: "1",
             producerInstance: UUID(),
+            deploymentIdentifiers: .init(systems: [:]),
             participants: [],
             nodes: [],
             outputs: outputs

@@ -213,6 +213,7 @@ extension ClinicalGraphStoreTests {
                 eventIdentifierSystem: event.eventIdentifierSystem,
                 eventIdentifierValue: event.eventIdentifierValue,
                 producerInstance: event.producerInstance,
+                deploymentIdentifiers: event.deploymentIdentifiers,
                 participants: event.participants,
                 nodes: event.nodes + [.init(ordinal: event.nodes.count, fullURL: contextURL, resourceType: "QuestionnaireResponse")],
                 outputs: event.outputs,

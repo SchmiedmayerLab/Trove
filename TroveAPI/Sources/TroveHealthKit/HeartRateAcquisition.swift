@@ -152,7 +152,7 @@ public struct HeartRateAcquisition: Sendable {
         guard refreshed == source, before.hasSameAuthority(as: after) else { throw AcquisitionError.authorityChanged }
         let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
         let exporter = try await Self.exporter(
-            source: binding, privacy: privacy, application: application, host: host, storage: journal.producerStorage(for: sourceID)
+            source: binding, privacy: privacy, application: application, host: host, storage: journal.producerStorage(from: checkpoint)
         )
         let prepared = try await Self.prepare(delta, exporter: exporter, snapshot: after, detections: detections)
         let cursor = try JSONEncoder().encode(delta.nextAnchor)

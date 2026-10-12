@@ -111,12 +111,33 @@ const elementAt = (
   );
 };
 
-const verifyProjection = (element: ConsentElement, ids: Set<string>) => {
+const verifyProjection = (
+  source: string,
+  element: ConsentElement,
+  ids: Set<string>,
+) => {
   if (!element.attributes.id?.trim() || ids.has(element.attributes.id))
     throw new Error(
       "Every field needs a unique ID. Review the document in Markdown mode.",
     );
   ids.add(element.attributes.id);
+  if (
+    element.name === "toggle" &&
+    ["initial-value", "expected-value"].some((name) => {
+      const value = element.attributes[name];
+      return value !== undefined && value !== "true" && value !== "false";
+    })
+  )
+    throw new Error(
+      "Toggle values must be true or false. Review the Markdown.",
+    );
+  if (
+    element.name === "signature" &&
+    source.slice(element.contentStart, element.contentEnd).trim()
+  )
+    throw new Error(
+      "Signature fields cannot contain text. Review the Markdown.",
+    );
   const allowedAttributes =
     element.name === "signature" ?
       ["id"]
@@ -142,12 +163,41 @@ const verifyProjection = (element: ConsentElement, ids: Set<string>) => {
     );
 };
 
+class MarkdownContext {
+  private fence: { character: string; length: number } | undefined;
+  inComment = false;
+
+  consumes(line: string): boolean {
+    if (!this.fence && (this.inComment || line.includes("<!--"))) {
+      let offset = 0;
+      while (offset < line.length) {
+        const index = line.indexOf(this.inComment ? "-->" : "<!--", offset);
+        if (index < 0) break;
+        offset = index + (this.inComment ? 3 : 4);
+        this.inComment = !this.inComment;
+      }
+      return true;
+    }
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)/.exec(line);
+    if (!marker) return this.fence !== undefined;
+    if (!this.fence)
+      this.fence = { character: marker[1][0], length: marker[1].length };
+    else if (
+      marker[1].startsWith(this.fence.character) &&
+      marker[1].length >= this.fence.length &&
+      !marker[2].trim()
+    )
+      this.fence = undefined;
+    return true;
+  }
+}
+
 export const consentBlocks = (source: string): ConsentBlock[] => {
   const blocks: ConsentBlock[] = [];
   const ids = new Set<string>();
   let cursor = 0;
   let markdownStart = 0;
-  let fence: { character: string; length: number } | undefined;
+  const context = new MarkdownContext();
   // Metadata is preserved separately instead of being sent through a rich-text editor.
   if (source.startsWith("---\n") || source.startsWith("---\r\n")) {
     const end = /\r?\n---(?:\r?\n|$)/.exec(source.slice(3));
@@ -163,20 +213,15 @@ export const consentBlocks = (source: string): ConsentBlock[] => {
     const newline = source.indexOf("\n", cursor);
     const lineEnd = newline < 0 ? source.length : newline + 1;
     const line = source.slice(cursor, lineEnd);
-    const marker = /^ {0,3}(`{3,}|~{3,})(.*)/.exec(line);
-    if (marker) {
-      if (!fence) fence = { character: marker[1][0], length: marker[1].length };
-      else if (
-        marker[1].startsWith(fence.character) &&
-        marker[1].length >= fence.length &&
-        !marker[2].trim()
-      )
-        fence = undefined;
-    } else if (!fence && /^<(toggle|select|signature)\b/.test(line)) {
+    if (context.consumes(line)) {
+      cursor = lineEnd;
+      continue;
+    }
+    if (/^<(toggle|select|signature)\b/.test(line)) {
       if (cursor > markdownStart)
         blocks.push({ kind: "markdown", start: markdownStart, end: cursor });
       const element = elementAt(source, cursor);
-      verifyProjection(element, ids);
+      verifyProjection(source, element, ids);
       blocks.push({
         kind: "control",
         start: cursor,
@@ -189,6 +234,8 @@ export const consentBlocks = (source: string): ConsentBlock[] => {
     }
     cursor = lineEnd;
   }
+  if (context.inComment)
+    throw new Error("Unclosed comment. Review the Markdown.");
   if (markdownStart < source.length)
     blocks.push({ kind: "markdown", start: markdownStart, end: source.length });
   return blocks;

@@ -57,7 +57,9 @@ test.describe("session renewal", () => {
         `Bearer ${accessToken}`,
       "Study creation must use the renewed bearer credential",
     ).toBe(true);
-    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: title, exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Continue to sign in" }),
     ).toHaveCount(0);

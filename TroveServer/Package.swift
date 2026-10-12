@@ -38,7 +38,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.4"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         // Match the API's immutable Grove revision until the shared products have a tagged release.
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "dfa881ff265507306ebbcb9576499688c8909afd"),
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "8f3a68562b237c402a0a66df92f7fa805c169d8e"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),

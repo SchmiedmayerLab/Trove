@@ -156,8 +156,9 @@ Codecov. The required checks, signed commits and review requirements are in
 branch protection automatically; keep the hosted `main` ruleset synchronized with it.
 
 Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
-use GitHub-hosted Xcode 27 runners; Swift CodeQL also requires a hosted runner in
-the shared workflow. All external contributors' runs require maintainer approval.
+use GitHub-hosted Xcode 27 runners. Swift CodeQL uses hosted macOS 26 with Xcode
+26.6 until its [build tracer supports Xcode 27](https://github.com/github/codeql/issues/22742).
+All external contributors' runs require maintainer approval.
 Before approving a fork, review workflow changes and the code that will execute:
 runner selection in a pull request is not an isolation boundary. Self-hosted
 runners must have no production credentials or access to study data. Workflow

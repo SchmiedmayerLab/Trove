@@ -42,9 +42,10 @@ jobs:
     with:
       path: TroveiOS
       job_name: Analyze Swift
-      # The shared workflow only initializes CodeQL on GitHub-hosted runners.
-      runsonlabels: '["xcode-27"]'
-      destination: 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+      # CodeQL tracing does not support macOS/Xcode 27 yet: github/codeql#22742.
+      runsonlabels: '["macos-26"]'
+      xcodeversion: '26.6'
+      destination: 'generic/platform=iOS Simulator'
       scheme: Trove
       test: false
       codeql: true

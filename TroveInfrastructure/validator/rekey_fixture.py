@@ -10,13 +10,24 @@ from pathlib import Path
 import sys
 
 
-def rekey(bundle, *, event_system, producer_instance, participant_system, participant_value, effective_at, sequence):
+def rekey(bundle, *, event_system, producer_instance, participant_system, participant_value, effective_at, sequence,
+          identifier_root, registration_id):
     from Scripts.exchange_protocol import derive_hmac_identity, entry_full_url, entry_node_identity, event_identity
     patient = next(entry["resource"] for entry in bundle["entry"] if entry["resource"]["resourceType"] == "Patient")
     original_participant = patient["identifier"][0]
 
     def transform(value):
         if isinstance(value, dict):
+            identifier_type = value.get("type")
+            codings = identifier_type.get("coding", []) if isinstance(identifier_type, dict) else []
+            for coding in codings:
+                if coding.get("system") == "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role":
+                    role = coding["code"]
+                    suffix = "" if role in ("event", "entry-node") else f"/{registration_id}/1"
+                    value["system"] = f"{identifier_root.rstrip('/')}/NamingSystem/grove-{role}-v0{suffix}"
+                    if suffix:
+                        prefix, _, epoch, digest = value["value"].split(":", 3)
+                        value["value"] = f"{prefix}:{registration_id}:{epoch}:{digest}"
             if value.get("system") == original_participant["system"] and value.get("value") == original_participant["value"]:
                 value["system"] = participant_system
                 value["value"] = participant_value
@@ -47,7 +58,7 @@ def rekey(bundle, *, event_system, producer_instance, participant_system, partic
                                                 role=parts[1], ordinal=int(parts[2]))
         elif role == "device-snapshot":
             key["value"] = derive_hmac_identity(
-                key=bytes(range(32)), key_id="test-key", epoch=1, identity_kind="device-snapshot",
+                key=bytes(range(32)), key_id=registration_id, epoch=1, identity_kind="device-snapshot",
                 components=[event_system, event["value"], "application", "fixture-app"],
             )
             entry["resource"]["identifier"] = [copy.deepcopy(key)]
@@ -75,6 +86,8 @@ def main():
     parser.add_argument("--assets", type=Path, required=True, help="Verified prepare.py output assets directory")
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--event-system", required=True)
+    parser.add_argument("--identifier-root", required=True)
+    parser.add_argument("--registration-id", required=True)
     parser.add_argument("--producer-instance", required=True)
     parser.add_argument("--participant-system", required=True)
     parser.add_argument("--participant-value", required=True)
@@ -85,7 +98,8 @@ def main():
     bundle = json.loads(args.fixture.read_bytes())
     result = rekey(bundle, event_system=args.event_system, producer_instance=args.producer_instance,
                    participant_system=args.participant_system, participant_value=args.participant_value,
-                   effective_at=args.effective_at, sequence=args.sequence)
+                   effective_at=args.effective_at, sequence=args.sequence,
+                   identifier_root=args.identifier_root, registration_id=args.registration_id)
     print(json.dumps(result, separators=(",", ":")))
 
 
