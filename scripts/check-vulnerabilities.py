@@ -20,6 +20,7 @@ VERSION = "0.74.0"
 ROOT = Path(__file__).resolve().parents[1]
 # Recovery uses a nonstandard filename; stage identical bytes under a detected name.
 INPUTS = {
+    "documentation/requirements.txt": ("documentation/requirements.txt", "pip"),
     "TroveAPI/Package.resolved": ("TroveAPI/Package.resolved", "swift"),
     "TroveServer/Package.resolved": ("TroveServer/Package.resolved", "swift"),
     "TroveiOS/Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved":

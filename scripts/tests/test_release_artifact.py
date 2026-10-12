@@ -192,6 +192,9 @@ class ReleaseArtifactTests(unittest.TestCase):
     def test_publication_consumes_both_tested_architectures_without_build_or_deployment(self) -> None:
         workflow = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
         job = workflow["jobs"]["publish"]
+        self.assertEqual(job["if"],
+                         "github.event_name == 'push' && github.ref == 'refs/heads/main' && "
+                         "vars.TROVE_CANDIDATE_PUBLICATION_ENABLED == 'true'")
         self.assertEqual(job["environment"], "candidate-publication")
         commands = "\n".join(step.get("run", "") for step in job["steps"])
         self.assertNotIn("docker build ", commands)

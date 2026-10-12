@@ -8,15 +8,44 @@ SPDX-License-Identifier: MIT
 
 # Data and Platform Architecture
 
-Trove's target architecture combines one authoritative study backend with storage suited to the data it receives. The central design choice is to separate source identity, study permission and physical storage.
+Trove's Swift server handles study operations and data access for the dashboard,
+command-line client and participant app. PostgreSQL with TimescaleDB stores study
+and clinical records; S3-compatible storage holds bundles and consent PDFs.
+Keycloak handles authentication.
 
-That separation makes it possible to preserve interoperable clinical records, avoid unnecessary duplication and change storage strategies without changing what a participant authorized.
+## Components
 
-## One Core Authority, Purpose-Built Storage
+```mermaid
+flowchart TB
+    accTitle: Trove Components
+    accDescr: The researcher dashboard, Swift CLI and participant app send requests to the Trove server. The server validates identity with Keycloak and stores data in PostgreSQL with TimescaleDB and S3-compatible storage.
+    W["Researcher dashboard<br/>React, TypeScript"] --> S
+    C["Researcher CLI<br/>Swift"] --> S
+    I["Participant app<br/>Swift, SwiftUI"] --> S
+    S["Trove server<br/>HTTPS API · Swift, Vapor"]
+    S --> K["Keycloak<br/>Identity and authentication"]
+    S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
+    S --> OS[("S3-compatible storage<br/>Bundles and consent PDFs")]
+```
 
-The core backend is a modular Swift service. It owns identity relationships, study revisions, consent, task occurrences, data attribution and access decisions. Clients and background workers use the same domain operations.
+The diagram also appears in the [repository README](https://github.com/SchmiedmayerLab/Trove#how-it-fits-together).
+OpenAPI defines the shared server interface and generated client types.
+All clients use the server's authorization checks; none receives direct database
+or object-store credentials. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/4273560d0c3e6454219995b649d56dce1e234135/TroveAPI/CLI.md)
+accepts an already-issued token; it does not yet provide a login flow.
 
-The initial storage design uses one governed PostgreSQL/Timescale authority for core study and clinical data, with object storage for larger artifacts:
+The implemented foundation covers study publication, enrollment and consent,
+source-event custody, independent study grants and scoped audit reads. Task
+synchronization, conversations, generalized artifacts, exports and erasure are
+extensions to that foundation; their design is described below. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
+[issues](https://github.com/SchmiedmayerLab/Trove/issues) track implementation.
+
+## Database and Object Storage
+
+The Swift service owns identity relationships, study revisions, consent, data attribution and access decisions. Planned task and worker services use the same domain operations.
+
+Core study and clinical tables share one PostgreSQL database. The design assigns
+records to storage according to their transaction and query requirements:
 
 | Storage role | Suitable records |
 |---|---|
@@ -25,21 +54,28 @@ The initial storage design uses one governed PostgreSQL/Timescale authority for 
 | Indexed interaction records | Accepted questionnaire results, conversation messages and reproducible exchange metadata |
 | Governed object storage | Recordings, instruments, consent files, imported documents, transcripts and exports |
 
-“One authority” does not mean one large JSON table or that all bytes must stay on one machine. Core control tables and Timescale projections share one PostgreSQL database, and a domain operation passes the same transaction handle through its repositories. Separate databases or independently acquired connections do not become atomic merely by sharing a cluster. The separately isolated extension-document service remains outside this core transaction.
+An operation passes the same transaction handle through repositories that update
+core tables and Timescale projections. Separate databases or independently acquired
+connections would not provide that atomicity. Keycloak maintains its own identity
+store; the planned extension-document service also remains outside core transactions.
 
-This is preferable to a clinical database per study, which multiplies payloads and makes shared consent, source identity and lifecycle operations harder to reconcile. It also avoids beginning with separate services for every feature. Additional infrastructure should solve a measured operational problem.
+A clinical database per study would duplicate measurements and complicate
+consent and source-history updates. Separate services are reserved for workloads
+that need a distinct security or operational boundary.
 
-## Authorization and Activity History
+## Authorization and Audit
 
-Every protected operation validates the caller's signature, permitted algorithm, configured issuer, intended API audience and required lifetime/identity claims before constructing an authenticated context. Missing verification configuration or unavailable verification material cannot disable checks. A valid token establishes identity, not access to every study.
+Protected API operations validate the caller's signature, permitted algorithm, configured issuer, intended API audience and required lifetime/identity claims before constructing an authenticated context. Missing verification configuration or unavailable verification material cannot disable checks. A valid token establishes identity, not access to every study.
 
 Domain authorization then checks current role, enrollment, consent, purpose and applicable study state. List filters, counts, fields, artifacts and background jobs enforce the same boundaries as individual records. Client and service credentials have explicit audiences and narrow operation scopes. Group administration does not automatically grant identifiable data or unblinded results. Notifications and opaque identifiers are not access grants.
 
 Revocation takes effect at new admission and at defined commit or disclosure boundaries. Long-running jobs recheck permission before releasing results. Work already dispatched to an external provider may be irreversible; fencing prevents it from reopening revoked work, while reconciliation records its outcome.
 
-A shared append-only activity record identifies the actor, delegated initiator, action, scope, target/version, outcome and correlation identifier. Protected mutations commit their activity/outbox records atomically. Sensitive reads, exports and artifact downloads require durable activity acceptance before disclosure; unavailable recording denies that disclosure. Denied requests remain denied even if diagnostic logging fails.
+An append-only activity record identifies the actor, delegated initiator, action, scope, target/version, outcome and correlation identifier. Protected mutations commit their activity/outbox records atomically. Sensitive reads, exports and artifact downloads require durable activity acceptance before disclosure; unavailable recording denies that disclosure. Denied requests remain denied even if diagnostic logging fails.
 
-Activity history excludes bearer tokens, clinical bodies, contact addresses and transcripts. Runtime roles cannot rewrite it, readers are separately scoped, and retention remains governed. This is accountable operation, not a claim of immutability against database administrators or institutional certification.
+Activity history excludes bearer tokens, clinical bodies, contact addresses and
+transcripts. Runtime roles cannot rewrite it, and reading it requires a separate
+permission. Database administrators still control the underlying storage.
 
 The study audit reader requires researcher identity and both `admin` and
 `audit-reader` membership in the owning group. The reader capability is explicitly
@@ -50,7 +86,7 @@ use an in-scope event ID as a cursor, require committed disclosure intent and ca
 `Cache-Control: no-store`. Audit identifiers remain governed data. This bounded
 history reader is not a cross-study activity feed, frozen export or retention policy.
 
-## Store Source Data Once, Attribute It Explicitly
+## Source Data and Study Attribution
 
 Consider a participant whose heart-rate observation is eligible for two studies. The source event and its resource version are stored once within the appropriate participant/source scope. Each eligible study receives a separate, exact attribution record.
 
@@ -67,15 +103,15 @@ The important distinction is between physical deduplication and permission:
 - Conversation answers and questionnaire responses are generally task-specific; identical content does not make them one shared research result.
 - Deduplication stays within a governed identity, controller and region. It is not a global search for matching people or measurements.
 
-This model saves storage while preserving study isolation. Its cost is explicit attribution metadata, which must be included in capacity measurements.
+Capacity measurements include the attribution metadata as well as payloads.
 
-### Identity Is Not a Hash of the Value
+### Source Identity
 
 Two equal values at the same time are not necessarily the same measurement. A daily summary and a granular sample are not interchangeable. Copies arriving through a phone, a platform health store and a vendor API may lack sufficient evidence to establish that they are one source output.
 
 Identity therefore comes from the admitted producer/source contract and its recorded scope. Values and timestamps support interpretation, not automatic cross-source deduplication. Where the source lacks stable identifiers, the acquisition route needs a durable import identity and explicit limitations.
 
-## Preserve Events, Versions and Relationships
+## Events, Versions and References
 
 A FHIR exchange can contain several related resources. Flattening it into only the primary Observation loses context needed to interpret devices, recordings, provenance and companion outputs.
 
@@ -116,29 +152,28 @@ Profile validation and graph-consistency checks establish different properties. 
 
 Study-interaction profiles are separate from the mobile measurement exchange. Scheduling transport and conversation streaming do not require expanding the measurement resource whitelist or inventing a new recording format.
 
-## Shared Artifact Mechanics, Separate Permissions
+## Artifact Storage
 
-Many features need large or immutable files. A single internal artifact module provides staging, ownership and purpose binding, size limits, checksum verification, finalization, authorized retrieval and cleanup.
+Bundles and consent PDFs already use object storage. The planned common artifact interface extends staging, ownership, size limits, checksum verification and authorized retrieval to instruments, recordings and other immutable files.
 
 The same mechanics can serve a consent document, a raw recording and a retrieval corpus without giving them the same readers or retention rules. Feature modules decide which purpose and permissions apply.
 
 Files become reachable only after durable acceptance and verification. Opaque artifact identifiers are preferable to treating a caller-supplied URL as authority. A later storage move can change a physical locator without changing the identity of the accepted content.
 
-This avoids rebuilding upload and cleanup behavior in each feature while preserving a clear boundary between documents, clinical recordings and generated outputs.
 
-## API Design Starting Points
+## API Contracts
 
-Questionnaire components reference one multilingual artifact, replacing locale-keyed Questionnaire payloads and bundle files. Source language and translations remain inside the FHIR resource; the study selects admitted administration languages rather than maintaining a second editable translation catalog. Standalone translated documents retain separate source-linked artifact identities.
+OpenAPI owns routes and schemas; Swift and TypeScript consumers are generated
+from it. The dashboard and CLI use the same contract. Planned hosted tools and
+delegated clients will use it as well, with permissions enforced by the server.
 
-Use the existing typed, revision-checked instrument updates for all languages. Regenerate Swift and TypeScript consumers when changing OpenAPI. Validate standard translation extensions only at supported locations; do not broadly relax unknown or modifier-extension checks. Language-specific diagnostics include the language, item/field path and rule. Unsupported content may be preserved for authoring but cannot be admitted for execution.
+Questionnaire APIs follow the [localization contract](Study-Model-and-Research-Workflows.md#localization-sites-and-accessibility):
+one multilingual artifact, revision-checked updates and language-specific diagnostics.
+Validation binds the complete artifact digest, pinned IG and renderer capabilities.
+Approval additionally binds language and applicability.
 
-Validation binds the whole artifact digest, pinned IG and renderer capabilities. Review/approval additionally binds language and applicability. Any source or translation edit invalidates validation for that candidate; no translation fragments or automatic approval carry-forward are needed. Task-session and accepted-result evidence retain exact artifact identity and administration language. Historical evidence does not change when a new translation is published.
-
-Implementation issues include proposed operations, record shapes and state diagrams. They are starting points for contract review, not available endpoints or a frozen platform API. Final routes and schemas belong in the versioned OpenAPI definition, with generated Swift and TypeScript clients and shared fixtures. Pure Grove APIs remain usable without Trove.
-
-Swift CLI, hosted tools and optional MCP/voice adapters use these same operations. Keep OpenAPI as the contract owner and generate consumers; do not introduce an agent-only API, generic editing language or parallel policy engine. A candidate is existing typed study content or a FHIR artifact with its base revision and source evidence, applied through ordinary updates.
-
-Use a consistent operation boundary:
+The following conventions guide new operations; the versioned OpenAPI definition
+is the reference for available endpoints and their exact request requirements.
 
 - Participant routes derive identity from verified authentication; a supplied participant, enrollment or source identifier never grants access. Researcher and service operations enforce their own study, field and purpose scopes.
 - Mutable resources expose opaque state versions as ETags. Version-conditional commands use If-Match; immutable published revisions, artifact digests and FHIR canonical versions remain distinct identifiers.
@@ -150,11 +185,13 @@ Use a consistent operation boundary:
 - Long-running work returns a durable job ID, state and scoped progress. Cancellation is best-effort once an external effect has been dispatched; uncertain results require reconciliation. Job IDs and notifications grant no access.
 - Error responses expose stable codes, safe field/rule diagnostics and a correlation ID. They never contain tokens, clinical payloads or another study's existence.
 
-The initial HTTP conventions distinguish unauthenticated (401), denied operation (403), concealed/absent resource (404), conflicting state or changed replay (409), stale If-Match (412), invalid/unsupported input (422), quota/backpressure (429) and unavailable required services (503). A successful transport or 202 job admission is not accepted task completion. Missing validators or authorization cannot produce a success response.
+The HTTP contract conventions distinguish unauthenticated (401), denied operation (403), concealed/absent resource (404), conflicting state or changed replay (409), stale If-Match (412), invalid/unsupported input (422), quota/backpressure (429) and unavailable required services (503). A successful transport or 202 job admission is not accepted task completion. Missing validators or authorization cannot produce a success response.
 
-Review each sketch by walking through a valid request, a denied request, an exact retry, a stale version and interruption at the commit boundary. Endpoint names may change to fit the domain; these authority and recovery properties must remain explicit.
 
-## Explicit State and Durable Synchronization
+## State and Synchronization
+
+The synchronization design extends existing transactional commands and retry
+receipts to server-assigned tasks and external jobs.
 
 Authoritative changes use domain commands with expected state versions and idempotency identifiers. Authorization, the accepted state transition and its traceability are committed consistently. Repeated requests cannot manufacture a second enrollment, task completion or allocation.
 
@@ -168,6 +205,8 @@ Notifications request synchronization; they are not authoritative state. Local q
 
 ## Retention, Erasure and Result Availability
 
+Coordinated erasure and closeout are planned lifecycle capabilities.
+
 Consent history, source retraction and privacy-related erasure serve different purposes. The platform preserves those distinctions while applying the required lifecycle to payloads, projections, artifacts, caches and exports.
 
 A completed task records that an accepted action occurred. It does not guarantee that its evidence may remain accessible forever. For results held in a separate extension service, immutable acceptance receipts identify the exact result and its owner.
@@ -178,22 +217,21 @@ Restoration must reapply relevant erasures and access invalidations before servi
 
 ## Operational Views and Research Exports
 
-The platform's own queries support running a study: task state, collection counts, freshness, meaningful coverage, setup problems and export progress. Counts and status views still need subject, study and field-level authorization.
+Operational query design is limited to running a study: task state, collection counts, freshness, coverage, setup problems and export progress. Counts and status views still need subject, study and field-level authorization.
 
 Coverage is reported only where the admitted source provides a meaningful denominator. Recent synchronization can still be partial. Missing records do not prove non-adherence, and absent source-quality evidence remains unknown.
 
-Research exports preserve exact membership, resource and instrument versions, attribution, provenance and artifact checksums. A codebook explains the exported fields and relevant source limitations. Preparing an export and releasing it are separate stages; access is checked again at release.
+The planned export format preserves exact membership, resource and instrument versions, attribution, provenance and artifact checksums. A codebook explains the exported fields and relevant source limitations. Preparing an export and releasing it are separate stages; access is checked again at release.
 
 Scientific analysis belongs in separately governed tools or environments consuming authorized exports. Direct database access is not the platform's integration contract.
 
-## Scaling Based on the Real Workload
+## Capacity Planning
 
 Participant count alone is not a capacity estimate. Storage and throughput depend on measurement frequency, graph size, recording payloads, attribution, indexes, historical imports and retention.
 
-The first capacity model includes authenticated ingestion, simultaneous study attribution, corrections, retractions, exports and recovery. It also measures large-study closeout and erasure while unrelated studies continue operating. Time to deny disallowed access and time to finish background cleanup are separate measures.
+Capacity testing starts with authenticated ingestion, simultaneous study attribution, corrections, retractions and recovery. Export, closeout and erasure workloads require additional benchmarks as those capabilities are introduced. Time to deny disallowed access and time to finish background cleanup are separate measures.
 
 Bounded batches, streaming file handling, backpressure, fair job scheduling and separate budgets for backfill protect current collection. Identity registries retain partition or archive locations as payloads move out of hot storage.
 
-More compact attribution or additional database services remain possible optimizations. They should follow evidence that their benefits outweigh added permission and recovery complexity—not precede a working, measured implementation.
-
-[Platform Overview](README.md) · [Implementation Project](https://github.com/orgs/SchmiedmayerLab/projects/4)
+Storage estimates include attribution records and indexes, not just payloads.
+Database partitioning decisions also account for access checks and recovery.

@@ -8,208 +8,238 @@ SPDX-License-Identifier: MIT
 
 # Applications and Integrations
 
-Trove is designed as a shared study backend, not a requirement to use one participant interface. Applications can adopt common enrollment, task and data services while retaining their own navigation, branding, assessments and domain-specific behavior.
+Trove provides a Swift server, an iOS participant app, a Swift researcher CLI and
+a TypeScript dashboard. Clients use the same authenticated HTTP API; they do not
+connect directly to the database or object store.
 
-The integration boundary is a versioned contract and a scoped identity—not shared access to backend databases. The capabilities below follow the [roadmap](Roadmap-and-Engineering-Principles.md).
+The [platform tour](Platform-Tour.md) shows the available interfaces.
+The integration designs below identify capabilities that are still planned;
+delivery status is maintained in [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones).
 
-## Swift Where It Helps, Native Clients Where They Matter
+## Current Clients
 
-Swift is the implementation language for the server, iOS application, researcher CLI, hosted authoring orchestration, workers and optional MCP and researcher-voice services. Grove provides reusable definitions, conversion, questionnaire, scheduling and inference foundations.
+The iOS app uses Grove for shared application components and FHIR conversion.
+HealthKit acquisition policy belongs to TroveHealthKit and the app; the durable
+delivery journal belongs to TroveAPIClient. This separates collection from
+transport and allows uploads to resume after interruption.
 
-The existing TypeScript browser presentation and native Kotlin Android integration are explicit retained clients. This iteration does not rewrite those interfaces. New platform services and tooling are Swift, not additional TypeScript backends. Established FHIR validators and document-processing tools may run behind bounded Swift orchestration; language consistency does not justify reimplementing specialist tools.
+The dashboard provides study configuration, consent editing and publication.
+The [researcher CLI](https://github.com/SchmiedmayerLab/Trove/blob/4273560d0c3e6454219995b649d56dce1e234135/TroveAPI/CLI.md)
+uses Swift Argument Parser and the generated OpenAPI client. It accepts an
+already-issued access token; interactive login and token renewal are not yet
+provided. Its guide lists the supported commands and output formats.
 
-A portable Swift library may be useful on Android or WebAssembly when it reduces repeated domain logic. Adoption should depend on measurable benefits in maintenance, packaging, performance and dependency support. It is not a prerequisite for Android participation or browser questionnaires.
-
-This approach separates stable shared meaning from operating-system behavior. Background collection, permissions, notifications and user interfaces remain native responsibilities where necessary.
-
-## Questionnaire Presentation
-
-GroveStudy resolves a Questionnaire by exact artifact identity, not a locale-specific filename. Rendering selects the task session's admitted language from the one multilingual FHIR resource; retain the original resource rather than exporting a lossy single-language rendering. Shared conversion must distinguish language/script/region tags and localize supported answer displays without changing their values. Localized-file lookup remains useful for standalone Markdown/PDF documents. Trove tracks this coordinated shared-library work in [definitions #23](https://github.com/SchmiedmayerLab/Trove/issues/23) and [client integration #32](https://github.com/SchmiedmayerLab/Trove/issues/32), without moving server approval authority into Grove.
-
-## Scheduler Synchronization
-
-Apple clients use GroveScheduler as a persistent local view of assigned tasks, schedule revisions and accepted outcomes. Keep SwiftData's default store and route downloaded changes through one Scheduler-owned import path. Supported container configuration enables account-scoped persistence; it does not imply automatic synchronization, compatibility with every custom store, or support for other contexts writing scheduler models.
-
-Import exact task versions and outcome identities without issuing new completion commands. Version identity combines the stable task ID and immutable effective boundary; occurrence identity also includes its start. Successful imports refresh queries and reconcile reminders. A schedule revision applies at its approved boundary; reject changes that would reassign or hide accepted outcomes. A stale completion cannot satisfy a replacement occurrence.
-
-The application owns transport, account scoping, acknowledgement and late-completion policy. Persist offline commands before showing pending completion, keep pending presentation separate from accepted history, and retain commands until explicit backend disposition. Restart replays the outbox and resumes server snapshots/deltas; imports cannot discard unsent work. Library persistence notifications report commits or failures, not backend acceptance. Reconcile reminders on activation as well as after commits.
-
-SwiftData history remains useful for optional incremental change discovery, but records changes rather than immutable copies of original commands. It is not a substitute for the outbox, and its store-local tokens are not server cursors. A custom data store or direct external-context synchronization can follow when a concrete integration justifies its additional persistence and cache-coherence work; neither is required for the first implementation.
-
-## Device Collection and Connected Wearables
-
-A study may receive data through a mobile health store, a device-specific collector or a server connection to a wearable provider. These routes can provide different resolution, timing and provenance even when they refer to a similar health concept.
-
-The definition names the accepted output and allowed source routes. The implementation admits only the mappings it can faithfully produce and operate. Support for a provider does not imply support for every device, data category or historical window that provider offers.
-
-Cloud acquisition has four separate responsibilities:
-
-| Responsibility | Meaning |
-|---|---|
-| Provider registration | The approved application integration, endpoint, region and permitted scopes |
-| Participant connection | A verified upstream account binding and protected credential state |
-| Study collection grant | The enrollment's permitted categories, sources and collection windows |
-| Synchronization state | What has been fetched and durably accepted, independently of individual studies |
-
-Keeping these records separate permits one connection to serve multiple authorized studies without creating duplicate tokens, polling jobs or payloads. Reuse is limited to the same governed identity and deployment scope; it does not promise portability between unrelated provider registrations or institutions.
-
-Account control also does not prove that every record belongs to the participant. Shared devices and household profiles need an unambiguous subject binding. Reconnecting the same verified account differs from replacing it with another account.
-
-### Credentials and Collection Lifecycle
-
-The backend uses the provider's supported secure authorization flow, with bound redirects, expiring state and proof-key protection where supported. Provider credentials remain in protected server storage; clients receive connection status, not reusable tokens.
-
-Application secrets and participant tokens have separate lifecycles. Credential rotation and synchronization coordinate across workers. If an upstream rotation succeeds but local persistence is uncertain, recovery follows the provider's supported process or requires reauthorization. Blindly retrying an obsolete credential is not a reliable recovery strategy.
-
-Collection follows the union of active authorized study demands. A study withdrawal removes its own demand; disconnecting the provider stops the whole connection. When no demand remains, polling stops. Keeping a dormant connection for future use requires an explicit purpose and retention policy.
-
-### Frequent Pulls Without Unbounded Polling
-
-Synchronization combines provider-supported notifications with scheduled reconciliation. Notifications are hints to check authorized work, not permission to fetch an entire account.
-
-Cadence depends on the study's freshness needs, source behavior, quotas and deployment capacity. Durable checkpoints advance only after accepted data or an explicit disposition. Historical backfill has its own budget so it cannot starve current collection.
-
-The operational model distinguishes last attempt, last successful fetch, accepted-through time, provider delay and connection failure. An empty response is not proof of deletion, and a recent successful request is not proof of complete coverage.
-
-The shared Swift conversion product covers Google Health API, Oura and Withings through separate typed converters and a checked mapping matrix. Withings body measurements provide the first end-to-end engineering fixture, not a provider limitation. Converter increments can activate independently; full catalog implementation is not a gate for a tested pilot subset. Each provider connection still has separate access, mapping and operational requirements. Catalog representation and provider permission are different prerequisites.
+Custom applications can use the API without adopting Trove's navigation or
+branding. Specialized acquisition interfaces and scoring remain application-owned.
+A six-minute walk test or guided ECG assessment, for example, does not require a
+new assessment engine in Trove.
 
 ## Durable Collection and Client Recovery
 
-Native collection acknowledges source delivery only after immutable events and required files are durably staged. The source cursor can then advance independently of network availability. Upload uses bounded batches and per-event receipts; partial acceptance cannot discard the unaccepted remainder.
+The client stages immutable events and required files before acknowledging source
+delivery. The source cursor can then advance independently of network availability.
+Bounded uploads return per-event receipts; partial acceptance leaves the remainder
+queued. An uncertain response is retried with the same identity and content.
 
-A receipt must state the receiver's durable acceptance boundary. An accepted event transfers custody to the receiver, allowing local retirement even if its graph still awaits references. Acceptance, graph readiness and study access are separate states; pending data is not available for study use merely because it reached the server. Transport success alone is insufficient. An uncertain response is retried with the same event identity and content, not reconstructed as a new measurement.
+A receipt distinguishes durable acceptance from graph readiness and study access.
+A stored event may still await a referenced resource. Storage alone does not make
+that event available to a study.
 
-Local queues isolate accounts and source scopes, bound disk and memory, and apply backpressure without silently dropping accepted source data. Required cases include restart between staging and cursor advancement, interruption during receipt processing, missing files, disk exhaustion and account switching. File-backed conversion has explicit ownership and lifetime; cancellation must not delete caller-owned files.
+Queues isolate accounts and source scopes. Disk limits apply backpressure rather
+than silently dropping work, and cancellation does not delete caller-owned files.
+Reinstall can restore server-acknowledged records, not unsynchronized work erased
+with the application.
 
-The same principle applies to task outcomes. Durable local import preserves the server's execution IDs and timestamps without emitting another completion command. Reinstall restores acknowledged server state, not unsynchronized work erased with the application.
+## Planned Scheduler Synchronization
 
-### Share Mechanisms After Proving Them
+The synchronization design treats GroveScheduler as the Apple client's persistent
+view of assigned tasks, schedule revisions and accepted outcomes. A Scheduler-owned
+import path applies server state without issuing completion commands again.
+SwiftData remains the local store; automatic backend synchronization is not implied.
 
-Keep the durable journal in TroveAPIClient and acquisition policy in TroveHealthKit and the app. A second concrete client need may justify extracting a small Grove adapter in M5; synthetic two-configuration tests alone do not require a shared package. Keep source-specific collection policy, assessment UI, scoring, routing and study-specific delays in their owning application. Conversion remains a pure mapping layer, separate from OAuth, polling and authorization.
+Task versions combine a stable task identifier with an immutable effective boundary.
+Occurrence identity also includes its start. Schedule updates take effect at an
+approved boundary and cannot reassign accepted outcomes to a replacement occurrence.
 
-Existing MHC and Plainly deployments stay pinned until their owners approve adoption. A migration preserves identities, queues, consent and historical outcomes, rehearses cutover and documents rollback limits. Offline output comparison is preferable to duplicate live collection. Provider-neutral inference receipts and explicit history modes belong in GroveLLM; distributed reservations, credentials and task authority belong in Trove.
+The application owns transport, account scoping and a durable outbox of offline
+commands. Pending completion remains distinguishable from accepted completion.
+Snapshot or delta imports preserve unsent work, refresh queries and reconcile
+reminders. Persistence notifications report local commits or failures, not server
+acceptance.
 
-## Conversation Studies Through a Shared Gateway
+SwiftData history can help discover local changes, but it does not preserve the
+original commands and its tokens are not server cursors. A separate outbox is
+therefore necessary even when history is available.
 
-A conversation task is a published study component with a versioned intervention configuration. It identifies the approved connection and model policy, system prompt, allowed context, completion rule and usage limits.
+## Planned Device and Wearable Connections
 
-Trove uses GroveLLM as the inference abstraction rather than implementing a parallel provider stack. The initial deployment route targets the Stanford AI API Gateway. A provider registry can support other routes later without binding the study model to one vendor.
+Study definitions separate the requested data from permitted acquisition routes:
+a mobile health store, an app-specific collector or a server connection to a
+wearable provider. These routes may differ in resolution, provenance and delay.
+Provider support does not imply support for every device or historical window.
 
-The selected route must be approved for the intended data and use. Stanford's [Gateway guidance](https://uit.stanford.edu/service/ai-api-gateway/faqs) distinguishes technical access from the required review for high-risk data. A working credential is not approval, and failure must not silently redirect a request to another provider.
+Server connections separate four records:
 
-### Configuration and Credential Ownership
+| Record | Purpose |
+| --- | --- |
+| Provider registration | Approved integration, region, endpoints and scopes |
+| Participant connection | Verified upstream account and protected credentials |
+| Study collection grant | Authorized categories, sources and collection windows |
+| Synchronization state | Fetched and accepted data, independently of any one study |
 
-Researchers configure capabilities that the server actually supports. The first conversation path uses text and a system prompt; retrieval, image capabilities and additional channels are separate extensions.
+One connection can serve several authorized studies without duplicating credentials,
+polling jobs or source events. This reuse is limited to the governed identity and
+deployment scope. Shared devices require an unambiguous subject binding; account
+control alone does not prove that every record belongs to the participant.
 
-The dashboard can register a protected API credential for an authorized connection. Subsequent reads expose status and a short identifying suffix, not the saved secret. Study revisions bind the approved connection/model policy, while each request records the secret version used. Equivalent key rotation does not rewrite study content; a material routing or policy change requires review. Neither version embeds the secret in participant configuration.
+Authorization uses bound redirects, expiring state and proof-key protection where
+supported. Provider credentials remain on the server. Rotation coordinates across
+workers, including recovery when the provider changes a token but local persistence
+fails. Clients receive connection status, not reusable tokens.
 
-Participant inference and investigator authoring are separate purposes with separate permissions and budgets. An authorized institutional, group or personal authoring connection may be selected where supported. A user's preference cannot change the route of an already published intervention, and one purpose must not silently exhaust another's allocation.
+Polling follows the union of active collection grants. Withdrawal removes one
+study's demand; disconnecting stops the whole connection. Notifications prompt
+reconciliation within existing permissions. Checkpoints advance after durable
+acceptance, and backfill has a separate budget from current collection.
 
-### Eligibility on Every Turn
+Operational status distinguishes last attempt, last successful fetch,
+accepted-through time and provider delay. An empty response does not establish
+deletion or complete coverage. Grove FHIR mappings for providers such as Oura,
+Withings and Google Health API inform conversion; each connection also needs its
+own provider access and operational verification.
 
-Authentication identifies the caller. It does not establish an eligible conversation task. The gateway checks the participant's enrollment, consent, occurrence window, unfinished state and permitted context when admitting a session and each new turn.
+## Planned Questionnaire and Android Integration
 
-History access is authorized separately from generation. A participant may be allowed to read a completed conversation without being allowed to request another answer.
+A Questionnaire version is one multilingual FHIR resource. Clients select the
+session's admitted language without changing item identities, conditions or answer
+values. Standalone translated Markdown and PDF files remain separate artifacts.
+The [localization contract](Study-Model-and-Research-Workflows.md#localization-sites-and-accessibility)
+defines approval, fallback and round-trip requirements.
 
-Durable session, message and generation identities support reconnecting after interruption. Usage is reserved before dispatch and reconciled against the available provider result. Concurrent requests cannot escape shared limits by reaching different server instances. An uncertain provider outcome remains explicit; retrying delivery must not request a second answer.
+Android integration will use Kotlin foundations; the dashboard remains TypeScript.
+Shared Swift code on Android or WebAssembly is an option only where it reduces
+maintenance and has suitable dependency support. Permissions, background collection,
+notifications and UI remain platform-specific.
 
-### A Clear Completion Rule
+## Planned Conversation Gateway
 
-The initial rule is participant Finish after at least one durable participant/assistant exchange. The completion operation closes further turn admission, seals the accepted message set and prevents active or late generation from changing the completed result. Usage reconciliation can continue separately.
+A conversation task binds a published intervention configuration: connection,
+model policy, system prompt, allowed context, completion rule and usage limits.
+The server design uses GroveLLM for inference, beginning with text and a system
+prompt. Retrieval, images and additional channels are separate capabilities.
 
-A generated answer, quota exhaustion or leaving the screen does not by itself complete the task. Accepted completion can enable an exact-version follow-up questionnaire.
+The intended first route is the Stanford AI API Gateway. A deployment still needs
+approval for its data and use; the [Gateway guidance](https://uit.stanford.edu/service/ai-api-gateway/faqs)
+describes that review. A working credential is not approval, and a failed route
+cannot silently fall back to another provider.
 
-This rule records participation, not scientific adequacy or intervention success. Researchers determine suitability. Optional example-question previews and technical rehearsals use synthetic context and separate budgets; they are not clinical validation services.
+### Credentials and Turn Admission
 
-### Human Conversation Review
+Authorized researchers register credentials through the dashboard. Subsequent
+reads return status and an identifying suffix, never the saved secret. Study
+revisions bind the connection and model policy; requests record the credential
+version used. Material routing changes require review.
 
-M4 includes [study-scoped human review](https://github.com/SchmiedmayerLab/Trove/issues/86).
-Investigators publish versioned scoring criteria for complete conversations and
-individual messages, including safety, accuracy and other protocol-specific
-questions. Authorized reviewers inspect context, save drafts and submit
-attributable assessments against an exact transcript snapshot and rubric version.
-Multiple reviewers retain independent assessments; corrections preserve submitted
-history rather than overwriting it.
+Participant inference and researcher authoring have separate permissions and
+budgets. Each turn checks enrollment, consent, the occurrence window, unfinished
+task state and permitted context. Reading a completed conversation is a separate
+permission from generating another answer.
 
-Transcript disclosure, scoring and export require explicit study review access
-and mandatory audit persistence. General dashboard access is insufficient.
-Missing scores and not-assessable ratings remain distinct. Human review is separate
-from participant task completion and does not itself certify clinical safety,
-trigger an intervention or provide real-time monitoring. The first implementation
-does not require automated scoring or a general annotation framework.
+Durable session, message and generation identities support reconnecting. Usage is
+reserved before dispatch and reconciled afterward across server instances.
+An uncertain provider result remains unresolved until reconciled; retrying delivery
+must not generate a second answer.
 
-## Study-Scoped Retrieval
+### Completion and Review
 
-Retrieval adds a published knowledge source to a conversation; it does not create permission to search all participant data.
+The initial completion design is an explicit participant Finish action after at
+least one stored participant/assistant exchange. Completion seals the accepted
+message set and closes further turn admission. Leaving the screen, receiving an
+answer or exhausting a quota does not itself complete the task.
 
-A corpus consists of governed original documents, extracted content, chunks and a pinned embedding configuration. Indexing is a bounded job with explicit failure state. A new version becomes available only after it is complete, while the previous published version remains stable.
+Study-scoped reviewers will assess exact transcript snapshots using versioned
+conversation- and message-level rubrics. Submitted assessments retain reviewer
+identity and correction history. Transcript access requires specific review
+permission and an audit record; ordinary dashboard access is insufficient.
 
-Tasks reference an exact corpus version. Retrieval filters by the authorized study before loading content, and generated citations resolve to the material actually retrieved. A citation establishes source linkage, not the correctness of the generated conclusion.
+These assessments do not establish clinical safety or provide real-time monitoring.
+Research teams remain responsible for intervention suitability and any required
+human support.
 
-The initial storage approach uses relational metadata, object storage and PostgreSQL vector support rather than a separate vector-database service. Approximate indexing should follow demonstrated scale and retrieval-quality needs.
+### Study-Scoped Retrieval
 
-Research literature and participant clinical context remain distinct data sources with different permissions. Retrieved text is untrusted content, not instructions granting tools or broader access. Required retrieval failure cannot be hidden by a silent fallback to unsupported behavior.
+The retrieval design binds tasks to a published corpus version: original documents,
+extracted content and a pinned embedding configuration. Relational metadata,
+object storage and PostgreSQL vector support avoid a separate database initially.
 
-## Custom Applications and Services
+Indexes become available only after a complete build. Retrieval applies study
+authorization before loading content, and citations identify the actual source
+passages. Literature and participant clinical context have separate permissions.
+Retrieved text cannot grant tool access, and required retrieval failures remain
+visible rather than producing an unsupported answer.
 
-A specialized application can use Trove for identity, consent, data or tasks without adopting every feature or the default UI. Registered clients have explicit audiences and redirect policies. Existing identities require a verified migration, not matching email addresses.
+## Planned Custom Services
 
-Study-specific services can continue computing derived statistics or other domain results. They receive narrow credentials for named studies and operations. Notifications identify work; the service retrieves only currently authorized inputs and publishes a versioned result through the appropriate API.
+Study-specific services can compute derived statistics or other results using
+credentials limited to named studies and operations. Notifications identify work;
+the receiving service still checks current access before retrieving inputs.
 
-Each capability has one authoritative owner during migration. Keeping two systems writable without a clear reconciliation boundary risks conflicting consent, completion and data histories. Adoption therefore proceeds through a bounded capability and tested retained-data handling.
+### Extension Document Store
 
-### A Constrained Extension Document Store
+A separate service is planned for small app-specific records such as preferences
+and derived display statistics. Each namespace declares a schema version, owner,
+allowed fields and operations, indexed queries, retention and quotas.
 
-Small custom records—preferences, derived display statistics or app-specific results—do not all belong in the clinical schema. A separate document service provides this flexibility through registered contracts.
+Clients use bounded queries and conditional updates. Arbitrary executable rules
+and high-volume measurement arrays are outside this service. Large recordings use
+artifact storage instead.
 
-A contract declares its namespace, schema version, owner, permitted fields and operations, supported indexed queries, retention and quotas. Clients use bounded queries, conditional updates and explicit conflicts. Arbitrary queries, uploaded executable rules and raw high-volume measurement arrays are outside this service.
+The service has separate storage credentials and no direct access to core tables
+or inference secrets. It obtains current authorization through the core API.
+Consent, assignments and task completion remain core records, not custom fields.
+An optional result receipt can connect an accepted custom result to a task; a
+document write alone does not complete it.
 
-The service has its own storage credentials and no direct core-database, consent or inference-secret authority. It checks current authorization through the core interface. Network and credential separation reduce the consequences of a compromise; they do not make the services literally air-gapped.
+The [result-availability design](Data-and-Platform-Architecture.md#retention-erasure-and-result-availability)
+covers later erasure without rewriting completion history.
 
-Core consent, assignments and task completion cannot be replaced by custom document fields. Large recordings use the shared artifact mechanism. Custom JSON does not become FHIR merely because it is stored alongside research data.
+## Planned Authoring Assistance
 
-### App-Owned Assessments and Shared Results
+Hosted assistance will call typed API operations directly. It uses the same study
+drafts, validation and revision checks as the dashboard and CLI. Uploaded documents
+and generated text are inputs, not sources of authority.
 
-An application owns the procedure, acquisition interface and scoring of a custom assessment, including a six-minute walk test or guided ECG capture. Its immutable study configuration describes the required app capability and result contract.
+Delegation is study-scoped, expiring and revocable. Effective access is the
+intersection of the researcher's current authority, registered-client restrictions
+and the grant. The initiating researcher and executing client are recorded separately.
+Publication, participant contact, exports and credential administration retain
+separate permissions.
 
-A document write does not automatically complete a core task. Optional shared tracking submits an immutable receipt for an accepted result through the normal completion operation. The [data architecture](Data-and-Platform-Architecture.md#retention-erasure-and-result-availability) defines how acceptance and later erasure remain consistent.
+Questionnaire tools import and export the complete multilingual JSON. A language
+selection changes diagnostics or preview, not the stored instrument. Applying a
+proposal requires the current draft revision, and translation assistance does not
+approve the resulting content.
 
-When multiple applications need the same assessment mechanism, it can move into a shared package or Grove. The evidence of reuse should precede the abstraction.
+Optional Swift MCP and researcher-voice adapters can expose these same operations
+without a separate authorization model. Voice is an authoring interface, not a
+participant channel. Text and visual review remain available, particularly for
+ambiguous targets and consequential actions.
 
-## One API for Dashboards, Command-Line Tools and Assistance
+## Future Participation Channels
 
-Agent-operated study management is a core M3 capability. The visual workspace remains useful for editing, source comparison, branching inspection and reviewing changes. It is not the only way to operate a study.
+Browser questionnaires will require authenticated sessions and the same
+exact-version validation and completion rules as mobile clients. An authoring
+preview is not a participant session.
 
-The researcher CLI uses Swift Argument Parser and the existing generated Swift OpenAPI client. Support macOS and Linux, typed asynchronous commands, shell completion, stable JSON/exit codes and secure login or protected headless credentials. Adopt current stable packages through a verified, pinned toolchain update. Keep business rules and permissions on the server; avoid pulling mobile-only dependencies into the executable.
+Text-message or phone participation additionally requires verified contact binding,
+task-bound sessions, authenticated callbacks and replay protection. Caller ID alone
+is not identity. A channel must support the approved instrument; unsupported
+questions need an approved alternative rather than an improvised replacement.
+Raw audio retention requires explicit authorization.
 
-Hosted assistance calls curated typed API operations directly, not a shell or the CLI executable. Candidate content uses the existing study/instrument inputs and revision-checked updates. No editing language, generic patch engine, separate proposal-application API or agent-owned study state is required. Dashboard and command-line operations are peers; documents and tool output cannot broaden a caller's scope.
+## Other Research Systems
 
-Questionnaire import/export in the Swift CLI carries the entire multilingual JSON. A language option selects preview or diagnostics, not a separate stored instrument. Hosted tools, future MCP/voice adapters and custom clients use that same API and shared draft revision. Missing required text, unsupported rendering and absent approval are distinct structured results. Authoring examples pin the IG and renderer versions and preserve untouched translations; assisted translation cannot approve its own output. See [CLI #52](https://github.com/SchmiedmayerLab/Trove/issues/52) and [document authoring #88](https://github.com/SchmiedmayerLab/Trove/issues/88).
-
-### Scoped Delegation
-
-Extend the existing authorization service and identity provider with study-scoped, expiring, revocable grants for registered clients. Start with clear Inspect Study and Edit Study Draft presets. Effective access is the intersection of current grantor authority, client restrictions and the grant; further delegation is disabled by default. Record the verified initiating researcher and executing client separately. Never accept actor authority from document content or request fields.
-
-Recheck grants when admitting and executing jobs, applying changes and disclosing results. Unavailable authority fails closed. Routine draft edits can proceed within the grant without repeated confirmation; publishing, activation, participant access, contact, export and credential administration retain separate permissions. Where approval is required, bind it to the exact action and revision. A confirmation flag cannot grant authority.
-
-### Optional MCP and Researcher Voice
-
-An optional Swift MCP adapter exposes a curated subset of the same API using the official Swift SDK. It has no shell, arbitrary database access or independent authorization model. Select a transport for a concrete client and verify its authentication; remote MCP and downstream API audiences remain separate, with no arbitrary token passthrough.
-
-Researcher voice is an optional interaction layer over the authoring tools, not a participant channel. Begin with navigation, explanation and draft edits; clarify ambiguous targets and recover accepted results through operation receipts after interruption. Keep text/visual alternatives, approved speech egress and bounded audio retention. Initial voice tools cannot publish, contact participants, export data or change credentials. This work is independent of participant conversation tasks and M6 phone delivery.
-
-## Participation Channels
-
-Browser participation begins with authenticated content and the supported Questionnaire subset, using the same exact-version validation and occurrence commands as mobile clients. An authoring preview is not a participant session. Drafts remain account-scoped and distinguish pending work from accepted completion.
-
-Text-message and voice participation follow only for a selected study and approved route. Contact details require verified binding; a phone number or caller ID alone is not identity. Task-bound sessions, appropriate step-up verification, authenticated callbacks and replay checks protect handoff and completion. Reassigned numbers and opt-out must invalidate affected channel access without silently rewriting enrollment.
-
-A channel must faithfully support the approved instrument and response semantics. Unsupported questions use an approved secure web fallback, not an improvised conversational replacement. Uncertain speech answers need confirmation; raw audio retention is off unless authorized. Channel provenance and exact instrument/item identities remain part of the result.
-
-## Coexistence with Other Research Systems
-
-Trove does not include a REDCap importer, synchronization service or dedicated exchange API in the active roadmap. Studies can keep other research systems independently; Trove provides authorized exports with stable identities, versions and provenance.
-
-If a named study later needs interoperability, assess one narrowly scoped external adapter against that study's mappings and authority rules. Do not add generic field mapping, conflict reconciliation or bidirectional editing to the core platform preemptively. An external record must never create Trove consent or bypass normal authorization and validation.
-
-[Platform Overview](README.md) · [Implementation Project](https://github.com/orgs/SchmiedmayerLab/projects/4)
+Trove has no REDCap synchronization service or dedicated exchange API.
+Interoperability work will use study-specific adapters and authorized exports with
+stable identities, versions and provenance. An external record cannot establish
+Trove consent or bypass validation.

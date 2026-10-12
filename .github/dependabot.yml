@@ -12,6 +12,10 @@ multi-ecosystem-groups:
     schedule:
       interval: "weekly"
 updates:
+  - package-ecosystem: "pip"
+    directory: "/documentation"
+    patterns: ["*"]
+    multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "github-actions"
     directory: "/"
     patterns: ["*"]

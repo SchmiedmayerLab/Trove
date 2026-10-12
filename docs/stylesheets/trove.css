@@ -1,0 +1,45 @@
+/* SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+ * SPDX-License-Identifier: MIT */
+
+:root {
+  --md-primary-fg-color: #21694b;
+  --md-accent-fg-color: #237352;
+  --md-text-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --md-code-font: ui-monospace, "SFMono-Regular", monospace;
+  --trove-soft: #f0f6f2;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #194936;
+  --md-accent-fg-color: #80d6af;
+  --md-typeset-a-color: #80d6af;
+  --trove-soft: #202e29;
+}
+.md-grid { max-width: 76rem; }
+.md-typeset { line-height: 1.7; }
+.md-typeset .md-button { border-radius: .55rem; font-size: .8rem; margin: .25rem .35rem .25rem 0; }
+.md-typeset .md-button--primary { background: #21694b; border-color: #21694b; color: #fff; }
+.md-typeset .md-button:focus-visible { outline: 3px solid var(--md-accent-fg-color); outline-offset: 3px; }
+.trove-home { max-width: 65rem; margin: 0 auto; display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); column-gap: 2rem; }
+.trove-hero { padding: 2rem 0; }
+.md-typeset .trove-hero h1 { color: var(--md-default-fg-color); font-size: clamp(2rem, 3.4vw, 3.2rem); line-height: 1.08; letter-spacing: -.045em; font-weight: 700; margin: .6rem 0 1.2rem; }
+.trove-hero > p:not(.trove-caption) { max-width: 37rem; font-size: 1.08rem; }
+.md-typeset .trove-caption, .md-typeset figcaption { font-size: .7rem; color: var(--md-default-fg-color--light); font-style: normal; }
+.md-typeset .trove-showcase { max-width: none; width: 100%; margin: 0; padding: .5rem; background: var(--trove-soft); border-radius: 1.2rem; align-self: center; }
+.trove-showcase img { display: block; width: 100%; height: auto; }
+.trove-section { padding: 2.5rem 0; grid-column: 1 / -1; }
+.md-typeset .trove-section h2 { font-size: clamp(1.5rem, 2.4vw, 2.1rem); line-height: 1.2; letter-spacing: -.025em; font-weight: 650; margin: .5rem 0 1rem; }
+.trove-section > p { max-width: 46rem; }
+.trove-split { display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem; align-items: center; }
+.trove-split img { width: 100%; height: auto; }
+.trove-phones { display: flex; justify-content: center; gap: 2rem; padding: 1.5rem 0; }
+.md-typeset .trove-phones figure { margin: 0; flex: 1; max-width: 13rem; }
+.trove-phones img { width: 100%; height: auto; }
+.trove-foundation { background: var(--trove-soft); padding: 2.5rem; border-radius: 1.2rem; margin: 1rem 0; }
+@media (max-width: 900px) {
+  .trove-home { display: block; }
+  .trove-hero { padding-top: 1.5rem; }
+  .trove-split { grid-template-columns: 1fr; gap: .5rem; }
+  .trove-phones { gap: .3rem; }
+  .trove-foundation { padding: 1.2rem; }
+  .trove-section { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+}
