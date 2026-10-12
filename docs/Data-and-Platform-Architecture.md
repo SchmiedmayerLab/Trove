@@ -128,12 +128,22 @@ This avoids rebuilding upload and cleanup behavior in each feature while preserv
 
 ## API Design Starting Points
 
+Questionnaire components reference one multilingual artifact, replacing locale-keyed Questionnaire payloads and bundle files. Source language and translations remain inside the FHIR resource; the study selects admitted administration languages rather than maintaining a second editable translation catalog. Standalone translated documents retain separate source-linked artifact identities.
+
+Use the existing typed, revision-checked instrument updates for all languages. Regenerate Swift and TypeScript consumers when changing OpenAPI. Validate standard translation extensions only at supported locations; do not broadly relax unknown or modifier-extension checks. Language-specific diagnostics include the language, item/field path and rule. Unsupported content may be preserved for authoring but cannot be admitted for execution.
+
+Validation binds the whole artifact digest, pinned IG and renderer capabilities. Review/approval additionally binds language and applicability. Any source or translation edit invalidates validation for that candidate; no translation fragments or automatic approval carry-forward are needed. Task-session and accepted-result evidence retain exact artifact identity and administration language. Historical evidence does not change when a new translation is published.
+
 Implementation issues include proposed operations, record shapes and state diagrams. They are starting points for contract review, not available endpoints or a frozen platform API. Final routes and schemas belong in the versioned OpenAPI definition, with generated Swift and TypeScript clients and shared fixtures. Pure Grove APIs remain usable without Trove.
+
+Swift CLI, hosted tools and optional MCP/voice adapters use these same operations. Keep OpenAPI as the contract owner and generate consumers; do not introduce an agent-only API, generic editing language or parallel policy engine. A candidate is existing typed study content or a FHIR artifact with its base revision and source evidence, applied through ordinary updates.
 
 Use a consistent operation boundary:
 
 - Participant routes derive identity from verified authentication; a supplied participant, enrollment or source identifier never grants access. Researcher and service operations enforce their own study, field and purpose scopes.
 - Mutable resources expose opaque state versions as ETags. Version-conditional commands use If-Match; immutable published revisions, artifact digests and FHIR canonical versions remain distinct identifiers.
+- A study draft version covers interpretation-relevant components, schedules and artifact references. Editing any of them invalidates prior validation; publication rechecks the exact candidate and its complete reference closure.
+- Delegated operations intersect current grantor authority, registered-client restrictions and a revocable study/operation grant. Derive actor/client/initiator at the trusted boundary; recheck queued execution and result disclosure. Capability discovery is bounded and advisory, never authorization.
 - Commands with replay risk carry an Idempotency-Key scoped to the verified actor, operation and target. Matching content returns the original receipt only after current authorization to that receipt; altered content conflicts. Resolve an authorized completed replay before applying the new-command version check. An expired/unknown key must not bypass domain uniqueness.
 - Validate exact artifacts and expensive external rules before database locks. In the transaction, recheck current authority, expected state and digest-bound evidence while committing the domain change and audit/outbox record.
 - Lists have bounded limits and opaque snapshot/delta cursors. Cursor expiry requests a fresh snapshot; counts, filtering and pagination enforce the same scope as item reads.

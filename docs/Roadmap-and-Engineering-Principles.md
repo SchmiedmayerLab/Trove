@@ -12,6 +12,46 @@ Trove's development is organized around complete study workflows rather than a g
 
 The milestones below describe the intended sequence, not announced release dates or claims that the capabilities have shipped. Detailed implementation progress belongs in the project's published issues and release notes.
 
+## Foundation Checkpoint — 9 September 2026
+
+M1 and M2 are complete at the reviewed implementation and local-verification
+boundary. Trove PRs #75–#80 are merged at
+`8288439e21b9f74b1357c21cba2c2518748f61c2`; the merged tree exactly matches the
+reviewed combined tree. This is not a published release or production acceptance.
+
+| Checkpoint | Completed work | Explicit follow-up |
+|---|---|---|
+| M1: IG Exchange Contract | Multi-study/historical-protocol examples; replay, correction, conflict, reference and retraction fixtures; implemented and locally verified HealthKit context correction | [#82](https://github.com/SchmiedmayerLab/Trove/issues/82), M3: upstream integration and released dependency adoption |
+| M2: Reliable Shared Data Ingestion | Exact consent, verified token authority, immutable shared custody, independent study grants, durable delivery, audit, measured local ingestion, fresh-store recovery and shared verification/candidate mechanisms | [#83](https://github.com/SchmiedmayerLab/Trove/issues/83), M3: post-merge verification and durable evidence; [#84](https://github.com/SchmiedmayerLab/Trove/issues/84)/[#85](https://github.com/SchmiedmayerLab/Trove/issues/85), M3.1: approved publication and live protection |
+
+M1 spans repositories. [grove-fhir #34](https://github.com/SchmiedmayerLab/grove-fhir/issues/34)
+and [#35](https://github.com/SchmiedmayerLab/grove-fhir/issues/35) were merged in
+[#41](https://github.com/SchmiedmayerLab/grove-fhir/pull/41).
+[Grove #81](https://github.com/SchmiedmayerLab/Grove/issues/81) is implemented in
+the still-open [#94](https://github.com/SchmiedmayerLab/Grove/pull/94); its final
+integration remains M3 work. GitHub's repository-local milestone counts omit
+these upstream issues. [Trove #74](https://github.com/SchmiedmayerLab/Trove/issues/74)
+and the [project board](https://github.com/orgs/SchmiedmayerLab/projects/4) preserve
+the cross-repository delivery record.
+
+The demonstrated workflow stores an event once, authorizes two studies
+independently, handles exact retries, withdraws one study without affecting the
+other and preserves custody after backend restart. Simulator evidence is the
+accepted client boundary. Physical-device background/protection, online disaster
+recovery, deployed capacity and field use remain unverified until M3.1 acceptance.
+
+Closing a milestone does not turn its transferred requirements into passed checks.
+Publication still requires released dependencies, completed exact-source and
+per-architecture verification, and independently enforced approval. The journal
+remains in TroveAPIClient; optional extraction is [#25](https://github.com/SchmiedmayerLab/Trove/issues/25)
+in M5. Large file-backed recordings remain conditional M3 work in
+[Grove #82](https://github.com/SchmiedmayerLab/Grove/issues/82).
+
+Next, finish #82/#83 while developing the synthetic single-arm study workflow:
+portable publication and revision adoption, scheduled tasks, a Swift CLI, scoped
+delegation and a shared Questionnaire editor/validator. Document-assisted authoring
+then exercises those same APIs. Optional trial features do not gate the first study.
+
 ## Development Before Deployment
 
 M1 and M2 establish exchange and ingestion contracts; they do not require a live
@@ -20,16 +60,52 @@ Keep implementation acceptance, repository integration and field activation sepa
 
 | Stage | Completion evidence | Not required at this stage |
 |---|---|---|
-| M1: IG Exchange Contract | Validated examples, producer/receiver fixtures and coordinated upstream integration | A running research deployment |
-| M2: Reliable Shared Data Ingestion | Real local stores; consent-backed two-study custody; durable delivery; failure, restart and recovery tests; measured workloads; shared CI and exact-artifact verification | A cloud account, production region, operational recovery targets or human pilot |
-| M3: Portable Study and Trial Execution | A synthetic single-arm study from configuration through tasks, collection, coordinator operations and export | Every optional trial feature or field deployment |
+| M1: IG Exchange Contract | Reviewed contract implementation, validated examples and producer/receiver fixtures; upstream release integration follows in M3 #82 | A running research deployment or completed upstream release |
+| M2: Reliable Shared Data Ingestion | Real local stores; consent-backed two-study custody; durable delivery; failure, restart and recovery tests; measured workloads; shared verification and candidate mechanisms | A cloud account, production region, operational recovery targets, published candidate or human pilot |
+| M3: Portable Study Execution and Agent-Ready Authoring | A synthetic single-arm study through tasks, collection, coordinator operations and export; Swift CLI/API parity and a source-linked Questionnaire authoring demonstration | Every optional trial feature, MCP, researcher voice or field deployment |
 | M3.1: First Deployment and Reference Pilot | One selected target passes infrastructure acceptance, then an approved bounded study passes its predefined field criteria | Deployment on every cloud or completion of conversation and other later milestones |
 
 M3.1 is the planned deployment milestone; it follows M2 and the required R1 subset
 of M3, not all optional arms, sites or trial features. Preparation can run earlier.
-The existing M4–M7 capability sequence remains unchanged and independent work can
-continue without waiting for the pilot. Schedule field activation only after its
-owners, target and protocol are selected.
+M3 includes instrument authoring and shared inference connections formerly grouped
+in M7/M4. Participant conversations remain M4; optional researcher voice is a
+separate M4 increment. MCP is optional M5 integration. M6 contains participant
+channels only; broader institutional and study drafting remains M7. Independent
+work can proceed without waiting for the pilot. Schedule field activation only
+after its owners, target and protocol are selected.
+
+### Agent-Ready Authoring Sequence
+
+1. Finish #82/#83 without expanding the completed foundation checkpoint.
+2. Deliver [scoped delegation #87](https://github.com/SchmiedmayerLab/Trove/issues/87), revision-safe study operations (#31) and the [Swift CLI #52](https://github.com/SchmiedmayerLab/Trove/issues/52).
+3. Deliver [Questionnaire validation/editor #53](https://github.com/SchmiedmayerLab/Trove/issues/53): one FHIR draft, drag-and-drop with keyboard alternatives, graph, preview and deterministic named scenarios.
+4. Add [document-assisted authoring #88](https://github.com/SchmiedmayerLab/Trove/issues/88) using shared [connections #46](https://github.com/SchmiedmayerLab/Trove/issues/46). Its GroveLLM usage/completion subset is required before hosted dispatch; the participant gateway is not.
+5. Demonstrate source upload, conversational and visual correction, pinned IG/renderer validation, exact reviewed publication through the CLI, and synthetic participant administration. Include stale-write, revocation, unavailable-validator and interrupted-retry failures.
+
+These are independently testable increments. M3 tracks the authoring demonstration,
+but ordinary study execution and an independently approved manual-only pilot do not
+require inference to be enabled. M3.1 must verify any authoring capability selected
+for deployment; otherwise it remains disabled. MCP (#89), researcher voice (#90),
+multisite and randomization do not gate the first authoring demonstration.
+
+Existing due dates remain provisional ordering targets, not re-estimated delivery
+promises. Re-estimate added M3 work against actual staffing before making a commitment.
+
+### Localization Is a Shared M3 Contract
+
+This is remaining implementation work, not a capability supplied by the initial
+[M3 stack #101](https://github.com/SchmiedmayerLab/Trove/stack/101). That stack adds
+validation, revision-bound authoring access and initial Swift CLI commands. The
+single-resource localization transition, visual editor, task execution and hosted
+document authoring retain their issue acceptance criteria below.
+
+M3 stores every Questionnaire translation in one FHIR JSON resource, using the pinned Grove IG translation contract. Study metadata uses language-keyed values; standalone Markdown/PDF/media translations remain separate source-linked artifacts. Adopt the finalized upstream contract and fixtures with an immutable dependency pin rather than inventing a parallel extension or following a moving branch for acceptance.
+
+The required synthetic verification is: import one bilingual JSON, edit both languages through the shared revision boundary, validate, publish one artifact, administer either admitted language with unchanged branching/answer identities, and export the complete multilingual source with untouched content preserved. Cover missing/malformed translations, language-only/script/region tags, string and coded answer display, RTL, stale cross-language edits, offline/restart language retention and invalidated validation/review after content changes. These are targeted contract tests, not a requirement to deploy a multilingual study.
+
+[Definitions #23](https://github.com/SchmiedmayerLab/Trove/issues/23), [editor #53](https://github.com/SchmiedmayerLab/Trove/issues/53), [publication #31](https://github.com/SchmiedmayerLab/Trove/issues/31), [occurrences #37](https://github.com/SchmiedmayerLab/Trove/issues/37), [client/GroveStudy adoption #32](https://github.com/SchmiedmayerLab/Trove/issues/32), [CLI #52](https://github.com/SchmiedmayerLab/Trove/issues/52) and [assisted authoring #88](https://github.com/SchmiedmayerLab/Trove/issues/88) own their portions. [Reviewed variants #67](https://github.com/SchmiedmayerLab/Trove/issues/67) adds the selected additional-language/site workflow, not a separate Questionnaire representation.
+
+M3.1 verifies exact approved artifacts and administration languages for the selected pilot. Unsupported or unapproved languages remain disabled; ordinary UI fallback cannot authorize instrument or consent fallback. Additional production languages and sites are conditional, while the single-resource architecture is not.
 
 Use disposable Docker services for routine integration and a local Kubernetes
 reference setup for orchestration-specific checks. Exercise the real database,
@@ -41,8 +117,11 @@ claims remain unverified until later device/field acceptance. Provider sandbox
 access and development signing may still require external services.
 
 Keep required CI, security checks, review and coordinated dependency publication
-in the engineering milestones. Uncommitted local dependencies are not published
-integration evidence. A local restore proves only the tested recovery procedure;
+as explicit handoff and activation gates. The completed M1/M2 checkpoint transfers
+remaining execution/adoption to M3 #82/#83 and approved publication/enforcement to
+M3.1 #84/#85. Uncommitted local dependencies are not published integration
+evidence, and unavailable protection must still prevent publication.
+A local restore proves only the tested recovery procedure;
 online backup, WAL recovery and traffic interruption can also be developed locally
 before target-specific durability and recovery objectives are approved. Early
 development uses fresh schemas, not legacy-data migrations.
@@ -80,7 +159,7 @@ feature's acceptance before that feature is activated:
 | Fresh schema and immutable custody (#29) | Deployment policy (#34) requires a reviewed upgrade before changing a retained-data deployment; no development legacy importer |
 | Authenticated ingestion measurements (#28) | Export/status performance (#45), governed closeout and erasure workloads (#50), online recovery and target admission limits (#34) |
 | Audit transactions, disclosure and scoped history (#54) | CLI (#52), task/publication/lifecycle/export (#37/#31/#50/#45), connector/communication (#63/#58), inference (#38/#46), custom integration (#48/#49) and target retention/recovery (#34) |
-| Current contract and transition evidence (#61) | Task synchronization (#37), Questionnaire preview/pairing (#53), connectors (#63), erasure (#50), custom/Kotlin integration (#48/#49/#65) and assisted authoring (#44) |
+| Current contract and transition evidence (#61) | Task synchronization (#37), Questionnaire preview/pairing (#53), connectors (#63), erasure (#50), custom/Kotlin integration (#48/#49/#65), delegated access (#87) and assisted authoring (#88, then #44) |
 
 Later issues reuse the same audit and verification mechanisms. They add actions,
 fixtures and evidence for their own activated behavior; they do not require a
@@ -112,7 +191,7 @@ A representative synthetic study can test the whole path before any field deploy
 
 Success is more than a passing build. A researcher must be able to configure and publish the supported study without bespoke database changes. Participants must be able to enroll, perform activities, recover from interruption and withdraw. Coordinators must be able to distinguish setup, synchronization and coverage problems. Exports must retain interpretable versions and provenance.
 
-The first study does not wait for conversations, generated authoring, multiple arms, every language or a custom-document service. Those capabilities build on the same foundations when required.
+The first manual study does not wait for conversations, hosted generation, multiple arms, every language or a custom-document service. M3 separately demonstrates source-linked Questionnaire authoring; field activation requires only the capabilities selected for that study, with inference disabled unless its controls are verified.
 
 ### Reference Protocol and Field Acceptance
 
@@ -135,6 +214,12 @@ Existing study deployments are not pilot targets without separately approved ado
 ## Next: One Conversation Study
 
 The conversation delivery adds a Stanford-backed text task, shared eligibility checks, durable messages and enforced usage through GroveLLM.
+
+It also includes [human conversation review (#86)](https://github.com/SchmiedmayerLab/Trove/issues/86):
+authorized study reviewers assess safety, accuracy and study-defined criteria at
+conversation and message level. Versioned rubrics, exact transcript references
+and independent reviewer history preserve the meaning of each rating. This is
+researcher-led assessment, not an automated clinical validation or monitoring service.
 
 Its defining property is continuity with the study model: the participant uses a published intervention within an assigned occurrence, and accepted completion can lead to a versioned follow-up questionnaire.
 
@@ -257,6 +342,8 @@ Automation can reduce repetitive engineering and research work, but it does not 
 Contributor tools should work with scoped access and synthetic fixtures. Security-sensitive changes, data migrations, consequential operations and weaker verification require appropriate independent review. Generated summaries are not substitutes for trusted test results.
 
 Researcher assistance operates through the same API as the dashboard and command line. It proposes reviewable changes, preserves sources and uncertainty, and stops short of independently approving studies, contacting participants, allocating arms or releasing data.
+
+Every new operation specifies its authenticated actor/client, resource scope, permitted action, approval boundary and forbidden side effects. Use a small shared permission scheme with readable presets, not per-interface policy. Test stale/replayed commands, revoked delegation, prompt injection and unavailable audit/validation against persisted outcomes. Keep deterministic CI separate from a bounded document/model evaluation corpus measuring source fidelity, unresolved ambiguity, correction effort and cost; model agreement is not a correctness oracle.
 
 This keeps automation useful without making it another source of study state or a privileged route around the platform's controls.
 
