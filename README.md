@@ -10,17 +10,52 @@ SPDX-License-Identifier: MIT
 
 [![Build and Test](https://github.com/SchmiedmayerLab/Trove/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/SchmiedmayerLab/Trove/actions/workflows/build-and-test.yml)
 [![CodeQL](https://github.com/SchmiedmayerLab/Trove/actions/workflows/codeql.yml/badge.svg)](https://github.com/SchmiedmayerLab/Trove/actions/workflows/codeql.yml)
+[![REUSE status](https://api.reuse.software/badge/github.com/SchmiedmayerLab/Trove)](https://github.com/SchmiedmayerLab/Trove/actions/workflows/repository-standards.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
-**Trove is an open-source platform for running longitudinal digital health studies.**
+**Study management for digital health research. Open source, built with Swift and Grove.**
 
-Research teams usually build a mobile app, a server, and a study-management layer from scratch for every project, and compile the study protocol into the app binary — so every protocol change needs a new App Store release. Trove separates the two. Researchers compose a study in the web portal, publish it as an immutable revision, and participants enrol against that revision. Changing a study does not mean shipping an app.
+Define a study in the web dashboard, then make it available to participants in the
+iOS app. Trove brings study information, eligibility, enrollment, consent and
+health-data collection into one platform.
 
-Clinical exchange uses immutable events aligned with the Grove FHIR implementation
-guide, exact resource identities and consent-backed study attribution. The former
-unversioned observation upload endpoint is retired. See the server's
-[event-admission contract](TroveServer/README.md#event-admission) for the supported
-capabilities and required validator setup.
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Roadmap](docs/Roadmap-and-Engineering-Principles.md)
+
+## For Research Teams
+
+Set up eligibility and enrollment, edit consent documents, and add study components.
+Preview what participants will see before publishing. Each published revision keeps
+the study definition and consent terms together, separate from later draft edits.
+
+![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details.png#gh-light-mode-only)
+![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details~dark.png#gh-dark-mode-only)
+
+## For Participants
+
+Discover a study, review its requirements, and enroll. Review and sign its consent
+document before authorizing health-data collection.
+
+<table>
+  <tr>
+    <th>Find a Study</th>
+    <th>Review the Details</th>
+    <th>Provide Consent</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mobile/studies.png#gh-light-mode-only" alt="Published studies in the Trove iOS app" width="230"><img src="docs/images/mobile/studies~dark.png#gh-dark-mode-only" alt="Published studies in the Trove iOS app" width="230"></td>
+    <td align="center"><img src="docs/images/mobile/study.png#gh-light-mode-only" alt="Study information and eligibility in the Trove iOS app" width="230"><img src="docs/images/mobile/study~dark.png#gh-dark-mode-only" alt="Study information and eligibility in the Trove iOS app" width="230"></td>
+    <td align="center"><img src="docs/images/mobile/consent.png#gh-light-mode-only" alt="Consent review with agreement and signature fields" width="230"><img src="docs/images/mobile/consent~dark.png#gh-dark-mode-only" alt="Consent review with agreement and signature fields" width="230"></td>
+  </tr>
+</table>
+
+Trove is under active development. These screenshots use a fictional Daily Activity
+Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
+current flows; the [roadmap](docs/Roadmap-and-Engineering-Principles.md) covers planned
+features, including randomization and automated follow-up.
+
+Health-data exchange follows the Grove FHIR implementation guide. See the
+[event-admission contract](TroveServer/README.md#event-admission) for supported data
+and validation requirements.
 
 ## How it fits together
 
@@ -112,13 +147,21 @@ known-vulnerable control. Web and development-stack jobs also scan their built
 application images by local image ID. Findings of any severity fail verification;
 reports, input identities and CycloneDX inventories are retained as artifacts.
 
-`static-analysis.yml` runs SwiftLint and, when repository access permits, Swift
-CodeQL analysis. `codeql.yml` covers JavaScript and TypeScript under the same access
-condition. A skipped CodeQL job is not security-analysis evidence.
+`static-analysis.yml` runs SwiftLint and Swift CodeQL analysis. `codeql.yml` covers
+JavaScript and TypeScript. Both scans run on every pull request, including stacks;
+GitHub's default CodeQL setup must remain disabled to avoid conflicting uploads.
 `repository-standards.yml` runs the organization checks; coverage is uploaded to
-Codecov. The proposed required checks are in
+Codecov. The required checks, signed commits and review requirements are in
 [`.github/rulesets/main.json`](.github/rulesets/main.json). This file does not apply
-branch protection: an administrator must configure and verify hosted enforcement.
+branch protection automatically; keep the hosted `main` ruleset synchronized with it.
+
+Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
+use GitHub-hosted Xcode 27 runners; Swift CodeQL also requires a hosted runner in
+the shared workflow. All external contributors' runs require maintainer approval.
+Before approving a fork, review workflow changes and the code that will execute:
+runner selection in a pull request is not an isolation boundary. Self-hosted
+runners must have no production credentials or access to study data. Workflow
+tokens default to read-only and cannot approve pull requests.
 
 ### Verified Image Candidates
 

@@ -96,6 +96,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
           "Trove is a web application that allows users to create and manage studies.",
       },
     ],
-    links: [{ rel: "icon", href: "favicon.ico" }],
+    links: [{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
   }),
 });

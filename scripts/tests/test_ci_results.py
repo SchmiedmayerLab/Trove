@@ -168,6 +168,34 @@ class CIResultTests(unittest.TestCase):
         self.assertTrue(rule["parameters"]["strict_required_status_checks_policy"])
         self.assertEqual(ruleset["bypass_actors"], [])
 
+    def test_public_repository_scanning_is_unconditional_and_required(self) -> None:
+        ruleset = json.loads((ROOT / ".github/rulesets/main.json").read_text())
+        rules = {rule["type"]: rule for rule in ruleset["rules"]}
+        contexts = {check["context"] for check in rules["required_status_checks"]["parameters"]["required_status_checks"]}
+        self.assertIn("required_signatures", rules)
+        self.assertIn("required_linear_history", rules)
+        for filename, job_id in (("codeql.yml", "analyze"), ("static-analysis.yml", "codeql")):
+            workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+            # PyYAML's YAML 1.1 reader interprets the unquoted workflow key 'on' as True.
+            self.assertIsNone(workflow[True]["pull_request"])
+            job = workflow["jobs"][job_id]
+            self.assertNotIn("if", job)
+            self.assertNotIn("needs", job)
+            if job_id == "codeql":
+                self.assertEqual(json.loads(job["with"]["runsonlabels"]), ["xcode-27"])
+                self.assertTrue(job["with"]["codeql"])
+                self.assertIn(f'{job["name"]} / {job["with"]["job_name"]}', contexts)
+            else:
+                self.assertIn(job["name"], contexts)
+
+    def test_fork_runner_routing_and_simulator_runtime_are_explicit(self) -> None:
+        jobs = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())["jobs"]
+        self.assertIn("OS=27.0", jobs["ios"]["with"]["destination"])
+        for runner in (jobs["ios"]["with"]["runsonlabels"], jobs["ios-ui"]["runs-on"],
+                       jobs["native-line-coverage"]["runs-on"], jobs["coverage"]["with"]["runs_on_labels"]):
+            self.assertIn("github.event.pull_request.head.repo.full_name != github.repository", runner)
+            self.assertIn("'[\"xcode-27\"]' || '[\"self-hosted\", \"macOS\"]'", runner)
+
 
 if __name__ == "__main__":
     unittest.main()

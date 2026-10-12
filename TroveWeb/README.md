@@ -10,7 +10,10 @@ SPDX-License-Identifier: MIT
 
 The researcher-facing portal. Researchers define studies by specifying metadata, participant criteria, and app components; those definitions then configure the participant app.
 
-<img width="1618" height="939" alt="Trove Web interface overview" src="./images/hero.webp" />
+<picture><source media="(prefers-color-scheme: dark)" srcset="../docs/images/web/study-details~dark.png"><img src="../docs/images/web/study-details.png" alt="Study details and participant preview"></picture>
+
+See the [platform tour](../docs/Platform-Tour.md) for current web and mobile
+screens, and the [capture guide](../docs/images/README.md) to reproduce them.
 
 ## Getting started
 

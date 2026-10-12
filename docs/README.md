@@ -16,6 +16,9 @@ This documentation describes the platform's target architecture and development 
 
 ## The Core Idea
 
+For a visual walkthrough of the current development build, see the
+[Platform Tour](Platform-Tour.md), with synthetic study data and reproducible captures.
+
 A study definition connects the scientific protocol to the software that carries it out. It identifies approved content, activities, collection requirements, supported sources and execution rules. Trove connects that definition to participant consent, assigned task occurrences and governed data access.
 
 The definition should describe *what the study needs*, rather than encode the internals of one mobile operating system. Applications report which requirements they can support. The backend owns shared state and authorization; clients provide the appropriate experience.
