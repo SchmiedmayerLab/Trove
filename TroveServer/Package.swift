@@ -62,6 +62,7 @@ let package = Package(
                 .product(name: "Grove", package: "Grove"),
                 .product(name: "GroveFoundation", package: "Grove"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveQuestionnaireFHIR", package: "Grove"),
                 .target(name: "GroveVapor"),
                 .product(name: "JWTKit", package: "jwt-kit"),
                 .product(name: "Crypto", package: "swift-crypto"),

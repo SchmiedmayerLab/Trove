@@ -10,11 +10,100 @@ from email.message import Message
 import tempfile
 import socketserver
 import subprocess
+from types import SimpleNamespace
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import worker
+
+
+class QuestionnaireValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.validator = object.__new__(worker.Validator)
+        self.validator.manifest = {"contractRevision": "pinned"}
+        self.validator.identity = "sha256:pinned"
+        self.validator.questionnaire_rules = Mock(return_value=[])
+        self.validator.engine = Mock()
+        self.reject = Mock()
+        self.error = type("ProducerValidationError", (Exception,), {})
+        self.modules = patch.dict(worker.sys.modules, {
+            "Scripts.producer_validation.external_validator": SimpleNamespace(reject_validator_errors=self.reject),
+            "Scripts.producer_validation.diagnostics": SimpleNamespace(ProducerValidationError=self.error),
+        })
+        self.modules.start()
+        self.addCleanup(self.modules.stop)
+        self.resource = {
+            "resourceType": "Questionnaire",
+            "meta": {"profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]},
+        }
+
+    def validate(self):
+        raw = json.dumps(self.resource).encode()
+        status, response = self.validator.validate_questionnaire(raw)
+        self.assertEqual(response["purpose"], "questionnaire")
+        self.assertEqual(response["sha256"], hashlib.sha256(raw).hexdigest())
+        return status, response
+
+    def test_runs_both_validation_layers_and_binds_original_bytes(self):
+        status, response = self.validate()
+        self.assertEqual(status, 200)
+        self.assertTrue(response["valid"])
+        self.validator.questionnaire_rules.assert_called_once_with(self.resource)
+        self.validator.engine.validate.assert_called_once_with(json.dumps(self.resource).encode())
+        self.reject.assert_called_once_with(self.validator.engine.validate.return_value, "questionnaire")
+
+    def test_missing_profile_and_companion_failure_do_not_contact_engine(self):
+        for change in ("missing", "wrong", "companion"):
+            with self.subTest(change=change):
+                if change == "missing":
+                    self.resource["meta"]["profile"] = []
+                elif change == "wrong":
+                    self.resource["meta"]["profile"] = ["https://example.org/StructureDefinition/other"]
+                else:
+                    self.resource["meta"]["profile"] = ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]
+                    self.validator.questionnaire_rules.return_value = [SimpleNamespace(severity="error")]
+                status, response = self.validate()
+                self.assertEqual((status, response["code"]), (422, "invalid_fhir"))
+                self.validator.engine.validate.assert_not_called()
+
+    def test_official_rejection_is_not_success_or_unavailability(self):
+        self.reject.side_effect = self.error("private diagnostic")
+        status, response = self.validate()
+        self.assertEqual((status, response["code"]), (422, "invalid_fhir"))
+        self.assertNotIn("private diagnostic", json.dumps(response))
+
+    def test_engine_failure_is_unavailable(self):
+        self.validator.engine.validate.side_effect = TimeoutError("private diagnostic")
+        status, response = self.validate()
+        self.assertEqual((status, response["code"]), (503, "validator_unavailable"))
+
+    def test_invalid_json_never_reaches_rules_or_engine(self):
+        status, response = self.validator.validate_questionnaire(b'{"x":1,"x":2}')
+        self.assertEqual((status, response["code"], response["purpose"]), (422, "invalid_json", "questionnaire"))
+        self.validator.questionnaire_rules.assert_not_called()
+        self.validator.engine.validate.assert_not_called()
+
+    def test_routes_do_not_select_each_others_validation(self):
+        for path in ("/validate", "/validate/questionnaire"):
+            with self.subTest(path=path):
+                handler = object.__new__(worker.Handler)
+                handler.path = path
+                handler.headers = Message()
+                handler.headers["Content-Length"] = "2"
+                handler.headers["Content-Type"] = "application/fhir+json"
+                handler.rfile = io.BytesIO(b'{}')
+                handler.connection = Mock()
+                handler.server = Mock()
+                handler.server.validator.validate.return_value = (200, {})
+                handler.server.validator.validate_questionnaire.return_value = (200, {})
+                handler.send_result = Mock()
+                with patch.object(worker.signal, "alarm"):
+                    handler.do_POST()
+                selected = handler.server.validator.validate_questionnaire if path.endswith("questionnaire") else handler.server.validator.validate
+                other = handler.server.validator.validate if path.endswith("questionnaire") else handler.server.validator.validate_questionnaire
+                selected.assert_called_once_with(b'{}')
+                other.assert_not_called()
 
 
 class StrictJSONTests(unittest.TestCase):
