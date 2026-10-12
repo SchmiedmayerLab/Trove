@@ -209,8 +209,11 @@ def query_plans(stack, workload, receipt):
 def fixture_event(template, source, sequence, instant, derive):
     """Create a distinct native record using the pinned IG identity implementation."""
     bundle = copy.deepcopy(template)
+    # Synthetic workloads use the source UUID as a reproducible local producer ID.
+    # The API no longer assigns producer identity; deployed clients use Grove's ledger.
+    producer_instance = str(uuid.UUID(source["id"]))
     components = ["org.troveplatform.benchmark.heart-rate.v1", "HKQuantityTypeIdentifierHeartRate",
-                  source["eventIdentifierSystem"], source["producerInstance"], str(sequence)]
+                  source["eventIdentifierSystem"], producer_instance, str(sequence)]
     identities = {role: derive(key=bytes(range(32)), key_id="test-key", epoch=1, identity_kind=role,
                               components=components + (["observation", "primary"] if role == "source-output" else []))
                   for role in ("source-record", "source-output")}
@@ -229,7 +232,7 @@ def fixture_event(template, source, sequence, instant, derive):
                 replace(child)
 
     replace(bundle)
-    result = rekey(bundle, event_system=source["eventIdentifierSystem"], producer_instance=source["producerInstance"],
+    result = rekey(bundle, event_system=source["eventIdentifierSystem"], producer_instance=producer_instance,
                    participant_system=source["participantIdentifier"]["system"], participant_value=source["participantIdentifier"]["value"],
                    effective_at=instant, sequence=sequence)
     return json.dumps(result, separators=(",", ":")).encode()

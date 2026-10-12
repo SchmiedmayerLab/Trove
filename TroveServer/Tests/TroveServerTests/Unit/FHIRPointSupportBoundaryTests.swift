@@ -29,7 +29,9 @@ struct FHIRPointSupportBoundaryTests {
         try FHIRPointSupportBoundary.validateExtensionLocations(in: bytes())
     }
 
-    @Test(arguments: [HealthKitContract.sourceTypeExtension, Canonicals.recordingMethod])
+    @Test(arguments: [
+        FHIRPrimitive<FHIRURI>(stringLiteral: Canonicals.root + "/healthkit/StructureDefinition/healthkit-source-type"), Canonicals.recordingMethod
+    ])
     func acquisitionMetadataCannotIntroduceReferences(url: FHIRPrimitive<FHIRURI>) throws {
         let injected: [String: Any] = [
             "url": try #require(url.value?.url.absoluteString), "valueReference": Self.foreignPatient

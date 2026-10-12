@@ -103,7 +103,7 @@ extension DeliveryJournal {
 
     /// Restores the private Grove conversion scope only for a confirmed, non-revoked stream.
     /// One key epoch belongs to one stream; replacing a lost key requires an explicitly new source.
-    public func identityScope(for sourceID: UUID) throws -> PseudonymousIdentityScope {
+    public func identityScope(for sourceID: UUID) throws -> OpaqueIdentityScope {
         let setup = try activeSource(sourceID)
         guard let binding = setup.binding else { throw JournalError.corruptJournal }
         let keys = try database.query("SELECT privacy_key FROM source_state WHERE source_id = ?", [.text(sourceID.uuidString.lowercased())]) {
@@ -113,8 +113,8 @@ extension DeliveryJournal {
         return try .init(
             systems: Contract.source(binding, localID: setup.localID, scope: scope).systems,
             keyID: setup.localID.uuidString.lowercased(),
-            epoch: 1,
-            key: key
+            epoch: EventSequence(1),
+            key: SymmetricKey(data: key)
         )
     }
 }

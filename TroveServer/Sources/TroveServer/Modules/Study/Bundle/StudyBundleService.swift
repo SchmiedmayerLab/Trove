@@ -86,6 +86,10 @@ final class StudyBundleService: Module, @unchecked Sendable {
             components: components.definitions,
             componentSchedules: schedules
         )
+        let archive = try writeBundleZip(
+            studyId: studyId, definition: definition, files: consentFiles + components.files, collectionPolicy: collectionPolicy
+        )
+        let questionnaires = try archivedQuestionnaires(in: archive, inputs: components.questionnaires)
 
         return Publication(
             metadata: metadata,
@@ -94,11 +98,39 @@ final class StudyBundleService: Module, @unchecked Sendable {
             enrollmentCondition: study.enrollmentCondition,
             collectionPolicy: collectionPolicy,
             groupID: study.$group.id,
-            bundle: try writeBundleZip(
-                studyId: studyId, definition: definition, files: consentFiles + components.files, collectionPolicy: collectionPolicy
-            ),
-            questionnaires: components.questionnaires
+            bundle: archive,
+            questionnaires: questionnaires
         )
+    }
+}
+
+
+extension StudyBundleService {
+    /// Grove merges translations during bundle construction. Only the resulting archive
+    /// bytes may receive validation evidence; validating the inputs would attest different content.
+    private func archivedQuestionnaires(in bytes: Data, inputs: [QuestionnaireResource]) throws -> [QuestionnaireResource] {
+        let archive = try Archive(data: bytes, accessMode: .read)
+        let entries = archive.filter { $0.path.contains("/questionnaire/") && $0.type == .file }
+        let components = Dictionary(grouping: inputs, by: \.componentID)
+        guard entries.count == components.count else { throw Self.missingResource }
+        return try components.keys.sorted(by: { $0.uuidString < $1.uuidString }).map { id in
+            let candidates = (components[id] ?? []).compactMap { input -> (QuestionnaireResource, Entry)? in
+                let suffix = "/questionnaire/\(id.uuidString.lowercased())+\(input.locale).json"
+                guard let entry = entries.first(where: { $0.path.hasSuffix(suffix) }) else {
+                    return nil
+                }
+                return (input, entry)
+            }
+            guard candidates.count == 1, let (input, entry) = candidates.first else { throw Self.missingResource }
+            var content = Data()
+            _ = try archive.extract(entry) { chunk in
+                guard chunk.count <= ArtifactReference.Purpose.publication.maximumBytes - content.count else {
+                    throw Self.resourceLimitExceeded
+                }
+                content.append(chunk)
+            }
+            return QuestionnaireResource(componentID: id, locale: input.locale, bytes: content)
+        }
     }
 }
 

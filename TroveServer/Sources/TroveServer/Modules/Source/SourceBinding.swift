@@ -22,13 +22,11 @@ struct SourceBinding: Sendable, Equatable {
     let registrationID: UUID
     let kind: SourceKind
     let eventIdentifierSystem: String
-    let pseudonymousIdentifierSystems: PseudonymousIdentitySystems
+    let identifierRoot: String
     let participantIdentifierSystem: String
     let participantIdentifierValue: String
     let createdAt: Date
     let revokedAt: Date?
-
-    var producerInstance: UUID { id }
 
     init(row: any SQLRow) throws {
         id = try row.decode(column: "id", as: UUID.self)
@@ -36,7 +34,11 @@ struct SourceBinding: Sendable, Equatable {
         registrationID = try row.decode(column: "registration_id", as: UUID.self)
         kind = try row.decode(column: "kind", as: SourceKind.self)
         eventIdentifierSystem = try row.decode(column: "event_identifier_system", as: String.self)
-        pseudonymousIdentifierSystems = try SourceIdentityNamespaces.assign(eventSystem: eventIdentifierSystem)
+        identifierRoot = try row.decode(column: "identifier_root", as: String.self)
+        guard try SourceIdentityNamespaces.assign(root: identifierRoot, registrationID: registrationID).event.rawValue
+            == eventIdentifierSystem else {
+            throw ExchangeIdentityError.invalidIdentifierSystem(eventIdentifierSystem)
+        }
         participantIdentifierSystem = try row.decode(column: "participant_identifier_system", as: String.self)
         participantIdentifierValue = try row.decode(column: "participant_identifier_value", as: String.self)
         createdAt = try row.decode(column: "created_at", as: Date.self)

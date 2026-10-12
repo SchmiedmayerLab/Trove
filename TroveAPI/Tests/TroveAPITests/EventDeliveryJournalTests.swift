@@ -12,8 +12,6 @@ import Testing
 
 
 struct EventDeliveryJournalTests {
-    private enum TestFailure: Error { case interrupted }
-
     @Test
     func originalBytesIdentityAndUncertainAttemptSurviveReopening() async throws {
         try await DeliveryFixture.withJournal { journal, url in
@@ -30,7 +28,7 @@ struct EventDeliveryJournalTests {
             #expect(retried.commitment.receiptLookup == initial.commitment.receiptLookup)
             #expect(try await reopened.checkpoint(for: DeliveryFixture.sourceID).cursor != nil)
             await #expect(throws: EventDeliveryJournal.JournalError.staleCheckpoint) {
-                try await reopened.stage(from: checkpoint, nextCursor: Data([2]), changeCount: 1) { _, _ in throw TestFailure.interrupted }
+                try await reopened.stage(from: checkpoint, nextCursor: Data([2]), payloads: [.init(bytes: Data(), targets: [])])
             }
             await reopened.close()
         }
@@ -40,15 +38,12 @@ struct EventDeliveryJournalTests {
     func emptyDeltaAdvancesCheckpointWithoutConsumingEventIdentity() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let initial = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let empty = try await journal.stage(from: initial, nextCursor: Data([1]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+            let empty = try await journal.stage(from: initial, nextCursor: Data([1]), payloads: [])
             #expect(empty.isEmpty)
             let next = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             #expect(next.cursor == Data([1]))
             #expect(next != initial)
-            let ids = try await journal.stage(from: next, nextCursor: Data([2]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-            }
+            let ids = try await journal.stage(from: next, nextCursor: Data([2]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])])
             let id = try #require(ids.first)
             let pending = try await journal.pendingDeliveryIDs()
             #expect(pending == [id])
@@ -56,19 +51,18 @@ struct EventDeliveryJournalTests {
     }
 
     @Test
-    func failedStagingDoesNotConsumeSequenceOrAcknowledgeChanges() async throws {
+    func invalidPayloadDoesNotAcknowledgeChanges() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            await #expect(throws: TestFailure.self) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, _ in throw TestFailure.interrupted }
+            await #expect(throws: EventSubmissionCommitment.ValidationError.invalidEnvelope) {
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [.init(bytes: Data(), targets: [])])
             }
             let pending = try await journal.pendingDeliveryIDs()
             #expect(pending.isEmpty)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
-            let id = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-            }
+            let id = try await journal.stage(
+                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+            )
             #expect(!id.isEmpty)
         }
     }
@@ -113,7 +107,8 @@ struct EventDeliveryJournalTests {
             }
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var changed = try #require(setup.binding)
-            changed.eventIdentifierSystem = "https://trove.test/replacement"
+            changed.identifierRoot = "https://trove.test/replacement"
+            changed.eventIdentifierSystem = changed.identifierRoot + "/NamingSystem/grove-event-v0"
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) { try await journal.confirmSource(changed, for: setup) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) {
                 try await journal.createSource(localID: DeliveryFixture.epoch, queryDefinition: Data("different-predicate".utf8))
@@ -151,9 +146,9 @@ struct EventDeliveryJournalTests {
                 for _ in 0..<16 {
                     group.addTask {
                         do {
-                            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                                DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-                            }
+                            _ = try await journal.stage(
+                                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+                            )
                             return 1
                         } catch EventDeliveryJournal.JournalError.staleCheckpoint {
                             return 0
@@ -184,10 +179,9 @@ struct EventDeliveryJournalTests {
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             try connection.execute("DROP TRIGGER fail_staging")
             connection.close()
-            let id = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-            }
+            let id = try await journal.stage(
+                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+            )
             #expect(!id.isEmpty)
         }
     }
@@ -243,10 +237,10 @@ extension EventDeliveryJournalTests {
             let existing = try await DeliveryFixture.stage(journal, changes: ["add:a"])
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             do {
-                _ = try await journal.stage(from: checkpoint, nextCursor: Data([2]), changeCount: 1) { _, sequence in
-                    let payload = DeliveryFixture.payload(sequence: sequence, changes: ["add:b"])
-                    return .init(bytes: payload.bytes + Data(repeating: 32, count: 192 * 1024), targets: payload.targets)
-                }
+                let payload = DeliveryFixture.payload(sequence: 2, changes: ["add:b"])
+                _ = try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: [
+                    .init(bytes: payload.bytes + Data(repeating: 32, count: 192 * 1024), targets: payload.targets)
+                ])
                 Issue.record("SQLite accepted an event larger than the configured database limit")
             } catch let failure as DeliverySQLite.Failure {
                 #expect(failure.code == 13) // SQLITE_FULL, not the application-level quota error.
@@ -255,10 +249,9 @@ extension EventDeliveryJournalTests {
             let reopened = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
             #expect(try await reopened.pendingDeliveryIDs() == existing)
             #expect(try await reopened.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
-            _ = try await reopened.stage(from: checkpoint, nextCursor: Data([2]), changeCount: 1) { _, sequence in
-                #expect(sequence == 2)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:b"])
-            }
+            _ = try await reopened.stage(
+                from: checkpoint, nextCursor: Data([2]), payloads: [DeliveryFixture.payload(sequence: 2, changes: ["add:b"])]
+            )
             await reopened.close()
         }
     }

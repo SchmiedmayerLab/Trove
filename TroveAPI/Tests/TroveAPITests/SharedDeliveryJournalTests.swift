@@ -20,9 +20,9 @@ struct SharedDeliveryJournalTests {
         try await withJournal { journal, url, sourceID in
             let checkpoint = try await journal.checkpoint(for: sourceID)
             let bytes = try JSONEncoder().encode(FixtureEvent(sourceID: sourceID, sequence: 1))
-            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, _ in
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
                 .init(bytes: bytes, targets: ["study-b", "study-a"])
-            }
+            ])
             let id = try #require(ids.first)
             let attempt = try #require(await journal.prepareAttempt(id))
             #expect(attempt.bytes == bytes)
@@ -54,17 +54,16 @@ struct SharedDeliveryJournalTests {
         try await withJournal { journal, _, sourceID in
             let checkpoint = try await journal.checkpoint(for: sourceID)
             await #expect(throws: FixtureError.self) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([2]), changeCount: 2) { index, sequence in
-                    guard index == 0 else { throw FixtureError.invalid }
-                    return .init(bytes: try JSONEncoder().encode(FixtureEvent(sourceID: sourceID, sequence: sequence)), targets: ["study"])
-                }
+                try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: [
+                    .init(bytes: try JSONEncoder().encode(FixtureEvent(sourceID: sourceID, sequence: 1)), targets: ["study"]),
+                    .init(bytes: try JSONEncoder().encode(FixtureEvent(sourceID: UUID(), sequence: 2)), targets: ["study"])
+                ])
             }
             #expect(try await journal.checkpoint(for: sourceID) == checkpoint)
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
-            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return .init(bytes: try JSONEncoder().encode(FixtureEvent(sourceID: sourceID, sequence: sequence)), targets: ["study"])
-            }
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
+                .init(bytes: try JSONEncoder().encode(FixtureEvent(sourceID: sourceID, sequence: 1)), targets: ["study"])
+            ])
             #expect(ids.count == 1)
         }
     }
@@ -85,7 +84,7 @@ struct SharedDeliveryJournalTests {
         }
     }
 
-    @Test(arguments: [4, 999])
+    @Test(arguments: [4, 5, 999])
     func incompatibleSchemaIsRejectedWithoutRecreatingState(version: Int64) async throws {
         try await withJournal { journal, url, _ in
             await journal.close()

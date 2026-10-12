@@ -8,6 +8,7 @@
 
 import Crypto
 import Foundation
+import GroveFHIRContract
 
 
 /// Identity required before a client can acknowledge durable custody of exact staged bytes.
@@ -40,12 +41,10 @@ public struct EventSubmissionCommitment: Sendable {
               let envelope = try? JSONDecoder().decode(Envelope.self, from: originalBytes),
               (1...512).contains(envelope.entry.count) else { throw ValidationError.invalidEnvelope }
         let identifier = envelope.identifier
-        let prefix = "e0:\(sourceID.uuidString.lowercased()):"
         guard (1...512).contains(identifier.system.utf8.count), (1...512).contains(identifier.value.utf8.count),
-              identifier.value.hasPrefix(prefix) else { throw ValidationError.invalidEventIdentity }
-        let sequence = identifier.value.dropFirst(prefix.count)
-        guard let first = sequence.utf8.first, (49...57).contains(first),
-              sequence.utf8.allSatisfy({ (48...57).contains($0) }) else { throw ValidationError.invalidEventIdentity }
+              (try? ExchangeEventIdentifier(BusinessIdentifier(
+                system: IdentifierSystem(identifier.system), value: identifier.value
+              ))) != nil else { throw ValidationError.invalidEventIdentity }
         self.sourceID = sourceID
         producerEventIdentifier = .init(system: identifier.system, value: identifier.value)
         payloadSHA256 = SHA256.hash(data: originalBytes).map { String(format: "%02x", $0) }.joined()

@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Foundation
 import GroveHealthKit
 import HealthKit
 import TroveAPIClient
@@ -21,7 +22,9 @@ extension TroveStandard: HealthKitConstraint {
     }
 
     func handleDeletedObjects<Sample>(
-        _ deletedObjects: some Collection<HKDeletedObject> & Sendable, ofType sampleType: SampleType<Sample>
+        _ deletedObjects: some Collection<HKDeletedObject> & Sendable,
+        ofType sampleType: SampleType<Sample>,
+        deletedAfter: Date?
     ) async throws -> HealthKitAnchorCommitAction? {
         throw EventDeliveryJournal.JournalError.invalidConfiguration
     }

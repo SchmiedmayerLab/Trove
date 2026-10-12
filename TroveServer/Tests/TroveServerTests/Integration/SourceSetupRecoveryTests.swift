@@ -67,7 +67,7 @@ extension SourceSetupRecoveryTests {
         let sourceID = try #require(UUID(uuidString: binding.id))
         let identity = try await journal.identityScope(for: sourceID)
         #expect(identity.keyID == setup.localID.uuidString.lowercased())
-        #expect(identity.systems == (try binding.pseudonymousIdentifierSystems.groveSystems()))
+        #expect(identity.systems == (try binding.identifierSystems()))
         let checkpoint = try await journal.checkpoint(for: sourceID)
         #expect(checkpoint.cursor == nil)
         let sql = try #require(app.db as? any SQLDatabase)

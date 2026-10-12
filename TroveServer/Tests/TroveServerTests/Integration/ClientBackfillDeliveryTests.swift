@@ -75,19 +75,14 @@ extension ClientBackfillDeliveryTests {
         for page in 1...2 {
             let checkpoint = try await journal.checkpoint(for: fixture.source.id)
             let cursor = Data("page-\(page)".utf8)
-            let ids = try await journal.stage(from: checkpoint, nextCursor: cursor, changeCount: 10) { index, sequence in
-                // Caller-owned selection filters one source change without losing page progress
-                // or consuming an event sequence. The shared journal knows no study policy.
-                guard index != 0 else {
-                    return nil
-                }
-                try #require((1...18).contains(sequence))
-                return payloads[Int(sequence) - 1]
-            }
+            // Selection and immutable event construction precede staging. The journal commits
+            // each selected page and its cursor together without assigning FHIR identities.
+            let pagePayloads = Array(payloads[((page - 1) * 9)..<(page * 9)])
+            let ids = try await journal.stage(from: checkpoint, nextCursor: cursor, payloads: pagePayloads)
             #expect(ids.count == 9)
             identifiers.append(contentsOf: ids)
             await #expect(throws: EventDeliveryJournal.JournalError.staleCheckpoint) {
-                try await journal.stage(from: checkpoint, nextCursor: cursor, changeCount: 0) { _, _ in nil }
+                try await journal.stage(from: checkpoint, nextCursor: cursor, payloads: [])
             }
         }
         #expect(identifiers.count == 18)

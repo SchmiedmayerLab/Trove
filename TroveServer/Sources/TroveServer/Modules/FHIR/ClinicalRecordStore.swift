@@ -44,7 +44,7 @@ struct ClinicalRecordRevision: Sendable {
         case (nil, nil): break
         case let (.some(writer), .some(version)):
             guard Self.bounded(writer), version.utf8.count <= 4096,
-                  (try? CanonicalNonnegativeDecimal(version)) != nil else {
+                  Self.isCanonicalWriterVersion(version) else {
                 throw ServerError.badRequest("Unsupported writer revision evidence")
             }
         default: throw ServerError.badRequest("Incomplete writer revision evidence")
@@ -53,6 +53,16 @@ struct ClinicalRecordRevision: Sendable {
         writer = first.writerIdentifier
         version = first.writerVersion
         kind = "active"
+    }
+
+    private static func isCanonicalWriterVersion(_ value: String) -> Bool {
+        guard let first = value.utf8.first else {
+            return false
+        }
+        if first == 48 {
+            return value == "0"
+        }
+        return (49...57).contains(first) && value.utf8.dropFirst().allSatisfy { (48...57).contains($0) }
     }
 
     private static func bounded(_ identifier: ValidatedExchangeEvent.Identifier) -> Bool {

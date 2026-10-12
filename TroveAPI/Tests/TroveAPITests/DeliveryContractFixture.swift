@@ -96,18 +96,7 @@ extension FixtureDeliveryContract {
             id: binding.id,
             eventSystem: "urn:example:events",
             revokedAt: nil,
-            systems: .init(
-                sourceRecord: .init("urn:example:source-record"),
-                sourceOutput: .init("urn:example:source-output"),
-                writerRecord: .init("urn:example:writer"),
-                providerRecord: .init("urn:example:provider-record"),
-                providerOutput: .init("urn:example:provider-output"),
-                sourceArtifact: .init("urn:example:source-artifact"),
-                providerArtifact: .init("urn:example:provider-artifact"),
-                sourceContext: .init("urn:example:context"),
-                recordingDevice: .init("urn:example:device"),
-                deviceSnapshot: .init("urn:example:snapshot")
-            )
+            systems: .derived(root: "urn:example:fixture", keyID: localID.uuidString.lowercased(), epoch: EventSequence(1))
         )
     }
 

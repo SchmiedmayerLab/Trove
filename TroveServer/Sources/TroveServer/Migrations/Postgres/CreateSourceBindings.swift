@@ -20,6 +20,7 @@ struct CreateSourceBindings: AsyncMigration {
                 .field("participant_id", .uuid, .required, .references("participants", "id", onDelete: .restrict))
                 .field("registration_id", .uuid, .required)
                 .field("kind", .string, .required)
+                .field("identifier_root", .string, .required)
                 .field("event_identifier_system", .string, .required)
                 .field("participant_identifier_system", .string, .required)
                 .field("participant_identifier_value", .string, .required)
@@ -27,9 +28,10 @@ struct CreateSourceBindings: AsyncMigration {
                 .field("revoked_at", .datetime)
                 .unique(on: "participant_id", "registration_id")
                 .unique(on: "event_identifier_system")
+                .unique(on: "identifier_root")
                 .unique(on: "id", "participant_id", name: "source_participant_identity")
                 .constraint(.custom(SQLConstraint(algorithm: SQLTableConstraintAlgorithm.check(SQLRaw("""
-                    kind = 'participant-app' AND length(event_identifier_system) > 0
+                    kind = 'participant-app' AND length(event_identifier_system) > 0 AND length(identifier_root) BETWEEN 1 AND 256
                     AND length(participant_identifier_system) > 0 AND length(participant_identifier_value) > 0
                     AND (revoked_at IS NULL OR revoked_at >= created_at)
                     """)))))
@@ -49,7 +51,7 @@ struct CreateSourceBindings: AsyncMigration {
 
     private func prepareIdentityGuard(on sql: any SQLDatabase, postgres: Bool) async throws {
         let columns = [
-            "id", "participant_id", "registration_id", "kind", "event_identifier_system",
+            "id", "participant_id", "registration_id", "kind", "identifier_root", "event_identifier_system",
             "participant_identifier_system", "participant_identifier_value", "created_at"
         ]
         let differs = postgres ? "IS DISTINCT FROM" : "IS NOT"

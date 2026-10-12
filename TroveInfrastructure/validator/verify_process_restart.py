@@ -408,7 +408,7 @@ class Checkpoint:
         source = self.api_json("/participant/sources", participant, "POST", {"registrationID": str(uuid.uuid4())})
         event = self.run([sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
                           "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
-                          "--event-system", source["eventIdentifierSystem"], "--producer-instance", source["producerInstance"],
+                          "--event-system", source["eventIdentifierSystem"], "--producer-instance", source["id"],
                           "--participant-system", source["participantIdentifier"]["system"], "--participant-value", source["participantIdentifier"]["value"],
                           "--effective-at", datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")])
         (self.evidence / "event.json").write_bytes(event)

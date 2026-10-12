@@ -49,13 +49,9 @@ struct EventSubmissionCommitmentTests {
     }
 
     @Test
-    func completeIdentifierComparisonDoesNotFoldUnicode() throws {
+    func noncanonicalIdentifierSystemsAreRejectedWithoutNormalization() throws {
         let bytes = Data(String(decoding: Self.bytes, as: UTF8.self).replacingOccurrences(of: "/events", with: "/caf\u{e9}").utf8)
-        let commitment = try Self.commitment(bytes: bytes)
-        var receipt = Self.receipt(commitment)
-        receipt.producerEventIdentifier.system = "https://example.test/cafe\u{301}"
-        #expect(receipt.producerEventIdentifier.system == commitment.producerEventIdentifier.system)
-        #expect(throws: EventSubmissionCommitment.ValidationError.receiptMismatch) { try commitment.verify(receipt) }
+        #expect(throws: EventSubmissionCommitment.ValidationError.invalidEventIdentity) { try Self.commitment(bytes: bytes) }
     }
 
     @Test(arguments: ["0", "01", "-1", "1.0", "1e2", "１", ""])
@@ -70,10 +66,11 @@ struct EventSubmissionCommitmentTests {
     }
 
     @Test
-    func aDifferentSourceCannotClaimTheStagedEvent() throws {
-        #expect(throws: EventSubmissionCommitment.ValidationError.invalidEventIdentity) {
-            try EventSubmissionCommitment(sourceID: UUID(), originalBytes: Self.bytes, targets: Self.targets())
-        }
+    func producerInstanceDoesNotReplaceTheSourceReceiptBinding() throws {
+        let original = try Self.commitment()
+        let other = try EventSubmissionCommitment(sourceID: UUID(), originalBytes: Self.bytes, targets: Self.targets())
+        #expect(other.producerEventIdentifier == original.producerEventIdentifier)
+        #expect(throws: EventSubmissionCommitment.ValidationError.receiptMismatch) { try other.verify(Self.receipt(original)) }
     }
 
     @Test

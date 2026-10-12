@@ -27,6 +27,18 @@ enum DeliveryJournalSchema {
         let contract: String
     }
 
+    static func checkByteLimit(_ database: DeliverySQLite, maximumBytes: Int) throws {
+        let sizes = try database.query("""
+            SELECT
+                (SELECT coalesce(sum(coalesce(length(payload), 0) + length(targets)), 0) FROM delivery)
+                + (SELECT coalesce(sum(length(query_definition) + coalesce(length(cursor), 0)
+                    + length(privacy_key) + coalesce(length(binding), 0)), 0) FROM source_state)
+                + (SELECT coalesce(sum(length(key) + length(value)), 0) FROM producer_ledger)
+                + (SELECT count(*) * 80 FROM deletion_detection)
+            """) { sqlite3_column_int64($0, 0) }
+        guard let size = sizes.first, size <= maximumBytes else { throw DeliveryJournalError.capacityExceeded }
+    }
+
     /// Journal sidecars inherit the private containing directory's protection and backup exclusion.
     static func checkProtection(of url: URL) throws {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -71,7 +83,7 @@ enum DeliveryJournalSchema {
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
         if !create {
             let version = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard version == [5] else { throw DeliveryJournalError.unsupportedFormat }
+            guard version == [6] else { throw DeliveryJournalError.unsupportedFormat }
             let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
             guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
         }
@@ -102,7 +114,7 @@ enum DeliveryJournalSchema {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
-                try database.execute("PRAGMA user_version = 5")
+                try database.execute("PRAGMA user_version = 6")
             }
         }
     }
@@ -133,6 +145,7 @@ extension DeliveryJournalSchema {
             id TEXT PRIMARY KEY NOT NULL,
             source_id TEXT NOT NULL REFERENCES source_state(source_id),
             sequence INTEGER NOT NULL CHECK (sequence > 0),
+            event_value TEXT NOT NULL CHECK (length(event_value) BETWEEN 1 AND 512),
             payload BLOB,
             targets BLOB NOT NULL CHECK (length(targets) BETWEEN 1 AND 524288),
             payload_digest TEXT NOT NULL CHECK (length(payload_digest) = 64),
@@ -143,8 +156,25 @@ extension DeliveryJournalSchema {
             blocked BLOB CHECK (blocked IS NULL OR length(blocked) BETWEEN 1 AND 128),
             receipt BLOB CHECK (receipt IS NULL OR length(receipt) BETWEEN 1 AND 8192),
             UNIQUE (source_id, sequence),
+            UNIQUE (source_id, event_value),
             CHECK ((payload IS NOT NULL AND length(payload) BETWEEN 1 AND 4194304 AND receipt IS NULL)
                 OR (payload IS NULL AND receipt IS NOT NULL AND blocked IS NULL AND retry_after = 0))
+        ) STRICT
+        """,
+        """
+        CREATE TABLE producer_ledger (
+            source_id TEXT NOT NULL REFERENCES source_state(source_id),
+            key TEXT NOT NULL CHECK (length(key) BETWEEN 1 AND 64),
+            value BLOB NOT NULL CHECK (length(value) BETWEEN 1 AND 1048576),
+            PRIMARY KEY (source_id, key)
+        ) STRICT
+        """,
+        """
+        CREATE TABLE deletion_detection (
+            source_id TEXT NOT NULL REFERENCES source_state(source_id),
+            record_id TEXT NOT NULL CHECK (length(record_id) = 36),
+            detected_at REAL NOT NULL CHECK (detected_at BETWEEN 0 AND 253402300799),
+            PRIMARY KEY (source_id, record_id)
         ) STRICT
         """
     ]

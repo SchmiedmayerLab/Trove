@@ -29,6 +29,7 @@ struct QuestionnaireValidationServiceTests {
     private static let fixture = Data(#"""
     {
       "resourceType": "Questionnaire",
+      "language": "en",
       "meta": {"profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]},
       "extension": [{
         "url": "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm",
@@ -81,7 +82,7 @@ struct QuestionnaireValidationServiceTests {
     @Test
     func branchingIsPreservedAndEvaluatedByGrove() throws {
         let resource = try JSONDecoder().decode(ModelsR4.Questionnaire.self, from: Self.fixture)
-        let questionnaire = try GroveQuestionnaire.Questionnaire(resource, evaluationInstant: Self.instant)
+        let questionnaire = try GroveQuestionnaire.Questionnaire(resource, clock: .fixed(at: Self.instant, in: .gmt))
         let task = try #require(questionnaire.sections.flatMap(\.tasks).first { $0.id == "duration" })
         #expect(Self.conjunctionTerms(task.enabledCondition) == [.responseValueComparison(taskId: "completed", operator: .equal, value: .bool(true))])
         var response = ModelsR4.QuestionnaireResponse(
@@ -90,6 +91,7 @@ struct QuestionnaireValidationServiceTests {
                 .init(answer: [.init(value: .boolean(true))], linkId: "completed", text: resource.item?[0].text),
                 .init(answer: [.init(value: .integer(5))], linkId: "duration", text: resource.item?[1].text)
             ],
+            language: "en",
             meta: .init(profile: ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response"]),
             questionnaire: "https://example.org/fhir/Questionnaire/synthetic-branching|1.0.0",
             status: .init(.completed),

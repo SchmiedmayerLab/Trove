@@ -172,13 +172,15 @@ extension EventDeliveryBatchTests {
         targets: [EventTargetIntent.Target] = [.init(consentID: DeliveryFixture.consentID, outputFullURLs: ["urn:output:a"])]
     ) async throws -> [UUID] {
         let checkpoint = try await journal.checkpoint(for: sourceID)
-        return try await journal.stage(from: checkpoint, nextCursor: Data(UUID().uuidString.utf8), changeCount: count) { _, sequence in
-            let payload = DeliveryFixture.payload(sequence: sequence, changes: ["sample"], sourceID: sourceID)
+        let producer = UUID()
+        let payloads = try (0..<count).map { index -> EventDeliveryJournal.Payload in
+            let payload = DeliveryFixture.payload(sequence: Int64(index + 1), changes: ["sample"], sourceID: sourceID, producerID: producer)
             let size = byteCount ?? payload.bytes.count
             try #require(size >= payload.bytes.count)
             let bytes = payload.bytes + Data(repeating: 32, count: size - payload.bytes.count)
             return .init(bytes: bytes, targets: targets)
         }
+        return try await journal.stage(from: checkpoint, nextCursor: Data(UUID().uuidString.utf8), payloads: payloads)
     }
 
     private static func waiting(_ result: EventDeliveryDrainer.Outcome) -> Bool {

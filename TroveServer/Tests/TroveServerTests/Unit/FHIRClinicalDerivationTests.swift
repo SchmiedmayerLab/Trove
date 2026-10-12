@@ -26,7 +26,7 @@ struct FHIRClinicalDerivationTests {
             try #require(entry.path == "resources/\(name).json")
             let bytes = try Data(contentsOf: root.appendingPathComponent(entry.path))
             try #require(SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() == entry.sha256)
-            _ = try ExchangeGraph(kind: .active, jsonData: bytes)
+            _ = try ExchangeGraph(validating: bytes, kind: .active)
             let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "projection-test-only")
             #expect(event.rawBytes == bytes)
             return event
@@ -72,7 +72,7 @@ struct FHIRClinicalDerivationTests {
             entries[pointIndex]["resource"] = point
             entries.remove(at: contextIndex)
         }
-        _ = try ExchangeGraph(kind: .active, jsonData: bytes)
+        _ = try ExchangeGraph(validating: bytes, kind: .active)
         let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
         #expect(event.rawBytes == bytes)
         #expect(event.questionnaireContexts.isEmpty)
@@ -95,7 +95,7 @@ struct FHIRClinicalDerivationTests {
             entries[pointIndex]["resource"] = point
             entries[contextIndex]["resource"] = context
         }
-        _ = try ExchangeGraph(kind: .active, jsonData: bytes)
+        _ = try ExchangeGraph(validating: bytes, kind: .active)
         #expect {
             try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
         } throws: { ($0 as? ServerError)?.status.code == 422 }
