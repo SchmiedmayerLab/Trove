@@ -1,0 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md) -->
+<!-- SPDX-License-Identifier: MIT -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="oklch(64.33% 0.141 156.81)"/>
+  <path fill="#fff" d="M14 15h36v11h-3l-2-7h-9v29l6 2v3H22v-3l6-2V19h-9l-2 7h-3z"/>
+</svg>

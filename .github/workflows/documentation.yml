@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+name: Documentation
+
+on:
+  pull_request:
+    paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
+  push:
+    branches: [main]
+    paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: documentation/requirements.txt
+      - name: Install the locked documentation tools
+        run: python -m pip install --require-hashes -r documentation/requirements.txt
+      - name: Build and check the public site
+        run: |
+          zensical build --clean --strict
+          python documentation/check_site.py
+          python -m unittest discover -s documentation -p 'test_*.py'
+      - uses: actions/upload-pages-artifact@v5
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: site
+
+  deploy:
+    name: Publish Documentation
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the checked site
+        id: deployment
+        uses: actions/deploy-pages@v5

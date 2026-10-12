@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+[project]
+site_name = "Trove"
+site_description = "An open-source foundation for digital health studies. Design studies, review consent, and connect participants with research."
+site_url = "https://schmiedmayerlab.github.io/Trove/"
+repo_url = "https://github.com/SchmiedmayerLab/Trove"
+repo_name = "SchmiedmayerLab/Trove"
+docs_dir = "docs"
+site_dir = "site"
+use_directory_urls = false
+extra_css = ["stylesheets/trove.css"]
+extra_javascript = ["javascripts/appearance.js"]
+copyright = "© 2026 Schmiedmayer Lab and the project authors"
+nav = [
+  { "Home" = "README.md" },
+  { "Platform Tour" = "Platform-Tour.md" },
+  { "Design" = [
+    { "Vision and Scope" = "Vision.md" },
+    { "Study Model and Workflows" = "Study-Model-and-Research-Workflows.md" },
+    { "Data and Architecture" = "Data-and-Platform-Architecture.md" },
+    { "Applications and Integrations" = "Applications-and-Integrations.md" },
+  ] },
+  { "Roadmap" = "Roadmap-and-Engineering-Principles.md" },
+  { "Contribute" = [
+    { "Documentation Site" = "Documentation-Site.md" },
+    { "Reproduce the Screenshots" = "images/README.md" },
+  ] },
+]
+
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+unresolved_references = true
+unresolved_footnotes = true
+
+[project.theme]
+custom_dir = "documentation/overrides"
+font = false
+logo = "images/trove.svg"
+favicon = "images/trove.svg"
+features = ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.highlight", "content.code.copy"]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "custom"
+accent = "custom"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark appearance"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "custom"
+accent = "custom"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light appearance"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+tables = {}
+footnotes = {}
+
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx.details]
+
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [{ name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }]

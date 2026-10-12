@@ -123,7 +123,8 @@ class VerificationInputTests(unittest.TestCase):
     def test_dependency_updates_point_at_manifests(self):
         source = (ROOT / ".github/dependabot.yml").read_text()
         updates = re.findall(r'package-ecosystem: "([^"]+)"\s+directory: "([^"]+)"', source)
-        self.assertEqual(len(updates), 10)
+        self.assertEqual(len(updates), 11)
+        self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
         manifests = {

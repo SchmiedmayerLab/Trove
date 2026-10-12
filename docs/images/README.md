@@ -11,8 +11,8 @@ clinical deployment. Do not capture a running study or a personal Health library
 
 ## Prepare the Local Stack
 
-Use the repository's [native UI-test stack](../../TroveiOS/scripts/start-ui-test-stack.sh)
-with the Keycloak version and setup in [Build and Test](../../.github/workflows/build-and-test.yml).
+Use the repository's [native UI-test stack](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveiOS/scripts/start-ui-test-stack.sh)
+with the Keycloak version and setup in [Build and Test](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/build-and-test.yml).
 It binds Keycloak to port 8180 and a fresh in-memory development backend to port 8080.
 The script refuses occupied ports. Keep its process IDs and stop only those processes
 when finished; never clear another developer's database or identity service.
