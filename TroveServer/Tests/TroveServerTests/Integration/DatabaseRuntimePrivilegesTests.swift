@@ -109,11 +109,12 @@ struct DatabaseRuntimePrivilegesTests {
             let sql = try #require(fixture.database as? any SQLDatabase)
             try await sql.raw("""
                 INSERT INTO source_bindings (
-                    id, participant_id, registration_id, kind, event_identifier_system,
+                    id, participant_id, registration_id, kind, identifier_root, event_identifier_system,
                     participant_identifier_system, participant_identifier_value, created_at
                 ) VALUES (
                     \(bind: id), \(bind: participant.requireId()), \(bind: UUID()), 'participant-app',
-                    'https://example.invalid/source', 'https://example.invalid/participant', 'synthetic', CURRENT_TIMESTAMP
+                    'https://example.invalid', 'https://example.invalid/source',
+                    'https://example.invalid/participant', 'synthetic', CURRENT_TIMESTAMP
                 )
                 """)
                 .run()

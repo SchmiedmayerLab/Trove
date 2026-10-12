@@ -182,15 +182,22 @@ class CIResultTests(unittest.TestCase):
             self.assertNotIn("if", job)
             self.assertNotIn("needs", job)
             if job_id == "codeql":
-                self.assertEqual(json.loads(job["with"]["runsonlabels"]), ["xcode-27"])
+                self.assertEqual(json.loads(job["with"]["runsonlabels"]), ["macos-26"])
+                self.assertEqual(job["with"]["xcodeversion"], "26.6")
                 self.assertTrue(job["with"]["codeql"])
+                self.assertEqual(job["with"]["destination"], "generic/platform=iOS Simulator")
                 self.assertIn(f'{job["name"]} / {job["with"]["job_name"]}', contexts)
             else:
                 self.assertIn(job["name"], contexts)
 
     def test_fork_runner_routing_and_simulator_runtime_are_explicit(self) -> None:
         jobs = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())["jobs"]
-        self.assertIn("OS=27.0", jobs["ios"]["with"]["destination"])
+        self.assertEqual(jobs["ios"]["with"]["destination"],
+                         "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0")
+        ui_test = next(step["run"] for step in jobs["ios-ui"]["steps"]
+                       if step.get("name") == "Run the real-stack UI test")
+        self.assertIn(jobs["ios"]["with"]["destination"], ui_test)
+        self.assertNotIn("--show-sdk-version", ui_test)
         for runner in (jobs["ios"]["with"]["runsonlabels"], jobs["ios-ui"]["runs-on"],
                        jobs["native-line-coverage"]["runs-on"], jobs["coverage"]["with"]["runs_on_labels"]):
             self.assertIn("github.event.pull_request.head.repo.full_name != github.repository", runner)

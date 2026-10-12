@@ -124,7 +124,7 @@ jobs:
       path: TroveiOS
       runsonlabels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
       # Bind the runtime: OS:latest can select an installed runtime without this device.
-      destination: 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0'
+      destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
       scheme: Trove
       resultBundle: Trove-iOS-Tests.xcresult
       artifactname: Trove-iOS-Tests.xcresult
@@ -186,13 +186,12 @@ jobs:
       - name: Run the real-stack UI test
         working-directory: TroveiOS
         run: |
-          simulator_os="$(xcrun --sdk iphonesimulator --show-sdk-version)"
           set -o pipefail
           xcodebuild test \
             -project Trove.xcodeproj \
             -scheme Trove \
             -onlyUsePackageVersionsFromResolvedFile \
-            -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=$simulator_os" \
+            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
             -only-testing:TroveUITests/TroveUITests/testParticipantCanSignInEnrollAndWithdraw \
             -parallel-testing-enabled NO \
             -enableCodeCoverage YES \
