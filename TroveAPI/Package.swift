@@ -31,7 +31,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.12.1"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.3.1"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"5.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"6.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.13.1"),
