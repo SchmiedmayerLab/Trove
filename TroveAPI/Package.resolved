@@ -1,5 +1,5 @@
 {
-  "originHash" : "24a61bd14d6cee1d5f6cccc7d34cd49ae092b1a9214237a3f70f1cdc0fb798e9",
+  "originHash" : "26122a2c29aa055d18a7ea95c3f9555f427f3d128758948b6860723f30b6debe",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -87,7 +87,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/SchmiedmayerLab/Grove.git",
       "state" : {
-        "revision" : "53d2d475571d634371b58871fc1ad749259f401b"
+        "revision" : "dfa881ff265507306ebbcb9576499688c8909afd"
       }
     },
     {
@@ -257,8 +257,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
-        "version" : "3.15.1"
+        "revision" : "da9d28d69ebe3894b18376c8f2395c2f37b8448f",
+        "version" : "4.5.2"
       }
     },
     {

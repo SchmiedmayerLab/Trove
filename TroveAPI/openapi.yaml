@@ -2407,67 +2407,6 @@ components:
           enum:
             - participant-app
 
-    PseudonymousIdentifierSystems:
-      type: object
-      additionalProperties: false
-      description: >
-        Complete, distinct Grove HMAC identifier namespaces for this source.
-        Immutable across registration retries and revocation. These public
-        identifiers are not keys or credentials. Clients persist the returned
-        set with the source binding; they must not substitute global defaults.
-      required:
-        - sourceRecord
-        - sourceOutput
-        - writerRecord
-        - providerRecord
-        - providerOutput
-        - sourceArtifact
-        - providerArtifact
-        - sourceContext
-        - recordingDevice
-        - deviceSnapshot
-      properties:
-        sourceRecord:
-          type: string
-          format: uri
-          maxLength: 512
-        sourceOutput:
-          type: string
-          format: uri
-          maxLength: 512
-        writerRecord:
-          type: string
-          format: uri
-          maxLength: 512
-        providerRecord:
-          type: string
-          format: uri
-          maxLength: 512
-        providerOutput:
-          type: string
-          format: uri
-          maxLength: 512
-        sourceArtifact:
-          type: string
-          format: uri
-          maxLength: 512
-        providerArtifact:
-          type: string
-          format: uri
-          maxLength: 512
-        sourceContext:
-          type: string
-          format: uri
-          maxLength: 512
-        recordingDevice:
-          type: string
-          format: uri
-          maxLength: 512
-        deviceSnapshot:
-          type: string
-          format: uri
-          maxLength: 512
-
     ParticipantSource:
       type: object
       additionalProperties: false
@@ -2480,8 +2419,7 @@ components:
         - registrationID
         - kind
         - eventIdentifierSystem
-        - pseudonymousIdentifierSystems
-        - producerInstance
+        - identifierRoot
         - participantIdentifier
         - createdAt
       properties:
@@ -2499,12 +2437,16 @@ components:
           type: string
           format: uri
           description: Immutable namespace for event identifiers only, not HMAC identifiers.
-        pseudonymousIdentifierSystems:
-          $ref: '#/components/schemas/PseudonymousIdentifierSystems'
-        producerInstance:
+        identifierRoot:
           type: string
-          format: uuid
-          description: The durable producer stream identity used in Grove event values.
+          format: uri
+          maxLength: 256
+          description: >
+            Immutable, server-assigned root for this source's Grove identifiers.
+            Derive DeploymentIdentifierSystems with registrationID as keyID and
+            epoch 1. The derived event system must equal eventIdentifierSystem.
+            The client persists its privacy key and Grove producer ledger together;
+            producer instances are allocated by that ledger, not by the server.
         participantIdentifier:
           type: object
           additionalProperties: false

@@ -19,7 +19,7 @@ enum FHIRClinicalDerivations {
                 guard let identifier = response.identifier else { throw FHIRValidationClient.invalid }
                 let identity = try BusinessIdentifier(identifier)
                 event.questionnaireContexts.append(.init(
-                    fullURL: node.fullURL, identifier: .init(system: identity.systemValue, value: identity.value)
+                    fullURL: node.fullURL, identifier: .init(system: identity.system.rawValue, value: identity.value)
                 ))
             case .observation(let observation):
                 for reference in observation.derivedFrom ?? [] {
@@ -44,6 +44,6 @@ enum FHIRClinicalDerivations {
             throw FHIRValidationClient.invalid
         }
         let identifier = try BusinessIdentifier(value)
-        return .logical(.init(system: identifier.systemValue, value: identifier.value))
+        return .logical(.init(system: identifier.system.rawValue, value: identifier.value))
     }
 }

@@ -73,8 +73,8 @@ public struct HeartRateAcquisition: Sendable {
         guard (0...253_402_300_799).contains(start.timeIntervalSince1970) else { throw AcquisitionError.invalidQueryDefinition }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        // Version 2 derives complete identity namespaces instead of appending paths to URNs.
-        return try encoder.encode(Definition(adapter: "healthkit-heart-rate", version: 2, start: start))
+        // Version 3 uses Grove's durable producer ledger and frozen deletion bounds.
+        return try encoder.encode(Definition(adapter: "healthkit-heart-rate", version: 3, start: start))
     }
 
     static func catchUp(nextPage: @Sendable () async throws -> Page) async throws -> Progress {
@@ -101,7 +101,9 @@ public struct HeartRateAcquisition: Sendable {
     /// Uses Grove's caller-owned anchored query. It neither prompts for permission nor enables background collection.
     /// Returned IDs refer to durable events ready for the existing session-bound delivery drainer.
     public func collect(localID: UUID, enrollmentIDs: [UUID], healthKit: GroveHealthKit.HealthKit) async throws -> Page {
-        try await collect(localID: localID, enrollmentIDs: enrollmentIDs, application: .main, host: .current) { start, previous in
+        try await collect(
+            localID: localID, enrollmentIDs: enrollmentIDs, application: ApplicationDevice(bundle: .main), host: .current()
+        ) { start, previous in
             var anchor = previous
             let changes = try await healthKit.query(.heartRate, timeRange: .startingAt(start), anchor: &anchor, limit: 64)
             return Delta(added: changes.added, deletedIDs: changes.deleted.map(\.uuid), nextAnchor: anchor)
@@ -119,8 +121,8 @@ public struct HeartRateAcquisition: Sendable {
     func collect(
         localID: UUID,
         enrollmentIDs: [UUID],
-        application: HealthKitApplication,
-        host: HealthKitHostDevice,
+        application: ApplicationDevice,
+        host: HostDevice,
         query: @Sendable (Date, QueryAnchor) async throws -> Delta
     ) async throws -> Page {
         let source = try await synchronize(localID)
@@ -129,7 +131,7 @@ public struct HeartRateAcquisition: Sendable {
         }
         let checkpoint = try await journal.checkpoint(for: sourceID)
         let definition = try JSONDecoder().decode(Definition.self, from: checkpoint.queryDefinition)
-        guard definition.adapter == "healthkit-heart-rate", definition.version == 2,
+        guard definition.adapter == "healthkit-heart-rate", definition.version == 3,
               try Self.queryDefinition(start: definition.start) == checkpoint.queryDefinition else {
             throw AcquisitionError.invalidQueryDefinition
         }
@@ -148,15 +150,23 @@ public struct HeartRateAcquisition: Sendable {
         let refreshed = try await synchronize(localID)
         let after = try await collectionSnapshot(enrollmentIDs)
         guard refreshed == source, before.hasSameAuthority(as: after) else { throw AcquisitionError.authorityChanged }
-        let context = ConversionInputs(source: binding, privacy: privacy, application: application, host: host, instant: Date())
+        let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
+        let exporter = try await Self.exporter(
+            source: binding, privacy: privacy, application: application, host: host, storage: journal.producerStorage(for: sourceID)
+        )
+        let prepared = try await Self.prepare(delta, exporter: exporter, snapshot: after, detections: detections)
         let cursor = try JSONEncoder().encode(delta.nextAnchor)
         try await checkSession()
-        let ids = try await journal.stage(from: checkpoint, nextCursor: cursor, changeCount: changeCount) { index, sequence in
-            if index < delta.added.count {
-                return try Self.payload(delta.added[index], sequence: sequence, snapshot: after, context: context)
-            }
-            return try Self.retraction(delta.deletedIDs[index - delta.added.count], sequence: sequence, context: context)
+        let finalSource = try await synchronize(localID)
+        let finalAuthority = try await collectionSnapshot(enrollmentIDs)
+        guard finalSource == source, after.hasSameAuthority(as: finalAuthority) else {
+            throw AcquisitionError.authorityChanged
         }
+        try await checkSession()
+        let ids = try await journal.stage(
+            from: checkpoint, nextCursor: cursor, payloads: prepared.payloads, observedDeletions: delta.deletedIDs
+        )
+        prepared.receipts.forEach { $0.release() }
         try await checkSession()
         return Page(eventIDs: ids, changeCount: changeCount)
     }

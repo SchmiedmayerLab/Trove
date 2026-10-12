@@ -18,10 +18,10 @@ struct EventDeliveryDrainerTests {
     func lostResponseRecoversReceiptAfterReopeningWithoutResubmitting(restrictiveIntent: Bool) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let staged = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                let payload = DeliveryFixture.payload(sequence: sequence, changes: ["change:a"])
-                return .init(bytes: payload.bytes, targets: restrictiveIntent ? [] : payload.targets)
-            }
+            let payload = DeliveryFixture.payload(sequence: 1, changes: ["change:a"])
+            let staged = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
+                .init(bytes: payload.bytes, targets: restrictiveIntent ? [] : payload.targets)
+            ])
             let id = try #require(staged.first)
             let transport = DeliveryTransport()
             await transport.configure(.loseFirstResponse)

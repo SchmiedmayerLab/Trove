@@ -12,55 +12,44 @@ import Testing
 import TroveAPITypes
 
 
-struct PseudonymousIdentifierSystemsTests {
-    private static let systems = Components.Schemas.PseudonymousIdentifierSystems(
-        sourceRecord: "https://example.test/source-record",
-        sourceOutput: "https://example.test/source-output",
-        writerRecord: "https://example.test/writer-record",
-        providerRecord: "https://example.test/provider-record",
-        providerOutput: "https://example.test/provider-output",
-        sourceArtifact: "https://example.test/source-artifact",
-        providerArtifact: "https://example.test/provider-artifact",
-        sourceContext: "https://example.test/source-context",
-        recordingDevice: "https://example.test/recording-device",
-        deviceSnapshot: "https://example.test/device-snapshot"
-    )
-
+struct ParticipantSourceIdentifierTests {
     @Test
-    func roundTripPreservesTheCompleteTypedSet() throws {
-        let bytes = try JSONEncoder().encode(Self.systems)
-        let decoded = try JSONDecoder().decode(Components.Schemas.PseudonymousIdentifierSystems.self, from: bytes)
-        let typed = try decoded.groveSystems()
-        #expect(Components.Schemas.PseudonymousIdentifierSystems(typed) == Self.systems)
-        #expect(typed.all.count == PseudonymousIdentityKind.allCases.count)
-        #expect(Set(typed.all).count == 10)
+    func roundTripDerivesAllTwelveDistinctSystems() throws {
+        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        let decoded = try JSONDecoder().decode(Components.Schemas.ParticipantSource.self, from: JSONEncoder().encode(source))
+        let systems = try decoded.identifierSystems()
+        #expect(systems == (try source.identifierSystems()))
+        #expect(systems.event.rawValue == source.eventIdentifierSystem)
+        #expect(Set([
+            systems.sourceRecord, systems.sourceOutput, systems.writerRecord, systems.providerRecord, systems.providerOutput,
+            systems.sourceArtifact, systems.providerArtifact, systems.sourceContext, systems.recordingDevice,
+            systems.deviceSnapshot, systems.event, systems.entryNode
+        ]).count == 12)
+    }
+
+    @Test(arguments: ["", "/relative", "not a URI", "https://example.test/" + String(repeating: "a", count: 256)])
+    func invalidRootCannotBecomeAConversionContext(root: String) {
+        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        source.identifierRoot = root
+        #expect(throws: ExchangeIdentityError.self) { try source.identifierSystems() }
     }
 
     @Test
-    func duplicateNamespacesCannotBecomeAConversionContext() {
-        var received = Self.systems
-        received.sourceOutput = received.sourceRecord
-        #expect(throws: PseudonymousIdentityError.reusedIdentifierSystem) { try received.groveSystems() }
+    func inconsistentEventNamespaceIsRejected() {
+        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        source.eventIdentifierSystem = "https://foreign.test/events"
+        #expect(throws: ExchangeIdentityError.self) { try source.identifierSystems() }
     }
 
-    @Test(arguments: ["", "/relative", "not a URI", "https://example.test/" + String(repeating: "a", count: 512)])
-    func invalidNamespaceCannotBecomeAConversionContext(value: String) {
-        var received = Self.systems
-        received.recordingDevice = value
-        #expect(throws: ExchangeIdentityError.self) { try received.groveSystems() }
-    }
-
-    @Test(arguments: [
-        "sourceRecord", "sourceOutput", "writerRecord", "providerRecord", "providerOutput",
-        "sourceArtifact", "providerArtifact", "sourceContext", "recordingDevice", "deviceSnapshot"
-    ])
+    @Test(arguments: ["identifierRoot", "registrationID", "eventIdentifierSystem"])
     func incompleteResponseDoesNotSupplyDefaults(missing: String) throws {
-        let bytes = try JSONEncoder().encode(Self.systems)
-        var object = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: String])
+        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        let bytes = try JSONEncoder().encode(source)
+        var object = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
         object.removeValue(forKey: missing)
         let incomplete = try JSONSerialization.data(withJSONObject: object)
         #expect(throws: DecodingError.self) {
-            try JSONDecoder().decode(Components.Schemas.PseudonymousIdentifierSystems.self, from: incomplete)
+            try JSONDecoder().decode(Components.Schemas.ParticipantSource.self, from: incomplete)
         }
     }
 }

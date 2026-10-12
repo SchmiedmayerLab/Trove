@@ -43,8 +43,7 @@ struct QuestionnaireValidationService: Sendable {
             validUntil = try resource.effectivePeriod?.end?.value?.asNSDate()
             _ = try GroveQuestionnaire.Questionnaire(
                 resource,
-                evaluationInstant: evaluationInstant,
-                using: .init(locale: Locale(identifier: "en_US_POSIX"))
+                clock: .fixed(at: evaluationInstant, in: .gmt)
             )
         } catch {
             // Decoder/converter errors can contain researcher-authored content.

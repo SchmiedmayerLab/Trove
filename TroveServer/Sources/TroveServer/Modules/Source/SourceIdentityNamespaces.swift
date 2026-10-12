@@ -6,31 +6,15 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Foundation
 import GroveFHIRContract
 
 
 enum SourceIdentityNamespaces {
-    /// Public namespace assignment only, never key generation or native-record pseudonymization.
-    /// The versioned names and Grove UUIDv5 mapping are pinned by fixed-vector tests.
-    static func assign(eventSystem: String) throws -> PseudonymousIdentitySystems {
-        func system(_ kind: PseudonymousIdentityKind) throws -> IdentifierSystem {
-            let identifier = try BusinessIdentifier(
-                system: eventSystem,
-                value: "trove-source-namespace-v1:\(kind.rawValue)"
-            )
-            return try IdentifierSystem(ExchangeIdentity.fullURL(for: identifier))
-        }
-        return try .init(
-            sourceRecord: system(.sourceRecord),
-            sourceOutput: system(.sourceOutput),
-            writerRecord: system(.writerRecord),
-            providerRecord: system(.providerRecord),
-            providerOutput: system(.providerOutput),
-            sourceArtifact: system(.sourceArtifact),
-            providerArtifact: system(.providerArtifact),
-            sourceContext: system(.sourceContext),
-            recordingDevice: system(.recordingDevice),
-            deviceSnapshot: system(.deviceSnapshot)
+    /// Namespace assignment is public metadata, never evidence of source ownership.
+    static func assign(root: String, registrationID: UUID) throws -> DeploymentIdentifierSystems {
+        try .derived(
+            root: IdentifierSystem(root), keyID: registrationID.uuidString.lowercased(), epoch: EventSequence(1)
         )
     }
 }

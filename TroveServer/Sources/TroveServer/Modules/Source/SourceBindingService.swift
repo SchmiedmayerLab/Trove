@@ -33,11 +33,13 @@ final class SourceBindingService: Module, Sendable {
             }
             let id = UUID()
             let createdAt = Date()
+            let root = context.issuer + "/trove/sources/" + id.uuidString.lowercased()
+            let systems = try SourceIdentityNamespaces.assign(root: root, registrationID: registrationID)
             try await sql.raw("""
-                INSERT INTO source_bindings (id, participant_id, registration_id, kind, event_identifier_system,
+                INSERT INTO source_bindings (id, participant_id, registration_id, kind, identifier_root, event_identifier_system,
                     participant_identifier_system, participant_identifier_value, created_at)
                 VALUES (\(bind: id), \(bind: participantID), \(bind: registrationID), \(bind: SourceKind.participantApp.rawValue),
-                    \(bind: "urn:uuid:" + id.uuidString.lowercased()), \(bind: context.issuer + "/trove/participants"),
+                    \(bind: root), \(bind: systems.event.rawValue), \(bind: context.issuer + "/trove/participants"),
                     \(bind: participantID.uuidString.lowercased()), \(bind: createdAt))
                 """)
                 .run()

@@ -1399,135 +1399,6 @@ extension Components {
                 ])
             }
         }
-        /// Complete, distinct Grove HMAC identifier namespaces for this source. Immutable across registration retries and revocation. These public identifiers are not keys or credentials. Clients persist the returned set with the source binding; they must not substitute global defaults.
-        ///
-        ///
-        /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems`.
-        public struct PseudonymousIdentifierSystems: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/sourceRecord`.
-            public var sourceRecord: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/sourceOutput`.
-            public var sourceOutput: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/writerRecord`.
-            public var writerRecord: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/providerRecord`.
-            public var providerRecord: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/providerOutput`.
-            public var providerOutput: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/sourceArtifact`.
-            public var sourceArtifact: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/providerArtifact`.
-            public var providerArtifact: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/sourceContext`.
-            public var sourceContext: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/recordingDevice`.
-            public var recordingDevice: Swift.String
-            /// - Remark: Generated from `#/components/schemas/PseudonymousIdentifierSystems/deviceSnapshot`.
-            public var deviceSnapshot: Swift.String
-            /// Creates a new `PseudonymousIdentifierSystems`.
-            ///
-            /// - Parameters:
-            ///   - sourceRecord:
-            ///   - sourceOutput:
-            ///   - writerRecord:
-            ///   - providerRecord:
-            ///   - providerOutput:
-            ///   - sourceArtifact:
-            ///   - providerArtifact:
-            ///   - sourceContext:
-            ///   - recordingDevice:
-            ///   - deviceSnapshot:
-            public init(
-                sourceRecord: Swift.String,
-                sourceOutput: Swift.String,
-                writerRecord: Swift.String,
-                providerRecord: Swift.String,
-                providerOutput: Swift.String,
-                sourceArtifact: Swift.String,
-                providerArtifact: Swift.String,
-                sourceContext: Swift.String,
-                recordingDevice: Swift.String,
-                deviceSnapshot: Swift.String
-            ) {
-                self.sourceRecord = sourceRecord
-                self.sourceOutput = sourceOutput
-                self.writerRecord = writerRecord
-                self.providerRecord = providerRecord
-                self.providerOutput = providerOutput
-                self.sourceArtifact = sourceArtifact
-                self.providerArtifact = providerArtifact
-                self.sourceContext = sourceContext
-                self.recordingDevice = recordingDevice
-                self.deviceSnapshot = deviceSnapshot
-            }
-            public enum CodingKeys: String, CodingKey {
-                case sourceRecord
-                case sourceOutput
-                case writerRecord
-                case providerRecord
-                case providerOutput
-                case sourceArtifact
-                case providerArtifact
-                case sourceContext
-                case recordingDevice
-                case deviceSnapshot
-            }
-            public init(from decoder: any Swift.Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                self.sourceRecord = try container.decode(
-                    Swift.String.self,
-                    forKey: .sourceRecord
-                )
-                self.sourceOutput = try container.decode(
-                    Swift.String.self,
-                    forKey: .sourceOutput
-                )
-                self.writerRecord = try container.decode(
-                    Swift.String.self,
-                    forKey: .writerRecord
-                )
-                self.providerRecord = try container.decode(
-                    Swift.String.self,
-                    forKey: .providerRecord
-                )
-                self.providerOutput = try container.decode(
-                    Swift.String.self,
-                    forKey: .providerOutput
-                )
-                self.sourceArtifact = try container.decode(
-                    Swift.String.self,
-                    forKey: .sourceArtifact
-                )
-                self.providerArtifact = try container.decode(
-                    Swift.String.self,
-                    forKey: .providerArtifact
-                )
-                self.sourceContext = try container.decode(
-                    Swift.String.self,
-                    forKey: .sourceContext
-                )
-                self.recordingDevice = try container.decode(
-                    Swift.String.self,
-                    forKey: .recordingDevice
-                )
-                self.deviceSnapshot = try container.decode(
-                    Swift.String.self,
-                    forKey: .deviceSnapshot
-                )
-                try decoder.ensureNoAdditionalProperties(knownKeys: [
-                    "sourceRecord",
-                    "sourceOutput",
-                    "writerRecord",
-                    "providerRecord",
-                    "providerOutput",
-                    "sourceArtifact",
-                    "providerArtifact",
-                    "sourceContext",
-                    "recordingDevice",
-                    "deviceSnapshot"
-                ])
-            }
-        }
         /// Server-assigned identity for an unverified participant-app stream. Identifiers are not credentials. Every use requires participant authentication and ownership checks. This is not provider attestation.
         ///
         ///
@@ -1547,12 +1418,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/eventIdentifierSystem`.
             public var eventIdentifierSystem: Swift.String
-            /// - Remark: Generated from `#/components/schemas/ParticipantSource/pseudonymousIdentifierSystems`.
-            public var pseudonymousIdentifierSystems: Components.Schemas.PseudonymousIdentifierSystems
-            /// The durable producer stream identity used in Grove event values.
+            /// Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
             ///
-            /// - Remark: Generated from `#/components/schemas/ParticipantSource/producerInstance`.
-            public var producerInstance: Swift.String
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/identifierRoot`.
+            public var identifierRoot: Swift.String
             /// Complete FHIR Patient business identifier assigned to this participant.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/participantIdentifier`.
@@ -1610,8 +1480,7 @@ extension Components {
             ///   - registrationID:
             ///   - kind:
             ///   - eventIdentifierSystem: Immutable namespace for event identifiers only, not HMAC identifiers.
-            ///   - pseudonymousIdentifierSystems:
-            ///   - producerInstance: The durable producer stream identity used in Grove event values.
+            ///   - identifierRoot: Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
             ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant.
             ///   - createdAt:
             ///   - revokedAt: Present only after permanent revocation; never cleared.
@@ -1620,8 +1489,7 @@ extension Components {
                 registrationID: Swift.String,
                 kind: Components.Schemas.ParticipantSource.KindPayload,
                 eventIdentifierSystem: Swift.String,
-                pseudonymousIdentifierSystems: Components.Schemas.PseudonymousIdentifierSystems,
-                producerInstance: Swift.String,
+                identifierRoot: Swift.String,
                 participantIdentifier: Components.Schemas.ParticipantSource.ParticipantIdentifierPayload,
                 createdAt: Foundation.Date,
                 revokedAt: Foundation.Date? = nil
@@ -1630,8 +1498,7 @@ extension Components {
                 self.registrationID = registrationID
                 self.kind = kind
                 self.eventIdentifierSystem = eventIdentifierSystem
-                self.pseudonymousIdentifierSystems = pseudonymousIdentifierSystems
-                self.producerInstance = producerInstance
+                self.identifierRoot = identifierRoot
                 self.participantIdentifier = participantIdentifier
                 self.createdAt = createdAt
                 self.revokedAt = revokedAt
@@ -1641,8 +1508,7 @@ extension Components {
                 case registrationID
                 case kind
                 case eventIdentifierSystem
-                case pseudonymousIdentifierSystems
-                case producerInstance
+                case identifierRoot
                 case participantIdentifier
                 case createdAt
                 case revokedAt
@@ -1665,13 +1531,9 @@ extension Components {
                     Swift.String.self,
                     forKey: .eventIdentifierSystem
                 )
-                self.pseudonymousIdentifierSystems = try container.decode(
-                    Components.Schemas.PseudonymousIdentifierSystems.self,
-                    forKey: .pseudonymousIdentifierSystems
-                )
-                self.producerInstance = try container.decode(
+                self.identifierRoot = try container.decode(
                     Swift.String.self,
-                    forKey: .producerInstance
+                    forKey: .identifierRoot
                 )
                 self.participantIdentifier = try container.decode(
                     Components.Schemas.ParticipantSource.ParticipantIdentifierPayload.self,
@@ -1690,8 +1552,7 @@ extension Components {
                     "registrationID",
                     "kind",
                     "eventIdentifierSystem",
-                    "pseudonymousIdentifierSystems",
-                    "producerInstance",
+                    "identifierRoot",
                     "participantIdentifier",
                     "createdAt",
                     "revokedAt"

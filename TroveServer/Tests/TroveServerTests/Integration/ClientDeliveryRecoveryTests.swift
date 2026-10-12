@@ -110,7 +110,8 @@ extension ClientDeliveryRecoveryTests {
         try await app.test(.GET, "\(apiBasePath)/participant/sources/\(source.id)", beforeRequest: { $0.bearerAuth(token) }) { response in
             #expect(response.status == .ok)
             let binding = try response.content.decode(Components.Schemas.ParticipantSource.self)
-            #expect(try binding.pseudonymousIdentifierSystems.groveSystems() == source.pseudonymousIdentifierSystems)
+            let expectedSystems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+            #expect(try binding.identifierSystems() == expectedSystems)
             #expect((binding.revokedAt != nil) == revoked)
         }
     }
@@ -150,11 +151,8 @@ extension ClientDeliveryRecoveryTests {
         }
         let checkpoint = try await journal.checkpoint(for: fixture.source.id)
         let identifiers = try await journal.stage(
-            from: checkpoint, nextCursor: Data("delta-2".utf8), changeCount: payloads.count
-        ) { index, sequence in
-            try #require(sequence == Int64(index + 1))
-            return payloads[index]
-        }
+            from: checkpoint, nextCursor: Data("delta-2".utf8), payloads: payloads
+        )
         return Staged(identifiers: identifiers, payloads: payloads, checkpoint: try await journal.checkpoint(for: fixture.source.id))
     }
 

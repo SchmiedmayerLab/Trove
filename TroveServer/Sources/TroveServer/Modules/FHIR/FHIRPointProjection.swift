@@ -35,16 +35,16 @@ enum FHIRPointProjection {
         // any model decoder can round them. This is not graph or identity validation.
         let quantities = try ValidatedQuantityLexemes.extract(from: bytes)
         let header = try JSONDecoder().decode(Header.self, from: bytes)
-        if let profile = GroveLifecycleContract.retractionBundleProfile.value?.url.absoluteString,
+        if let profile = Profile.groveMobileRetractionBundle.value?.url.absoluteString,
            header.meta?.profile.contains(profile) == true {
             return try FHIRRetractionProjection.project(bytes: bytes, validatorIdentity: validatorIdentity)
         }
         // Shared graph/identity rules consume the original bytes; receiver capability and
         // authorization checks remain separate from both this contract and full IG validation.
-        let graph = try ExchangeGraph(kind: .active, jsonData: bytes)
+        let graph = try ExchangeGraph(validating: bytes, kind: .active)
         try FHIRPointSupportBoundary.validateExtensionLocations(in: bytes)
         guard let entries = graph.bundle.entry, (1...512).contains(entries.count) else { throw FHIRValidationClient.invalid }
-        let event = graph.eventIdentifier.businessIdentifier
+        let event = graph.event
         let (nodes, resources) = try index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
         var participants: Set<Identity> = []
@@ -61,7 +61,7 @@ enum FHIRPointProjection {
         var result = ValidatedExchangeEvent(
             rawBytes: bytes,
             validatorIdentity: validatorIdentity,
-            eventIdentifierSystem: event.systemValue,
+            eventIdentifierSystem: event.system.rawValue,
             eventIdentifierValue: event.value,
             producerInstance: graph.eventIdentifier.producerInstance,
             participants: participants,
@@ -110,7 +110,7 @@ enum FHIRPointProjection {
     }
 
     private static func point(_ observation: Observation, fullURL: String, quantityText: String) throws -> ValidatedExchangeEvent.PointOutput {
-        let identifiers = try (observation.identifier ?? []).map(BusinessIdentifier.init)
+        let identifiers = try (observation.identifier ?? []).map(RoledIdentifier.init)
         guard observation.status.value == .final,
               observation.meta?.profile?.contains(Profile.groveMobileHeartRate) == true,
               let profile = Profile.groveMobileHeartRate.value?.url.absoluteString,
@@ -141,7 +141,7 @@ enum FHIRPointProjection {
             effectiveAt: effective.asNSDate(),
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
-            writerIdentifier: writers.first.map { .init(system: $0.systemValue, value: $0.value) },
+            writerIdentifier: writers.first.map { .init(system: $0.identifier.system.rawValue, value: $0.identifier.value) },
             writerVersion: writerVersion,
             quantityValue: quantityText,
             quantitySystem: quantitySystem,
@@ -151,15 +151,15 @@ enum FHIRPointProjection {
         )
     }
 
-    private static func oneIdentifier(_ identifiers: [BusinessIdentifier], role: GroveIdentifierRole) throws -> Identity {
+    private static func oneIdentifier(_ identifiers: [RoledIdentifier], role: GroveIdentifierRole) throws -> Identity {
         let matches = identifiers.filter { $0.role == role }
         guard matches.count == 1, let match = matches.first else { throw FHIRValidationClient.invalid }
-        return .init(system: match.systemValue, value: match.value)
+        return .init(system: match.identifier.system.rawValue, value: match.identifier.value)
     }
 
     private static func identifier(_ identifier: Identifier) throws -> Identity {
         let identifier = try BusinessIdentifier(identifier)
-        return .init(system: identifier.systemValue, value: identifier.value)
+        return .init(system: identifier.system.rawValue, value: identifier.value)
     }
 
     private static func patientIdentifier(_ patient: Patient) throws -> Identity {

@@ -15,7 +15,7 @@ import ModelsR4
 /// The graph has no patient payload; authentication and the source binding establish its scope.
 enum FHIRRetractionProjection {
     static func project(bytes: Data, validatorIdentity: String) throws -> ValidatedExchangeEvent {
-        let graph = try ExchangeGraph(kind: .retraction, jsonData: bytes)
+        let graph = try ExchangeGraph(validating: bytes, kind: .retraction)
         try FHIRPointSupportBoundary.validateExtensionLocations(in: bytes)
         guard let entries = graph.bundle.entry, entries.count == 1,
               let fullURL = entries[0].fullUrl?.value?.url.absoluteString,
@@ -28,7 +28,7 @@ enum FHIRRetractionProjection {
               let entity = provenance.entity, entity.count == 1,
               entity[0].agent?.isEmpty != false,
               let source = entity[0].what.identifier else { throw FHIRValidationClient.invalid }
-        let record = try BusinessIdentifier(source)
+        let record = try RoledIdentifier(source)
         guard record.role == .sourceRecord else { throw FHIRValidationClient.invalid }
         let targets = try provenance.target.map { target -> ValidatedExchangeEvent.Identifier in
             guard target.type?.value?.url.absoluteString == "Observation", target.reference == nil,
@@ -36,21 +36,23 @@ enum FHIRRetractionProjection {
                   (target.extension ?? []).allSatisfy({
                       $0.url == Canonicals.retractionTargetRole || $0.url == Canonicals.retractionTargetNativeIdentifier
                   }) else { throw FHIRValidationClient.invalid }
-            let identifierValue = try BusinessIdentifier(identifier)
+            let identifierValue = try RoledIdentifier(identifier)
             guard identifierValue.role == .sourceOutput else { throw FHIRValidationClient.invalid }
-            return .init(system: identifierValue.systemValue, value: identifierValue.value)
+            return .init(system: identifierValue.identifier.system.rawValue, value: identifierValue.identifier.value)
         }
-        let identity = graph.eventIdentifier.businessIdentifier
+        let identity = graph.event
         let result = ValidatedExchangeEvent(
             rawBytes: bytes,
             validatorIdentity: validatorIdentity,
-            eventIdentifierSystem: identity.systemValue,
+            eventIdentifierSystem: identity.system.rawValue,
             eventIdentifierValue: identity.value,
             producerInstance: graph.eventIdentifier.producerInstance,
             participants: [],
             nodes: [.init(ordinal: 0, fullURL: fullURL, resourceType: "Provenance")],
             outputs: [],
-            retraction: .init(sourceRecordIdentifier: .init(system: record.systemValue, value: record.value), outputIdentifiers: targets)
+            retraction: .init(
+                sourceRecordIdentifier: .init(system: record.identifier.system.rawValue, value: record.identifier.value), outputIdentifiers: targets
+            )
         )
         _ = try ClinicalRecordRevision(result)
         return result

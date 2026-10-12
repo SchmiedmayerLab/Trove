@@ -47,8 +47,7 @@ extension Components.Schemas.ParticipantSource {
             registrationID: binding.registrationID.uuidString.lowercased(),
             kind: kind,
             eventIdentifierSystem: binding.eventIdentifierSystem,
-            pseudonymousIdentifierSystems: .init(binding.pseudonymousIdentifierSystems),
-            producerInstance: binding.producerInstance.uuidString.lowercased(),
+            identifierRoot: binding.identifierRoot,
             participantIdentifier: .init(system: binding.participantIdentifierSystem, value: binding.participantIdentifierValue),
             createdAt: binding.createdAt,
             revokedAt: binding.revokedAt

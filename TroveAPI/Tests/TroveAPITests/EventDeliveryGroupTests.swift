@@ -12,18 +12,13 @@ import Testing
 
 
 struct EventDeliveryGroupTests {
-    private enum Failure: Error { case conversion }
-
     @Test
     func aQueryGroupCommitsEveryEventWithOneCursorAndReopensExactly() async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 3) { index, sequence in
-                #expect(sequence == index + 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:\(index)"])
-            }
-            #expect(ids.count == 3)
-            #expect(Set(ids).count == 3)
+            let payloads = (1...3).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["add:\($0)"]) }
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
+            #expect(ids.count == 3 && Set(ids).count == 3)
             let originals = try await Self.attempts(ids, in: journal)
             await journal.close()
             let reopened = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
@@ -37,21 +32,16 @@ struct EventDeliveryGroupTests {
     }
 
     @Test(arguments: [0, 1, 2])
-    func aFailedMemberRollsBackEarlierMembersCursorAndSequence(failingIndex: Int) async throws {
+    func aMalformedMemberRollsBackEarlierMembersAndCursor(failingIndex: Int) async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            await #expect(throws: Failure.self) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 3) { index, sequence in
-                    if index == failingIndex { throw Failure.conversion }
-                    return DeliveryFixture.payload(sequence: sequence, changes: ["add:\(index)"])
-                }
+            var payloads = (1...3).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
+            payloads[failingIndex] = .init(bytes: Data("invalid".utf8), targets: [])
+            await #expect(throws: EventSubmissionCommitment.ValidationError.invalidEnvelope) {
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             }
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
-            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 3) { index, sequence in
-                #expect(sequence == index + 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:\(index)"])
-            }
         }
     }
 
@@ -59,61 +49,64 @@ struct EventDeliveryGroupTests {
     func aGroupCannotPartiallyCommitAtCapacity() async throws {
         try await DeliveryFixture.withJournal(limits: .init(maximumEvents: 1)) { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let payloads = (1...2).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
             await #expect(throws: EventDeliveryJournal.JournalError.capacityExceeded) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 2) { index, sequence in
-                    DeliveryFixture.payload(sequence: sequence, changes: ["add:\(index)"])
-                }
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             }
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
         }
     }
 
-    @Test(arguments: [-1, 129])
-    func invalidGroupCountsNeverInvokeTheBuilder(count: Int) async throws {
+    @Test
+    func oversizedGroupCannotAdvanceTheCursor() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let payloads = (1...129).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
             await #expect(throws: EventDeliveryJournal.JournalError.invalidConfiguration) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: count) { _, _ in
-                    throw Failure.conversion
-                }
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
         }
     }
 
     @Test
-    func policyExclusionsDoNotConsumeSequencesOrCapacity() async throws {
-        try await DeliveryFixture.withJournal(limits: .init(maximumEvents: 1)) { journal, _ in
+    func wireSequenceBelongsToTheProducerNotTheQueue() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 3) { index, sequence in
-                #expect(sequence == (index == 2 ? 2 : 1))
-                return index == 1 ? DeliveryFixture.payload(sequence: sequence, changes: ["eligible"]) : nil
-            }
-            #expect(ids.count == 1)
-            #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID).cursor == Data([1]))
+            let producer = UUID()
+            let payload = DeliveryFixture.payload(sequence: 42, changes: ["sample"], producerID: producer)
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload])
+            let id = try #require(ids.first)
+            let attempt = try #require(await journal.prepareAttempt(id))
+            #expect(attempt.bytes == payload.bytes)
+            #expect(attempt.commitment.producerEventIdentifier.value == "e0:\(producer.uuidString.lowercased()):42")
         }
     }
 
     @Test
-    func unsupportedChangesAfterAnExclusionStillRollBackTheWholeDelta() async throws {
+    func anotherSourcesNamespaceCannotBeStaged() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            await #expect(throws: Failure.self) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 3) { index, sequence in
-                    if index == 0 {
-                        return nil
-                    }
-                    if index == 2 { throw Failure.conversion }
-                    return DeliveryFixture.payload(sequence: sequence, changes: ["eligible"])
-                }
+            let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"], sourceID: UUID())
+            await #expect(throws: DeliveryJournalError.eventIdentityMismatch) {
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload])
             }
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
-            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["retry"])
+        }
+    }
+
+    @Test
+    func duplicateEventIdentityCannotCommitTwoQueueRows() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"])
+            await #expect(throws: DeliverySQLite.Failure.self) {
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload, payload])
             }
+            #expect(try await journal.pendingDeliveryIDs().isEmpty)
+            #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
         }
     }
 }

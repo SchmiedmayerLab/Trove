@@ -17,6 +17,7 @@ enum FHIRPointSupportBoundary {
     private static let gatewayDevice = "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice"
     private static let researchStudy = "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy"
     private static let completionMode = "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-completionMode"
+    private static let healthKitSourceType = Canonicals.root + "/healthkit/StructureDefinition/healthkit-source-type"
 
     static func validate(resources: [String: ResourceProxy]) throws {
         for resource in resources.values {
@@ -155,7 +156,7 @@ enum FHIRPointSupportBoundary {
                 try literal(reference, type: "ResearchStudy", resources: resources)
             case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
                 break // Complete pair, canonical text and cross-output consistency are checked by the revision projection.
-            case ("Observation", HealthKitContract.sourceTypeExtension.value?.url.absoluteString, .code),
+            case ("Observation", healthKitSourceType, .code),
                  ("Observation", Canonicals.recordingMethod.value?.url.absoluteString, .coding):
                 // Full validation establishes the metadata; the location walk rejects nested extensions.
                 break // Retaining acquisition context grants no collection authority.

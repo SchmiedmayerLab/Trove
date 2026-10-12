@@ -93,7 +93,7 @@ struct FHIRPointProjectionTests {
                 ["text": "A note with unsupported author attribution.", "authorReference": author]
             ]
         }
-        _ = try ExchangeGraph(kind: .active, jsonData: bytes)
+        _ = try ExchangeGraph(validating: bytes, kind: .active)
         #expect {
             try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator")
         } throws: { ($0 as? ServerError)?.status.code == 422 }
@@ -118,7 +118,7 @@ struct FHIRPointProjectionTests {
             observation["extension"] = extensions
             observation["note"] = [["text": "Original source wording.", "authorString": "Synthetic author"]]
         }
-        _ = try ExchangeGraph(kind: .active, jsonData: bytes)
+        _ = try ExchangeGraph(validating: bytes, kind: .active)
         let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator")
         #expect(event.outputs.first?.writerVersion == "9007199254740992")
         #expect(event.outputs.first?.writerIdentifier?.value == "v0:test-key:1:TN39cF6jcCICy4SlWBjpAulk4eMlcb-KM3MwESD9cvw")

@@ -80,9 +80,9 @@ public struct DeliverySource: Sendable {
     public let id: UUID
     public let eventSystem: String
     public let revokedAt: Date?
-    public let systems: PseudonymousIdentitySystems
+    public let systems: DeploymentIdentifierSystems
 
-    public init(id: UUID, eventSystem: String, revokedAt: Date?, systems: PseudonymousIdentitySystems) {
+    public init(id: UUID, eventSystem: String, revokedAt: Date?, systems: DeploymentIdentifierSystems) {
         self.id = id
         self.eventSystem = eventSystem
         self.revokedAt = revokedAt
@@ -105,7 +105,6 @@ public protocol DeliveryContract: Sendable {
     static func metadata(for commitment: Commitment) -> DeliveryCommitment
     /// The canonical encoding must decode back into [Target].
     static func serializedTargets(for commitment: Commitment) -> Data
-    static func eventValue(sourceID: UUID, sequence: Int64) -> String
     /// Reject every mismatch, including receipt identity and timestamps, before payload retirement.
     static func verify(_ receipt: Receipt, against commitment: DeliveryCommitment) throws
     /// Validate the entire binding, including its registration nonce and account scope.

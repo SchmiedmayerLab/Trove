@@ -22,7 +22,7 @@ struct EventDeliveryCheckpointTests {
             let otherURL = url.deletingLastPathComponent().appendingPathComponent("other.sqlite")
             let other = try EventDeliveryJournal(url: otherURL, scope: scope, mode: .createNew)
             await #expect(throws: EventDeliveryJournal.JournalError.wrongScope) {
-                try await other.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+                try await other.stage(from: checkpoint, nextCursor: Data([1]), payloads: [])
             }
             await other.close()
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
@@ -43,10 +43,9 @@ struct EventDeliveryCheckpointTests {
             let reopened = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
             #expect(try await reopened.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             #expect(try await reopened.pendingDeliveryIDs() == [second])
-            _ = try await reopened.stage(from: checkpoint, nextCursor: Data([3]), changeCount: 1) { _, sequence in
-                #expect(sequence == 3)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:c"])
-            }
+            _ = try await reopened.stage(
+                from: checkpoint, nextCursor: Data([3]), payloads: [DeliveryFixture.payload(sequence: 3, changes: ["add:c"])]
+            )
             await reopened.close()
         }
     }
@@ -56,10 +55,9 @@ struct EventDeliveryCheckpointTests {
         try await DeliveryFixture.withJournal(limits: .init(maximumEvents: 1)) { journal, _ in
             for sequence in 1...64 {
                 let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-                let ids = try await journal.stage(from: checkpoint, nextCursor: Data("cursor-\(sequence)".utf8), changeCount: 1) { _, actual in
-                    #expect(actual == sequence)
-                    return DeliveryFixture.payload(sequence: actual, changes: ["add:\(sequence)"])
-                }
+                let ids = try await journal.stage(from: checkpoint, nextCursor: Data("cursor-\(sequence)".utf8), payloads: [
+                    DeliveryFixture.payload(sequence: Int64(sequence), changes: ["add:\(sequence)"])
+                ])
                 let id = try #require(ids.first)
                 let attempt = try #require(await journal.prepareAttempt(id))
                 try await journal.recordReceipt(DeliveryFixture.receipt(attempt), for: id)
@@ -73,14 +71,14 @@ struct EventDeliveryCheckpointTests {
     func aRepeatedOpaqueCursorDoesNotAllowAnOldCheckpointToCommit() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let initial = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            _ = try await journal.stage(from: initial, nextCursor: Data([1]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+            _ = try await journal.stage(from: initial, nextCursor: Data([1]), payloads: [])
             let before = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            _ = try await journal.stage(from: before, nextCursor: Data([1]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+            _ = try await journal.stage(from: before, nextCursor: Data([1]), payloads: [])
             let after = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             #expect(before.cursor == after.cursor)
             #expect(before != after)
             await #expect(throws: EventDeliveryJournal.JournalError.staleCheckpoint) {
-                try await journal.stage(from: before, nextCursor: Data([2]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+                try await journal.stage(from: before, nextCursor: Data([2]), payloads: [])
             }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == after)
         }
@@ -111,18 +109,15 @@ struct EventDeliveryCheckpointTests {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             let task = Task { @concurrent in
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                    withUnsafeCurrentTask { $0?.cancel() }
-                    return DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-                }
+                withUnsafeCurrentTask { $0?.cancel() }
+                return try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
+                    DeliveryFixture.payload(sequence: 1, changes: ["add:a"])
+                ])
             }
             await #expect(throws: CancellationError.self) { try await task.value }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
-            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 1) { _, sequence in
-                #expect(sequence == 1)
-                return DeliveryFixture.payload(sequence: sequence, changes: ["add:a"])
-            }
+            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])])
         }
     }
 }

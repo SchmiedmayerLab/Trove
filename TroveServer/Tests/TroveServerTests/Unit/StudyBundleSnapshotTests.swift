@@ -34,7 +34,7 @@ struct StudyBundleSnapshotTests {
         try Self.verifyArchive(publication)
     }
 
-    @Test("Every localization supplies the exact archived bytes for validation")
+    @Test("Validation receives the exact merged multilingual questionnaire from the archive")
     func localizedResources() throws {
         let german = try #require(LocalizationKey("de-DE"))
         let study = Self.study()
@@ -42,7 +42,15 @@ struct StudyBundleSnapshotTests {
         study.$components.value = [component]
 
         let publication = try StudyBundleService().preparePublication(from: study, revision: 1)
-        #expect(Set(publication.questionnaires.map(\.locale)) == ["en-US", "de-DE"])
+        #expect(publication.questionnaires.count == 1)
+        let resource = try #require(publication.questionnaires.first)
+        #expect(resource.locale == "en-US")
+        let json = try #require(JSONSerialization.jsonObject(with: resource.bytes) as? [String: Any])
+        #expect(json["language"] as? String == "en-US")
+        let text = String(decoding: try JSONSerialization.data(withJSONObject: json, options: [.withoutEscapingSlashes]), as: UTF8.self)
+        #expect(text.contains("http://hl7.org/fhir/StructureDefinition/translation"))
+        #expect(text.contains("Synthetic de-DE"))
+        #expect(text.contains("Synthetic en-US"))
         try Self.verifyArchive(publication)
     }
 

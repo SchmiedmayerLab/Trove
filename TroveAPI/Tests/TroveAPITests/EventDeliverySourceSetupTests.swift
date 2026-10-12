@@ -41,7 +41,7 @@ struct EventDeliverySourceSetupTests {
         }
     }
 
-    @Test(arguments: ["nonce", "producer", "participant", "namespace", "event", "time"])
+    @Test(arguments: ["nonce", "participant", "namespace", "event", "time"])
     func invalidReplyLeavesSetupPending(field: String) async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let setup = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
@@ -49,10 +49,9 @@ struct EventDeliverySourceSetupTests {
             var response = DeliveryFixture.binding(sourceID: sourceID, registrationID: setup.registrationID)
             switch field {
             case "nonce": response.registrationID = UUID().uuidString
-            case "producer": response.producerInstance = UUID().uuidString
             case "participant": response.participantIdentifier.system = "https://another.test/participants"
-            case "namespace": response.pseudonymousIdentifierSystems.sourceRecord = response.pseudonymousIdentifierSystems.sourceOutput
-            case "event": response.eventIdentifierSystem = response.pseudonymousIdentifierSystems.sourceRecord
+            case "namespace": response.identifierRoot = "/relative"
+            case "event": response.eventIdentifierSystem = "https://foreign.test/events"
             default: response.revokedAt = response.createdAt.addingTimeInterval(-1)
             }
             await #expect(throws: EventDeliveryJournal.JournalError.invalidSourceBinding) { try await journal.confirmSource(response, for: setup) }
@@ -97,7 +96,7 @@ struct EventDeliverySourceSetupTests {
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) { try await journal.confirmSource(active, for: setup) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceRevoked) { try await journal.identityScope(for: DeliveryFixture.sourceID) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceRevoked) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), changeCount: 0, build: DeliveryFixture.unexpectedBuild)
+                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [])
             }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             let attempt = try #require(try await journal.prepareAttempt(id))
@@ -199,7 +198,7 @@ extension EventDeliverySourceSetupTests {
             sourceType: "heart-rate",
             repositoryScope: .init(system: "https://test.example/repositories", value: "local"),
             nativeRecordID: "sample-1"
-        )
+        ).identifier.identifier
     }
 
     private static func expectRestored(

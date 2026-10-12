@@ -31,14 +31,12 @@ struct SourceBindingTests {
                 #expect(binding == retry)
                 #expect(binding.registrationID == nonce)
                 #expect(binding.participantID == participantID)
-                #expect(binding.producerInstance == binding.id)
+                #expect(binding.identifierRoot == TestApp.issuer + "/trove/sources/" + binding.id.uuidString.lowercased())
                 #expect(binding.kind == .participantApp)
-                #expect(binding.eventIdentifierSystem == "urn:uuid:" + binding.id.uuidString.lowercased())
+                #expect(binding.eventIdentifierSystem == binding.identifierRoot + "/NamingSystem/grove-event-v0")
                 #expect(binding.participantIdentifierSystem == TestApp.issuer + "/trove/participants")
                 #expect(binding.participantIdentifierValue == participantID.uuidString.lowercased())
                 #expect(binding.revokedAt == nil)
-                #expect(Set(binding.pseudonymousIdentifierSystems.all).count == 10)
-                #expect(!binding.pseudonymousIdentifierSystems.all.contains { $0.rawValue == binding.eventIdentifierSystem })
                 let loaded = try await service.find(id: binding.id)
                 #expect(loaded == binding)
                 try await Self.expectCount(1, table: "source_bindings", on: app.db)
@@ -62,7 +60,7 @@ struct SourceBindingTests {
                 // Project a corrupt value without disabling or changing schema constraints.
                 let row = try #require(try await sql.raw("""
                     SELECT id, participant_id, registration_id, \(bind: kind) AS kind,
-                        event_identifier_system, participant_identifier_system, participant_identifier_value,
+                        identifier_root, event_identifier_system, participant_identifier_system, participant_identifier_value,
                         created_at, revoked_at
                     FROM source_bindings WHERE id = \(bind: binding.id)
                     """)
@@ -82,7 +80,7 @@ struct SourceBindingTests {
                 let revoked = try await service.revoke(id: binding.id)
                 let revokedAt = try #require(revoked.revokedAt)
                 #expect(revokedAt >= revoked.createdAt)
-                #expect(revoked.pseudonymousIdentifierSystems == binding.pseudonymousIdentifierSystems)
+                #expect(revoked.identifierRoot == binding.identifierRoot)
                 #expect(try await service.revoke(id: binding.id) == revoked)
                 #expect(try await service.register(registrationID: nonce) == revoked)
                 #expect(try await service.find(id: binding.id) == revoked)
@@ -108,7 +106,8 @@ struct SourceBindingTests {
                     await #expect { try await service.revoke(id: binding.id) } throws: { ($0 as? ServerError)?.status.code == 404 }
                     let separate = try await service.register(registrationID: nonce)
                     #expect(separate.id != binding.id)
-                    #expect(Set(separate.pseudonymousIdentifierSystems.all).isDisjoint(with: binding.pseudonymousIdentifierSystems.all))
+                    #expect(separate.identifierRoot != binding.identifierRoot)
+                    #expect(separate.eventIdentifierSystem != binding.eventIdentifierSystem)
                     #expect(separate.participantID == other.id)
                     #expect(separate.participantIdentifierSystem == otherIssuer + "/trove/participants")
                 }
@@ -157,7 +156,7 @@ struct SourceBindingTests {
 
     @Test(arguments: [
         "registration_id = '00000000-0000-4000-8000-000000000001'",
-        "kind = 'provider'", "event_identifier_system = 'urn:uuid:other'",
+        "kind = 'provider'", "identifier_root = 'https://other.example.test/source'", "event_identifier_system = 'urn:uuid:other'",
         "participant_identifier_system = 'https://other.example.test/participants'",
         "participant_identifier_value = 'other'", "created_at = NULL"
     ])

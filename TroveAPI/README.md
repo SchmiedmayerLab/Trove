@@ -91,15 +91,25 @@ and Grove's millisecond-normalized wire time must be inside the selected consent
 so rounding cannot admit a pre-consent sample.
 
 The query requests at most 64 additions and retains a hard 128-change staging
-bound. Conversion, bytes, targets and the next anchor commit together. A failed
-member preserves the previous anchor and all earlier queued work. Delivery uses
-the existing drainer and never reconverts a queued event.
+bound. Grove reserves event identities in a durable producer ledger backed by the
+protected journal. Prepared bytes, targets and the next anchor then commit together.
+Only after that commit does the caller release Grove's retry reservations. A failed
+member preserves the previous anchor, exact export reservations and earlier queued
+work. Delivery uses the existing drainer and never reconverts a queued event.
 
-Known consent exclusions advance the anchor without storing a sample or consuming
-an event sequence. Unsupported changes still roll back the whole pass. Deletions
-use Grove's source/output identities and retraction builder, with no copied samples
+Known native consent exclusions advance the anchor without exporting a sample.
+Unsupported changes never advance the anchor. Deletions
+use Grove's source/output identities and exporter, with no copied samples
 or study targets. An end-only occurrence period records the known upper time bound
-without inventing an exact deletion timestamp.
+without inventing an exact deletion timestamp. The observed upper bound is persisted
+before export and reused after interruption until the page commits.
+
+Source registration assigns an immutable `identifierRoot`; Grove derives the full
+namespace set using the retained registration ID and key epoch. Its ledger owns the
+producer UUID and wire sequence, independently of the queue's local ordering.
+The receiver still authenticates ownership and checks the assigned event namespace.
+Journal schema 6 and query definition 3 deliberately reject earlier local formats
+without removing queued work; this development change includes no data migration.
 
 This acquisition path is not enabled automatically. App lifecycle and permission UI remain
 unfinished. Synthetic tests exercise the real converter and journal, not a live
