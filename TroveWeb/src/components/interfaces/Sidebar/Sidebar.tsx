@@ -204,7 +204,7 @@ const Sidebar = ({
 
   return (
     <div
-      className="group peer text-text-secondary hidden md:block"
+      className="group peer text-text-secondary data-[variant=sidebar]:bg-bg-secondary hidden md:block"
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}

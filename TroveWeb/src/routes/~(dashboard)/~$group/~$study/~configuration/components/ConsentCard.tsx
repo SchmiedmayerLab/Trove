@@ -52,7 +52,7 @@ export const ConsentCard = ({ study, isLoading }: ConsentCardProps) => {
   return (
     <KeyValueCard
       title="Consent"
-      description="Author the consent document participants must accept before enrolling."
+      description="Author the consent document participants review before sharing study data."
       actions={
         <EditButtonLink
           aria-label="Edit consent"

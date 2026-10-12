@@ -97,7 +97,9 @@ test.describe("study authoring", () => {
     await openNewStudyDialog(page);
     await page.getByLabel("Study title").fill(original);
     await page.getByRole("button", { name: "Create study" }).click();
-    await expect(page.getByText(original, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: original, exact: true }),
+    ).toBeVisible();
     await page
       .getByRole("link", { name: "Configuration", exact: true })
       .click();
@@ -197,7 +199,9 @@ test.describe("study authoring", () => {
     await openNewStudyDialog(page);
     await page.getByLabel("Study title").fill(studyTitle);
     await page.getByRole("button", { name: "Create study" }).click();
-    await expect(page.getByText(studyTitle, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: studyTitle, exact: true }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "Components", exact: true }).click();
 

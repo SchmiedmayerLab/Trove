@@ -29,6 +29,10 @@ const EnrollmentRouteComponent = () => {
         body: {
           enrollmentConditions: data.enrollmentConditions,
           visibility: data.visibility,
+          participationCriterion: data.participationCriterion ?? {
+            type: "all",
+            criteria: [],
+          },
         },
       },
       {
@@ -36,6 +40,7 @@ const EnrollmentRouteComponent = () => {
           form.reset({
             enrollmentConditions: updatedStudy.enrollmentConditions,
             visibility: updatedStudy.visibility,
+            participationCriterion: updatedStudy.participationCriterion,
           });
         },
       },

@@ -14,7 +14,7 @@ import {
 import {
   Bolt,
   ChartBar,
-  Home,
+  Blocks,
   Search,
   Users,
   type LucideIcon,
@@ -48,12 +48,6 @@ const navBarItems: NavBarItem[] = [
     onClick: () => notImplementedToast("Search"),
   },
   {
-    id: "home",
-    title: "Home",
-    icon: Home,
-    linkOptions: { to: "/$group/$study" },
-  },
-  {
     id: "configuration",
     title: "Configuration",
     icon: Bolt,
@@ -65,27 +59,23 @@ const navBarItems: NavBarItem[] = [
         linkOptions: { to: "/$group/$study/configuration/general" },
       },
       {
-        id: "consent",
-        title: "Consent",
-        linkOptions: { to: "/$group/$study/configuration/consent" },
-      },
-      {
         id: "enrollment",
         title: "Enrollment",
         linkOptions: { to: "/$group/$study/configuration/enrollment" },
       },
       {
-        id: "participation",
-        title: "Participation",
-        linkOptions: { to: "/$group/$study/configuration/participation" },
-      },
-      {
-        id: "components",
-        title: "Components",
-        linkOptions: { to: "/$group/$study/configuration/components" },
-        fuzzy: true,
+        id: "consent",
+        title: "Consent",
+        linkOptions: { to: "/$group/$study/configuration/consent" },
       },
     ],
+  },
+  {
+    id: "components",
+    title: "Components",
+    icon: Blocks,
+    linkOptions: { to: "/$group/$study/configuration/components" },
+    fuzzy: true,
   },
   {
     id: "participants",
