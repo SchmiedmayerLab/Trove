@@ -53,6 +53,7 @@ jobs:
               - ".github/workflows/build-and-test.yml"
               - "scripts/**"
             server:
+              - "TroveInfrastructure/validator/**"
               - "TroveServer/**"
               - "TroveAPI/**"
               - ".dockerignore"

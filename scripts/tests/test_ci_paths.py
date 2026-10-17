@@ -109,6 +109,9 @@ class CIPathTests(unittest.TestCase):
             "TroveiOS/TroveTests/NewTests.swift": {"ios", "ios_ui"},
             "TroveInfrastructure/docker/keycloak/realm.json": {"infrastructure", "ios_ui"},
             "TroveInfrastructure/apps/base/server/deployment.yaml": {"infrastructure"},
+            "TroveInfrastructure/validator/worker.py": {"server", "infrastructure"},
+            "TroveInfrastructure/validator/lifecycle-corpus.json": {"server", "infrastructure"},
+            "TroveInfrastructure/validator/manifest.json": {"server", "infrastructure", "ios_ui"},
         }
         for path, expected in cases.items():
             with self.subTest(path=path):
