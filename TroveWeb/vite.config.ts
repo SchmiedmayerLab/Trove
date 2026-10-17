@@ -55,8 +55,12 @@ export default defineConfig(({ mode }) => ({
       ]
     : []),
   ],
-  esbuild: {
-    drop: mode === "production" ? ["console"] : [],
+  build: {
+    rolldownOptions: {
+      output: {
+        minify: { compress: { dropConsole: mode === "production" } },
+      },
+    },
   },
   resolve: {
     alias: {

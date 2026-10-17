@@ -13,7 +13,7 @@
     "Frontend"
   ],
   "engines": {
-    "node": "24"
+    "node": "26"
   },
   "repository": {
     "type": "git",
@@ -37,50 +37,51 @@
     "test:e2e:coverage": "COVERAGE=true playwright test; test_status=$?; nyc report --reporter=lcov --reporter=text-summary --report-dir coverage-e2e; coverage_status=$?; if [ \"$test_status\" -ne 0 ]; then exit \"$test_status\"; fi; exit \"$coverage_status\""
   },
   "dependencies": {
-    "@schmiedmayerlab/grove-design-system": "^0.1.1",
+    "@schmiedmayerlab/grove-design-system": "^0.1.2",
     "@tailwindcss/vite": "^4.1.18",
-    "@tanstack/react-query": "^5.90.21",
-    "@tanstack/react-router": "^1.160.2",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-router": "^1.170.41",
     "@tanstack/react-table": "^8.21.3",
-    "@tiptap/extension-table": "^3.30.6",
-    "@tiptap/pm": "^3.30.4",
-    "@tiptap/react": "^3.30.4",
-    "@tiptap/starter-kit": "^3.30.4",
+    "@tiptap/extension-table": "^3.31.4",
+    "@tiptap/pm": "^3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
-    "es-toolkit": "^1.44.0",
+    "es-toolkit": "^1.52.0",
     "keycloak-js": "^26.2.3",
-    "lucide-react": "^0.574.0",
+    "lucide-react": "^1.54.0",
     "match-sorter": "^8.2.0",
-    "radix-ui": "^1.4.3",
+    "radix-ui": "^1.7.0",
     "react": "^19",
     "react-dom": "^19",
     "react-hotkeys-hook": "^5.2.4",
-    "tailwind-merge": "^3.4.1",
+    "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.1.18",
     "tiptap-markdown": "^0.9.0",
     "usehooks-ts": "^3.1.1",
-    "virtua": "^0.48.6",
-    "zod": "^4.3.6"
+    "virtua": "^0.53.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.99.0",
-    "@playwright/test": "^1.58.2",
-    "@schmiedmayerlab/grove-configurations": "^0.1.1",
-    "@tanstack/router-plugin": "^1.161.0",
+    "@playwright/test": "^1.64.0",
+    "@schmiedmayerlab/grove-configurations": "^0.1.2",
+    "@tanstack/router-plugin": "^1.168.42",
     "@total-typescript/ts-reset": "^0.6.1",
-    "@types/node": "^24",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.11",
-    "eslint": "^10.8.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
     "nyc": "^18.0.0",
     "prettier": "^3",
-    "typescript": "^5",
-    "vite": "^7.3.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vite": "^8.3.4",
     "vite-plugin-istanbul": "^9.0.1",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3",
+    "@typescript/native": "npm:typescript@^7.0.2"
   },
   "overrides": {
     "@firebase/firestore": {
@@ -91,6 +92,9 @@
     },
     "@hey-api/json-schema-ref-parser": {
       "js-yaml": "4.3.2"
+    },
+    "@schmiedmayerlab/grove-design-system": {
+      "zod": "$zod"
     }
   }
 }

@@ -32,11 +32,11 @@ import uuid
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[2]
-KEYCLOAK_SHA = "f3ce596dcf772ae145581ef338f9c3937ee37c74d7c1793e563c61519baaaafc"
+KEYCLOAK_SHA = "9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 PDF = b"%PDF-1.4 Synthetic process-restart consent evidence"
-POSTGRES_IMAGE = "timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c"
-STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6"
+POSTGRES_IMAGE = "timescale/timescaledb:latest-pg18@sha256:e72689191e1c977892c53d6f2c344dbc4a9657a867dc8cc1899229f9d3672b2e"
+STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
 
 # The relay can reach only its fixed worker destination in this implementation.
 # The worker itself has only the internal network, without Internet egress.
@@ -267,7 +267,7 @@ class Checkpoint:
     def prepare_keycloak(self, *, participant_usernames=()):
         with tarfile.open(self.args.keycloak_archive) as archive:
             archive.extractall(self.evidence, filter="data")
-        home = self.evidence / "keycloak-26.6.1"
+        home = self.evidence / "keycloak-26.8.0"
         realm = json.loads((ROOT / "TroveInfrastructure/docker/keycloak/realm.json").read_bytes())
         existing = {user["username"] for user in realm["users"]}
         require(len(set(participant_usernames)) == len(participant_usernames)

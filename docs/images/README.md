@@ -25,7 +25,7 @@ being captured. Use the development realm's synthetic password as
 
 ## Web Captures
 
-From the repository root, with Node 24 and the disposable stack running:
+From the repository root, with Node 26 and the disposable stack running:
 
 ```sh
 cd TroveWeb
