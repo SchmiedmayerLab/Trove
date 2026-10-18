@@ -10,6 +10,7 @@
 
 from pathlib import Path
 import unittest
+import xml.etree.ElementTree as ET
 
 import yaml
 
@@ -19,6 +20,20 @@ SELECTORS = {"api", "server", "web", "ios", "ios_ui", "infrastructure", "devstac
 
 
 class CIPathTests(unittest.TestCase):
+    def test_reusable_xcode_jobs_select_shared_schemes(self) -> None:
+        schemes = set()
+        for filename in ("build-and-test.yml", "static-analysis.yml"):
+            workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+            for job in workflow["jobs"].values():
+                if scheme := job.get("with", {}).get("scheme"):
+                    schemes.add(scheme)
+        self.assertTrue(schemes, "No CI Xcode schemes were checked")
+        for scheme in schemes:
+            with self.subTest(scheme=scheme):
+                path = ROOT / "TroveiOS/Trove.xcodeproj/xcshareddata/xcschemes" / f"{scheme}.xcscheme"
+                self.assertTrue(path.is_file(), f"CI scheme {scheme} must be shared, not generated in local user data")
+                self.assertEqual(ET.parse(path).getroot().tag, "Scheme")
+
     def test_validator_cache_is_verified_before_image_builds(self) -> None:
         workflow = yaml.safe_load((ROOT / ".github/workflows/dev-stack.yml").read_text())
         steps = workflow["jobs"]["smoke-test"]["steps"]
