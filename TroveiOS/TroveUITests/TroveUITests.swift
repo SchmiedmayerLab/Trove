@@ -56,6 +56,12 @@ final class TroveUITests: XCTestCase {
         // Return submits the web form without relying on a button that the software keyboard can obscure.
         passwordField.typeText("password123\n") // Local development realm fixture; not a production credential.
 
+        // A fresh simulator can pause the authentication callback to offer password storage.
+        let savePassword = authenticationSession.alerts["Save Password?"]
+        if savePassword.waitForExistence(timeout: 5) {
+            savePassword.buttons["Not Now"].tap()
+        }
+
         let studies = app.navigationBars["Studies"]
         XCTAssertTrue(studies.waitForExistence(timeout: 30), "The app did not reach the study list after sign-in.")
         return app
