@@ -68,6 +68,19 @@ rechecks every byte; a matching version label alone is insufficient. Retain this
 inventory durably with its manifest, outside the source repository and temporary
 CI artifact retention. Do not rely on regenerating byte-identical archives.
 
+## Receiver Lifecycle Test Corpus
+
+Pass `--include-lifecycle-corpus` to `prepare.py` to extract the corpus locked by
+`lifecycle-corpus.json`. The source checkout must contain both that commit and the
+validator manifest's contract commit. Preparation verifies the archive checksum,
+extracts it into `corpus/Conformance/corpora/receiver-lifecycle`, and retains its
+identity in `corpus/identity.json`. No working-tree fixture or moving branch is used.
+
+This corpus comes from the later receiver-lifecycle contract work. It supplies
+35 expected transition sequences; it does not replace the separately pinned
+validator source or published guide packages. CI runs each sequence through the
+actual validator and receiver. See the [server test setup](../../TroveServer/README.md#required-full-validator-ci-lane).
+
 ## Deployment Boundary
 
 Use `compose.yaml` as an overlay for `../docker/docker-compose.yml`. Set `FHIR_VALIDATOR_IMAGE` to the built image's immutable digest and `FHIR_VALIDATOR_IDENTITY` to `sha256:` followed by the manifest's SHA-256. The server must compare the expected identity, contract revision and digest of the exact submitted bytes; it must never learn its expected identity from a response.

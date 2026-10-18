@@ -53,6 +53,7 @@ jobs:
               - ".github/workflows/build-and-test.yml"
               - "scripts/**"
             server:
+              - "TroveInfrastructure/validator/**"
               - "TroveServer/**"
               - "TroveAPI/**"
               - ".dockerignore"
@@ -125,7 +126,8 @@ jobs:
       runsonlabels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
       # Bind the runtime: OS:latest can select an installed runtime without this device.
       destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
-      scheme: Trove
+      # The real-stack job owns UI testing and its service/simulator prerequisites.
+      scheme: Trove-UnitTests
       resultBundle: Trove-iOS-Tests.xcresult
       artifactname: Trove-iOS-Tests.xcresult
 

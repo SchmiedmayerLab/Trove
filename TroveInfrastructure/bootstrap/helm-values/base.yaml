@@ -6,6 +6,11 @@
 # SPDX-License-Identifier: MIT
 #
 
+# Pull the chart-selected Redis image directly from its upstream registry.
+redis:
+  image:
+    repository: docker.io/library/redis
+
 configs:
   cm:
     resource.customizations.ignoreResourceUpdates.external-secrets.io_PushSecret: |

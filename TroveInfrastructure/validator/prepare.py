@@ -43,6 +43,8 @@ def main():
     parser.add_argument("--artifacts", type=Path,
                         help="Locked validator_cli.jar and packages/ directory; defaults to the checkout's build outputs.")
     parser.add_argument("--output", type=Path, required=True, help="Must not exist; only this new directory is written.")
+    parser.add_argument("--include-lifecycle-corpus", action="store_true",
+                        help="Extract the separately pinned receiver test corpus into the context.")
     args = parser.parse_args()
     manifest = json.loads((HERE / "manifest.json").read_bytes())
     args.output.mkdir(parents=True, exist_ok=False)
@@ -79,7 +81,29 @@ def main():
     shutil.copyfile(HERE / "manifest.json", assets / "manifest.json")
     verified_copy(HERE / "worker.py", assets / "worker.py", manifest["workerSHA256"])
     shutil.copyfile(HERE / "Dockerfile", args.output / "Dockerfile")
+    if args.include_lifecycle_corpus:
+        prepare_lifecycle_corpus(args.grove_fhir, args.output / "corpus")
     print("Prepared checksum-verified offline validation context: " + str(args.output))
+
+
+def prepare_lifecycle_corpus(repository, output):
+    # This later corpus tests receiver semantics against the deployed validator.
+    # It does not change the validator's independently pinned admission contract.
+    lock = json.loads((HERE / "lifecycle-corpus.json").read_bytes())
+    archive = subprocess.run(
+        ["git", "-C", str(repository), "archive", lock["revision"], lock["path"]],
+        check=True, capture_output=True,
+    ).stdout
+    if hashlib.sha256(archive).hexdigest() != lock["archiveSHA256"]:
+        raise ValueError("Pinned lifecycle corpus archive mismatch")
+    output.mkdir(parents=True, exist_ok=False)
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        tar.extractall(output, filter="data")
+    root = output / lock["path"]
+    corpus = json.loads((root / "revision-sequences.json").read_bytes())
+    if corpus["schemaVersion"] != 0 or len(corpus["sequences"]) != lock["sequences"]:
+        raise ValueError("Unexpected lifecycle corpus acceptance matrix")
+    shutil.copyfile(HERE / "lifecycle-corpus.json", output / "identity.json")
 
 
 if __name__ == "__main__":
