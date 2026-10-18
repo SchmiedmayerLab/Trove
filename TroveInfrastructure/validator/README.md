@@ -143,14 +143,14 @@ The smoke check tests the CLI with networking disabled, then HTTP through a temp
 
 ## Backend Process Restart Check
 
-On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.6.1 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
+On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.8.0 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
 
 ```sh
 python3 TroveInfrastructure/validator/verify_process_restart.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 
@@ -173,7 +173,7 @@ python3 TroveInfrastructure/validator/verify_healthkit_acquisition.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
   --runtime com.apple.CoreSimulator.SimRuntime.iOS-26-5
 ```
@@ -278,7 +278,7 @@ python3 -m venv /private/tmp/trove-recovery-tools
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 

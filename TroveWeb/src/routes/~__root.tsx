@@ -69,7 +69,11 @@ const RootErrorComponent = ({ error, reset }: ErrorComponentProps) => (
       >
         Something went wrong
       </h1>
-      <p style={{ color: "#666", marginBottom: "1.5rem" }}>{error.message}</p>
+      <p style={{ color: "#666", marginBottom: "1.5rem" }}>
+        {error instanceof Error ?
+          error.message
+        : "An unexpected error occurred."}
+      </p>
       <button
         type="button"
         onClick={reset}

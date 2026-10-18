@@ -28,7 +28,7 @@ jobs:
     name: Swift Test
     runs-on: ubuntu-24.04
     container:
-      image: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
+      image: swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca
     steps:
       - uses: actions/checkout@v7
       - name: Install verification and client journal build dependencies
@@ -69,14 +69,14 @@ jobs:
       VALIDATOR_NETWORK: trove-test-validator-${{ github.run_id }}-${{ github.run_attempt }}
       # Exercise supported PG17 here; the development stack and native checks use PG18.
       TIMESCALE_IMAGE: timescale/timescaledb:latest-pg17@sha256:bc8527e62f70f0766b29515077965025872fabb5349db421565f69ee273baf2d
-      SWIFT_IMAGE: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
-      STORAGE_IMAGE: chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6
+      SWIFT_IMAGE: swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca
+      STORAGE_IMAGE: chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     steps:
       - uses: actions/checkout@v7
       - name: Prepare hosted runner disk capacity
         run: bash scripts/prepare-hosted-disk.sh
       - name: Restore pinned public validator artifacts
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/validator-artifacts
           key: fhir-validator-artifacts-v1-${{ hashFiles('TroveInfrastructure/validator/manifest.json') }}

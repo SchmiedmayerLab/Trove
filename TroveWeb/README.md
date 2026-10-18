@@ -22,6 +22,17 @@ screens, and the [capture guide](../docs/images/README.md) to reproduce them.
 3. Start the API server and Keycloak from [`TroveInfrastructure/docker`](../TroveInfrastructure/docker)
 4. Start the development server: `npm run dev`
 
+Use Node.js 26, matching the container, workflows, and shared verification command.
+TypeScript 7 supplies `tsc`; the `typescript` dependency aliases the official
+TypeScript 6 compatibility package because OpenAPI generation and typed ESLint
+still require its compiler API. See the [upstream migration guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/).
+
+Keep TanStack Table on version 8 until Grove's published `DataTable` accepts the
+version 9 column definitions. The Grove design-system Zod override shares the
+app's schema implementation with its form helpers; installing two incompatible
+schema type graphs breaks form inference and can exhaust the lint heap. Check
+generation, typed lint, build, and tests together when changing these dependencies.
+
 ## Container transport
 
 The image defaults to `APP_ENVIRONMENT=production` and serves HTTPS on port 8080.
@@ -44,7 +55,7 @@ or participant identifiers. Startup diagnostics remain available; deployed ingre
 logs retain only the configured allowlisted operational fields.
 
 CI builds the image and runs `TroveInfrastructure/tools/verify_web_image.py` against
-it. The same local check requires Docker, Node.js 24, and the pinned Python tooling
+it. The same local check requires Docker, Node.js 26, and the pinned Python tooling
 dependencies:
 
 ```bash

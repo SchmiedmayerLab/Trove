@@ -71,11 +71,12 @@ export const Route = createFileRoute("/(dashboard)/$group/")({
   beforeLoad: async ({ context: { queryClient }, params }) => {
     // We validate that the `params.group` exists, so we can throw a more
     // meaningful error if it doesn't.
-    await queryClient.ensureQueryData(
-      groupRetrieveQueryOptions({ groupId: params.group }),
-    );
+    await queryClient.query({
+      ...groupRetrieveQueryOptions({ groupId: params.group }),
+      staleTime: "static",
+    });
 
-    const studies = await queryClient.fetchQuery(
+    const studies = await queryClient.query(
       studyListQueryOptions({ groupId: params.group }),
     );
     const firstStudy = studies.at(0);

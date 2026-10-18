@@ -255,7 +255,6 @@ export const MultiSelectValue = ({
       element.style.display = "none";
       overflowElement?.style.removeProperty("display");
     }
-    // eslint-disable-next-line @eslint-react/set-state-in-effect -- measures the rendered width, so it can only run after layout
     setOverflowAmount(hiddenCount);
   }, []);
 

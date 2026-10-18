@@ -44,12 +44,8 @@ export const Route = createFileRoute("/(dashboard)/$group/$study")({
     // We validate that the `params.group` and `params.study` exist before
     // loading the dashboard, so we can redirect to the error page if they don't.
     await Promise.all([
-      queryClient.fetchQuery(
-        groupRetrieveQueryOptions({ groupId: params.group }),
-      ),
-      queryClient.fetchQuery(
-        studyResponseQueryOptions({ studyId: params.study }),
-      ),
+      queryClient.query(groupRetrieveQueryOptions({ groupId: params.group })),
+      queryClient.query(studyResponseQueryOptions({ studyId: params.study })),
     ]);
   },
 });

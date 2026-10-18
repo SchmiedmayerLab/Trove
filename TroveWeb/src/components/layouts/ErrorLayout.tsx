@@ -14,7 +14,7 @@ interface ErrorLayoutProps extends ErrorComponentProps {
   entityName?: string;
 }
 
-const getErrorMessage = (error: Error, entityName?: string) => {
+const getErrorMessage = (error: unknown, entityName?: string) => {
   if (error instanceof ApiError) {
     if (error.detail) return error.detail;
     switch (error.status) {
