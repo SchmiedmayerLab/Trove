@@ -7,52 +7,92 @@
 #
 
 version: 2
-multi-ecosystem-groups:
-  weekly-dependencies:
-    schedule:
-      interval: "weekly"
 updates:
   - package-ecosystem: "pip"
     directory: "/documentation"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "swift"
     directory: "/TroveAPI"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "swift"
     directory: "/TroveServer"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "npm"
     directory: "/TroveWeb"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "pip"
     directory: "/TroveInfrastructure/tools"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "pip"
     directory: "/TroveInfrastructure/validator"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "docker"
     directory: "/TroveServer"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "docker"
     directory: "/TroveWeb"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "docker-compose"
     directory: "/TroveInfrastructure/docker"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "terraform"
     directory: "/TroveInfrastructure/terraform"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    schedule:
+      interval: "weekly"
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
