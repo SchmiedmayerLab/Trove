@@ -9,7 +9,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9 AS build
+FROM swift:6.4.1-noble@sha256:19cbe56bdaec1918f7cf5fdeba42b9bd55bdd8a6149c9990d0e0e3a89a127d63 AS build
 ARG TARGETARCH
 
 # Install OS updates
@@ -68,7 +68,7 @@ RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources
 # ================================
 # Run image
 # ================================
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:f15fea2f49cb14dceaea491fcbde0d35e0c190126a744ac05a9838440d47d994
 
 # Keep the Swift toolchain in the build stage. The serving image needs only the
 # binary's dynamic libraries, certificate roots and time-zone data.
