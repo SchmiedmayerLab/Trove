@@ -12,12 +12,12 @@ import FluentSQL
 import SQLKit
 
 
-/// One payload per event, entry addresses, lossless point facts, and independent study decisions.
+/// Immutable event custody, additional representations, lossless facts, and independent study decisions.
 struct CreateClinicalEvents: AsyncMigration {
     enum RollbackError: Error, Equatable { case retainedEvents }
 
     private static let tables = [
-        "clinical_events", "clinical_source_records", "clinical_record_events", "clinical_output_bindings",
+        "clinical_events", "clinical_event_representations", "clinical_source_records", "clinical_record_events", "clinical_output_bindings",
         "clinical_record_retractions",
         "clinical_event_nodes", "clinical_point_facts", "clinical_questionnaire_contexts", "clinical_point_derivations",
         "study_data_grants", "clinical_attribution_commands"
@@ -26,6 +26,7 @@ struct CreateClinicalEvents: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.transaction { transaction in
             try await createEvents(on: transaction)
+            try await createRepresentations(on: transaction)
             try await ClinicalRecordSchema.create(on: transaction)
             try await createNodes(on: transaction)
             try await createFacts(on: transaction)
@@ -72,6 +73,20 @@ struct CreateClinicalEvents: AsyncMigration {
             .field("node_count", .int, .required, .sql(unsafeRaw: "CHECK (node_count BETWEEN 1 AND 512)"))
             .unique(on: "identifier_system", "identifier_value", name: "clinical_event_identity")
             .unique(on: "id", "source_id", name: "clinical_event_source")
+            .create()
+    }
+
+    private func createRepresentations(on database: any Database) async throws {
+        let byteLength = database is any PostgresDatabase ? "octet_length(raw_bytes)" : "length(raw_bytes)"
+        let nonHex = "0123456789abcdef".reduce(into: "raw_sha256") { $0 = "replace(\($0), '\($1)', '')" }
+        try await database.schema("clinical_event_representations")
+            .field("event_id", .uuid, .required, .references("clinical_events", "id", onDelete: .restrict))
+            .field("raw_sha256", .string, .required, .sql(unsafeRaw: "CHECK (length(raw_sha256) = 64 AND length(\(nonHex)) = 0)"))
+            .compositeIdentifier(over: "event_id", "raw_sha256")
+            .field("raw_bytes", .data, .required, .sql(unsafeRaw: "CHECK (\(byteLength) BETWEEN 1 AND 4194304)"))
+            .field("validator_identity", .string, .required, boundedText("validator_identity"))
+            .field("received_at", .datetime, .required)
+            .field("node_count", .int, .required, .sql(unsafeRaw: "CHECK (node_count BETWEEN 1 AND 512)"))
             .create()
     }
 
@@ -200,7 +215,8 @@ struct CreateClinicalEvents: AsyncMigration {
             guard let sql = transaction as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
             if transaction is any PostgresDatabase {
                 try await sql.raw("""
-                    LOCK TABLE clinical_events, clinical_source_records, clinical_record_events, clinical_output_bindings,
+                    LOCK TABLE clinical_events, clinical_event_representations, clinical_source_records,
+                        clinical_record_events, clinical_output_bindings,
                         clinical_record_retractions,
                         clinical_event_nodes, clinical_point_facts, clinical_questionnaire_contexts, clinical_point_derivations,
                         study_data_grants, clinical_attribution_commands IN ACCESS EXCLUSIVE MODE

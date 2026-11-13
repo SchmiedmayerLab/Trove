@@ -54,11 +54,20 @@ struct ClinicalEventReceiptStore: Sendable {
                 AND identifier_value = \(bind: lookup.identifier.value)
             """)
             .first() else { throw ServerError.notFound("Event receipt not found") }
-        guard try row.decode(column: "raw_sha256", as: String.self) == lookup.digest,
-              try row.decode(column: "target_intent", as: String.self) == lookup.intent else {
-            throw ServerError.conflict("Receipt does not match the original bytes or study targets")
+        guard try row.decode(column: "target_intent", as: String.self) == lookup.intent else {
+            throw ServerError.conflict("Receipt does not match the original study targets")
         }
-        let receipt = try ClinicalEventReceipt(row: row)
+        let receipt: ClinicalEventReceipt
+        if try row.decode(column: "raw_sha256", as: String.self) == lookup.digest {
+            receipt = try ClinicalEventReceipt(row: row)
+        } else {
+            // A known version does not prove custody of this representation. The client
+            // must resubmit unknown bytes for validation and independent authorization.
+            guard let retained = try await ClinicalEventRepresentationStore.receipt(
+                eventID: row.decode(column: "id", as: UUID.self), digest: lookup.digest, on: sql
+            ) else { throw ServerError.notFound("Event receipt not found") }
+            receipt = retained
+        }
         return try await AuditRepository.disclose(.init(
             context: context.auditContext,
             action: .clinicalEventReceiptDisclosure,

@@ -48,9 +48,9 @@ GRANT UPDATE (revoked_at) ON public.study_delegations TO :"runtime_name";
 GRANT SELECT, INSERT ON public.source_bindings TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.source_bindings TO :"runtime_name";
 GRANT SELECT, INSERT ON public.audit_events TO :"runtime_name";
-GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_nodes,
+GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representations, public.clinical_event_nodes,
     public.clinical_point_facts, public.study_data_grants, public.clinical_source_records,
-    public.clinical_record_events, public.clinical_output_bindings, public.clinical_output_retractions,
+    public.clinical_record_events, public.clinical_output_bindings, public.clinical_record_retractions,
     public.clinical_questionnaire_contexts, public.clinical_point_derivations,
     public.clinical_attribution_commands TO :"runtime_name";
 

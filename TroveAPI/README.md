@@ -53,7 +53,7 @@ its `registrationID` through the authenticated client. Restore existing setup wi
 `confirmSource(_:for:)` persists the response, and `identityScope(for:)` restores
 the Grove conversion context without exposing key bytes. The former direct
 `registerSource` API is removed. Keys and queries cannot be replaced in place.
-Journal format 7 rejects earlier or unknown formats without migration or deletion.
+Journal format 8 rejects earlier or unknown formats without migration or deletion.
 
 The private journal retains the 256-bit key under its OS/app storage protections;
 this does not provide independent at-rest encryption or resist same-user access.
@@ -124,12 +124,12 @@ withdrawal does not prevent a restrictive source assertion. Active events and
 attribution commands still require explicit consent targets. Receipt lookup uses
 the event's original intent, including an empty array for a retraction.
 
-The receiver currently supports Observation targets. Each complete logical output
-Identifier is scoped to its source and bound to the asserted source record.
-Retraction keeps immutable evidence and suppresses every version of that output,
-including later arrivals; it neither deletes the original event nor creates
-study grants. Unrelated outputs and other sources remain unaffected. Unsupported
-target types reject the entire event. A policy for reappearance remains separate work.
+The receiver resolves the complete source-record Identifier within the registered
+source. Retraction keeps immutable evidence and suppresses every output of every
+version of that record, including later arrivals; it neither deletes the original
+record nor creates study grants. Other source records remain unaffected. Repeated
+reports use the same record-retraction identity; the first accepted report keeps
+its lifecycle effect, while additional accepted bytes have their own custody receipts.
 
 Direct QuestionnaireResponse derivations may remain pending until one exact
 source-scoped context is known and independently authorized for the same enrollment.
@@ -154,6 +154,24 @@ Withdrawal returns no windows. The snapshot is not an upload capability or
 permission for continued offline collection: uploads recheck authority. The
 foreground heart-rate adapter refreshes these windows before and after each query;
 it does not enable automatic or offline collection.
+
+## Record Representations and Receipts
+
+An accepted clinical version may have several byte representations: equivalent JSON
+serialization, a changed enrollment snapshot outside the clinical version, or another
+report of the same whole-record retraction. These share the server `eventId`, but each
+receipt binds its exact submitted bytes through `payloadSHA256`, with its own
+`receivedAt` and `nodeCount`. Clinical facts, versions and study grants are not duplicated. The journal stages distinct
+byte-and-target commitments separately and reuses the retained delivery ID for an exact
+duplicate, including one with an already verified receipt.
+New representations still require validation, current collection authority and an audit
+record. Changed clinical tokens under the same version or changed study targets conflict.
+
+Receipt lookup returns 404 for a payload digest whose bytes have not been accepted,
+even when the clinical version is known. The client then resubmits the staged bytes for
+validation. Only a receipt matching the original source, producer identifier, payload
+and target-intent digests permits retirement. Already retained receipts remain
+recoverable after withdrawal or source revocation without restoring study access.
 
 ## Event Batches
 

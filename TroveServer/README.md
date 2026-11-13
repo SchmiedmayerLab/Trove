@@ -268,8 +268,17 @@ crossing participant, study, enrollment, consent, or publication identities.
 
 For the authenticated owner of an active source, an exact-byte retry with the same study
 targets returns the original receipt without adding grants. Revoked sources cannot retry.
-Changed bytes or targets conflict. Withdrawal makes only that enrollment's grant
-ineffective; it does not rewrite the event or another study's decision. The receipt contains
+A different serialization with identical lossless resource tokens, a changed enrollment
+snapshot outside the clinical version, or a re-reported whole-record retraction may
+retain additional exact bytes under the same server record ID. Each representation
+has its own payload digest, receipt time and node count. New representations require
+current collection authority and an atomic audit record, but add no clinical facts,
+versions or study grants. Changed clinical tokens, changed content under a retained
+snapshot key, or different study targets conflict; late attribution uses its separate
+endpoint. The first retraction keeps its lifecycle effect.
+
+Withdrawal makes only that enrollment's grant ineffective; it does not rewrite the
+event or another study's decision. The receipt contains
 the server record ID, source ID, original producer identifier, SHA-256 of the exact
 accepted bytes, normalized target-intent digest, receipt time and node count—not
 samples or current study access. Clients must match the source, complete producer
@@ -282,7 +291,9 @@ recovers the original receipt using the complete producer identifier, payload SH
 and original consent/output targets. Its JSON body is limited to 1 MiB. Recovery requires
 the authenticated source owner and a committed audit disclosure intent; it works
 after withdrawal or source revocation without admitting data or restoring access.
-An unknown/foreign-owned event returns 404; a mismatched digest or intent returns 409.
+An unknown/foreign-owned event or unaccepted payload digest returns 404; a different
+consent/output intent returns 409. An unknown digest requires resubmission and validation,
+not retirement of staged bytes.
 It returns no clinical payload, and an unavailable audit store denies disclosure.
 
 `POST /participant/sources/{sourceId}/events/{eventId}/attributions` adds purposes
