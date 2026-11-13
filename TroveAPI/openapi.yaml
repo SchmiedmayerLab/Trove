@@ -1359,6 +1359,8 @@ paths:
 
   /participant/sources/{sourceId}/events/{eventId}/attributions:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1378,7 +1380,7 @@ paths:
       description: >
         Requires participant source ownership and independently eligible exact consent
         targets. Never changes event bytes, original submission intent or current
-        revision selection. New grants require active enrollment and source, including
+        revision selection. New grants require active enrollment, source and installation, including
         for historical measurements. Pre-consent collection is not implicitly eligible.
         Each command is atomic and idempotent within its source. Exact command retries
         return the original outcome even after withdrawal or revocation; changed event
@@ -1418,6 +1420,8 @@ paths:
 
   /participant/sources/{sourceId}/events:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1435,7 +1439,7 @@ paths:
         relabel delayed measurements. Every retained clinical output requires coverage
         by a named consent; only explicitly selected outputs receive that study's grant.
         A source retraction requires an empty target list and creates no study grants.
-        It requires an authenticated, active source binding but no active enrollment.
+        It requires an authenticated, active source and installation but no active enrollment.
         It suppresses every output of every version of the source record, including later arrivals,
         without deleting retained evidence or affecting other sources. The first accepted retraction
         retains its lifecycle effect when another report repeats its record-retraction identity.
@@ -1502,6 +1506,8 @@ paths:
 
   /participant/sources/{sourceId}/events/batch:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1561,6 +1567,8 @@ paths:
 
   /participant/sources/{sourceId}/record-bundles:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1990,6 +1998,25 @@ paths:
 
 components:
   parameters:
+    SourceInstallationID:
+      name: Trove-Source-Installation-ID
+      in: header
+      required: true
+      description: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+      schema:
+        type: string
+        format: uuid
+    SourceInstallationProof:
+      name: Trove-Source-Credential
+      in: header
+      required: true
+      description: >
+        Private installation credential. Requires independently verified participant
+        authentication and ownership of the named source. New writes require an active
+        installation; the server rechecks under the revocation lock before committing.
+        Never include this value in logs, URLs, clinical resources or exports.
+      schema:
+        $ref: '#/components/schemas/SourceInstallationCredential'
     DelegationId:
       name: Trove-Delegation-ID
       in: header

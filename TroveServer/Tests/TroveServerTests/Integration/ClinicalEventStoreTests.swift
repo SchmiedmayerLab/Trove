@@ -32,9 +32,12 @@ struct ClinicalEventStoreTests {
 
     struct Fixture: Sendable {
         let source: SourceBinding
+        let installationID: UUID
         let studyIDs: [UUID]
         let enrollmentIDs: [UUID]
         let consentIDs: [UUID]
+
+        let installation: SourceInstallationProof
 
         var targets: [ClinicalEventTarget] {
             consentIDs.map { .init(consentID: $0, outputFullURLs: ["urn:uuid:point"]) }
@@ -54,7 +57,9 @@ struct ClinicalEventStoreTests {
             let candidate = event
             try await AuthContext.$current.withValue(Self.participant) {
                 await #expect {
-                    try await ClinicalEventStore(database: app.db).accept(candidate, sourceID: fixture.source.id, targets: fixture.targets)
+                    try await ClinicalEventStore(database: app.db).accept(
+                        candidate, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
+                    )
                 } throws: { ($0 as? ServerError)?.status.code == 403 }
                 try await Self.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
             }
@@ -65,11 +70,12 @@ struct ClinicalEventStoreTests {
     func onePayloadHasTwoIndependentGrantsAndWithdrawalDoesNotRewriteHistory() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await Self.prepare(on: app)
+            let sourceID = fixture.source.id, proof = fixture.installation
             try await AuthContext.$current.withValue(Self.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 let event = Self.event(source: fixture.source)
-                async let first = store.accept(event, sourceID: fixture.source.id, targets: fixture.targets)
-                async let concurrentRetry = store.accept(event, sourceID: fixture.source.id, targets: fixture.targets)
+                async let first = store.accept(event, sourceID: sourceID, targets: fixture.targets, installation: proof)
+                async let concurrentRetry = store.accept(event, sourceID: sourceID, targets: fixture.targets, installation: proof)
                 let (receipt, sameReceipt) = try await (first, concurrentRetry)
                 #expect(receipt == sameReceipt)
                 #expect(receipt.nodeCount == 2)
@@ -82,7 +88,7 @@ struct ClinicalEventStoreTests {
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
                 let reloaded = ClinicalEventStore(database: app.db)
-                let retry = try await reloaded.accept(event, sourceID: fixture.source.id, targets: fixture.targets.reversed())
+                let retry = try await reloaded.accept(event, sourceID: sourceID, targets: fixture.targets.reversed(), installation: proof)
                 #expect(retry == receipt)
                 try await Self.expectRows(events: 1, nodes: 2, facts: 1, grants: 2, on: app.db)
                 let sql = try #require(app.db as? any SQLDatabase)
@@ -109,14 +115,14 @@ struct ClinicalEventStoreTests {
                 let store = ClinicalEventStore(database: app.db)
                 let outputID = UUID().uuidString
                 let event = Self.event(source: fixture.source, outputID: outputID)
-                _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets)
+                _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 if change == "revoked-source" {
                     _ = try await app.grove[SourceBindingService.self].revoke(id: fixture.source.id)
                 }
                 let candidate = change == "bytes" ? Self.event(source: fixture.source, outputID: outputID, rawSuffix: "altered") : event
                 let targets = change == "targets" ? [fixture.targets[0]] : fixture.targets
                 await #expect {
-                    try await store.accept(candidate, sourceID: fixture.source.id, targets: targets)
+                    try await store.accept(candidate, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 409 }
                 try await Self.expectRows(events: 1, nodes: 2, facts: 1, grants: 2, on: app.db)
             }
@@ -133,7 +139,9 @@ struct ClinicalEventStoreTests {
                 }
                 let event = Self.event(source: fixture.source, effectiveAt: failure == "collection-time" ? .distantPast : Date())
                 await #expect {
-                    try await ClinicalEventStore(database: app.db).accept(event, sourceID: fixture.source.id, targets: fixture.targets)
+                    try await ClinicalEventStore(database: app.db).accept(
+                        event, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
+                    )
                 } throws: { ($0 as? ServerError)?.status.code == (failure == "missing-consent" ? 404 : 403) }
                 try await Self.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
             }
@@ -149,7 +157,7 @@ struct ClinicalEventStoreTests {
             try await AuthContext.$current.withValue(Self.participant) {
                 await #expect(throws: (any Error).self) {
                     try await ClinicalEventStore(database: app.db).accept(
-                        Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets
+                        Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
                     )
                 }
                 try await Self.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -162,10 +170,16 @@ struct ClinicalEventStoreTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await Self.prepare(on: app)
             try await AuthContext.$current.withValue(Self.participant) {
-                let otherSource = try await app.grove[SourceBindingService.self].registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
+                let otherInstallationID = UUID()
+                let otherSource = try await app.grove[SourceBindingService.self].registerSource(
+                    registrationID: otherInstallationID, repositoryKind: .sensorKit
+                )
                 await #expect {
                     try await ClinicalEventStore(database: app.db).accept(
-                        Self.event(source: fixture.source), sourceID: otherSource.id, targets: fixture.targets
+                        Self.event(source: fixture.source),
+                        sourceID: otherSource.id,
+                        targets: fixture.targets,
+                        installation: SourceBindingFixture.proof(otherInstallationID)
                     )
                 } throws: { ($0 as? ServerError)?.status.code == 403 }
                 try await Self.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -179,7 +193,7 @@ struct ClinicalEventStoreTests {
             let fixture = try await Self.prepare(on: app)
             try await AuthContext.$current.withValue(Self.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
-                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets
+                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
                 )
             }
             let sql = try #require(app.db as? any SQLDatabase)
@@ -211,7 +225,7 @@ struct ClinicalEventStoreTests {
             let fixture = try await Self.prepare(on: app)
             try await AuthContext.$current.withValue(Self.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
-                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets
+                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
                 )
             }
             let other = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "other-participant")
@@ -283,7 +297,7 @@ extension ClinicalEventStoreTests {
             let fixture = try await Self.prepare(on: app)
             try await AuthContext.$current.withValue(Self.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
-                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets
+                    Self.event(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
                 )
             }
             let sql = try #require(app.db as? any SQLDatabase)
@@ -387,8 +401,16 @@ extension ClinicalEventStoreTests {
                 }
                 enrollmentIDs.append(id)
             }
-            let source = try await app.grove[SourceBindingService.self].registerSource(registrationID: UUID())
-            return Fixture(source: source, studyIDs: studyIDs, enrollmentIDs: enrollmentIDs, consentIDs: consentIDs)
+            let installationID = UUID()
+            let source = try await app.grove[SourceBindingService.self].registerSource(registrationID: installationID)
+            return try Fixture(
+                source: source,
+                installationID: installationID,
+                studyIDs: studyIDs,
+                enrollmentIDs: enrollmentIDs,
+                consentIDs: consentIDs,
+                installation: SourceBindingFixture.proof(installationID)
+            )
         }
     }
 

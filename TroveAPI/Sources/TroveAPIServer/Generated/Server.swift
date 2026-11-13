@@ -7116,7 +7116,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Authorize additional exact-version study outputs without copying the event
     ///
-    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment and source, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
+    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment, source and installation, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/{eventId}/attributions`.
@@ -7147,7 +7147,19 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                         as: Swift.String.self
                     )
                 )
-                let headers: Operations.AttributeParticipantEvent.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let headers: Operations.AttributeParticipantEvent.Input.Headers = .init(
+                    troveSourceInstallationID: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Installation-ID",
+                        as: Components.Parameters.SourceInstallationID.self
+                    ),
+                    troveSourceCredential: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Credential",
+                        as: Components.Parameters.SourceInstallationProof.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
                 let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
                 let body: Operations.AttributeParticipantEvent.Input.Body
                 let chosenContentType = try converter.bestContentType(
@@ -7328,7 +7340,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source binding but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -7352,7 +7364,19 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     name: "sourceId",
                     as: Swift.String.self
                 ))
-                let headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers = .init(
+                    troveSourceInstallationID: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Installation-ID",
+                        as: Components.Parameters.SourceInstallationID.self
+                    ),
+                    troveSourceCredential: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Credential",
+                        as: Components.Parameters.SourceInstallationProof.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
                 let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
                 let body: Operations.PostParticipantSourcesSourceIdEvents.Input.Body
                 let chosenContentType = try converter.bestContentType(
@@ -7580,7 +7604,19 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     name: "sourceId",
                     as: Swift.String.self
                 ))
-                let headers: Operations.SubmitParticipantEventBatch.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let headers: Operations.SubmitParticipantEventBatch.Input.Headers = .init(
+                    troveSourceInstallationID: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Installation-ID",
+                        as: Components.Parameters.SourceInstallationID.self
+                    ),
+                    troveSourceCredential: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Credential",
+                        as: Components.Parameters.SourceInstallationProof.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
                 let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
                 let body: Operations.SubmitParticipantEventBatch.Input.Body
                 let chosenContentType = try converter.bestContentType(
@@ -7785,7 +7821,19 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     name: "sourceId",
                     as: Swift.String.self
                 ))
-                let headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(
+                    troveSourceInstallationID: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Installation-ID",
+                        as: Components.Parameters.SourceInstallationID.self
+                    ),
+                    troveSourceCredential: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Source-Credential",
+                        as: Components.Parameters.SourceInstallationProof.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
                 let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
                 let body: Operations.SubmitParticipantRecordBundle.Input.Body
                 let chosenContentType = try converter.bestContentType(

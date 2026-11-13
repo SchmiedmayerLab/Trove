@@ -74,6 +74,7 @@ extension ReceiverRevisionCorpusTests {
         var receipt: Components.Schemas.EventReceipt?
         try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events", beforeRequest: {
             $0.bearerAuth(token)
+            $0.sourceInstallation(fixture.installationID)
             try $0.encodeJSONBody(Components.Schemas.EventSubmission(
                 eventBase64: try event.bytes.base64EncodedString(),
                 targets: [.init(consentId: fixture.consentIDs[0].uuidString, outputFullUrls: event.selected)]

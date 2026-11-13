@@ -24,7 +24,9 @@ struct ClinicalAttributionReceipt: Sendable, Equatable {
 struct ClinicalAttributionStore: Sendable {
     let database: any Database
 
-    func attribute(eventID: UUID, sourceID: UUID, commandID: UUID, targets: [ClinicalEventTarget]) async throws -> ClinicalAttributionReceipt {
+    func attribute(
+        eventID: UUID, sourceID: UUID, commandID: UUID, targets: [ClinicalEventTarget], installation: SourceInstallationProof
+    ) async throws -> ClinicalAttributionReceipt {
         let context = try AuthContext.checkIsParticipant()
         guard !targets.isEmpty else { throw ServerError.badRequest("Attribution requires explicit consent targets") }
         let intent = try ClinicalEventIntent(targets: targets)
@@ -32,12 +34,13 @@ struct ClinicalAttributionStore: Sendable {
             let source = try await ClinicalEventStore(database: transaction).lockSourceOwner(
                 sourceID: sourceID, context: context, on: transaction, requireActive: false
             )
+            let retainedInstallation = try await installation.validate(source: source, on: transaction, requireActive: false)
             guard let sql = transaction as? any SQLDatabase else { throw ServerError.unexpectedError }
             if let receipt = try await self.replay(commandID: commandID, sourceID: sourceID, eventID: eventID, intent: intent, on: sql) {
                 return receipt
             }
-            guard source.revokedAt == nil, source.kind == .participantApp else {
-                throw ServerError.conflict("Source binding is not active")
+            guard source.revokedAt == nil, retainedInstallation.revokedAt == nil, source.kind == .participantApp else {
+                throw ServerError.conflict("Source installation is not active")
             }
             let grants = ClinicalGrantStore(database: transaction, source: source, context: context, acceptedAt: Date())
             return try await self.insert(commandID: commandID, eventID: eventID, intent: intent, grants: grants)

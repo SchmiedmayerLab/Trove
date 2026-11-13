@@ -25,8 +25,8 @@ struct ClinicalRecordRepresentationTests {
             let targets = fixture.targets(for: original)
             let receipts = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = try await store.accept(original, sourceID: fixture.source.id, targets: targets)
-                let second = try await store.accept(updated, sourceID: fixture.source.id, targets: targets)
+                let first = try await store.accept(original, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
+                let second = try await store.accept(updated, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 #expect(first.eventID == second.eventID)
                 #expect(first.payloadSHA256 != second.payloadSHA256)
                 #expect(first.targetIntentSHA256 == second.targetIntentSHA256)
@@ -39,7 +39,10 @@ struct ClinicalRecordRepresentationTests {
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                     let store = ClinicalEventStore(database: reopened.db)
                     for (event, receipt) in zip([original, updated], receipts) {
-                        #expect(try await store.accept(event, sourceID: fixture.source.id, targets: targets) == receipt)
+                        let replay = try await store.accept(
+                            event, sourceID: fixture.source.id, targets: targets, installation: fixture.installation
+                        )
+                        #expect(replay == receipt)
                     }
                     _ = try await SourceBindingService(database: reopened.db).revoke(id: fixture.source.id)
                     for receipt in receipts {
@@ -62,7 +65,7 @@ struct ClinicalRecordRepresentationTests {
             var targets = fixture.targets(for: original)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = try await store.accept(original, sourceID: fixture.source.id, targets: targets)
+                let first = try await store.accept(original, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 switch reason {
                 case "clinical":
                     let string = try #require(String(data: updated.rawBytes, encoding: .utf8))
@@ -72,12 +75,15 @@ struct ClinicalRecordRepresentationTests {
                     for enrollment in fixture.enrollmentIDs {
                         _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: enrollment)
                     }
-                    #expect(try await store.accept(original, sourceID: fixture.source.id, targets: targets) == first)
+                    let replay = try await store.accept(
+                        original, sourceID: fixture.source.id, targets: targets, installation: fixture.installation
+                    )
+                    #expect(replay == first)
                 case "audit": try await app.db.schema("audit_events").delete()
                 default: break
                 }
                 await #expect(throws: (any Error).self) {
-                    try await store.accept(updated, sourceID: fixture.source.id, targets: targets)
+                    try await store.accept(updated, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 }
             }
             #expect(try await Self.retained(on: app.db).isEmpty)
@@ -94,8 +100,8 @@ struct ClinicalRecordRepresentationTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 let targets = fixture.targets(for: original)
-                _ = try await store.accept(original, sourceID: fixture.source.id, targets: targets)
-                _ = try await store.accept(updated, sourceID: fixture.source.id, targets: targets)
+                _ = try await store.accept(original, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
+                _ = try await store.accept(updated, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
             }
             let sql = try #require(app.db as? any SQLDatabase)
             await #expect {
@@ -118,10 +124,10 @@ struct ClinicalRecordRepresentationTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 let targets = fixture.targets(for: original)
-                _ = try await store.accept(original, sourceID: fixture.source.id, targets: targets)
-                _ = try await store.accept(updated, sourceID: fixture.source.id, targets: targets)
+                _ = try await store.accept(original, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
+                _ = try await store.accept(updated, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 await #expect {
-                    try await store.accept(conflicting, sourceID: fixture.source.id, targets: targets)
+                    try await store.accept(conflicting, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 409 }
             }
             #expect(try await Self.retained(on: app.db) == [updated.rawBytes])
@@ -138,13 +144,15 @@ struct ClinicalRecordRepresentationTests {
             let second = try Self.project(RetractionEventFixture.bytes(activeBytes: active.rawBytes, sequence: 2))
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(active, sourceID: fixture.source.id, targets: fixture.targets(for: active))
-                let original = try await store.accept(first, sourceID: fixture.source.id, targets: [])
-                let repeated = try await store.accept(second, sourceID: fixture.source.id, targets: [])
+                _ = try await store.accept(
+                    active, sourceID: fixture.source.id, targets: fixture.targets(for: active), installation: fixture.installation
+                )
+                let original = try await store.accept(first, sourceID: fixture.source.id, targets: [], installation: fixture.installation)
+                let repeated = try await store.accept(second, sourceID: fixture.source.id, targets: [], installation: fixture.installation)
                 #expect(original.eventID == repeated.eventID)
                 #expect(original.payloadSHA256 != repeated.payloadSHA256)
-                #expect(try await store.accept(first, sourceID: fixture.source.id, targets: []) == original)
-                #expect(try await store.accept(second, sourceID: fixture.source.id, targets: []) == repeated)
+                #expect(try await store.accept(first, sourceID: fixture.source.id, targets: [], installation: fixture.installation) == original)
+                #expect(try await store.accept(second, sourceID: fixture.source.id, targets: [], installation: fixture.installation) == repeated)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 let sql = try #require(app.db as? any SQLDatabase)
                 let row = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM clinical_record_retractions").first())

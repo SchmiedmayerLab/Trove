@@ -78,6 +78,14 @@ The iOS `TroveAPIModule.synchronizeSource` wrapper supplies its existing Keycloa
 session-bound client. Successful synchronization is not consent or collection
 authority, and these HMAC identity keys are separate from optional signing keys.
 
+The drainer sends the retained installation UUID and credential as
+`Trove-Source-Installation-ID` and `Trove-Source-Credential` headers on Bundle
+submissions. These transport credentials do not enter FHIR bytes, resource IDs or
+submission commitments. Known installation revocation blocks submission, while an
+uncertain earlier upload can still recover its receipt through authenticated lookup
+without these headers. The server independently checks installation revocation at
+admission; a stale client state cannot authorize a revoked installation.
+
 ## HealthKit Acquisition
 
 The optional Apple-platform `TroveHealthKit` product connects Grove's anchored

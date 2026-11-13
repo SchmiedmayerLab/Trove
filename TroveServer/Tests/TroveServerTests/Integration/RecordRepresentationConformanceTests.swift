@@ -28,11 +28,17 @@ struct RecordRepresentationConformanceTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let service = try ClinicalEventService(database: app.db, validator: FHIRValidationClient(application: app))
                 for (payloads, intent) in [(active, targets), (retractions, [])] {
-                    let first = try await service.accept(body: HTTPBody(payloads[0]), sourceID: fixture.source.id, targets: intent)
-                    let second = try await service.accept(body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent)
+                    let first = try await service.accept(
+                        body: HTTPBody(payloads[0]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
+                    let second = try await service.accept(
+                        body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
                     #expect(first.eventID == second.eventID)
                     #expect(first.payloadSHA256 != second.payloadSHA256)
-                    let replay = try await service.accept(body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent)
+                    let replay = try await service.accept(
+                        body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
                     #expect(replay == second)
                 }
                 let store = ClinicalEventStore(database: app.db)

@@ -21,9 +21,10 @@ struct ClinicalEventBatchHTTPTests {
         try await TestApp.withApp(token: identity) { app, token in
             for route in ["events/batch", "record-bundles"] {
                 try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/\(route)", beforeRequest: {
-                $0.bearerAuth(token)
-                $0.headers.contentType = .json
-                $0.body = .init(data: Data(repeating: 32, count: 6 * 1024 * 1024 + 1))
+                    $0.bearerAuth(token)
+                    $0.sourceInstallation(UUID())
+                    $0.headers.contentType = .json
+                    $0.body = .init(data: Data(repeating: 32, count: 6 * 1024 * 1024 + 1))
                 }) { #expect($0.status == status) }
             }
         }
@@ -35,6 +36,7 @@ struct ClinicalEventBatchHTTPTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events/batch", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventBatchSubmission(events: [
                     .init(eventBase64: "private-not-base64", targets: []), .init(eventBase64: "e30", targets: [])
                 ]))
@@ -56,6 +58,7 @@ struct ClinicalEventBatchHTTPTests {
             }) { #expect($0.status == .ok) }
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events/batch", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventBatchSubmission(events: [.init(eventBase64: "e30=", targets: [])]))
             }) { #expect($0.status == .conflict) }
         }
@@ -69,6 +72,7 @@ struct ClinicalEventBatchHTTPTests {
             let submission = try ClinicalEventBatchTests.submission(ImmutablePointEventFixture.bytes(source: fixture.source), fixture: fixture)
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events/batch", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventBatchSubmission(events: [
                     submission, .init(eventBase64: "invalid", targets: []), submission
                 ]))

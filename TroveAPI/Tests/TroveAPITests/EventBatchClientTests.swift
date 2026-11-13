@@ -62,7 +62,12 @@ struct EventBatchClientTests {
             transport: Transport(submissions: submissions, outcomes: outcomes)
         )
         let response = try await client.submitParticipantEventBatch(.init(
-            path: .init(sourceId: DeliveryFixture.sourceID.uuidString), body: .json(.init(events: submissions))
+            path: .init(sourceId: DeliveryFixture.sourceID.uuidString),
+            headers: .init(
+                troveSourceInstallationID: UUID().uuidString,
+                troveSourceCredential: Data(repeating: 0x41, count: 32).base64EncodedString()
+            ),
+            body: .json(.init(events: submissions))
         ))
         #expect(try response.ok.body.json == outcomes)
     }

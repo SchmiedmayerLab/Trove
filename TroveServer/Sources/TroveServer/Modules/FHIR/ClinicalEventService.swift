@@ -21,13 +21,15 @@ final class ClinicalEventService: Module, Sendable {
         self.validator = validator
     }
 
-    func accept(body: HTTPBody, sourceID: UUID, targets: [ClinicalEventTarget]) async throws -> ClinicalEventReceipt {
+    func accept(
+        body: HTTPBody, sourceID: UUID, targets: [ClinicalEventTarget], installation: SourceInstallationProof
+    ) async throws -> ClinicalEventReceipt {
         _ = try AuthContext.checkIsParticipant()
         _ = try ClinicalEventIntent(targets: targets)
         // Refuse unknown, foreign, or revoked sources before spending validator resources.
         // The store repeats this check under the transaction lock before admitting anything.
         let source = try await SourceBindingService(database: database).find(id: sourceID)
-        guard source.revokedAt == nil else { throw ServerError.conflict("Source binding is not active") }
+        _ = try await installation.validate(source: source, on: database)
         let bytes: Data
         do {
             bytes = try await BoundedRequestBody.collect(body, upTo: FHIRValidationClient.maximumBytes)
@@ -43,6 +45,6 @@ final class ClinicalEventService: Module, Sendable {
         let identity = try await validator.validate(bytes)
         try Task.checkCancellation()
         let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: identity)
-        return try await ClinicalEventStore(database: database).accept(event, sourceID: sourceID, targets: targets)
+        return try await ClinicalEventStore(database: database).accept(event, sourceID: sourceID, targets: targets, installation: installation)
     }
 }

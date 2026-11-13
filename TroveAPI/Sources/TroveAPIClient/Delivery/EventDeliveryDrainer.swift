@@ -202,8 +202,17 @@ extension EventDeliveryDrainer {
 
     private func submit(_ batch: EventDeliveryBatch) async throws -> [Response] {
         guard let first = batch.members.first, let submission = batch.submission else { throw BatchError.invalidResponse }
+        let setup: EventDeliveryJournal.SourceSetup
+        do {
+            setup = try await journal.activeSource(first.attempt.commitment.sourceID)
+        } catch EventDeliveryJournal.JournalError.sourceRevoked {
+            return Array(repeating: .status(409), count: batch.members.count)
+        }
+        let credential = try await journal.installationCredential(for: setup.localID).base64EncodedString()
+        try await checkSession()
         let response = try await client.submitParticipantRecordBundle(.init(
             path: .init(sourceId: first.attempt.commitment.sourceID.uuidString.lowercased()),
+            headers: .init(troveSourceInstallationID: setup.localID.uuidString.lowercased(), troveSourceCredential: credential),
             body: .json(submission)
         ))
         return try submissionResponses(response, expectedCount: batch.members.count)

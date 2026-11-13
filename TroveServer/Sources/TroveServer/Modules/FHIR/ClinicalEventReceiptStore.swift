@@ -41,7 +41,7 @@ struct ClinicalEventReceiptStore: Sendable {
         let context = try AuthContext.checkIsParticipant()
         // Ownership remains mandatory after revocation. This is not the admission path.
         let source = try await SourceBindingService(database: database).find(id: sourceID)
-        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID)
+        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID, epoch: source.keyEpoch)
         guard [systems.recordVersion, systems.recordRetraction].contains(lookup.identifier.system) else {
             throw ServerError.notFound("Event receipt not found")
         }

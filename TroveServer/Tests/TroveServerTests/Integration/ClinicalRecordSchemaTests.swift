@@ -23,7 +23,8 @@ struct ClinicalRecordSchemaTests {
                     try await ClinicalEventStore(database: app.db).accept(
                         ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: version),
                         sourceID: fixture.source.id,
-                        targets: fixture.targets
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
             }
@@ -54,7 +55,8 @@ struct ClinicalRecordSchemaTests {
                 _ = try await ClinicalEventStore(database: app.db).accept(
                     ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "0"),
                     sourceID: fixture.source.id,
-                    targets: fixture.targets
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
             }
             await #expect {
@@ -106,15 +108,14 @@ struct ClinicalRecordSchemaTests {
                 let first = try await store.accept(
                     ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1"),
                     sourceID: fixture.source.id,
-                    targets: fixture.targets
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
                 let secondEvent = ClinicalRecordStoreTests.event(
                     source: fixture.source, sequence: 2, version: "1", record: "another", outputs: ["other"]
                 )
                 let second = try await store.accept(
-                    secondEvent,
-                    sourceID: fixture.source.id,
-                    targets: fixture.targets(for: secondEvent)
+                    secondEvent, sourceID: fixture.source.id, targets: fixture.targets(for: secondEvent), installation: fixture.installation
                 )
                 return (first, second)
             }

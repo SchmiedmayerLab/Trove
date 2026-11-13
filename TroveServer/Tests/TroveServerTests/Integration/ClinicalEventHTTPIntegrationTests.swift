@@ -97,6 +97,7 @@ extension ClinicalEventHTTPIntegrationTests {
         var receipt: Components.Schemas.EventReceipt?
         try await app.test(.POST, path(fixture), beforeRequest: { request in
             request.bearerAuth(token)
+            request.sourceInstallation(fixture.installationID)
             try request.encodeJSONBody(submission(bytes, fixture: fixture))
         }) { response in
             try #require(response.status == .ok)
@@ -110,6 +111,7 @@ extension ClinicalEventHTTPIntegrationTests {
     ) async throws {
         try await app.test(.POST, path(fixture), beforeRequest: { request in
             request.bearerAuth(token)
+            request.sourceInstallation(fixture.installationID)
             try request.encodeJSONBody(submission(bytes, fixture: fixture, oneTarget: oneTarget))
         }) { response in
             #expect(response.status == .conflict)

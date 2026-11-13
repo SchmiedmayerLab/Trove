@@ -10780,7 +10780,7 @@ public enum Operations {
     }
     /// Authorize additional exact-version study outputs without copying the event
     ///
-    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment and source, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
+    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment, source and installation, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/{eventId}/attributions`.
@@ -10810,12 +10810,29 @@ public enum Operations {
             public var path: Operations.AttributeParticipantEvent.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -10834,7 +10851,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.AttributeParticipantEvent.Input.Path,
-                headers: Operations.AttributeParticipantEvent.Input.Headers = .init(),
+                headers: Operations.AttributeParticipantEvent.Input.Headers,
                 body: Operations.AttributeParticipantEvent.Input.Body
             ) {
                 self.path = path
@@ -11122,7 +11139,7 @@ public enum Operations {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source binding but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -11145,12 +11162,29 @@ public enum Operations {
             public var path: Operations.PostParticipantSourcesSourceIdEvents.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -11169,7 +11203,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.PostParticipantSourcesSourceIdEvents.Input.Path,
-                headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers = .init(),
+                headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers,
                 body: Operations.PostParticipantSourcesSourceIdEvents.Input.Body
             ) {
                 self.path = path
@@ -11580,12 +11614,29 @@ public enum Operations {
             public var path: Operations.SubmitParticipantEventBatch.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -11604,7 +11655,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.SubmitParticipantEventBatch.Input.Path,
-                headers: Operations.SubmitParticipantEventBatch.Input.Headers = .init(),
+                headers: Operations.SubmitParticipantEventBatch.Input.Headers,
                 body: Operations.SubmitParticipantEventBatch.Input.Body
             ) {
                 self.path = path
@@ -11915,12 +11966,29 @@ public enum Operations {
             public var path: Operations.SubmitParticipantRecordBundle.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -11939,7 +12007,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.SubmitParticipantRecordBundle.Input.Path,
-                headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(),
+                headers: Operations.SubmitParticipantRecordBundle.Input.Headers,
                 body: Operations.SubmitParticipantRecordBundle.Input.Body
             ) {
                 self.path = path

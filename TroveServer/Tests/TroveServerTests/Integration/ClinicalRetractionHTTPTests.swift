@@ -34,6 +34,7 @@ struct ClinicalRetractionHTTPTests {
                 let body = bodies[index]
                 try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events", beforeRequest: {
                     $0.bearerAuth(token)
+                    $0.sourceInstallation(fixture.installationID)
                     try $0.encodeJSONBody(body)
                 }) { response in
                     try #require(response.status == .ok, "Synthetic retraction flow returned: \(response.body.string)")

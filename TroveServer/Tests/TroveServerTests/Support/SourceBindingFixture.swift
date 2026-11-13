@@ -19,6 +19,14 @@ import Vapor
 
 /// Low-level storage tests deliberately start before key provisioning. Application tests use the service above.
 enum SourceBindingFixture {
+    static func credentialBase64(_ registrationID: UUID) -> String {
+        Data(SHA256.hash(data: Data(registrationID.uuidString.utf8))).base64EncodedString()
+    }
+
+    static func proof(_ registrationID: UUID) throws -> SourceInstallationProof {
+        try .init(registrationID: registrationID, credential: .init(base64: credentialBase64(registrationID)))
+    }
+
     static func registerJournal(
         _ journal: EventDeliveryJournal, source: SourceBinding, query: Data, receiver: (Application, String?)
     ) async throws {
@@ -61,11 +69,10 @@ enum SourceBindingFixture {
 extension SourceBindingService {
     /// Production registration with a reproducible synthetic installation credential for retry fixtures.
     func registerSource(registrationID: UUID, repositoryKind: SourceRepositoryKind = .healthKit) async throws -> SourceBinding {
-        let bytes = Data(SHA256.hash(data: Data(registrationID.uuidString.utf8)))
-        return try await SourceInstallationService(database: database, keyring: TestApp.sourceKeyring()).register(
+        try await SourceInstallationService(database: database, keyring: TestApp.sourceKeyring()).register(
             registrationID: registrationID,
             repositoryKind: repositoryKind,
-            credential: SourceInstallationCredential(base64: bytes.base64EncodedString())
+            credential: SourceInstallationCredential(base64: SourceBindingFixture.credentialBase64(registrationID))
         ).source
     }
 }

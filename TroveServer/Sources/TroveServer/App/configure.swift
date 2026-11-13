@@ -50,7 +50,10 @@ private func configureDevelopmentCORS(for app: Application) {
         CORSMiddleware(configuration: .init(
             allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
             allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch, "Trove-Delegation-ID"]
+            allowedHeaders: [
+                .accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch,
+                "Trove-Delegation-ID", "Trove-Source-Installation-ID", "Trove-Source-Credential"
+            ]
         )),
         at: .beginning
     )

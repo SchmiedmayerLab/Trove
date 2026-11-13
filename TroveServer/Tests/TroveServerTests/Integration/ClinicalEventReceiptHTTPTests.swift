@@ -62,6 +62,7 @@ struct ClinicalEventReceiptHTTPTests {
             // Receipt recovery must not reopen the revoked upload path.
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.domain.source.id)/events", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.domain.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventSubmission(
                     eventBase64: Data("must not reach validation".utf8).base64EncodedString(), targets: fixture.body.targets
                 ))
@@ -167,7 +168,10 @@ extension ClinicalEventReceiptHTTPTests {
         let domain = try await ClinicalEventStoreTests.prepare(on: app)
         let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
             try await ClinicalEventStore(database: app.db).accept(
-                ClinicalEventStoreTests.event(source: domain.source), sourceID: domain.source.id, targets: domain.targets
+                ClinicalEventStoreTests.event(source: domain.source),
+                sourceID: domain.source.id,
+                targets: domain.targets,
+                installation: domain.installation
             )
         }
         return .init(domain: domain, receipt: receipt, body: .init(
