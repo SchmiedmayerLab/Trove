@@ -29,6 +29,7 @@ struct CreateEnrollmentConsents: AsyncMigration {
                 .field("evidence_key", .string, .required, .sql(unsafeRaw: "CHECK (length(evidence_key) BETWEEN 1 AND 1024)"))
                 .field("evidence_digest", .string, .required, .sql(unsafeRaw: digestConstraint))
                 .field("presentation_proof", .json, .required)
+                .field("collection_scope", .json)
                 .field("command_id", .uuid, .required)
                 .field("expected_enrollment_version", .int64, .required, .sql(unsafeRaw: "CHECK (expected_enrollment_version > 0)"))
                 .field(

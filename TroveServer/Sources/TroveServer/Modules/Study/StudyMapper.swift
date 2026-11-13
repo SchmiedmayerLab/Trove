@@ -71,7 +71,7 @@ extension Components.Schemas.StudyResponse {
 extension CollectionRequirement {
     init(_ schema: Components.Schemas.CollectionRequirement) {
         switch schema.sourceKind {
-        case .participantApp: self.init(profile: schema.profile, sourceKind: .participantApp)
+        case .participantApp: self.init(profile: schema.profile, sourceKind: .participantApp, measurementWindow: schema.measurementWindow)
         }
     }
 }
@@ -79,7 +79,7 @@ extension CollectionRequirement {
 extension Components.Schemas.CollectionRequirement {
     init(_ model: CollectionRequirement) {
         switch model.sourceKind {
-        case .participantApp: self.init(profile: model.profile, sourceKind: .participantApp)
+        case .participantApp: self.init(measurementWindow: model.measurementWindow, profile: model.profile, sourceKind: .participantApp)
         }
     }
 }

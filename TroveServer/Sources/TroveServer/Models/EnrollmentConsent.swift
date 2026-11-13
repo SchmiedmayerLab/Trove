@@ -8,6 +8,7 @@
 
 import Fluent
 import Foundation
+import TroveAPITypes
 
 
 /// Mirrors `ConsentDocument.UserResponses` from GroveConsent.
@@ -82,7 +83,10 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
     /// Version at acceptance, never replaced with the enrollment's current version on replay.
     @Field(key: "accepted_enrollment_version") var acceptedEnrollmentVersion: Int64
 
-    @Timestamp(key: "created_at", on: .create) var createdAt: Date?
+    @OptionalField(key: "collection_scope") var collectionScope: AcceptedCollectionScope?
+
+    /// Set inside the acceptance transaction, before resolving calendar-relative measurement bounds.
+    @Timestamp(key: "created_at", on: .none) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
 
@@ -102,6 +106,8 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
         id: UUID? = nil
     ) {
         self.id = id
+        self.createdAt = Date()
+        self.collectionScope = nil
         self.$enrollment.id = enrollmentId
         self.revision = revision
         self.userResponses = userResponses
@@ -112,5 +118,16 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
         self.commandID = commandID
         self.expectedEnrollmentVersion = expectedEnrollmentVersion
         self.acceptedEnrollmentVersion = acceptedEnrollmentVersion
+    }
+}
+
+
+extension EnrollmentConsent {
+    func resolveCollectionScope(from publication: PublishedStudy) throws {
+        let codec = TroveDateTranscoder()
+        let acceptedAt = try codec.decode(codec.encode(Date()))
+        let requirements = try publication.collectionPolicy.validatedRequirements(studyID: publication.$study.id, revision: revision)
+        collectionScope = try AcceptedCollectionScope(requirements: requirements, acceptedAt: acceptedAt)
+        createdAt = acceptedAt
     }
 }

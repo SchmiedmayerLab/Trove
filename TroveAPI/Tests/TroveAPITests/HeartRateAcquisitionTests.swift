@@ -454,7 +454,7 @@ extension HeartRateAcquisitionTests {
                         publicationId: UUID().uuidString.lowercased(),
                         revision: 1,
                         start: start,
-                        requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp)]
+                        requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
                     )
                 ])
             }

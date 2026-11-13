@@ -67,7 +67,7 @@ extension HeartRateAcquisition {
                   case .dateTime(let effective)? = observation.effective, let date = effective.value,
                   let original = nativeConsents[result.source.uuid] else { throw AcquisitionError.unsupportedDelta }
             // Native and canonical wire timestamps must both be covered. Rounding must
-            // never turn a pre-consent sample into authorized collection.
+            // never move a sample across an accepted measurement boundary.
             let consents = try snapshot.consentIDs(forHeartRateAt: date.asNSDate()).filter { original.contains($0) }
             guard !consents.isEmpty else {
                 return

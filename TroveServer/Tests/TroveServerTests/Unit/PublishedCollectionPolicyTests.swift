@@ -64,7 +64,7 @@ struct PublishedCollectionPolicyTests {
             json["contractVersion"] = "0.6.0"
             json["contractRevision"] = "444e06fb25680c3af29e5d3ccbebeb0249be7318"
         } else {
-            json[field] = field == "schemaVersion" ? 2 : "unsupported"
+            json[field] = field == "schemaVersion" ? 3 : "unsupported"
         }
         let altered = try JSONDecoder().decode(PublishedCollectionPolicy.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(throws: ServerError.self) {
