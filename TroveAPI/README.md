@@ -53,7 +53,7 @@ its `registrationID` through the authenticated client. Restore existing setup wi
 `confirmSource(_:for:)` persists the response, and `identityScope(for:)` restores
 the Grove conversion context without exposing key bytes. The former direct
 `registerSource` API is removed. Keys and queries cannot be replaced in place.
-Journal format 5 rejects earlier or unknown formats without migration or deletion.
+Journal format 7 rejects earlier or unknown formats without migration or deletion.
 
 The private journal retains the 256-bit key under its OS/app storage protections;
 this does not provide independent at-rest encryption or resist same-user access.
@@ -91,11 +91,11 @@ and Grove's millisecond-normalized wire time must be inside the selected consent
 so rounding cannot admit a pre-consent sample.
 
 The query requests at most 64 additions and retains a hard 128-change staging
-bound. Grove reserves event identities in a durable producer ledger backed by the
-protected journal. Prepared bytes, targets and the next anchor then commit together.
-Only after that commit does the caller release Grove's retry reservations. A failed
-member preserves the previous anchor, exact export reservations and earlier queued
-work. Delivery uses the existing drainer and never reconverts a queued event.
+bound. The journal persists one conversion instant for the pending checkpoint,
+so Grove's stateless converter reproduces the same record version after interruption.
+Canonical record bytes, targets and the next anchor then commit together, clearing
+that pending instant. A failed member preserves the previous anchor, conversion
+instant and earlier queued work. Delivery never reconverts a queued record.
 
 Known native consent exclusions advance the anchor without exporting a sample.
 Unsupported changes never advance the anchor. Deletions
@@ -105,10 +105,10 @@ without inventing an exact deletion timestamp. The observed upper bound is persi
 before export and reused after interruption until the page commits.
 
 Source registration assigns an immutable `identifierRoot`; Grove derives the full
-namespace set using the retained registration ID and key epoch. Its ledger owns the
-producer UUID and wire sequence, independently of the queue's local ordering.
-The receiver still authenticates ownership and checks the assigned event namespace.
-Journal schema 6 and query definition 3 deliberately reject earlier local formats
+namespace set using the retained registration ID and key epoch. Record-version
+and retraction identifiers replace producer-instance event sequences; queue ordering
+is local to the journal. The receiver authenticates ownership and checks the assigned
+namespace for each lifecycle kind. Journal schema 7 and query definition 3 reject earlier local formats
 without removing queued work; this development change includes no data migration.
 
 This acquisition path is not enabled automatically. App lifecycle and permission UI remain
@@ -189,7 +189,7 @@ and commits a caller-owned query cursor in the same transaction as its event.
 One query delta can stage up to 128 independently identified events atomically;
 conversion or storage failure in any member rolls back the entire group and cursor.
 Stale checkpoint snapshots cannot stage another event. Failed transactions advance
-neither cursor nor producer sequence. Established journals must
+neither the cursor nor local queue ordering. Established journals must
 be opened explicitly and are never silently recreated or migrated.
 
 The caller owns source registration, FHIR transformation, authenticated transport
@@ -256,11 +256,11 @@ fresh development journal; no migration or automatic replacement is provided.
 
 ## Grove Development Dependency
 
-API, server and iOS pin Grove commit
-`6e40cfbffcecafd59b253d6d1d9e2cfbdc89b1d0` from
-[Grove #118](https://github.com/SchmiedmayerLab/Grove/pull/118). This revision
-includes the merged consent validation and rendering changes from Grove #119
-and #120. The server uses `GroveConsent` for the shared document format.
+API, server and iOS pin Grove `0.3.0-beta.11` at
+`5aba9a0ad1a0e6bd4046b523d1dbd70b7cb71e6d`. This adopts stateless record conversion
+and Bundle exchange while retaining `GroveConsent` for the shared consent document
+format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation and
+simulator checks remain separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
 

@@ -44,30 +44,22 @@ enum ClinicalRecordSchema {
         try await createRetractions(on: database)
         guard let sql = database as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
         try await sql.raw("CREATE INDEX clinical_record_candidates ON clinical_record_events (record_id, kind)").run()
-        try await sql.raw("CREATE INDEX clinical_retracted_output ON clinical_output_retractions (output_binding_id)").run()
+        try await sql.raw("CREATE INDEX clinical_retracted_record ON clinical_record_retractions (record_id)").run()
     }
 
     private static func createRetractions(on database: any Database) async throws {
-        try await database.schema("clinical_output_retractions")
+        try await database.schema("clinical_record_retractions")
             .field("event_id", .uuid, .required)
             .field("source_id", .uuid, .required)
             .field("record_id", .uuid, .required)
-            .field("output_binding_id", .uuid, .required)
             .field("kind", .string, .required, .sql(unsafeRaw: "CHECK (kind = 'retraction')"))
-            .compositeIdentifier(over: "event_id", "output_binding_id")
+            .compositeIdentifier(over: "event_id")
             .foreignKey(
                 ["event_id", "record_id", "source_id", "kind"],
                 references: "clinical_record_events",
                 ["event_id", "record_id", "source_id", "kind"],
                 onDelete: .restrict,
                 name: "clinical_retraction_event_fk"
-            )
-            .foreignKey(
-                ["output_binding_id", "record_id", "source_id"],
-                references: "clinical_output_bindings",
-                ["id", "record_id", "source_id"],
-                onDelete: .restrict,
-                name: "clinical_retraction_output_fk"
             )
             .create()
     }
@@ -80,6 +72,8 @@ enum ClinicalRecordSchema {
             .field("source_id", .uuid, .required)
             .field("record_id", .uuid, .required)
             .field("kind", .string, .required, .sql(unsafeRaw: "CHECK (kind IN ('active', 'retraction'))"))
+            .field("recorded_seconds", .int64, .required)
+            .field("recorded_fraction", .string, .required)
             .field("writer_system", .string, identity("writer_system", on: database))
             .field("writer_value", .string, identity("writer_value", on: database))
             .field("writer_version", .string, .sql(unsafeRaw: """

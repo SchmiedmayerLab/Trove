@@ -172,7 +172,7 @@ case "${1:-}" in
         shellcheck TroveiOS/scripts/capture-documentation.sh
         shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
         shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
-        shellcheck scripts/prepare-hosted-disk.sh
+        shellcheck scripts/prepare-hosted-disk.sh scripts/check-xcode.sh
         shellcheck TroveWeb/docker-entrypoint.sh
         python3 -B -m unittest discover -s scripts/tests -v
         python3 -B -m unittest discover -s TroveServer/Benchmarks -v

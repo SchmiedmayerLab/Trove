@@ -40,7 +40,7 @@ struct ClinicalEventStore: Sendable {
             JOIN clinical_record_events r ON r.event_id = n.event_id
             JOIN source_bindings s ON s.id = n.source_id AND s.participant_id = e.participant_id
             WHERE g.study_id = \(bind: studyID) AND e.withdrawn_at IS NULL
-                AND NOT EXISTS (SELECT 1 FROM clinical_output_retractions t WHERE t.output_binding_id = f.output_binding_id)
+                AND NOT EXISTS (SELECT 1 FROM clinical_record_retractions t WHERE t.record_id = f.record_id)
                 AND \(selection)
                 AND \(ClinicalGraphStore.disclosurePredicate)
             """)
@@ -98,7 +98,8 @@ struct ClinicalEventStore: Sendable {
 
     private func validateBounds(_ event: ValidatedExchangeEvent) throws {
         guard (1...512).contains(event.nodes.count),
-              event.retraction == nil || (event.nodes.count == 1 && event.nodes[0].resourceType == "Provenance" && event.participants.isEmpty),
+              event.retraction == nil || (event.nodes.filter { $0.resourceType == "Provenance" }.count == 1
+                && event.nodes.allSatisfy { $0.resourceType == "Provenance" || $0.resourceType == "Device" } && event.participants.isEmpty),
               event.outputs.count <= event.nodes.count,
               !event.rawBytes.isEmpty, event.rawBytes.count <= FHIRValidationClient.maximumBytes, !event.validatorIdentity.isEmpty,
               Set(event.nodes.map(\.fullURL)).count == event.nodes.count,
@@ -136,9 +137,9 @@ struct ClinicalEventStore: Sendable {
     private func validateSource(_ event: ValidatedExchangeEvent, source: SourceBinding) throws {
         let participant = ValidatedExchangeEvent.Identifier(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)
         let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
-        // Grove's durable ledger allocates producer instances. Authority is the authenticated,
-        // owner-bound namespace, never a producer UUID supplied in the payload.
-        guard event.eventIdentifierSystem == source.eventIdentifierSystem,
+        // Registered source ownership establishes authority; knowledge of an opaque version does not.
+        let lifecycleSystem = event.retraction == nil ? namespaces.recordVersion : namespaces.recordRetraction
+        guard event.eventIdentifierSystem == lifecycleSystem.rawValue,
               event.deploymentIdentifiers.matches(namespaces),
               event.retraction == nil ? event.participants == [participant] : event.participants.isEmpty else {
             throw ServerError.forbidden("Event identity does not match the registered participant source")
@@ -185,8 +186,8 @@ struct ClinicalEventStore: Sendable {
         let records = ClinicalRecordStore(sql: sql)
         let grants = ClinicalGrantStore(database: transaction, source: acceptance.source, context: acceptance.context, acceptedAt: receipt.receivedAt)
         let recordID = try await records.insert(revision, eventID: receipt.eventID, sourceID: receipt.sourceID)
-        for output in event.retraction?.outputIdentifiers ?? [] {
-            try await records.retract(output, recordID: recordID, sourceID: receipt.sourceID, eventID: receipt.eventID)
+        if event.retraction != nil {
+            try await records.retract(recordID: recordID, sourceID: receipt.sourceID, eventID: receipt.eventID)
         }
         let nodeIDs = Dictionary(uniqueKeysWithValues: event.nodes.map { ($0.fullURL, UUID()) })
         for node in event.nodes {

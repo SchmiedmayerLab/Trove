@@ -9,6 +9,7 @@
 import Crypto
 import Fluent
 import Foundation
+import GroveFHIRContract
 import SQLKit
 import Testing
 import TroveAPIServer
@@ -116,10 +117,9 @@ extension ClinicalEventHTTPIntegrationTests {
     private static func expectState(
         _ fixture: ClinicalEventStoreTests.Fixture, receipt: Components.Schemas.EventReceipt, bytes: Data, withdrawn: Bool, on app: Application
     ) async throws {
-        let bundle = try #require(try JSONSerialization.jsonObject(with: bytes) as? [String: Any])
-        let identifier = try #require(bundle["identifier"] as? [String: Any])
-        #expect(receipt.producerEventIdentifier.system == identifier["system"] as? String)
-        #expect(receipt.producerEventIdentifier.value == identifier["value"] as? String)
+        let identifier = try ExchangeRecord(validating: bytes).version.identifier.identifier
+        #expect(receipt.producerEventIdentifier.system == identifier.system.rawValue)
+        #expect(receipt.producerEventIdentifier.value == identifier.value)
         #expect(receipt.payloadSHA256 == SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
         try await ClinicalEventStoreTests.expectRows(events: 1, nodes: receipt.nodeCount, facts: 1, grants: 2, on: app.db)
         let store = ClinicalEventStore(database: app.db)

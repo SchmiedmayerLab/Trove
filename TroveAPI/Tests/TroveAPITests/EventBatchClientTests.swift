@@ -37,8 +37,8 @@ struct EventBatchClientTests {
 
     @Test
     func generatedClientPreservesBytesIntentAndMixedOutcomes() async throws {
-        let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"])
-        let original = payload.bytes + Data("\n  ".utf8)
+        let payload = try DeliveryFixture.payload(sequence: 1, changes: ["sample"])
+        let original = payload.bytes
         let commitment = try EventSubmissionCommitment(sourceID: DeliveryFixture.sourceID, originalBytes: original, targets: payload.targets)
         let receipt = Components.Schemas.EventReceipt(
             eventId: UUID().uuidString,

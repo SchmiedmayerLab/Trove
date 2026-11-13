@@ -35,7 +35,7 @@ struct SourceBinding: Sendable, Equatable {
         kind = try row.decode(column: "kind", as: SourceKind.self)
         eventIdentifierSystem = try row.decode(column: "event_identifier_system", as: String.self)
         identifierRoot = try row.decode(column: "identifier_root", as: String.self)
-        guard try SourceIdentityNamespaces.assign(root: identifierRoot, registrationID: registrationID).event.rawValue
+        guard try SourceIdentityNamespaces.assign(root: identifierRoot, registrationID: registrationID).recordVersion.rawValue
             == eventIdentifierSystem else {
             throw ExchangeIdentityError.invalidIdentifierSystem(eventIdentifierSystem)
         }

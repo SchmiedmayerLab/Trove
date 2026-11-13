@@ -13,6 +13,7 @@ import GroveFHIRContract
 import GroveHealthKit
 import HealthKit
 import HTTPTypes
+import ModelsR4
 import OpenAPIRuntime
 import Testing
 @testable import TroveAPIClient
@@ -200,7 +201,7 @@ struct HeartRateAcquisitionTests {
     }
 
     @Test
-    func mixedDeltaRetractsTheExactGroveOutputWithoutCopyingSamplesOrConsentTargets() async throws {
+    func mixedDeltaRetractsTheWholeSourceRecordWithoutCopyingSamplesOrConsentTargets() async throws {
         try await Self.withFixture { fixture, _ in
             let sample = Self.sample()
             let ids = try await fixture.collect { _, _ in
@@ -212,29 +213,20 @@ struct HeartRateAcquisitionTests {
             let deletion = try #require(try await fixture.journal.prepareAttempt(lastID))
             let active = try ExchangeGraph(validating: addition.bytes, kind: .active)
             let retracted = try ExchangeGraph(validating: deletion.bytes, kind: .retraction)
-            #expect(active.eventIdentifier.sequence.rawValue == "1")
-            #expect(retracted.eventIdentifier.sequence.rawValue == "2")
+            let activeRecord = try ExchangeRecord(validating: addition.bytes)
+            let retractedRecord = try ExchangeRecord(validating: deletion.bytes)
+            #expect(activeRecord.sourceRecord == retractedRecord.sourceRecord)
+            #expect(activeRecord.version != retractedRecord.version)
+            #expect(retractedRecord.outputFullURLs.isEmpty)
             #expect(deletion.commitment.targetIntent.targets.isEmpty)
-            #expect(retracted.bundle.entry?.count == 1)
+            #expect(retracted.bundle.entry?.count == 3)
             let observation = try #require(active.bundle.entry?.compactMap { entry in
                 if case .observation(let value)? = entry.resource {
                     return value
                 }
                 return nil
             }.first)
-            guard case .provenance(let provenance)? = retracted.bundle.entry?.first?.resource else {
-                Issue.record("Retraction must contain only Provenance")
-                return
-            }
-            let identities = try (observation.identifier ?? []).map(RoledIdentifier.init)
-            #expect(try provenance.target.map { try RoledIdentifier(#require($0.identifier)) } == identities.filter { $0.role == .sourceOutput })
-            let source = try #require(provenance.entity?.first?.what.identifier)
-            #expect(try RoledIdentifier(source) == identities.first { $0.role == .sourceRecord })
-            guard case .period(let occurred)? = provenance.occurred else {
-                Issue.record("Unknown deletion time must not become a fabricated exact timestamp")
-                return
-            }
-            #expect(occurred.start == nil && occurred.end?.value != nil)
+            try Self.verifyRetraction(retracted, of: observation)
             #expect(!String(decoding: deletion.bytes, as: UTF8.self).lowercased().contains(sample.uuid.uuidString.lowercased()))
         }
     }
@@ -248,7 +240,9 @@ struct HeartRateAcquisitionTests {
             let id = try #require(ids.first)
             let attempt = try #require(try await fixture.journal.prepareAttempt(id))
             #expect(attempt.commitment.targetIntent.targets.isEmpty)
-            #expect(try ExchangeGraph(validating: attempt.bytes, kind: .retraction).bundle.entry?.count == 1)
+            let record = try ExchangeRecord(validating: attempt.bytes)
+            #expect(record.kind == .retraction && record.outputFullURLs.isEmpty)
+            #expect(record.sharedNodeFullURLs.count == 2)
         }
     }
 }
@@ -289,6 +283,24 @@ extension HeartRateAcquisitionTests {
 
 
 extension HeartRateAcquisitionTests {
+    private static func verifyRetraction(_ retracted: ExchangeGraph, of observation: Observation) throws {
+        let provenance = try #require(retracted.bundle.entry?.compactMap { entry in
+            if case .provenance(let value)? = entry.resource {
+                return value
+            }
+            return nil
+        }.first)
+        let identities = try (observation.identifier ?? []).map(RoledIdentifier.init)
+        #expect(try provenance.target.map { try RoledIdentifier(#require($0.identifier)) } == identities.filter { $0.role == .sourceRecord })
+        let source = try #require(provenance.entity?.first?.what.identifier)
+        #expect(try RoledIdentifier(source) == identities.first { $0.role == .sourceRecord })
+        guard case .period(let occurred)? = provenance.occurred else {
+            Issue.record("Unknown deletion time must not become a fabricated exact timestamp")
+            return
+        }
+        #expect(occurred.start == nil && occurred.end?.value != nil)
+    }
+
     private static func uncommittedPayloads(
         _ delta: HeartRateAcquisition.Delta, fixture: Fixture, journal: EventDeliveryJournal
     ) async throws -> [EventDeliveryJournal.Payload] {
@@ -299,11 +311,13 @@ extension HeartRateAcquisitionTests {
             source: fixture.transport.binding,
             privacy: journal.identityScope(for: fixture.sourceID),
             application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
-            host: .init(operatingSystemVersion: "26.0"),
-            storage: journal.producerStorage(from: checkpoint)
+            host: .init(operatingSystemVersion: "27.2")
         )
-        // Dropping the unreleased receipts models interruption before the cursor commit.
-        return try await HeartRateAcquisition.prepare(delta, exporter: exporter, snapshot: snapshot, detections: detections).payloads
+        // Retrying the same checkpoint reuses its persisted conversion time.
+        let instant = try await journal.conversionInstant(from: checkpoint)
+        return try await HeartRateAcquisition.prepare(
+            delta, exporter: exporter, snapshot: snapshot, detections: detections, instant: instant
+        ).payloads
     }
 }
 
@@ -401,7 +415,7 @@ extension HeartRateAcquisitionTests {
             let definition = try HeartRateAcquisition.queryDefinition(start: start)
             var binding = DeliveryFixture.binding(sourceID: sourceID, registrationID: localID)
             binding.identifierRoot = identifierRoot ?? DeliveryFixture.identifierRoot(sourceID)
-            binding.eventIdentifierSystem = binding.identifierRoot + "/NamingSystem/grove-event-v0"
+            binding.eventIdentifierSystem = binding.identifierRoot + "/NamingSystem/grove-record-version-v0/\(localID.uuidString.lowercased())/1"
             let setup = try await journal.createSource(localID: localID, queryDefinition: definition)
             try await journal.confirmSource(binding, for: setup)
             let enrollments = [UUID(), UUID()]

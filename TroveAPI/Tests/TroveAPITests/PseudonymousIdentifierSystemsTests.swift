@@ -14,17 +14,17 @@ import TroveAPITypes
 
 struct ParticipantSourceIdentifierTests {
     @Test
-    func roundTripDerivesAllTwelveDistinctSystems() throws {
+    func roundTripDerivesAllThirteenDistinctSystems() throws {
         let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
         let decoded = try JSONDecoder().decode(Components.Schemas.ParticipantSource.self, from: JSONEncoder().encode(source))
         let systems = try decoded.identifierSystems()
         #expect(systems == (try source.identifierSystems()))
-        #expect(systems.event.rawValue == source.eventIdentifierSystem)
+        #expect(systems.recordVersion.rawValue == source.eventIdentifierSystem)
         #expect(Set([
             systems.sourceRecord, systems.sourceOutput, systems.writerRecord, systems.providerRecord, systems.providerOutput,
             systems.sourceArtifact, systems.providerArtifact, systems.sourceContext, systems.recordingDevice,
-            systems.deviceSnapshot, systems.event, systems.entryNode
-        ]).count == 12)
+            systems.deviceSnapshot, systems.contextSnapshot, systems.recordVersion, systems.recordRetraction
+        ]).count == 13)
     }
 
     @Test(arguments: ["", "/relative", "not a URI", "https://example.test/" + String(repeating: "a", count: 256)])

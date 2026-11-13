@@ -233,10 +233,15 @@ a refusal; there is no structural-only fallback. See the [validator setup](../Tr
 
 The initial receiver deliberately supports one narrow capability: immutable, single-owner,
 Mobile heart-rate point quantities, including their supported questionnaire-derived source
-graph. Comparable writer revisions preserve complete output membership; incomparable
-or equal-maximum revisions remain conflicts with no current selection. Retractions,
-other profiles, pre-consent collection and arbitrary supporting reference shapes
-remain unsupported. Unsupported input is refused,
+graph, and whole-source-record retractions. Revision selection first removes versions
+dominated by a higher writer version under the same complete writer-record identity.
+It then selects the latest exact `Provenance.recorded`; equal instants use the
+bytewise-greater record-version identifier value, then system. Selection preserves
+complete output membership and never carries an earlier study grant forward.
+Retractions suppress every output version of that source record, including later
+arrivals, without reserving unrelated output identities. Other clinical profiles,
+pre-consent collection and arbitrary supporting reference shapes remain unsupported.
+Unsupported input is refused,
 even when it is otherwise valid FHIR. A study must explicitly publish the matching collection
 requirement; a native HealthKit component alone grants no backend collection permission.
 
@@ -312,8 +317,11 @@ The real-store job in `swift-package.yml` runs the full server suite with the
 checksum-pinned offline validator and the separately pinned receiver lifecycle
 corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the six named clinical test groups
 to execute; missing or skipped groups fail verification. The parameterized
-receiver group covers all 35 declared sequences, and the retraction group covers
-both arrival orders. Test-function counts are not parameter-case counts.
+receiver group covers all 43 declared sequences, and the retraction group covers
+both arrival orders. Deployment binding preserves recorded lexemes and writer
+evidence. The pinned IG generator supplies the expected states, including the
+identifier tie-break after content-derived keys change. Test-function counts are
+not parameter-case counts.
 
 To reproduce with disposable loopback PostgreSQL and S3 services, prepare the
 validator context with `--include-lifecycle-corpus`, run its image on an isolated

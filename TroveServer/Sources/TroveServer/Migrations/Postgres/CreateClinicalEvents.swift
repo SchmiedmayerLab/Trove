@@ -18,7 +18,7 @@ struct CreateClinicalEvents: AsyncMigration {
 
     private static let tables = [
         "clinical_events", "clinical_source_records", "clinical_record_events", "clinical_output_bindings",
-        "clinical_output_retractions",
+        "clinical_record_retractions",
         "clinical_event_nodes", "clinical_point_facts", "clinical_questionnaire_contexts", "clinical_point_derivations",
         "study_data_grants", "clinical_attribution_commands"
     ]
@@ -201,7 +201,7 @@ struct CreateClinicalEvents: AsyncMigration {
             if transaction is any PostgresDatabase {
                 try await sql.raw("""
                     LOCK TABLE clinical_events, clinical_source_records, clinical_record_events, clinical_output_bindings,
-                        clinical_output_retractions,
+                        clinical_record_retractions,
                         clinical_event_nodes, clinical_point_facts, clinical_questionnaire_contexts, clinical_point_derivations,
                         study_data_grants, clinical_attribution_commands IN ACCESS EXCLUSIVE MODE
                     """)

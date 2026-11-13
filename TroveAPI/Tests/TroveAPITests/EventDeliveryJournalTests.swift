@@ -43,7 +43,9 @@ struct EventDeliveryJournalTests {
             let next = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             #expect(next.cursor == Data([1]))
             #expect(next != initial)
-            let ids = try await journal.stage(from: next, nextCursor: Data([2]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])])
+            let ids = try await journal.stage(
+                from: next, nextCursor: Data([2]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+            )
             let id = try #require(ids.first)
             let pending = try await journal.pendingDeliveryIDs()
             #expect(pending == [id])
@@ -61,7 +63,7 @@ struct EventDeliveryJournalTests {
             #expect(pending.isEmpty)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             let id = try await journal.stage(
-                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+                from: checkpoint, nextCursor: Data([1]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
             )
             #expect(!id.isEmpty)
         }
@@ -108,7 +110,7 @@ struct EventDeliveryJournalTests {
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var changed = try #require(setup.binding)
             changed.identifierRoot = "https://trove.test/replacement"
-            changed.eventIdentifierSystem = changed.identifierRoot + "/NamingSystem/grove-event-v0"
+            changed.eventIdentifierSystem = changed.identifierRoot + "/NamingSystem/grove-record-version-v0/\(DeliveryFixture.epoch.uuidString.lowercased())/1"
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) { try await journal.confirmSource(changed, for: setup) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) {
                 try await journal.createSource(localID: DeliveryFixture.epoch, queryDefinition: Data("different-predicate".utf8))
@@ -147,7 +149,7 @@ struct EventDeliveryJournalTests {
                     group.addTask {
                         do {
                             _ = try await journal.stage(
-                                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+                                from: checkpoint, nextCursor: Data([1]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
                             )
                             return 1
                         } catch EventDeliveryJournal.JournalError.staleCheckpoint {
@@ -180,7 +182,7 @@ struct EventDeliveryJournalTests {
             try connection.execute("DROP TRIGGER fail_staging")
             connection.close()
             let id = try await journal.stage(
-                from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+                from: checkpoint, nextCursor: Data([1]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
             )
             #expect(!id.isEmpty)
         }
@@ -210,8 +212,8 @@ struct EventDeliveryJournalTests {
 
 
 extension EventDeliveryJournalTests {
-    @Test
-    func missingAndUnsupportedJournalsAreNotRecreated() async throws {
+    @Test(arguments: [6, 999])
+    func missingAndUnsupportedJournalsAreNotRecreated(version: Int) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let missing = url.deletingLastPathComponent().appendingPathComponent("missing.sqlite")
             #expect {
@@ -222,7 +224,7 @@ extension EventDeliveryJournalTests {
             #expect(!FileManager.default.fileExists(atPath: missing.path))
             await journal.close()
             let connection = try DeliverySQLite(url: url)
-            try connection.execute("PRAGMA user_version = 999")
+            try connection.execute("PRAGMA user_version = \(version)")
             connection.close()
             #expect(throws: EventDeliveryJournal.JournalError.unsupportedFormat) {
                 try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
@@ -237,10 +239,14 @@ extension EventDeliveryJournalTests {
             let existing = try await DeliveryFixture.stage(journal, changes: ["add:a"])
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             do {
-                let payload = DeliveryFixture.payload(sequence: 2, changes: ["add:b"])
-                _ = try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: [
-                    .init(bytes: payload.bytes + Data(repeating: 32, count: 192 * 1024), targets: payload.targets)
-                ])
+                let record = try RecordFixture.make(
+                    sourceID: DeliveryFixture.sourceID,
+                    registrationID: DeliveryFixture.epoch,
+                    seed: "oversized",
+                    note: String(repeating: "x", count: 192 * 1024)
+                )
+                let targets = [EventTargetIntent.Target(consentID: DeliveryFixture.consentID, outputFullURLs: record.outputFullURLs)]
+                _ = try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: [.init(bytes: record.json, targets: targets)])
                 Issue.record("SQLite accepted an event larger than the configured database limit")
             } catch let failure as DeliverySQLite.Failure {
                 #expect(failure.code == 13) // SQLITE_FULL, not the application-level quota error.
@@ -250,7 +256,7 @@ extension EventDeliveryJournalTests {
             #expect(try await reopened.pendingDeliveryIDs() == existing)
             #expect(try await reopened.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             _ = try await reopened.stage(
-                from: checkpoint, nextCursor: Data([2]), payloads: [DeliveryFixture.payload(sequence: 2, changes: ["add:b"])]
+                from: checkpoint, nextCursor: Data([2]), payloads: [try DeliveryFixture.payload(sequence: 2, changes: ["add:b"])]
             )
             await reopened.close()
         }
