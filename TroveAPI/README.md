@@ -256,10 +256,11 @@ fresh development journal; no migration or automatic replacement is provided.
 
 ## Grove Development Dependency
 
-API and server pin Grove `0.3.0-beta.11`; the iOS project declares the same exact
-version. This adopts stateless record conversion and Bundle exchange while retaining
-`GroveConsent` for the shared consent document format. The iOS lockfile and simulator
-verification must be refreshed before this dependency migration is complete.
+API, server and iOS pin Grove `0.3.0-beta.11` at
+`5aba9a0ad1a0e6bd4046b523d1dbd70b7cb71e6d`. This adopts stateless record conversion
+and Bundle exchange while retaining `GroveConsent` for the shared consent document
+format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation and
+simulator checks remain separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
 
