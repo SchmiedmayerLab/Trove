@@ -11037,6 +11037,392 @@ public enum Operations {
             }
         }
     }
+    /// Admit a Grove Bundle with independent record outcomes
+    ///
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)`.
+    public enum SubmitParticipantRecordBundle {
+        public static let id: Swift.String = "submitParticipantRecordBundle"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/path/sourceId`.
+                public var sourceId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - sourceId:
+                public init(sourceId: Swift.String) {
+                    self.sourceId = sourceId
+                }
+            }
+            public var path: Operations.SubmitParticipantRecordBundle.Input.Path
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SubmitParticipantRecordBundle.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.RecordBundleSubmission)
+            }
+            public var body: Operations.SubmitParticipantRecordBundle.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SubmitParticipantRecordBundle.Input.Path,
+                headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(),
+                body: Operations.SubmitParticipantRecordBundle.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/200/content/application\/json`.
+                    case json([Components.Schemas.EventBatchResult])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.EventBatchResult] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SubmitParticipantRecordBundle.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SubmitParticipantRecordBundle.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// One independent outcome per submitted event, in input order
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SubmitParticipantRecordBundle.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SubmitParticipantRecordBundle.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ContentTooLarge: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/413/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/413/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SubmitParticipantRecordBundle.Output.ContentTooLarge.Body
+                /// Creates a new `ContentTooLarge`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SubmitParticipantRecordBundle.Output.ContentTooLarge.Body) {
+                    self.body = body
+                }
+            }
+            /// Batch exceeds the request size limit; no member was processed
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/413`.
+            ///
+            /// HTTP response code: `413 contentTooLarge`.
+            case contentTooLarge(Operations.SubmitParticipantRecordBundle.Output.ContentTooLarge)
+            /// The associated value of the enum case if `self` is `.contentTooLarge`.
+            ///
+            /// - Throws: An error if `self` is not `.contentTooLarge`.
+            /// - SeeAlso: `.contentTooLarge`.
+            public var contentTooLarge: Operations.SubmitParticipantRecordBundle.Output.ContentTooLarge {
+                get throws {
+                    switch self {
+                    case let .contentTooLarge(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "contentTooLarge",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/responses/422/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SubmitParticipantRecordBundle.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SubmitParticipantRecordBundle.Output.UnprocessableContent.Body) {
+                    self.body = body
+                }
+            }
+            /// Invalid Grove exchange graph; no record was admitted
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.SubmitParticipantRecordBundle.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.SubmitParticipantRecordBundle.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Browse published studies
     ///
     /// Without `studyId`, returns publicly listed studies (visibility = public). With `studyId`, returns the matching study even if it is unlisted, allowing participants to access private studies they know the ID for.

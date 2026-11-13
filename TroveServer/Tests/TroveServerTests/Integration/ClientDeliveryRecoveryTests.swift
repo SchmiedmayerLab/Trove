@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GroveFHIRContract
 import SQLKit
 import Testing
 import TroveAPIClient
@@ -139,8 +140,8 @@ extension ClientDeliveryRecoveryTests {
         try await journal.confirmSource(.init(fixture.source), for: setup)
         let payloads = try (1...2).map { sequence in
             let bytes = try fullValidation
-                ? ImmutablePointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence))
-                : LocalPointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence))
+                ? ImmutablePointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence), recordID: "recovery-\(sequence)")
+                : LocalPointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence), recordID: "recovery-\(sequence)")
             let projection = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-target-selection-only")
             let targets = sequence == 1 ? fixture.targets(for: projection) : [
                 ClinicalEventTarget(consentID: UUID(), outputFullURLs: projection.outputs.map(\.fullURL))
@@ -212,14 +213,20 @@ extension ClientDeliveryRecoveryTests {
     }
 
     static func expectPayloads(_ body: Data, equalTo payloads: [EventDeliveryJournal.Payload]) throws {
-        let submission = try JSONDecoder().decode(Components.Schemas.EventBatchSubmission.self, from: body)
-        #expect(submission.events.map { Data(base64Encoded: $0.eventBase64) } == payloads.map(\.bytes))
+        let submission = try JSONDecoder().decode(Components.Schemas.RecordBundleSubmission.self, from: body)
+        let bytes = try #require(Data(base64Encoded: submission.bundleBase64))
+        let records = try ExchangeGraph(validating: bytes, kind: .active).records()
+        let restored = try submission.records.map { member in
+            let record = try #require(records.first { $0.version.identifier.identifier.value == member.commitment.producerEventIdentifier.value })
+            return try ExchangeRecordBytes(record).restoring(entryFullURLs: member.entryFullUrls).json
+        }
+        #expect(restored == payloads.map(\.bytes))
         let expectedTargets = try payloads.map { payload in
             try EventTargetIntent(targets: payload.targets).targets.map {
                 Components.Schemas.EventTarget(consentId: $0.consentID.uuidString.lowercased(), outputFullUrls: $0.outputFullURLs)
             }
         }
-        #expect(submission.events.map(\.targets) == expectedTargets)
+        #expect(submission.records.map { $0.commitment.targets } == expectedTargets)
     }
 
     static func drainer(

@@ -46,13 +46,13 @@ actor ReceiverClientTransport: ClientTransport {
         for field in request.headerFields { headers.add(name: field.name.rawName, value: field.value) }
         if let token { headers.bearerAuthorization = .init(token: token) }
         paths.append(path)
-        if path.hasSuffix("/events/batch") { batchBodies.append(bytes) }
+        if path.hasSuffix("/record-bundles") { batchBodies.append(bytes) }
         let isRegistration = request.method == .post && path.hasSuffix("/participant/sources")
         if isRegistration { registrationBodies.append(bytes) }
         let response = try await application.performTest(request: .init(
             method: .init(rawValue: request.method.rawValue), url: .init(string: path), headers: headers, body: .init(data: bytes)
         ))
-        if path.hasSuffix("/events/batch"), loseBatchResponse {
+        if path.hasSuffix("/record-bundles"), loseBatchResponse {
             loseBatchResponse = false
             // The router finished; committed transactions survive even though the client sees no response.
             throw URLError(.networkConnectionLost)

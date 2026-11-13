@@ -11,11 +11,12 @@ import sys
 
 
 def rekey(bundle, *, participant_system, participant_value, effective_at, sequence,
-          identifier_root, registration_id, preserve_recorded=False):
+          identifier_root, registration_id, preserve_recorded=False, native_record_id=None):
     # The synthetic sequence varies the conversion instant; it never enters a source-record
     # or source-output identity.
     from Scripts.canonical_json import JSONNumber
     from Scripts.exchange_fixtures import role_of
+    from Scripts.exchange_protocol import derive_hmac_identity
     patient = next((entry["resource"] for entry in bundle["entry"] if entry["resource"]["resourceType"] == "Patient"), None)
     original_participant = (next(value for value in patient["identifier"] if role_of(value) is None)
                             if patient is not None else None)
@@ -30,6 +31,14 @@ def rekey(bundle, *, participant_system, participant_value, effective_at, sequen
                 value["system"] = f"{identifier_root.rstrip('/')}/NamingSystem/grove-{role}-v0/{registration_id}/1"
                 prefix, _, epoch, digest = value["value"].split(":", 3)
                 value["value"] = f"{prefix}:{registration_id}:{epoch}:{digest}"
+                if native_record_id is not None and role in ("source-record", "source-output"):
+                    components = ["synthetic", "heart-rate", identifier_root + "/fixture-repository", registration_id, native_record_id]
+                    if role == "source-output":
+                        components += ["primary", digest]
+                    value["value"] = derive_hmac_identity(
+                        key=bytes(range(32)), key_id=registration_id, epoch=1,
+                        identity_kind=role, components=components,
+                    )
             if original_participant is not None and all(value.get(k) == original_participant[k] for k in ("system", "value")):
                 value["system"], value["value"] = participant_system, participant_value
             for key, child in value.items():
@@ -126,13 +135,14 @@ def main():
     parser.add_argument("--participant-value", required=True)
     parser.add_argument("--effective-at", required=True)
     parser.add_argument("--sequence", type=int, default=50)
+    parser.add_argument("--native-record-id", help="Independent synthetic native record; sequence still selects only a revision")
     args = parser.parse_args()
     sys.path.insert(0, str(args.assets / "grove-fhir"))
     from Scripts.canonical_json import canonical_bytes, loads_lossless
     result = rekey(loads_lossless(args.fixture.read_bytes()),
                    participant_system=args.participant_system, participant_value=args.participant_value,
                    effective_at=args.effective_at, sequence=args.sequence,
-                   identifier_root=args.identifier_root, registration_id=args.registration_id)
+                   identifier_root=args.identifier_root, registration_id=args.registration_id, native_record_id=args.native_record_id)
     sys.stdout.buffer.write(canonical_bytes(result))
 
 

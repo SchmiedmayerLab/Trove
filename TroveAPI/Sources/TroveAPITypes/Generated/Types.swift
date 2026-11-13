@@ -265,6 +265,14 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/batch`.
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/events/batch/post(submitParticipantEventBatch)`.
     func submitParticipantEventBatch(_ input: Operations.SubmitParticipantEventBatch.Input) async throws -> Operations.SubmitParticipantEventBatch.Output
+    /// Admit a Grove Bundle with independent record outcomes
+    ///
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)`.
+    func submitParticipantRecordBundle(_ input: Operations.SubmitParticipantRecordBundle.Input) async throws -> Operations.SubmitParticipantRecordBundle.Output
     /// Browse published studies
     ///
     /// Without `studyId`, returns publicly listed studies (visibility = public). With `studyId`, returns the matching study even if it is unlisted, allowing participants to access private studies they know the ID for.
@@ -965,6 +973,24 @@ extension APIProtocol {
         body: Operations.SubmitParticipantEventBatch.Input.Body
     ) async throws -> Operations.SubmitParticipantEventBatch.Output {
         try await submitParticipantEventBatch(Operations.SubmitParticipantEventBatch.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Admit a Grove Bundle with independent record outcomes
+    ///
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)`.
+    public func submitParticipantRecordBundle(
+        path: Operations.SubmitParticipantRecordBundle.Input.Path,
+        headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(),
+        body: Operations.SubmitParticipantRecordBundle.Input.Body
+    ) async throws -> Operations.SubmitParticipantRecordBundle.Output {
+        try await submitParticipantRecordBundle(Operations.SubmitParticipantRecordBundle.Input(
             path: path,
             headers: headers,
             body: body

@@ -513,6 +513,17 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.submitParticipantRecordBundle(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/sources/{sourceId}/record-bundles")
+        )
+        try transport.register(
+            {
                 try await server.getParticipantStudies(
                     request: $0,
                     body: $1,
@@ -7191,6 +7202,229 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                 case let .contentTooLarge(value):
                     suppressUnusedWarning(value)
                     var response = HTTPTypes.HTTPResponse(soar_statusCode: 413)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .internalServerError(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 500)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .undocumented(statusCode, _):
+                    return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// Admit a Grove Bundle with independent record outcomes
+    ///
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)`.
+    func submitParticipantRecordBundle(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.SubmitParticipantRecordBundle.id,
+            using: {
+                APIHandler.submitParticipantRecordBundle($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.SubmitParticipantRecordBundle.Input.Path = .init(sourceId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "sourceId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.SubmitParticipantRecordBundle.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.RecordBundleSubmission.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.SubmitParticipantRecordBundle.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .badRequest(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 400)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .unauthorized(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 401)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .forbidden(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 403)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .notFound(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 404)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .conflict(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 409)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .contentTooLarge(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 413)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .unprocessableContent(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 422)
                     suppressMutabilityWarning(&response)
                     let body: OpenAPIRuntime.HTTPBody
                     switch value.body {
