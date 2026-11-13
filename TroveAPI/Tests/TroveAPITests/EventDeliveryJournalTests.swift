@@ -212,7 +212,7 @@ struct EventDeliveryJournalTests {
 
 
 extension EventDeliveryJournalTests {
-    @Test(arguments: [6, 999])
+    @Test(arguments: [6, 7, 999])
     func missingAndUnsupportedJournalsAreNotRecreated(version: Int) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let missing = url.deletingLastPathComponent().appendingPathComponent("missing.sqlite")
