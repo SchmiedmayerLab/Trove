@@ -7,41 +7,64 @@
 //
 
 import Foundation
+import GroveFHIRContract
 import TroveAPITypes
 
 
-/// One source-specific wire envelope, not a second queue or persisted batch identity.
+/// One source-specific transport Bundle. Only its original records are persisted or retried.
 struct EventDeliveryBatch {
     struct Member {
         let attempt: EventDeliveryJournal.Attempt
-        let submission: Components.Schemas.EventSubmission
-        let encodedBytes: Int
+        let record: ExchangeRecord
+        let submission: Components.Schemas.RecordBundleMember
 
         init(_ attempt: EventDeliveryJournal.Attempt) throws {
             self.attempt = attempt
-            self.submission = .init(eventBase64: attempt.bytes.base64EncodedString(), targets: attempt.commitment.receiptLookup.targets)
-            let encoder = JSONEncoder()
-            // Matches Configuration.trove; no dates occur in this envelope.
-            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-            self.encodedBytes = try encoder.encode(submission).count
+            record = try ExchangeRecord(validating: attempt.bytes)
+            submission = try .init(commitment: attempt.commitment.receiptLookup, entryFullUrls: ExchangeRecordBytes(record).entryFullURLs)
         }
     }
 
     private(set) var members: [Member] = []
-    private(set) var encodedBytes = "{\"events\":[]}".utf8.count
-    private var base64Bytes = 0
+    private(set) var submission: Components.Schemas.RecordBundleSubmission?
+    private var packer: ExchangeBundlePacker?
+    private let packedAt: Date
 
-    mutating func append(_ member: Member) -> Bool {
-        let separatorBytes = members.isEmpty ? 0 : 1
+    init(packedAt: Date) {
+        self.packedAt = packedAt
+    }
+
+    /// A later version, another kind/source, or the transport bounds starts a new Bundle.
+    mutating func append(_ member: Member) throws -> Bool {
         guard members.count < EventSubmissionLimits.maximumBatchEvents,
-              members.first.map({ $0.attempt.commitment.sourceID == member.attempt.commitment.sourceID }) ?? true,
-              member.submission.eventBase64.utf8.count <= EventSubmissionLimits.maximumBase64Bytes - base64Bytes,
-              member.encodedBytes + separatorBytes <= EventSubmissionLimits.maximumEnvelopeBytes - encodedBytes else {
+              members.first.map({
+                  $0.attempt.commitment.sourceID == member.attempt.commitment.sourceID && $0.record.kind == member.record.kind
+              }) ?? true else {
+            return false
+        }
+        var candidate = packer ?? ExchangeBundlePacker(
+            kind: member.record.kind,
+            maximumRecords: EventSubmissionLimits.maximumBatchEvents,
+            maximumBytes: EventSubmissionLimits.maximumBundleBytes
+        )
+        guard try candidate.insert(member.record) == .inserted else {
+            return false
+        }
+        let graph = try candidate.bundle(packedAt: packedAt)
+        guard graph.json.count <= EventSubmissionLimits.maximumBundleBytes else {
+            return false
+        }
+        let submission = Components.Schemas.RecordBundleSubmission(
+            bundleBase64: graph.json.base64EncodedString(), records: members.map(\.submission) + [member.submission]
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard try encoder.encode(submission).count <= EventSubmissionLimits.maximumEnvelopeBytes else {
             return false
         }
         members.append(member)
-        encodedBytes += member.encodedBytes + separatorBytes
-        base64Bytes += member.submission.eventBase64.utf8.count
+        packer = candidate
+        self.submission = submission
         return true
     }
 }

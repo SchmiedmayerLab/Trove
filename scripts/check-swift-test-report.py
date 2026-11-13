@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 FULL_VALIDATOR_TESTS = {
     ("TroveServerTests.ClinicalEventBatchHTTPTests", "fullValidatorAdmitsAndReplaysAroundARejectedMember()"),
     ("TroveServerTests.ClientDeliveryRecoveryTests", "fullValidatorClientAndReceiverRecovery()"),
+    ("TroveServerTests.RecordBundleRecoveryTests", "fullValidatorAcceptsPackedRecordsAndRetractions()"),
     ("TroveServerTests.ClinicalEventHTTPIntegrationTests", "oneEventTwoStudiesSafeRetriesWithdrawalAndApplicationRestart()"),
     ("TroveServerTests.ClinicalRetractionHTTPTests", "fullValidationRetractionInBothArrivalOrdersAndReceiptRecovery(retractionFirst:)"),
     ("TroveServerTests.FHIRClinicalDerivationTests", "pinnedPendingAndTargetKeepTheirReferenceSemantics()"),

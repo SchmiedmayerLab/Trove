@@ -174,6 +174,13 @@ enum TestDatabase {
         // while FORCE closes their sessions. Only this invocation's exact owned names are affected.
         for name in names {
             try await admin.raw("ALTER DATABASE \(ident: name) ALLOW_CONNECTIONS false").run()
+            // Wait for backend termination before DROP's shorter internal wait. Timescale
+            // workers can otherwise still be exiting after FORCE sends its signals.
+            try await admin.raw("""
+                SELECT pg_terminate_backend(pid, 10000)
+                FROM pg_stat_activity WHERE datname = \(bind: name)
+                """)
+                .run()
             try await admin.raw("DROP DATABASE IF EXISTS \(ident: name) WITH (FORCE)").run()
         }
         app.storage[CreatedDatabases.self] = nil

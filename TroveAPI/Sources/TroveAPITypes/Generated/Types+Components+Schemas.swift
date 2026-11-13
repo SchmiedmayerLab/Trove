@@ -815,6 +815,88 @@ extension Components {
                 ])
             }
         }
+        /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission`.
+        public struct RecordBundleSubmission: Codable, Hashable, Sendable {
+            /// Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle, at most 4 MiB plus 1 KiB decoded.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission/bundleBase64`.
+            public var bundleBase64: Swift.String
+            /// Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission/records`.
+            public var records: [Components.Schemas.RecordBundleMember]
+            /// Creates a new `RecordBundleSubmission`.
+            ///
+            /// - Parameters:
+            ///   - bundleBase64: Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle, at most 4 MiB plus 1 KiB decoded.
+            ///   - records: Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+            public init(
+                bundleBase64: Swift.String,
+                records: [Components.Schemas.RecordBundleMember]
+            ) {
+                self.bundleBase64 = bundleBase64
+                self.records = records
+            }
+            public enum CodingKeys: String, CodingKey {
+                case bundleBase64
+                case records
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.bundleBase64 = try container.decode(
+                    Swift.String.self,
+                    forKey: .bundleBase64
+                )
+                self.records = try container.decode(
+                    [Components.Schemas.RecordBundleMember].self,
+                    forKey: .records
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "bundleBase64",
+                    "records"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordBundleMember`.
+        public struct RecordBundleMember: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecordBundleMember/commitment`.
+            public var commitment: Components.Schemas.EventReceiptLookup
+            /// Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleMember/entryFullUrls`.
+            public var entryFullUrls: [Swift.String]
+            /// Creates a new `RecordBundleMember`.
+            ///
+            /// - Parameters:
+            ///   - commitment:
+            ///   - entryFullUrls: Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+            public init(
+                commitment: Components.Schemas.EventReceiptLookup,
+                entryFullUrls: [Swift.String]
+            ) {
+                self.commitment = commitment
+                self.entryFullUrls = entryFullUrls
+            }
+            public enum CodingKeys: String, CodingKey {
+                case commitment
+                case entryFullUrls
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.commitment = try container.decode(
+                    Components.Schemas.EventReceiptLookup.self,
+                    forKey: .commitment
+                )
+                self.entryFullUrls = try container.decode(
+                    [Swift.String].self,
+                    forKey: .entryFullUrls
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "commitment",
+                    "entryFullUrls"
+                ])
+            }
+        }
         /// An immutable custody receipt or a per-event problem. Retry transient problems (408, 429, 5xx) with unchanged bytes and targets and bounded backoff. Preserve other rejected events for inspection. Never interpret an outer HTTP 200 as acceptance of every member.
         ///
         ///

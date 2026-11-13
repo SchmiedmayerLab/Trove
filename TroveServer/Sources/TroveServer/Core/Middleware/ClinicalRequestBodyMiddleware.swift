@@ -22,7 +22,8 @@ struct ClinicalRequestBodyMiddleware: ServerMiddleware {
     ) async throws -> (HTTPResponse, HTTPBody?) {
         let limit: Int
         switch operationID {
-        case Operations.PostParticipantSourcesSourceIdEvents.id, Operations.SubmitParticipantEventBatch.id:
+        case Operations.PostParticipantSourcesSourceIdEvents.id, Operations.SubmitParticipantEventBatch.id,
+             Operations.SubmitParticipantRecordBundle.id:
             limit = EventSubmissionLimits.maximumEnvelopeBytes
         case Operations.LookupParticipantEventReceipt.id, Operations.AttributeParticipantEvent.id: limit = 1024 * 1024
         default:
