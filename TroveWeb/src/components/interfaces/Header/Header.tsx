@@ -7,13 +7,13 @@
 //
 
 import { cn } from "@/utils/cn";
+import { SidebarTrigger } from "../Sidebar/Sidebar";
 import { GroupSelector } from "./GroupSelector";
 import { LocaleSelector } from "./LocaleSelector";
 import { Notifications } from "./Notifications";
 import { PublishButton } from "./PublishButton";
 import { StudySelector } from "./StudySelector";
 import { UserDropdown } from "./UserDropdown";
-import { SidebarTrigger } from "../Sidebar/Sidebar";
 
 /**
  * Thin angled line between header selectors.

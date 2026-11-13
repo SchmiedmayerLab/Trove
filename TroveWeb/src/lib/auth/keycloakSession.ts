@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import type Keycloak from "keycloak-js";
-import { parseGroupMemberships, type GroupRole } from "./groupMemberships";
 import { setAccessTokenProvider } from "../api/client";
+import { parseGroupMemberships, type GroupRole } from "./groupMemberships";
 
 export interface AuthUser {
   name: string;

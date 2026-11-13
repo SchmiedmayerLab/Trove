@@ -6,8 +6,8 @@ import { Field, Input } from "@schmiedmayerlab/grove-design-system";
 import { ConsentEditor } from "@/components/interfaces/ConsentEditor/ConsentEditor";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import { enhanceField } from "@/utils/enhanceField";
-import { LocaleSuffix } from "./LocaleSuffix";
 import type { ConsentForm as ConsentFormType } from "../lib/useConsentForm";
+import { LocaleSuffix } from "./LocaleSuffix";
 
 export const ConsentForm = ({
   form,

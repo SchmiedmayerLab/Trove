@@ -24,13 +24,13 @@ import {
   studyListQueryOptions,
   useDeleteStudyMutation,
 } from "@/lib/queries/study";
+import { NewStudyDialogContent } from "../NewStudyDialog";
 import {
   HeaderSelector,
   HeaderSelectorMenuItem,
   HeaderSelectorMenuLabel,
 } from "./HeaderSelector";
 import { HeaderSelectorSkeleton } from "./HeaderSelectorSkeleton";
-import { NewStudyDialogContent } from "../NewStudyDialog";
 
 export const StudySelector = () => {
   const { group, study: studyId } = useParams({ strict: false });

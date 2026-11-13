@@ -3,12 +3,12 @@
 
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { client } from "../api/client";
 import {
   bindKeycloakSession,
   type AuthUser,
   type SessionKeycloak,
 } from "./keycloakSession";
-import { client } from "../api/client";
 
 vi.mock("../env", () => ({
   env: { VITE_API_BASE_PATH: "https://api.example.test" },

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { draftHeaders, readDraftSnapshot, selectFormSnapshot } from "./draft";
 import { getStudiesByStudyId } from "../api/generated/sdk.gen";
+import { draftHeaders, readDraftSnapshot, selectFormSnapshot } from "./draft";
 
 vi.mock("../api/generated/sdk.gen", () => ({ getStudiesByStudyId: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
