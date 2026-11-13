@@ -92,9 +92,7 @@ private func configureObjectStorage(
     app.logger.info("Object storage ready.")
 }
 
-/// Configures the application: database, migrations, and (when serving) services and routes.
-public func configure(_ app: Application) async throws {
-    let auditConfiguration = try AuditConfiguration(applicationRevision: Environment.get("APPLICATION_REVISION"))
+private func configureTransports(for app: Application) throws {
     if app.environment.isServing {
         try InboundTransportConfiguration(
             environment: Environment.appEnvironment,
@@ -106,6 +104,16 @@ public func configure(_ app: Application) async throws {
         environment: Environment.appEnvironment,
         certificateAuthorityFile: Environment.get("TLS_CA_FILE")
     ).configure(app)
+}
+
+/// Configures the application: database, migrations, and (when serving) services and routes.
+public func configure(_ app: Application) async throws {
+    app.asyncCommands.use(CreateSourceIdentityKeyringCommand(), as: CreateSourceIdentityKeyringCommand.name)
+    if app.environment.commandInput.arguments.first == CreateSourceIdentityKeyringCommand.name {
+        return
+    }
+    let auditConfiguration = try AuditConfiguration(applicationRevision: Environment.get("APPLICATION_REVISION"))
+    try configureTransports(for: app)
     app.asyncCommands.use(CleanupArtifactsCommand(auditConfiguration: auditConfiguration), as: "cleanup-artifacts")
     let logger = app.logger
     let usesEphemeralServices = usesEphemeralUITestServices(app)

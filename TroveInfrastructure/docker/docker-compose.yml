@@ -7,6 +7,7 @@
 #
 volumes:
   server_authority_data:
+  source_identity_keys:
   keycloak_db_data:
   seaweedfs_data:
 
@@ -105,10 +106,22 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Explicit one-time initialization, never a serving dependency or startup fallback.
+  source-keyring-init:
+    image: ghcr.io/schmiedmayerlab/trove-server:main
+    profiles: ["tools"]
+    command: ["create-source-keyring", "--output", "/var/lib/trove/source-identity/keyring.secret"]
+    volumes:
+      - source_identity_keys:/var/lib/trove/source-identity
+    restart: "no"
+
   server:
     image: ghcr.io/schmiedmayerlab/trove-server:main
     command: ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - source_identity_keys:/var/lib/trove/source-identity:ro
     environment:
+      SOURCE_IDENTITY_KEYRING_FILE: /var/lib/trove/source-identity/keyring.secret
       APP_ENVIRONMENT: ${APP_ENVIRONMENT}
       LOG_LEVEL: ${LOG_LEVEL}
       DATABASE_HOST: server-db

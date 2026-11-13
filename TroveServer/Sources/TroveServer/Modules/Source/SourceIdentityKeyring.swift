@@ -16,6 +16,7 @@ import GroveFHIRContract
 struct SourceIdentityKeyring: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     enum Failure: Error, Equatable {
         case invalidConfiguration
+        case creationRefused
         case invalidContext
         case invalidIdentityKey
         case recoveryUnavailable

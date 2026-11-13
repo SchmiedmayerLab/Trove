@@ -12,7 +12,7 @@ import Vapor
 extension Environment {
     // Use the parsed command position, never an option value that happens to match a command.
     var isServing: Bool {
-        !["migrate", "revert", "cleanup-artifacts"].contains(commandInput.arguments.first ?? "serve")
+        !["migrate", "revert", "cleanup-artifacts", CreateSourceIdentityKeyringCommand.name].contains(commandInput.arguments.first ?? "serve")
     }
 
     var isDatabaseMigration: Bool {

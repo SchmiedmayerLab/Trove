@@ -225,6 +225,23 @@ Rewrapping changes storage encryption without changing resource identities. No
 production fallback generates a deployment key. Ephemeral UI-test databases use
 an explicitly ephemeral keyring.
 
+For a fresh native development database, initialize the keyring once from
+`TroveServer/`:
+
+```sh
+mkdir -p .secrets
+chmod 700 .secrets
+swift run --force-resolved-versions TroveServer create-source-keyring --output "$PWD/.secrets/source-keyring.secret"
+```
+
+Set `SOURCE_IDENTITY_KEYRING_FILE` in the local environment to that absolute path.
+The command does not connect to application services, prints no key material, and
+creates an owner-only file. Existing files, including empty files and symlinks, are
+never replaced. If initialization fails after creation, inspect the incomplete
+file explicitly before retrying. Back up the keyring separately with the database;
+loss of an encryption key prevents recovery of identities encrypted under it.
+Retain historical keys when adding a new current key, then restart serving processes.
+
 Clinical writes require `Trove-Source-Installation-ID` and `Trove-Source-Credential`
 headers in addition to account authentication and source ownership. Single-event,
 batch and Bundle admission check installation authority before validation and again
@@ -235,7 +252,7 @@ replay a retained command but cannot create new grants. Receipt lookup remains a
 owner-authorized read and requires no installation credential.
 
 Before activating shared-source collection, finish cross-device deletion authority
-and deployment secret provisioning.
+and verify deployment recovery and the complete client lifecycle.
 The registration endpoints accept no health data; the retired resource-upload
 endpoint remains absent.
 

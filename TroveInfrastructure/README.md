@@ -53,6 +53,29 @@ and run no initializer. Docker, Kubernetes and recovery verification reuse the s
 grant scripts. The production secret resources contain no seeded passwords: operators
 must supply real values through Secret Manager before synchronization.
 
+### Source Identity Encryption Keys
+
+The serving deployment mounts `trove-source-identity-keyring` read-only with mode
+0440 and group 999. Only the server receives this file; database operator and web
+pods do not. External Secrets reads the complete version-1 keyring JSON from
+`source-identity-keyring` in the configured secret store. Production Terraform
+creates the secret container without generating or retaining its value in state.
+Provision the value before synchronization using the server's
+`create-source-keyring --output <absolute-new-file>` command and your secret-store
+upload workflow. Never commit or include the resulting file in verification artifacts.
+
+Retain encryption keys and their IDs through server replacement and rotation.
+Adding a current encryption key must preserve keys needed by retained envelopes;
+restart serving processes after updating the secret. Back up the secret separately
+with the database and exercise restoration before using real participant data.
+Participant identity keys remain unchanged when their storage encryption is rotated.
+
+The disposable development Vault setup creates a random keyring using create-only
+compare-and-set. It cannot overwrite an existing value. Development Vault itself is
+in-memory: losing it loses this keyring unless separately backed up. Restoring a
+retained database requires restoring the corresponding keyring; reseeding Vault is
+not identity recovery. Production never uses this development seeder.
+
 ### Production Database
 
 Production uses CloudNativePG 1.30.0 (chart 0.29.0), PostgreSQL 18.6 and TimescaleDB

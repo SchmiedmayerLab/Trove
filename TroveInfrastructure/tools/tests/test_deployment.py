@@ -97,6 +97,51 @@ class DeploymentContractTests(unittest.TestCase):
                 )
                 cls.rendered[layer, environment] = list(yaml.safe_load_all(result.stdout))
 
+    def test_source_keyring_is_restricted_to_serving_and_never_seeded_in_production(self):
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                documents = self.rendered["apps", environment]
+                pod = named(documents, "Deployment", "trove-server")["spec"]["template"]["spec"]
+                self.assertEqual(pod["securityContext"]["fsGroup"], 999)
+                volume = next(item for item in pod["volumes"] if item["name"] == "source-identity-keyring")
+                self.assertEqual(volume["secret"], {
+                    "secretName": "trove-source-identity-keyring", "defaultMode": 0o440,
+                    "items": [{"key": "keyring.secret", "path": "keyring.secret"}],
+                })
+                server = pod["containers"][0]
+                mount = next(item for item in server["volumeMounts"] if item["name"] == volume["name"])
+                self.assertEqual(mount, {"name": volume["name"], "mountPath": "/run/secrets/source-identity", "readOnly": True})
+                config = named(documents, "ConfigMap", "trove-server-config")["data"]
+                self.assertEqual(config["SOURCE_IDENTITY_KEYRING_FILE"], mount["mountPath"] + "/keyring.secret")
+                for kind, name in (("Job", "trove-database-operator"), ("Deployment", "trove-web")):
+                    self.assertNotIn("source-identity-keyring", json.dumps(named(documents, kind, name)))
+                external = named(self.rendered["infrastructure", environment], "ExternalSecret", "trove-source-identity-keyring")
+                self.assertEqual(external["spec"]["data"], [{"secretKey": "keyring.secret", "remoteRef": {
+                    "key": "source-identity-keyring", "conversionStrategy": "Default",
+                    "decodingStrategy": "None", "metadataPolicy": "None",
+                }}])
+        production = json.dumps(self.rendered["infrastructure", "prod"])
+        self.assertNotIn("keyBase64", production)
+        self.assertNotIn("vault-source-identity-keyring-setup", production)
+
+    def test_compose_initializes_keys_explicitly_and_serving_reuses_them_read_only(self):
+        compose = yaml.safe_load((ROOT / "docker/docker-compose.yml").read_text())
+        initializer = compose["services"]["source-keyring-init"]
+        server = compose["services"]["server"]
+        path = "/var/lib/trove/source-identity"
+        self.assertIn("source_identity_keys", compose["volumes"])
+        self.assertEqual(initializer["profiles"], ["tools"])
+        self.assertEqual(initializer["image"], server["image"])
+        self.assertEqual(initializer["command"], ["create-source-keyring", "--output", path + "/keyring.secret"])
+        self.assertNotIn("environment", initializer)
+        self.assertNotIn("depends_on", initializer)
+        self.assertNotIn("source-keyring-init", server["depends_on"])
+        self.assertEqual(initializer["volumes"], ["source_identity_keys:" + path])
+        self.assertIn("source_identity_keys:" + path + ":ro", server["volumes"])
+        self.assertEqual(server["environment"]["SOURCE_IDENTITY_KEYRING_FILE"], path + "/keyring.secret")
+        for name in ("web", "server-migrate", "server-grants"):
+            self.assertNotIn("source_identity_keys", json.dumps(compose["services"][name]))
+
     def test_serving_never_receives_operator_credentials_or_initializes_schema(self):
         for environment in ("dev", "prod"):
             with self.subTest(environment=environment):

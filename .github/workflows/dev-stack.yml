@@ -102,10 +102,11 @@ jobs:
           echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
       # migration has to run first. It starts the backing services it depends on.
-      - name: Apply the migrations
+      - name: Initialize the fresh keyring and apply migrations
         working-directory: TroveInfrastructure/docker
         run: |
           cp .env.example .env
+          docker compose run --rm source-keyring-init
           docker compose run --rm server-migrate
       - name: Verify the Timescale schema
         working-directory: TroveInfrastructure/docker

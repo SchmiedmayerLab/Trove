@@ -28,6 +28,16 @@ spec:
         app: trove-server
     spec:
       serviceAccountName: trove-server
+      securityContext:
+        fsGroup: 999
+      volumes:
+        - name: source-identity-keyring
+          secret:
+            secretName: trove-source-identity-keyring
+            defaultMode: 0440
+            items:
+              - key: keyring.secret
+                path: keyring.secret
       containers:
         - name: trove-server-container
           image: ghcr.io/schmiedmayerlab/trove-server:latest
@@ -48,6 +58,10 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: source-identity-keyring
+              mountPath: /run/secrets/source-identity
+              readOnly: true
           envFrom:
             - configMapRef:
                 name: trove-server-config
