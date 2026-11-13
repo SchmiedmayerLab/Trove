@@ -31,6 +31,8 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone
 
+from rekey_fixture import recovered_arguments
+
 ROOT = Path(__file__).resolve().parents[2]
 KEYCLOAK_SHA = "9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
@@ -84,7 +86,7 @@ def response_uuid(response: object, field: str) -> str:
     return value
 
 
-def request(url, method="GET", data=None, token=None, headers=None, expected=200):
+def request(url, method="GET", data=None, token=None, headers=None, expected=200, *, response_headers=None):
     headers = dict(headers or {})
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -94,16 +96,35 @@ def request(url, method="GET", data=None, token=None, headers=None, expected=200
     try:
         with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=150) as response:
             status, body = response.status, response.read(10_000_001)
+            for name, value in (response_headers or {}).items():
+                require(response.headers.get(name) == value, f"Unexpected response header: {name}")
     except urllib.error.HTTPError as error:
         status, body = error.code, error.read(2048)
     require(status == expected, f"{method} {urllib.parse.urlsplit(url).path}: expected {expected}, received {status}")
     return body
 
 
+def installation_headers(registration_request):
+    return {"Trove-Source-Installation-ID": registration_request["registrationID"],
+            "Trove-Source-Credential": registration_request["credentialBase64"]}
+
+
+def record_version_identifier(event):
+    """The conversion Provenance entry identifies the record version, not the Bundle."""
+    identifiers = [extension["valueIdentifier"] for entry in json.loads(event)["entry"]
+                   if entry["resource"]["resourceType"] == "Provenance"
+                   for extension in entry.get("extension", [])
+                   if extension.get("url") == "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key"]
+    require(len(identifiers) == 1, "Expected one record-version entry identity")
+    return {key: identifiers[0][key] for key in ("system", "value")}
+
+
 class Checkpoint:
     def __init__(self, args):
         self.args = args
         self.evidence = Path(tempfile.mkdtemp(prefix="trove-process-restart-", dir="/private/tmp"))
+        # Never retain encryption keys with the evidence bundle or database backup.
+        self.private_directory = tempfile.TemporaryDirectory(prefix="trove-restart-secrets-")
         self.name = "trove_restart_" + uuid.uuid4().hex[:12]
         self.bucket = self.name.replace("_", "-")
         self.runtime_password = "synthetic-" + uuid.uuid4().hex
@@ -186,6 +207,7 @@ class Checkpoint:
         images = json.loads(self.run(["docker", "image", "inspect", self.args.image, POSTGRES_IMAGE, STORAGE_IMAGE]))
         self.validator_image = images[0]["Id"]
         self.summary["validatorImageID"] = self.validator_image
+        self.prepare_identity_keyring(binary)
         self.prepare_stores()
         self.sql(f"CREATE DATABASE {self.name};", database="postgres")
         self.sql("CREATE EXTENSION IF NOT EXISTS timescaledb;")
@@ -198,6 +220,38 @@ class Checkpoint:
                         FHIR_VALIDATOR_URL=f"http://127.0.0.1:{self.args.validator_port}/validate", FHIR_VALIDATOR_IDENTITY=self.identity)
         self.monitor = threading.Thread(target=self.sample_memory, daemon=True)
         self.monitor.start()
+
+    def prepare_identity_keyring(self, binary):
+        keyring = Path(self.private_directory.name) / "keyring.secret"
+        self.run([str(binary), "create-source-keyring", "--output", str(keyring)], env=self.env)
+        require(keyring.is_file() and keyring.stat().st_mode & 0o777 == 0o600, "Identity keyring is not private")
+        self.env["SOURCE_IDENTITY_KEYRING_FILE"] = str(keyring)
+
+    def register_installation(self, participant, repository_kind="healthkit"):
+        body = {"registrationID": str(uuid.uuid4()), "repositoryKind": repository_kind,
+                "credentialBase64": base64.b64encode(os.urandom(32)).decode()}
+        registration = self.api_json("/participant/sources", participant, "POST", body)
+        require(registration["installation"]["registrationID"] == body["registrationID"]
+                and registration["installation"]["sourceID"] == registration["source"]["id"]
+                and registration["source"]["repositoryKind"] == repository_kind,
+                "Registration did not retain the requested installation and repository")
+        return registration, body
+
+    def recover_identity(self, participant, registration, registration_request):
+        recovery = json.loads(request(
+            self.api + f'/participant/source-installations/{registration_request["registrationID"]}/identity',
+            "POST", {"credentialBase64": registration_request["credentialBase64"]}, participant,
+            response_headers={"Cache-Control": "no-store"}))
+        require(recovery["registration"] == registration, "Identity recovery changed the retained registration")
+        recovered_arguments(recovery)  # Validate complete context; never use synthetic fallback material.
+        return recovery
+
+    def fixture(self, recovery, effective_at, native_record_id):
+        return self.run([
+            sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
+            "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
+            "--recovered-identity-stdin", "--native-record-id", native_record_id, "--effective-at", effective_at,
+        ], data=json.dumps(recovery).encode())
 
     def provision_runtime(self):
         self.run(["docker", "exec", self.pg_container, "mkdir", self.container_scripts])
@@ -405,22 +459,30 @@ class Checkpoint:
     def exercise(self):
         first = self.backend(1)
         researcher, participant, studies, enrollments, consents = self.prepare_studies()
-        source = self.api_json("/participant/sources", participant, "POST", {"registrationID": str(uuid.uuid4())})
-        event = self.run([sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
-                          "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
-                          "--event-system", source["eventIdentifierSystem"], "--producer-instance", source["id"],
-                          "--identifier-root", source["identifierRoot"], "--registration-id", source["registrationID"],
-                          "--participant-system", source["participantIdentifier"]["system"], "--participant-value", source["participantIdentifier"]["value"],
-                          "--effective-at", datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")])
+        registration, registration_request = self.register_installation(participant)
+        recovery = self.recover_identity(participant, registration, registration_request)
+        source = registration["source"]
+        headers = installation_headers(registration_request)
+        effective_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        native_record_id = str(uuid.uuid4())
+        event = self.fixture(recovery, effective_at, native_record_id)
+        replacement, replacement_request = self.register_installation(participant)
+        replacement_recovery = self.recover_identity(participant, replacement, replacement_request)
+        require(replacement["source"] == source and replacement["installation"] != registration["installation"],
+                "Second installation did not retain independent authority over the same source")
+        require(recovered_arguments(replacement_recovery) == recovered_arguments(recovery),
+                "Second installation recovered different identity material")
+        require(self.fixture(replacement_recovery, effective_at, native_record_id) == event,
+                "Recovered identity changed the same synthetic conversion")
         (self.evidence / "event.json").write_bytes(event)
         path = f'/participant/sources/{source["id"]}/events'
         outputs = [entry["fullUrl"] for entry in json.loads(event)["entry"] if entry["resource"]["resourceType"] == "Observation"]
         targets = [{"consentId": consent["id"], "outputFullUrls": outputs} for consent in consents]
         submission = {"eventBase64": base64.b64encode(event).decode(), "targets": targets[:1]}
-        receipt = request(self.api + path, "POST", submission, participant)
+        receipt = request(self.api + path, "POST", submission, participant, headers=headers)
         accepted = json.loads(receipt)
         require(accepted["sourceId"] == source["id"], "Receipt does not identify the accepted source")
-        producer_identifier = json.loads(event)["identifier"]
+        producer_identifier = record_version_identifier(event)
         require(accepted["producerEventIdentifier"] == {
             key: producer_identifier[key] for key in ("system", "value")
         }, "Receipt does not identify the accepted producer event")
@@ -432,17 +494,22 @@ class Checkpoint:
         )
         intent_digest = hashlib.sha256(json.dumps(canonical_targets, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         require(accepted["targetIntentSHA256"] == intent_digest, "Receipt does not identify the original target intent")
-        require(request(self.api + path, "POST", submission, participant) == receipt, "Initial retry changed receipt bytes")
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt, "Initial retry changed receipt bytes")
         attribution_path = path + f'/{accepted["eventId"]}/attributions'
         attribution = {"commandId": str(uuid.uuid4()), "targets": targets[1:]}
-        attribution_receipt = self.api_json(attribution_path, participant, "POST", attribution)
+        attribution_receipt = self.api_json(attribution_path, participant, "POST", attribution, headers=headers)
         require(attribution_receipt["authorizedOutputCount"] == 1, "Late attribution did not grant exactly the second study output")
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Attribution retry changed its original receipt")
-        self.api_json(attribution_path, participant, "POST", {**attribution, "targets": targets[:1]}, 409)
+        self.api_json(attribution_path, participant, "POST", {**attribution, "targets": targets[:1]}, 409, headers=headers)
         self.check_state(studies, event, withdrawn=False)
-        request(self.api + path, "POST", {**submission, "eventBase64": base64.b64encode(event + b" ").decode()}, participant, expected=409)
-        request(self.api + path, "POST", {**submission, "targets": targets}, participant, expected=409)
+        variant = event + b" "
+        variant_submission = {**submission, "eventBase64": base64.b64encode(variant).decode()}
+        variant_receipt = self.api_json(path, participant, "POST", variant_submission, headers=headers)
+        require(variant_receipt["eventId"] == accepted["eventId"]
+                and variant_receipt["payloadSHA256"] == hashlib.sha256(variant).hexdigest(),
+                "A byte representation duplicated the record or lost its own receipt")
+        request(self.api + path, "POST", {**submission, "targets": targets}, participant, headers=headers, expected=409)
         self.api_json(f"/participant/enrollments/{enrollments[0]}/withdraw", participant, "POST")
         self.check_state(studies, event, withdrawn=True)
         lookup_path = f'/participant/sources/{source["id"]}/event-receipts/lookup'
@@ -450,27 +517,50 @@ class Checkpoint:
                   "payloadSHA256": accepted["payloadSHA256"], "targets": submission["targets"]}
         require(self.api_json(lookup_path, participant, "POST", lookup) == accepted,
                 "Receipt recovery after withdrawal changed the immutable acknowledgement")
-        # A second stream is already revoked in the snapshot. The primary stream
-        # remains active so the original retry/revocation checks still run after restore.
-        retired = self.api_json("/participant/sources", participant, "POST", {"registrationID": str(uuid.uuid4())})
-        retired = self.api_json(f'/participant/sources/{retired["id"]}/revoke', participant, "POST")
-        self.check_revoked_source(retired, participant, submission)
+        # A different repository is an independent logical source; another HealthKit
+        # installation must never be used as a stand-in for a different source.
+        retired, retired_request = self.register_installation(participant, "sensorkit")
+        retired["source"] = self.api_json(f'/participant/sources/{retired["source"]["id"]}/revoke', participant, "POST")
+        self.check_revoked_source(retired, retired_request, participant, submission)
+        retired_installation = self.api_json(
+            f'/participant/source-installations/{registration_request["registrationID"]}/revoke', participant, "POST")
+        require(retired_installation["source"] == source and retired_installation["installation"].get("revokedAt"),
+                "Installation revocation changed the logical source or failed to revoke its authority")
+        request(self.api + path, "POST", submission, participant, headers=headers, expected=409)
+        self.api_json(f'/participant/source-installations/{registration_request["registrationID"]}/identity', participant,
+                      "POST", {"credentialBase64": registration_request["credentialBase64"]}, 409)
+        headers = installation_headers(replacement_request)
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt,
+                "Revoking one installation revoked its independent replacement")
         prior_audit = self.check_study_audit(studies, researcher, participant)
         second = self.replace_backend(first)
         require(first.pid != second.pid and first.poll() is not None, "Backend was not replaced by a new OS process")
         participant = self.token("alice@example.com")
-        self.check_revoked_source(retired, participant, submission)
-        require(request(self.api + path, "POST", submission, participant) == receipt, "Restart retry changed receipt bytes")
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        self.check_revoked_source(retired, retired_request, participant, submission)
+        restored_recovery = self.recover_identity(participant, replacement, replacement_request)
+        require(recovered_arguments(restored_recovery) == recovered_arguments(recovery),
+                "Backend replacement changed the retained identity key or scope")
+        require(self.fixture(restored_recovery, effective_at, native_record_id) == event,
+                "Backend replacement changed synthetic record identities")
+        require(self.api_json(f'/participant/source-installations/{registration_request["registrationID"]}', participant)
+                == retired_installation, "Backend replacement lost installation revocation")
+        request(self.api + path, "POST", submission, participant,
+                headers=installation_headers(registration_request), expected=409)
+        require(self.api_json(path, participant, "POST", variant_submission, headers=headers) == variant_receipt,
+                "Backend replacement lost the additional byte representation receipt")
+        require(self.sql("SELECT encode(raw_bytes,'hex') FROM clinical_event_representations;") == variant.hex(),
+                "Backend replacement lost or changed the additional representation")
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt, "Restart retry changed receipt bytes")
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Late attribution receipt did not survive backend process replacement")
         self.api_json(f'/participant/sources/{source["id"]}/revoke', participant, "POST")
         require(self.api_json(lookup_path, participant, "POST", lookup) == accepted,
                 "Receipt recovery after process restart and source revocation failed")
-        request(self.api + path, "POST", submission, participant, expected=409)
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        request(self.api + path, "POST", submission, participant, headers=headers, expected=409)
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Source revocation lost the original attribution receipt")
-        self.api_json(attribution_path, participant, "POST", {**attribution, "commandId": str(uuid.uuid4())}, 409)
-        self.api_json(lookup_path, participant, "POST", {**lookup, "payloadSHA256": "0" * 64}, 409)
+        self.api_json(attribution_path, participant, "POST", {**attribution, "commandId": str(uuid.uuid4())}, 409, headers=headers)
+        self.api_json(lookup_path, participant, "POST", {**lookup, "payloadSHA256": "0" * 64}, 404)
         self.api_json(lookup_path, researcher, "POST", lookup, 403)
         require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.receipt.disclosure' AND outcome='disclosure_intent';") == "2",
                 "Receipt disclosures lack committed intent or denied lookups disclosed data")
@@ -483,6 +573,10 @@ class Checkpoint:
         self.summary["studyAuditReader"] = {"explicitCapabilityRequired": True, "administratorDenied": True,
             "participantDenied": True, "foreignCursorDenied": True, "retainedAcrossRestart": len(prior_audit),
             "scopedDisclosureIntents": 2}
+        self.summary["participantIdentityRecovery"] = {
+            "sameSyntheticRecordAcrossInstallationsAndRestart": True, "independentInstallationRevocation": True,
+            "recoveryResponsesNotCacheable": True, "keyringRetainedOutsideEvidence": True,
+            "physicalHealthKitAcquisitionVerified": False}
         self.summary["retainedSourceRevocation"] = {"revokedBeforeReplacement": True,
             "registrationRetryRemainsRevoked": True, "revocationRetryRemainsUnchanged": True,
             "admissionDeniedBeforeAndAfter": True, "revocationAudits": 1}
@@ -494,21 +588,23 @@ class Checkpoint:
                             receiptRecoveryAfterRevocation=True, receiptDisclosureIntents=2,
                             retainedConsentPDFs=2, runtimeRole=self.name)
 
-    def check_revoked_source(self, source: dict[str, object], participant: str, submission: dict[str, object]) -> None:
-        identifier, registration, revoked_at = source.get("id"), source.get("registrationID"), source.get("revokedAt")
-        if not isinstance(identifier, str) or not isinstance(registration, str) or not isinstance(revoked_at, str):
-            raise RuntimeError("Revoked source fixture lacks its identity or revocation time")
-        identifier, registration = uuid.UUID(identifier), uuid.UUID(registration)
+    def check_revoked_source(self, registration, registration_request, participant, submission):
+        source = registration["source"]
+        identifier = uuid.UUID(response_uuid(source, "id"))
+        uuid.UUID(response_uuid(registration_request, "registrationID"))
+        revoked_at = source.get("revokedAt")
+        require(isinstance(revoked_at, str), "Revoked source fixture lacks its revocation time")
         require(datetime.fromisoformat(revoked_at.replace("Z", "+00:00")).tzinfo is not None,
                 "Revoked source fixture lacks a timezone")
         path = f"/participant/sources/{identifier}"
         require(self.api_json(path, participant) == source, "Restored source identity or revocation changed")
-        require(self.api_json("/participant/sources", participant, "POST", {"registrationID": str(registration)}) == source,
+        require(self.api_json("/participant/sources", participant, "POST", registration_request) == registration,
                 "Registration retry reopened or replaced a revoked source")
         require(self.api_json(path + "/revoke", participant, "POST") == source,
                 "Revocation retry changed its retained timestamp or identity")
-        denied = self.api_json(path + "/events", participant, "POST", submission, 409)
-        require(denied.get("detail") == "Source binding is not active",
+        denied = self.api_json(path + "/events", participant, "POST", submission, 409,
+                               headers=installation_headers(registration_request))
+        require(denied.get("detail") == "Source installation is not active",
                 "Retained source was not rejected at the revocation boundary")
         require(self.sql(f"SELECT count(*) FROM audit_events WHERE action='source.revoked' "
                          f"AND source_binding_id='{identifier}' AND outcome='succeeded';") == "1",
@@ -579,6 +675,7 @@ class Checkpoint:
             attempt(lambda: self.run(["docker", "network", "rm", self.name]))
         # Database, runtime role, script copies and bucket existed only inside these owned
         # disposable containers/tmpfs. Removing the containers removes those records too.
+        attempt(self.private_directory.cleanup)
         self.summary["cleanupComplete"] = not errors
         self.summary["passed"] = self.summary.get("passed", False) and not errors
         self.summary["elapsedSeconds"] = round(time.monotonic() - self.started, 3)
