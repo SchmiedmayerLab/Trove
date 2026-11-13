@@ -407,8 +407,8 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
-            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind)
-            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), 'active')
+            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind, recorded_seconds, recorded_fraction)
+            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), 'active', 1800000000, '')
             """)
             .run()
         try await sql.raw("""
