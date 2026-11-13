@@ -13,7 +13,7 @@ import Foundation
 extension DeliveryJournal {
     private static var querySelection: String { """
         SELECT acquisition_query.id, acquisition_query.local_id, definition, cursor, checkpoint_revision,
-            (SELECT revision FROM collection_state WHERE id = 1)
+            (SELECT revision FROM collection_state WHERE id = 1), last_served, query_exhausted
         FROM acquisition_query JOIN source_state ON acquisition_query.local_id = source_state.local_id
         """ }
 
@@ -74,9 +74,21 @@ extension DeliveryJournal {
         )
     }
 
+    func lastQuerySequence(for sourceID: UUID) throws -> Int64 {
+        let rows = try database.query(
+            """
+            SELECT coalesce(max(last_served), 0) FROM acquisition_query JOIN source_state
+                ON acquisition_query.local_id = source_state.local_id WHERE source_id = ?
+            """, [.text(sourceID.uuidString.lowercased())]
+        ) { sqlite3_column_int64($0, 0) }
+        guard let sequence = rows.first, sequence >= 0 else { throw JournalError.corruptJournal }
+        return sequence
+    }
+
     private func decodeCheckpoint(_ statement: OpaquePointer, sourceID: UUID) throws -> Checkpoint {
         guard (1...16_384).contains(sqlite3_column_bytes(statement, 2)),
-              sqlite3_column_type(statement, 3) == SQLITE_NULL || (1...65_536).contains(sqlite3_column_bytes(statement, 3)) else {
+              sqlite3_column_type(statement, 3) == SQLITE_NULL || (1...65_536).contains(sqlite3_column_bytes(statement, 3)),
+              sqlite3_column_int64(statement, 6) >= 0, (0...1).contains(sqlite3_column_int64(statement, 7)) else {
             throw JournalError.corruptJournal
         }
         return Checkpoint(
@@ -85,6 +97,8 @@ extension DeliveryJournal {
             epoch: try Self.identifier(statement, 1),
             queryDefinition: try DeliverySQLite.blob(statement, 2),
             cursor: sqlite3_column_type(statement, 3) == SQLITE_NULL ? nil : try DeliverySQLite.blob(statement, 3),
+            lastServedSequence: sqlite3_column_int64(statement, 6),
+            queryExhausted: sqlite3_column_int64(statement, 7) == 1,
             scope: scope,
             revision: try Self.identifier(statement, 4),
             collectionRevision: sqlite3_column_type(statement, 5) == SQLITE_NULL ? nil : try Self.identifier(statement, 5)

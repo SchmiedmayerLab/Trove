@@ -54,6 +54,8 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         public let epoch: UUID
         public let queryDefinition: Data
         public let cursor: Data?
+        public let lastServedSequence: Int64
+        public let queryExhausted: Bool
         let scope: Scope
         let revision: UUID
         let collectionRevision: UUID?
@@ -137,7 +139,8 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         from expected: Checkpoint,
         nextCursor: Data,
         payloads: [Payload],
-        observedDeletions: [UUID] = []
+        observedDeletions: [UUID] = [],
+        queryExhausted: Bool = false
     ) throws -> [UUID] {
         try Task.checkCancellation()
         guard expected.scope == scope else { throw JournalError.wrongScope }
@@ -154,10 +157,18 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
             guard let (sequence, system) = source.first else { throw JournalError.unknownSource }
             let deliveryIDs = try stagePayloads(payloads, source: registered, sequence: sequence, system: system)
             try retireDeletionDetections(observedDeletions, queryID: expected.queryID)
+            let lastServed = try lastQuerySequence(for: expected.sourceID)
+            guard lastServed < Int64.max else { throw JournalError.capacityExceeded }
             // Retire the conversion instant only after record bytes and the cursor are durable.
             try database.execute(
-                "UPDATE acquisition_query SET cursor = ?, checkpoint_revision = ?, conversion_instant = NULL WHERE id = ?",
-                [.blob(nextCursor), .text(UUID().lowercase), .text(expected.queryID.lowercase)]
+                """
+                UPDATE acquisition_query SET cursor = ?, checkpoint_revision = ?, conversion_instant = NULL,
+                    last_served = ?, query_exhausted = ? WHERE id = ?
+                """,
+                [
+                    .blob(nextCursor), .text(UUID().lowercase), .integer(lastServed + 1),
+                    .integer(queryExhausted ? 1 : 0), .text(expected.queryID.lowercase)
+                ]
             )
             try checkByteLimit()
             try Task.checkCancellation()
