@@ -36,6 +36,7 @@ enum DeliveryJournalSchema {
                 + (SELECT coalesce(sum(length(definition) + coalesce(length(cursor), 0)
                     + coalesce(length(conversion_instant), 0)), 0) FROM acquisition_query)
                 + (SELECT count(*) * 80 FROM deletion_detection)
+                + (SELECT coalesce(sum(length(content)), 0) FROM collection_state)
             """) { sqlite3_column_int64($0, 0) }
         guard let size = sizes.first, size <= maximumBytes else { throw DeliveryJournalError.capacityExceeded }
     }
@@ -84,7 +85,7 @@ enum DeliveryJournalSchema {
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
         if !create {
             let version = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard version == [10] else { throw DeliveryJournalError.unsupportedFormat }
+            guard version == [11] else { throw DeliveryJournalError.unsupportedFormat }
             let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
             guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
         }
@@ -115,7 +116,7 @@ enum DeliveryJournalSchema {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
-                try database.execute("PRAGMA user_version = 10")
+                try database.execute("PRAGMA user_version = 11")
             }
         }
     }
@@ -124,6 +125,13 @@ enum DeliveryJournalSchema {
 
 extension DeliveryJournalSchema {
     private static let statements = [
+        """
+        CREATE TABLE collection_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            revision TEXT NOT NULL CHECK (length(revision) = 36),
+            content BLOB NOT NULL CHECK (length(content) BETWEEN 1 AND 4194304)
+        ) STRICT
+        """,
         "CREATE TABLE journal_identity (id INTEGER PRIMARY KEY CHECK (id = 1), scope BLOB NOT NULL) STRICT",
         """
         CREATE TABLE source_state (

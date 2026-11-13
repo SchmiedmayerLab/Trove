@@ -56,6 +56,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         public let cursor: Data?
         let scope: Scope
         let revision: UUID
+        let collectionRevision: UUID?
     }
 
     public struct Attempt: Sendable {

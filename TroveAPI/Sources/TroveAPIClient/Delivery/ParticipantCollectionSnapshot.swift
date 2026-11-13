@@ -10,8 +10,8 @@ import Foundation
 import TroveAPITypes
 
 
-/// A validated observation of collection authority, not an offline lease or an upload grant.
-/// Refresh around acquisition; the receiver independently authorizes every submitted output.
+/// A validated observation of accepted collection authority. Observation time is not an expiry.
+/// Retained authority must honor local withdrawal; the receiver independently authorizes every upload.
 public struct ParticipantCollectionSnapshot: Sendable {
     public enum CollectionError: Error, Equatable {
         case invalidPlan
@@ -19,7 +19,7 @@ public struct ParticipantCollectionSnapshot: Sendable {
         case collectionNotAuthorized
     }
 
-    private let plans: [Components.Schemas.ParticipantCollectionPlan]
+    let plans: [Components.Schemas.ParticipantCollectionPlan]
 
     /// An active requirement is needed to start another query, even if historical windows remain.
     public var permitsHeartRateAcquisition: Bool {

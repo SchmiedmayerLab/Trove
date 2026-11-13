@@ -12,7 +12,8 @@ import Foundation
 
 extension DeliveryJournal {
     private static var querySelection: String { """
-        SELECT acquisition_query.id, acquisition_query.local_id, definition, cursor, checkpoint_revision
+        SELECT acquisition_query.id, acquisition_query.local_id, definition, cursor, checkpoint_revision,
+            (SELECT revision FROM collection_state WHERE id = 1)
         FROM acquisition_query JOIN source_state ON acquisition_query.local_id = source_state.local_id
         """ }
 
@@ -85,7 +86,8 @@ extension DeliveryJournal {
             queryDefinition: try DeliverySQLite.blob(statement, 2),
             cursor: sqlite3_column_type(statement, 3) == SQLITE_NULL ? nil : try DeliverySQLite.blob(statement, 3),
             scope: scope,
-            revision: try Self.identifier(statement, 4)
+            revision: try Self.identifier(statement, 4),
+            collectionRevision: sqlite3_column_type(statement, 5) == SQLITE_NULL ? nil : try Self.identifier(statement, 5)
         )
     }
 }

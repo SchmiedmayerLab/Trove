@@ -66,7 +66,7 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 10 rejects earlier or unknown formats without
+later response. Journal format 11 rejects earlier or unknown formats without
 migration or deletion.
 
 The private journal retains both secrets under its OS/app storage protections;
@@ -185,10 +185,30 @@ bounds from the outer adoption window or recompute relative history on a device.
 The audited response includes an enrollment state version and server observation
 time, uses `Cache-Control: no-store`, and contains no signatures or samples.
 Publishing alone does not change these windows; participant adoption does.
-Withdrawal returns no windows. The snapshot is not an upload capability or
-permission for continued offline collection: uploads recheck authority. The
-foreground heart-rate adapter refreshes these windows before and after each query;
-it does not enable automatic or offline collection.
+Withdrawal returns no windows. A collection snapshot is not an upload capability;
+the receiver rechecks every upload against current server authority.
+
+`ParticipantCollectionRefresh` discovers the complete enrollment set and retains
+all active plans atomically in the account/backend-bound delivery journal. Failed
+or partial discovery does not replace accepted plans. Known withdrawals are
+persisted immediately, including when a later plan request fails. Enrollment
+versions and observation times cannot move backward, and a delayed response cannot
+overwrite an intervening adoption or local stop.
+
+`collectionState()` restores these plans without a network request or time-based
+expiry. Observation time is not a lease, and resolved historical bounds never
+move on restart. Call `stopCollection(for:)` before attempting local withdrawal
+online; that stop survives restart and cannot be undone by a server refresh.
+The stop preserves queued bytes and their original consent IDs. Use
+`collectionCheckpoint(for:state:)` to bind acquisition to its retained snapshot;
+`stage` rejects it atomically if authority changed while the page was in flight,
+including changes written through another journal connection.
+
+Native lifecycle integration is still pending: the current heart-rate adapter
+continues to refresh over the network around each page. The retained-plan APIs do
+not by themselves enable offline collection or wire withdrawal into the app UI.
+The enrollment model does not yet expose a scheduled enrollment end; a measurement
+window's end must not be repurposed as one.
 
 ## Record Representations and Receipts
 
@@ -267,7 +287,8 @@ be opened explicitly and are never silently recreated or migrated.
 
 The caller owns source registration, FHIR transformation, authenticated transport
 and bounded source queries. Register an immutable query definition with each
-source; changing filters or restarting a lost stream requires a new source.
+source; additional immutable ranges use independent queries under that same source.
+Never reset a retained anchor or generate a replacement identity to widen a range.
 Always query from the journal's current checkpoint. Do not also let another store
 advance that stream's cursor or reuse an old query result under a newer checkpoint.
 The journal does not validate FHIR conformance or grant collection authority.
@@ -295,7 +316,7 @@ requirements cannot be verified on a physical device. Simulator builds enforce
 backup exclusion and the filesystem checks above, but cannot verify iOS Data
 Protection; device lock and encryption behavior require physical-device testing.
 This protection permits background access after
-the first device unlock. Logical payload/intent/setup/query/cursor byte and event quotas, and an independent
+the first device unlock. Logical payload/intent/setup/query/cursor/collection-plan byte and event quotas, and an independent
 SQLite database-size limit provide backpressure; reserve additional disk space
 for the rollback journal. Fixed-size receipt/metadata overhead is covered by the
 physical limit. Full storage never silently evicts pending work.

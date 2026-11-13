@@ -23,6 +23,7 @@ public enum DeliveryJournalError: Error, Equatable {
     case sourceRevoked
     case invalidSourceBinding
     case staleCheckpoint
+    case staleCollectionState
     case capacityExceeded
     case sequenceExhausted
     case eventIdentityMismatch
