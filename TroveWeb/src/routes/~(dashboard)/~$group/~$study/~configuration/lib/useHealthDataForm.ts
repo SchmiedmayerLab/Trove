@@ -9,41 +9,14 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { z } from "zod";
-import type {
-  HealthDataComponentInput,
-  HealthDataComponentResponse,
-} from "@/lib/api/generated/types.gen";
-import { zSampleTypesCollection } from "@/lib/api/generated/zod.gen";
 import { healthDataRetrieveQueryOptions } from "@/lib/queries/component";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
-
-const healthDataSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  sampleTypes: zSampleTypesCollection.min(
-    1,
-    "At least one sample type is required",
-  ),
-});
-
-const defaultValues: z.infer<typeof healthDataSchema> = {
-  name: "Health Data",
-  sampleTypes: [],
-};
-
-const transformResponseToForm = (response: HealthDataComponentResponse) => ({
-  name: response.name,
-  sampleTypes: response.data.sampleTypes,
-});
-
-const transformHealthDataFormToInput = (
-  formData: z.infer<typeof healthDataSchema>,
-): HealthDataComponentInput => ({
-  name: formData.name,
-  data: {
-    sampleTypes: formData.sampleTypes,
-  },
-});
+import {
+  defaultValues,
+  healthDataSchema,
+  transformHealthDataFormToInput,
+  transformResponseToForm,
+} from "./healthDataForm";
 
 export const useHealthDataForm = () => {
   const params = useParams({ strict: false });
