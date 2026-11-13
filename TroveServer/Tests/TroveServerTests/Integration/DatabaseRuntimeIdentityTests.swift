@@ -18,6 +18,45 @@ import Testing
 
 extension DatabaseRuntimePrivilegesTests {
     @Test
+    func actualRuntimeRetainsInstallationCredentialsAndPermanentRevocation() async throws {
+        try await Self.withRuntime { fixture in
+            try await ParticipantFixtures.createParticipant(on: fixture.database)
+            try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                let service = SourceInstallationService(
+                    database: fixture.database,
+                    keyring: try .init(currentKeyID: "current", keys: ["current": SymmetricKey(size: .bits256)])
+                )
+                let credential = try SourceInstallationCredential(
+                    base64: SymmetricKey(size: .bits256).withUnsafeBytes { Data($0).base64EncodedString() }
+                )
+                let id = UUID()
+                let registered = try await service.register(registrationID: id, repositoryKind: .healthKit, credential: credential)
+                let sql = try #require(fixture.database as? any SQLDatabase)
+                for statement in [
+                    "UPDATE source_installations SET credential_verifier = credential_verifier",
+                    "UPDATE source_installations SET source_id = source_id",
+                    "DELETE FROM source_installations", "TRUNCATE source_installations CASCADE"
+                ] {
+                    await #expect {
+                        try await sql.raw(SQLQueryString(statement)).run()
+                    } throws: { ($0 as? PSQLError)?.serverInfo?[.sqlState] == "42501" }
+                }
+                #expect(try await service.recover(registrationID: id, credential: credential).registration == registered)
+                let revoked = try await service.revoke(registrationID: id)
+                #expect(revoked.installation.revokedAt != nil)
+                await #expect {
+                    try await sql.raw("UPDATE source_installations SET revoked_at = NULL").run()
+                } throws: { ($0 as? PSQLError)?.serverInfo?[.sqlState] == "23514" }
+                #expect(try await service.find(registrationID: id) == revoked)
+                await #expect { try await service.recover(registrationID: id, credential: credential) } throws: {
+                    ($0 as? ServerError)?.status.code == 409
+                }
+                try await DatabaseRuntimePrivileges.validate(on: fixture.database)
+            }
+        }
+    }
+
+    @Test
     func actualRuntimeCanProvisionAndRecoverIdentity() async throws {
         try await Self.withRuntime { fixture in
             let identity = try await Self.registerIdentity(on: fixture.database)
