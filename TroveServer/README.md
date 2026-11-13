@@ -335,8 +335,9 @@ The selected scope is included in the retained consent markdown and therefore it
 presentation digest and exported document. Collection summaries currently support
 English and German; another requested consent locale fails publication instead of
 silently substituting a language. This server support does not complete historical
-acquisition: durable backfill alongside live cursors, offline plans and the full
-collection authoring UI remain separate work.
+acquisition: durable backfill alongside live cursors, offline plans and broader
+collection authoring remain separate work. The web editor exposes the current
+heart-rate measurement-window settings through the shared draft API.
 
 For the authenticated owner of an active source, an exact-byte retry with the same study
 targets returns the original receipt without adding grants. Revoked sources cannot retry.

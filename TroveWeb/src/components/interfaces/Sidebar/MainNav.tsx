@@ -64,6 +64,11 @@ const navBarItems: NavBarItem[] = [
         linkOptions: { to: "/$group/$study/configuration/enrollment" },
       },
       {
+        id: "collection",
+        title: "Health collection",
+        linkOptions: { to: "/$group/$study/configuration/collection" },
+      },
+      {
         id: "consent",
         title: "Consent",
         linkOptions: { to: "/$group/$study/configuration/consent" },

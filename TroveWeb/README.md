@@ -39,6 +39,29 @@ the lint and coverage tools still request vulnerable major versions. Keep
 the overrides when the upstream dependency ranges select patched versions, and
 rerun the shared web and dependency vulnerability checks.
 
+## Health collection authoring
+
+Study configuration → Health collection edits the draft's collection requirements
+through the shared API with the revision that populated the form. Concurrent edits
+are rejected without replacing unsaved values. Saving a draft does not change an
+accepted participant scope; publish and obtain acceptance of the new version.
+
+The current editor supports heart rate from participant acceptance, a Gregorian
+calendar lookback (six months initially), a fixed start, or all available history.
+Choose an explicit IANA time zone for lookbacks and an optional exclusive end.
+Fixed times use UTC strings, preserving the API's six fractional-second digits
+through unrelated edits. Relative dates resolve once at acceptance on the server.
+Unsupported settings remain unchanged and cannot be saved through this editor.
+
+Native health-data components remain separate app configuration; adding a component
+does not authorize server collection. Sleep/workout admission, metadata and route
+controls, durable backfill, and offline execution remain in the collection roadmap.
+This editor does not establish those acquisition capabilities.
+
+The browser regressions in `e2e/collection-authoring.spec.ts` use the real authenticated
+API to verify save/reload, exact date retention, invalid input, and stale revisions.
+They exercise draft authoring, not publication or native data acquisition.
+
 ## Container transport
 
 The image defaults to `APP_ENVIRONMENT=production` and serves HTTPS on port 8080.
