@@ -170,7 +170,7 @@ extension SourceIdentityKeyStoreTests {
     private static func context(_ binding: SourceBinding) throws -> SourceIdentityKeyContext {
         try .init(
             owner: (binding.participantID, binding.id),
-            keyID: binding.registrationID,
+            keyID: binding.keyID,
             epoch: KeyEpoch(1),
             identifierRoot: binding.identifierRoot,
             repository: BusinessIdentifier(system: IdentifierSystem(binding.identifierRoot + "/repository"), value: "healthkit")
@@ -204,7 +204,7 @@ extension SourceIdentityKeyStoreTests {
                 participantRole: TestApp.participantRole
             )
             let binding = try await AuthContext.$current.withValue(auth) {
-                try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                try await SourceBindingFixture.unprovisioned(on: app.db)
             }
             try await test(app, binding)
         }

@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Crypto
 import Fluent
 import Grove
 import GroveVapor
@@ -55,13 +56,16 @@ private func configureDevelopmentCORS(for app: Application) {
     )
 }
 
-private func configureObjectStorage(for app: Application, ephemeral: Bool, keycloak: KeycloakClient) async throws {
+private func configureObjectStorage(
+    for app: Application, ephemeral: Bool, keycloak: KeycloakClient, sourceKeyring: SourceIdentityKeyring
+) async throws {
     if ephemeral {
         app.logger.info("Configuring ephemeral UI-test object storage...")
         try await configureServices(
             for: app,
             storageProvider: InMemoryObjectStorageProvider(),
             validator: FHIRValidationClient(application: app),
+            sourceKeyring: sourceKeyring,
             grantorAuthority: keycloak.authorityProvider,
             clientPolicy: keycloak.config.clientPolicy
         )
@@ -75,6 +79,7 @@ private func configureObjectStorage(for app: Application, ephemeral: Bool, keycl
         for: app,
         storageProvider: storageProvider,
         validator: validator,
+        sourceKeyring: sourceKeyring,
         grantorAuthority: keycloak.authorityProvider,
         clientPolicy: keycloak.config.clientPolicy
     )
@@ -101,6 +106,7 @@ public func configure(_ app: Application) async throws {
     app.asyncCommands.use(CleanupArtifactsCommand(auditConfiguration: auditConfiguration), as: "cleanup-artifacts")
     let logger = app.logger
     let usesEphemeralServices = usesEphemeralUITestServices(app)
+    let sourceKeyring = try configuredSourceIdentityKeyring(app, ephemeral: usesEphemeralServices)
     let keycloakConfig: KeycloakConfiguration? = app.environment.isServing ? .init() : nil
     // Validate the trusted token boundary before connecting services or accepting traffic.
     let tokenPolicy = try keycloakConfig?.tokenPolicy
@@ -114,17 +120,16 @@ public func configure(_ app: Application) async throws {
     guard app.environment.isServing else {
         return
     }
-    guard let keycloakConfig, let tokenPolicy, let keycloak else {
+    guard let keycloakConfig, let tokenPolicy, let keycloak, let sourceKeyring else {
         throw ServerError.internalServerError("Token verification is not configured")
     }
 
     configureDevelopmentCORS(for: app)
-    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices, keycloak: keycloak)
+    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices, keycloak: keycloak, sourceKeyring: sourceKeyring)
 
     logger.info("Fetching groups from Keycloak")
     let groups = try await keycloak.fetchGroups()
-    let groupService = app.grove[GroupService.self]
-    try await groupService.syncGroups(from: groups)
+    try await app.grove[GroupService.self].syncGroups(from: groups)
 
     let jwks = try await keycloak.fetchJWKS()
     let signingKeys = try await KeycloakSigningKeys(initialJWKS: jwks) {
@@ -151,6 +156,7 @@ func configureServices(
     for app: Application,
     storageProvider: any ObjectStorageProvider,
     validator: FHIRValidationClient,
+    sourceKeyring: SourceIdentityKeyring,
     grantorAuthority: GrantorAuthorityProvider = .unavailable,
     clientPolicy: KeycloakClientPolicy = .production
 ) async {
@@ -168,6 +174,7 @@ func configureServices(
         InvitationCodeService()
         ProfileService()
         SourceBindingService(database: app.db(.psql))
+        SourceInstallationService(database: app.db(.psql), keyring: sourceKeyring)
         ClinicalEventService(database: app.db(.psql), validator: validator)
         PublishedStudyService()
         EnrollmentService()
@@ -218,4 +225,16 @@ struct ObjectStorageLifecycle: Vapor.LifecycleHandler {
             app.logger.error("Object storage shutdown failed")
         }
     }
+}
+
+
+private func configuredSourceIdentityKeyring(_ app: Application, ephemeral: Bool) throws -> SourceIdentityKeyring? {
+    guard app.environment.isServing else {
+        return nil
+    }
+    if ephemeral {
+        // This mode owns an ephemeral database; it never restores production identities.
+        return try .init(currentKeyID: "ephemeral-ui-test", keys: ["ephemeral-ui-test": SymmetricKey(size: .bits256)])
+    }
+    return try SourceIdentityKeyring.load(file: Environment.get("SOURCE_IDENTITY_KEYRING_FILE") ?? "")
 }

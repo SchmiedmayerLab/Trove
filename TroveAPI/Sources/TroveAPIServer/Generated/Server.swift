@@ -447,6 +447,39 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.getParticipantSourceInstallation(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/participant/source-installations/{registrationId}")
+        )
+        try transport.register(
+            {
+                try await server.revokeParticipantSourceInstallation(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/source-installations/{registrationId}/revoke")
+        )
+        try transport.register(
+            {
+                try await server.recoverParticipantSourceIdentity(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/source-installations/{registrationId}/identity")
+        )
+        try transport.register(
+            {
                 try await server.getParticipantSourcesSourceId(
                     request: $0,
                     body: $1,
@@ -5989,9 +6022,9 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
             }
         )
     }
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
@@ -6113,6 +6146,491 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                 case let .notFound(value):
                     suppressUnusedWarning(value)
                     var response = HTTPTypes.HTTPResponse(soar_statusCode: 404)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .conflict(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 409)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .serviceUnavailable(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 503)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .undocumented(statusCode, _):
+                    return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    func getParticipantSourceInstallation(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetParticipantSourceInstallation.id,
+            using: {
+                APIHandler.getParticipantSourceInstallation($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetParticipantSourceInstallation.Input.Path = .init(registrationId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "registrationId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.GetParticipantSourceInstallation.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetParticipantSourceInstallation.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .badRequest(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 400)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .unauthorized(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 401)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .forbidden(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 403)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .notFound(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 404)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .undocumented(statusCode, _):
+                    return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    func revokeParticipantSourceInstallation(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.RevokeParticipantSourceInstallation.id,
+            using: {
+                APIHandler.revokeParticipantSourceInstallation($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.RevokeParticipantSourceInstallation.Input.Path = .init(registrationId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "registrationId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.RevokeParticipantSourceInstallation.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.RevokeParticipantSourceInstallation.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .badRequest(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 400)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .unauthorized(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 401)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .forbidden(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 403)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .notFound(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 404)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .undocumented(statusCode, _):
+                    return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    func recoverParticipantSourceIdentity(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.RecoverParticipantSourceIdentity.id,
+            using: {
+                APIHandler.recoverParticipantSourceIdentity($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.RecoverParticipantSourceIdentity.Input.Path = .init(registrationId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "registrationId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.RecoverParticipantSourceIdentity.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.RecoverParticipantSourceIdentity.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Operations.RecoverParticipantSourceIdentity.Input.Body.JsonPayload.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.RecoverParticipantSourceIdentity.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .badRequest(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 400)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .unauthorized(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 401)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .forbidden(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 403)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .notFound(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 404)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .conflict(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 409)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .serviceUnavailable(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 503)
                     suppressMutabilityWarning(&response)
                     let body: OpenAPIRuntime.HTTPBody
                     switch value.body {

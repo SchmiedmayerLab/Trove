@@ -42,8 +42,7 @@ extension RecordBundleRecoveryTests {
             try await ClientDeliveryRecoveryTests.withJournal(
                 url: directory.appendingPathComponent("journal.sqlite"), scope: scope, mode: .createNew
             ) { journal in
-                let setup = try await journal.createSource(localID: fixture.source.registrationID, queryDefinition: Data([1]))
-                try await journal.confirmSource(.init(fixture.source), for: setup)
+                try await SourceBindingFixture.registerJournal(journal, source: fixture.source, query: Data([1]), receiver: (app, token))
                 let payloads = try Self.payloads(fixture, fullValidation: fullValidation)
                 let checkpoint = try await journal.checkpoint(for: fixture.source.id)
                 _ = try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: payloads)

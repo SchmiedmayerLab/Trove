@@ -32,7 +32,8 @@ struct SourceIdentityKeyStore: Sendable {
     func provision(context: SourceIdentityKeyContext, on transaction: any Database) async throws -> Recovered {
         let sql = try Self.sql(transaction)
         let binding = try await Self.binding(sourceID: context.sourceID, participantID: context.participantID, on: sql)
-        guard context.identifierRoot == binding.identifierRoot, context.keyID == binding.registrationID, context.epoch == KeyEpoch(1) else {
+        guard context.identifierRoot == binding.identifierRoot, context.keyID == binding.keyID, context.epoch == binding.keyEpoch,
+              context.repository == (try binding.repositoryScope) else {
             throw SourceIdentityKeyring.Failure.invalidContext
         }
         let key = SymmetricKey(size: .bits256)
@@ -111,8 +112,9 @@ extension SourceIdentityKeyStore {
             )
         )
         guard context.participantID == binding.participantID, context.sourceID == binding.id,
-              context.keyID == binding.registrationID, context.epoch == KeyEpoch(1),
-              context.identifierRoot == binding.identifierRoot else { throw SourceIdentityKeyring.Failure.recoveryUnavailable }
+              context.keyID == binding.keyID, context.epoch == binding.keyEpoch,
+              context.identifierRoot == binding.identifierRoot,
+              context.repository == (try binding.repositoryScope) else { throw SourceIdentityKeyring.Failure.recoveryUnavailable }
         return context
     }
 

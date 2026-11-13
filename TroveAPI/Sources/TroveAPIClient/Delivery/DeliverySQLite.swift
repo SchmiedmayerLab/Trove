@@ -13,6 +13,7 @@ import Foundation
 /// Private connection owned exclusively by DeliveryJournal; never crosses actor isolation.
 final class DeliverySQLite {
     enum Value {
+        case null
         case text(String)
         case blob(Data)
         case integer(Int64)
@@ -73,6 +74,8 @@ final class DeliverySQLite {
             let index = Int32(offset + 1)
             let result: Int32
             switch value {
+            case .null:
+                result = sqlite3_bind_null(statement, index)
             case .text(let text):
                 result = text.withCString { trove_delivery_bind_text(statement, index, $0, Int32(text.utf8.count)) }
             case .blob(let bytes):

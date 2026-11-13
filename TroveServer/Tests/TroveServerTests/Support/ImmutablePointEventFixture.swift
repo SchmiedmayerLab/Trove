@@ -34,7 +34,7 @@ enum ImmutablePointEventFixture {
         process.arguments = [
             "python3", root.appendingPathComponent("TroveInfrastructure/validator/rekey_fixture.py").path,
             "--assets", assets, "--fixture", url.path,
-            "--identifier-root", source.identifierRoot, "--registration-id", source.registrationID.uuidString.lowercased(),
+            "--identifier-root", source.identifierRoot, "--registration-id", source.keyID.uuidString.lowercased(),
             "--participant-system", source.participantIdentifierSystem, "--participant-value", source.participantIdentifierValue,
             "--effective-at", timestamp, "--sequence", String(sequence)
         ]

@@ -61,6 +61,10 @@ extension Controller {
         grove[SourceBindingService.self]
     }
 
+    var sourceInstallationService: SourceInstallationService {
+        grove[SourceInstallationService.self]
+    }
+
     var clinicalEventService: ClinicalEventService {
         grove[ClinicalEventService.self]
     }

@@ -107,7 +107,7 @@ struct ClinicalGraphStoreTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let other = try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                let other = try await SourceBindingService(database: app.db).registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
                 let target = Self.event(source: other, sequence: 1, includesContext: true)
                 let dependent = Self.event(source: fixture.source, sequence: 2, includesContext: false)
                 let store = ClinicalEventStore(database: app.db)

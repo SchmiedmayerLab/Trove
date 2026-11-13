@@ -212,14 +212,35 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /participant/profile`.
     /// - Remark: Generated from `#/paths//participant/profile/put`.
     func putParticipantProfile(_ input: Operations.PutParticipantProfile.Input) async throws -> Operations.PutParticipantProfile.Output
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
     /// - Remark: Generated from `#/paths//participant/sources/post`.
     func postParticipantSources(_ input: Operations.PostParticipantSources.Input) async throws -> Operations.PostParticipantSources.Output
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    func getParticipantSourceInstallation(_ input: Operations.GetParticipantSourceInstallation.Input) async throws -> Operations.GetParticipantSourceInstallation.Output
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    func revokeParticipantSourceInstallation(_ input: Operations.RevokeParticipantSourceInstallation.Input) async throws -> Operations.RevokeParticipantSourceInstallation.Output
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    func recoverParticipantSourceIdentity(_ input: Operations.RecoverParticipantSourceIdentity.Input) async throws -> Operations.RecoverParticipantSourceIdentity.Output
     /// Get an app data stream owned by the authenticated participant
     ///
     /// - Remark: HTTP `GET /participant/sources/{sourceId}`.
@@ -861,9 +882,9 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
@@ -873,6 +894,53 @@ extension APIProtocol {
         body: Operations.PostParticipantSources.Input.Body
     ) async throws -> Operations.PostParticipantSources.Output {
         try await postParticipantSources(Operations.PostParticipantSources.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    public func getParticipantSourceInstallation(
+        path: Operations.GetParticipantSourceInstallation.Input.Path,
+        headers: Operations.GetParticipantSourceInstallation.Input.Headers = .init()
+    ) async throws -> Operations.GetParticipantSourceInstallation.Output {
+        try await getParticipantSourceInstallation(Operations.GetParticipantSourceInstallation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    public func revokeParticipantSourceInstallation(
+        path: Operations.RevokeParticipantSourceInstallation.Input.Path,
+        headers: Operations.RevokeParticipantSourceInstallation.Input.Headers = .init()
+    ) async throws -> Operations.RevokeParticipantSourceInstallation.Output {
+        try await revokeParticipantSourceInstallation(Operations.RevokeParticipantSourceInstallation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    public func recoverParticipantSourceIdentity(
+        path: Operations.RecoverParticipantSourceIdentity.Input.Path,
+        headers: Operations.RecoverParticipantSourceIdentity.Input.Headers = .init(),
+        body: Operations.RecoverParticipantSourceIdentity.Input.Body
+    ) async throws -> Operations.RecoverParticipantSourceIdentity.Output {
+        try await recoverParticipantSourceIdentity(Operations.RecoverParticipantSourceIdentity.Input(
+            path: path,
             headers: headers,
             body: body
         ))

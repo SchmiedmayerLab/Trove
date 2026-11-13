@@ -108,11 +108,11 @@ struct ClinicalEventReceiptHTTPTests {
     }
 
     @Test
-    func anotherOwnedStreamCannotRecoverTheReceipt() async throws {
+    func anotherOwnedRepositoryCannotRecoverTheReceipt() async throws {
         try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
             let fixture = try await Self.prepare(on: app)
             let other = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                try await SourceBindingService(database: app.db).registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
             }
             try await app.test(.POST, Self.path(other.id), beforeRequest: {
                 $0.bearerAuth(token)

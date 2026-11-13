@@ -137,7 +137,7 @@ struct ClinicalEventStore: Sendable {
 
     private func validateSource(_ event: ValidatedExchangeEvent, source: SourceBinding) throws {
         let participant = ValidatedExchangeEvent.Identifier(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)
-        let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+        let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID)
         // Registered source ownership establishes authority; knowledge of an opaque version does not.
         let lifecycleSystem = event.retraction == nil ? namespaces.recordVersion : namespaces.recordRetraction
         guard event.eventIdentifierSystem == lifecycleSystem.rawValue,

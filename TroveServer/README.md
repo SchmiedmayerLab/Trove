@@ -191,21 +191,44 @@ production readiness.
 
 ## Participant Data Sources
 
-Participant identity is the verified token's exact issuer and subject pair, not the
-subject alone. App streams are registered through `POST /participant/sources` using a
-participant-scoped registration UUID. The server assigns the source identity and event
-namespace. Retrying returns the same registration, even after revocation. Only its owner
-can read or revoke it; revocation is permanent and does not delete retained history.
+Participant identity is the verified token's exact issuer and subject pair. Each
+participant has one logical source per native repository (`healthkit` or
+`sensorkit`). `POST /participant/sources` registers an installation UUID and
+credential against that source. Reinstalling or registering another device
+preserves the source's key ID/epoch, identifier root and repository scope.
+Registration returns public source and installation descriptors, without key bytes.
+Retries require the original credential and return retained state, including
+permanent revocation.
 
-The response also supplies the ten distinct Grove pseudonymous identifier systems.
-They are derived from the immutable event namespace using versioned metadata names
-and Grove's deterministic UUID mapping; no additional database state is needed.
-Clients persist the returned set rather than deriving it or choosing defaults.
-These public namespaces neither contain nor generate the client's privacy key.
+`POST /participant/source-installations/{registrationId}/identity` requires both
+verified account ownership and the installation credential. It recovers the
+server-provisioned HMAC key only for active source and installation records, commits
+a disclosure audit before returning it, and sends `Cache-Control: no-store`.
+Missing or unverifiable key material never creates a replacement identity. The
+client derives all thirteen Grove namespaces from the explicit root, key ID and
+epoch, and uses the returned repository scope for conversion. Matching native IDs
+under this context retain their identity across installations; distinct native
+IDs are not merged by matching measurement values or timestamps.
 
-Registration is not provider attestation, enrollment, consent or a study data grant.
-The registration endpoints accept no health data. The retired resource-upload endpoint
-remains absent.
+Installation revocation is independent of logical-source revocation. The verified
+owner can revoke a lost installation without its credential. Both forms preserve
+history and cannot be reversed. Registration and key possession are not provider
+attestation, enrollment, consent or a study data grant. Identity keys are separate
+from optional installation signing keys.
+
+Serving processes require `SOURCE_IDENTITY_KEYRING_FILE`, a restricted regular file
+containing a version-1 JSON object with `currentKeyID` and a `keys` array of
+`{id, keyBase64}` entries. Each encryption key must be exactly 32 bytes in canonical
+base64; retain historical keys during rotation. The server encrypts each participant
+identity key with AES-256-GCM bound to its complete ownership and identity context.
+Rewrapping changes storage encryption without changing resource identities. No
+production fallback generates a deployment key. Ephemeral UI-test databases use
+an explicitly ephemeral keyring.
+
+Before activating shared-source collection, finish installation checks on upload
+admission, cross-device deletion authority and deployment secret provisioning.
+The registration endpoints accept no health data; the retired resource-upload
+endpoint remains absent.
 
 ## Event Admission
 

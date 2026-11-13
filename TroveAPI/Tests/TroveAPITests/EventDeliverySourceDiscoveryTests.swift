@@ -19,14 +19,14 @@ struct EventDeliverySourceDiscoveryTests {
             let active = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             let setup = try await journal.createSource(localID: UUID(), queryDefinition: Data([2]))
             var binding = DeliveryFixture.binding(sourceID: UUID(), registrationID: setup.registrationID)
-            binding.revokedAt = binding.createdAt
+            binding.source.revokedAt = binding.source.createdAt
             let revoked = try await journal.confirmSource(binding, for: setup)
             _ = try await DeliveryFixture.stage(journal, changes: ["retained"])
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             let expected = [pending, active, revoked].sorted { $0.localID.uuidString < $1.localID.uuidString }
             let connection = try DeliverySQLite(url: url)
             defer { connection.close() }
-            let keyQuery = "SELECT privacy_key FROM source_state ORDER BY local_id"
+            let keyQuery = "SELECT privacy_key FROM source_state WHERE privacy_key IS NOT NULL ORDER BY local_id"
             let keys = try connection.query(keyQuery) { try DeliverySQLite.blob($0, 0) }
             #expect(try await journal.sourceSetups() == expected)
             await journal.close()
@@ -43,7 +43,7 @@ struct EventDeliverySourceDiscoveryTests {
         }
     }
 
-    @Test(arguments: ["local_id", "privacy_key", "query_definition", "binding", "source_id", "producer_system"])
+    @Test(arguments: ["local_id", "privacy_key", "installation_credential", "query_definition", "binding", "source_id", "producer_system"])
     func corruptStreamRejectsTheWholeSnapshot(field: String) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let pending = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
@@ -53,6 +53,7 @@ struct EventDeliverySourceDiscoveryTests {
             let assignments = [
                 "local_id": "local_id = 'not-a-uuid'",
                 "privacy_key": "privacy_key = x'00'",
+                "installation_credential": "installation_credential = x'00'",
                 "query_definition": "query_definition = zeroblob(16385)",
                 "binding": "binding = x'00'",
                 "source_id": "source_id = '00000000-0000-0000-0000-000000000000'",
@@ -126,7 +127,7 @@ extension EventDeliverySourceDiscoveryTests {
     private static func insertPendingSource(_ connection: DeliverySQLite) throws {
         try connection.execute(
             """
-            INSERT INTO source_state(local_id, privacy_key, query_definition, next_sequence, checkpoint_revision)
+            INSERT INTO source_state(local_id, installation_credential, query_definition, next_sequence, checkpoint_revision)
             VALUES (?, zeroblob(32), x'01', 1, ?)
             """,
             [.text(UUID().uuidString.lowercased()), .text(UUID().uuidString.lowercased())]

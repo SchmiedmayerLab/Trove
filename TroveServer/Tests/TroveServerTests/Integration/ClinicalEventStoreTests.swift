@@ -162,7 +162,7 @@ struct ClinicalEventStoreTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await Self.prepare(on: app)
             try await AuthContext.$current.withValue(Self.participant) {
-                let otherSource = try await app.grove[SourceBindingService.self].register(registrationID: UUID())
+                let otherSource = try await app.grove[SourceBindingService.self].registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
                 await #expect {
                     try await ClinicalEventStore(database: app.db).accept(
                         Self.event(source: fixture.source), sourceID: otherSource.id, targets: fixture.targets
@@ -387,7 +387,7 @@ extension ClinicalEventStoreTests {
                 }
                 enrollmentIDs.append(id)
             }
-            let source = try await app.grove[SourceBindingService.self].register(registrationID: UUID())
+            let source = try await app.grove[SourceBindingService.self].registerSource(registrationID: UUID())
             return Fixture(source: source, studyIDs: studyIDs, enrollmentIDs: enrollmentIDs, consentIDs: consentIDs)
         }
     }

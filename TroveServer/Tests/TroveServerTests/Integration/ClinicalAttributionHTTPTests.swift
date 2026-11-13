@@ -31,7 +31,10 @@ struct ClinicalAttributionHTTPTests {
             }
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await configureServices(
-                    for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: FHIRValidationClient(application: reopened)
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: FHIRValidationClient(application: reopened),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
                 let retry = try await Self.send(body, path: Self.path(fixture, event: event), token: token, on: reopened)

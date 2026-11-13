@@ -37,15 +37,18 @@ struct ClientBackfillDeliveryTests {
                 backend: Servers.Server1.url().absoluteString, issuer: TestApp.issuer, subject: "test-participant"
             )
             let staged = try await ClientDeliveryRecoveryTests.withJournal(url: url, scope: scope, mode: .createNew) { journal in
-                try await Self.stagePages(journal: journal, fixture: fixture)
+                try await Self.stagePages(journal: journal, fixture: fixture, receiver: (app, token))
             }
-            // Reopen before any network request: acquisition does not depend on an uploader staying alive.
+            // Reopen before any upload: acquisition does not depend on an uploader staying alive.
             try await ClientDeliveryRecoveryTests.withJournal(url: url, scope: scope, mode: .openExisting) { journal in
                 try await Self.deliver(staged, journal: journal, fixture: fixture, on: app, token: token)
             }
             try await TestDatabase.withRestartedApplication(app) { reopened in
-                await configureServices(
-                    for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: ClinicalEventBatchTests.validator()
+                try await configureServices(
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: ClinicalEventBatchTests.validator(),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
                 try await ClientDeliveryRecoveryTests.withJournal(url: url, scope: scope, mode: .openExisting) { journal in
@@ -58,11 +61,12 @@ struct ClientBackfillDeliveryTests {
 
 
 extension ClientBackfillDeliveryTests {
-    private static func stagePages(journal: EventDeliveryJournal, fixture: ClinicalEventStoreTests.Fixture) async throws -> Staged {
-        let setup = try await journal.createSource(
-            localID: fixture.source.registrationID, queryDefinition: Data("synthetic-paged-backfill-v1".utf8)
+    private static func stagePages(
+        journal: EventDeliveryJournal, fixture: ClinicalEventStoreTests.Fixture, receiver: (Application, String?)
+    ) async throws -> Staged {
+        try await SourceBindingFixture.registerJournal(
+            journal, source: fixture.source, query: Data("synthetic-paged-backfill-v1".utf8), receiver: receiver
         )
-        try await journal.confirmSource(.init(fixture.source), for: setup)
         let payloads = try (1...18).map { sequence in
             let bytes = try LocalPointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence), recordID: "sample-\(sequence)")
             let projection = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-target-selection-only")

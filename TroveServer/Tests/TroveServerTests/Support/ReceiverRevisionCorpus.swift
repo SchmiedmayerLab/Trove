@@ -61,7 +61,7 @@ struct ReceiverRevisionCorpus: Decodable, Sendable {
         process.arguments = [
             "python3", root.appendingPathComponent("TroveInfrastructure/validator/prepare_revision_corpus.py").path,
             "--assets", assets, "--corpus", corpus,
-            "--identifier-root", source.identifierRoot, "--registration-id", source.registrationID.uuidString.lowercased(),
+            "--identifier-root", source.identifierRoot, "--registration-id", source.keyID.uuidString.lowercased(),
             "--participant-system", source.participantIdentifierSystem, "--participant-value", source.participantIdentifierValue,
             "--effective-at", try TroveDateTranscoder().encode(Date())
         ]

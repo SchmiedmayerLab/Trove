@@ -17,8 +17,12 @@ extension Controller {
         guard case .json(let body) = input.body else {
             throw ServerError.jsonBodyRequired
         }
-        let binding = try await sourceBindingService.register(registrationID: body.registrationID.requireId())
-        return .ok(.init(body: .json(.init(binding))))
+        let registration = try await sourceInstallationService.register(
+            registrationID: body.registrationID.requireId(),
+            repositoryKind: SourceRepositoryKind(body.repositoryKind),
+            credential: SourceInstallationCredential(base64: body.credentialBase64)
+        )
+        return .ok(.init(body: .json(.init(registration))))
     }
 
     func getParticipantSourcesSourceId(
@@ -44,7 +48,10 @@ extension Components.Schemas.ParticipantSource {
         }
         self.init(
             id: binding.id.uuidString.lowercased(),
-            registrationID: binding.registrationID.uuidString.lowercased(),
+            keyID: binding.keyID.uuidString.lowercased(),
+            keyEpoch: binding.keyEpoch.rawValue,
+            repositoryKind: binding.repositoryKind.apiValue,
+            repositoryScope: .init(system: binding.identifierRoot + "/repository", value: binding.repositoryKind.rawValue),
             kind: kind,
             eventIdentifierSystem: binding.eventIdentifierSystem,
             identifierRoot: binding.identifierRoot,

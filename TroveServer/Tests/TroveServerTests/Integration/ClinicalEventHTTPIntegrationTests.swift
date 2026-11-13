@@ -56,7 +56,9 @@ struct ClinicalEventHTTPIntegrationTests {
                 try await TestDatabase.withRestartedApplication(app) { restarted in
                     let reopenedStorage = try S3ObjectStorageProvider(application: restarted, config: configuration)
                     do {
-                        try await configureServices(for: restarted, storageProvider: reopenedStorage, validator: .init(application: restarted))
+                        let validator = try FHIRValidationClient(application: restarted)
+                        let keyring = try TestApp.sourceKeyring()
+                        await configureServices(for: restarted, storageProvider: reopenedStorage, validator: validator, sourceKeyring: keyring)
                         _ = try await TestApp.configureTransport(for: restarted)
                         let afterRestart = try await Self.upload(bytes, fixture: fixture, token: token, on: restarted)
                         #expect(afterRestart == receipt)

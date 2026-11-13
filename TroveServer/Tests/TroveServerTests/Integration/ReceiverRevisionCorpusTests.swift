@@ -45,7 +45,10 @@ struct ReceiverRevisionCorpusTests {
             let final = try #require(sequence.steps.last).expect
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await configureServices(
-                    for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: FHIRValidationClient(application: reopened)
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: FHIRValidationClient(application: reopened),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
                 let assertion = ReceiverRevisionAssertions(fixture: fixture, prepared: prepared, receipts: accepted)

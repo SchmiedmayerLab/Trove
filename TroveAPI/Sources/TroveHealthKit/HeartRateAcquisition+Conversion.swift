@@ -35,7 +35,7 @@ extension HeartRateAcquisition {
         return try HealthKitFHIRExporter(
             producer: producer,
             repositoryScope: BusinessIdentifier(
-                system: IdentifierSystem(source.identifierRoot + "/repository"), value: "healthkit"
+                system: IdentifierSystem(source.repositoryScope.system), value: source.repositoryScope.value
             )
         )
     }

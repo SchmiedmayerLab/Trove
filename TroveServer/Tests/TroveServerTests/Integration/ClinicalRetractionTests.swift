@@ -61,7 +61,7 @@ struct ClinicalRetractionTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let other = try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                let other = try await SourceBindingService(database: app.db).registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
                 let store = ClinicalEventStore(database: app.db)
                 let first = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
                 let second = ClinicalRecordStoreTests.event(source: other, sequence: 1, version: "1")

@@ -116,7 +116,7 @@ struct SharedDeliveryJournalTests {
         do {
             let setup = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
             let sourceID = UUID()
-            try await journal.confirmSource(.init(id: sourceID, registrationID: setup.localID), for: setup)
+            try await journal.confirmSource(.init(id: sourceID, registrationID: setup.localID), for: setup, identityKey: DeliveryFixture.identityKey)
             try await operation(journal, url, sourceID)
             await journal.close()
         } catch {

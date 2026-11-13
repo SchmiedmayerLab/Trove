@@ -25,7 +25,7 @@ enum LocalPointEventFixture {
         var document = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
         var entries = try #require(document["entry"] as? [[String: Any]])
         var replacements = try recordID.map { try recordReplacements(in: previous, source: source, recordID: $0) } ?? [:]
-        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID)
         let identifiers = try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: original)
         for (role, oldSystems) in identifiers.systems {
             for oldSystem in oldSystems {

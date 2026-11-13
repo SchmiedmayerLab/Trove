@@ -1475,31 +1475,88 @@ extension Components {
                 ])
             }
         }
-        /// Server-assigned identity for an unverified participant-app stream. Identifiers are not credentials. Every use requires participant authentication and ownership checks. This is not provider attestation.
+        /// Native repository identity; assignment alone does not imply receiver support for every data type.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NativeSourceRepository`.
+        @frozen public enum NativeSourceRepository: String, Codable, Hashable, Sendable, CaseIterable {
+            case healthkit = "healthkit"
+            case sensorkit = "sensorkit"
+        }
+        /// Canonical base64 of a random 256-bit installation secret, independent of identity and signing keys.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SourceInstallationCredential`.
+        public typealias SourceInstallationCredential = Swift.String
+        /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier`.
+        public struct SourceBusinessIdentifier: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier/system`.
+            public var system: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier/value`.
+            public var value: Swift.String
+            /// Creates a new `SourceBusinessIdentifier`.
+            ///
+            /// - Parameters:
+            ///   - system:
+            ///   - value:
+            public init(
+                system: Swift.String,
+                value: Swift.String
+            ) {
+                self.system = system
+                self.value = value
+            }
+            public enum CodingKeys: String, CodingKey {
+                case system
+                case value
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.system = try container.decode(
+                    Swift.String.self,
+                    forKey: .system
+                )
+                self.value = try container.decode(
+                    Swift.String.self,
+                    forKey: .value
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "system",
+                    "value"
+                ])
+            }
+        }
+        /// Server-assigned logical source shared by a participant's authorized installations for one native repository. Identifiers are not credentials or provider attestation. Reinstalling does not change this identity.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/ParticipantSource`.
         public struct ParticipantSource: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/id`.
             public var id: Swift.String
-            /// - Remark: Generated from `#/components/schemas/ParticipantSource/registrationID`.
-            public var registrationID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/keyID`.
+            public var keyID: Swift.String
+            /// Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/keyEpoch`.
+            public var keyEpoch: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/repositoryKind`.
+            public var repositoryKind: Components.Schemas.NativeSourceRepository
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/repositoryScope`.
+            public var repositoryScope: Components.Schemas.SourceBusinessIdentifier
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case participantApp = "participant-app"
             }
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/kind`.
             public var kind: Components.Schemas.ParticipantSource.KindPayload
-            /// Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
+            /// Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/eventIdentifierSystem`.
             public var eventIdentifierSystem: Swift.String
-            /// Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived recordVersion system must equal eventIdentifierSystem. The client persists its identity key, pending conversion instant and canonical record bytes in its account-scoped delivery journal.
+            /// Derive DeploymentIdentifierSystems from this server-assigned root, keyID and keyEpoch. The derived recordVersion system must equal eventIdentifierSystem. Use the supplied repositoryScope in all conversions and retain exact staged record bytes across retries.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/identifierRoot`.
             public var identifierRoot: Swift.String
-            /// Complete FHIR Patient business identifier assigned to this participant.
+            /// Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/participantIdentifier`.
             public struct ParticipantIdentifierPayload: Codable, Hashable, Sendable {
@@ -1539,13 +1596,13 @@ extension Components {
                     ])
                 }
             }
-            /// Complete FHIR Patient business identifier assigned to this participant.
+            /// Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/participantIdentifier`.
             public var participantIdentifier: Components.Schemas.ParticipantSource.ParticipantIdentifierPayload
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/createdAt`.
             public var createdAt: Foundation.Date
-            /// Present only after permanent revocation; never cleared.
+            /// Permanent logical-source revocation affects every installation; never cleared.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/revokedAt`.
             public var revokedAt: Foundation.Date?
@@ -1553,16 +1610,22 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id:
-            ///   - registrationID:
+            ///   - keyID:
+            ///   - keyEpoch: Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+            ///   - repositoryKind:
+            ///   - repositoryScope:
             ///   - kind:
-            ///   - eventIdentifierSystem: Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
-            ///   - identifierRoot: Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived recordVersion system must equal eventIdentifierSystem. The client persists its identity key, pending conversion instant and canonical record bytes in its account-scoped delivery journal.
-            ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant.
+            ///   - eventIdentifierSystem: Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
+            ///   - identifierRoot: Derive DeploymentIdentifierSystems from this server-assigned root, keyID and keyEpoch. The derived recordVersion system must equal eventIdentifierSystem. Use the supplied repositoryScope in all conversions and retain exact staged record bytes across retries.
+            ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///   - createdAt:
-            ///   - revokedAt: Present only after permanent revocation; never cleared.
+            ///   - revokedAt: Permanent logical-source revocation affects every installation; never cleared.
             public init(
                 id: Swift.String,
-                registrationID: Swift.String,
+                keyID: Swift.String,
+                keyEpoch: Swift.String,
+                repositoryKind: Components.Schemas.NativeSourceRepository,
+                repositoryScope: Components.Schemas.SourceBusinessIdentifier,
                 kind: Components.Schemas.ParticipantSource.KindPayload,
                 eventIdentifierSystem: Swift.String,
                 identifierRoot: Swift.String,
@@ -1571,7 +1634,10 @@ extension Components {
                 revokedAt: Foundation.Date? = nil
             ) {
                 self.id = id
-                self.registrationID = registrationID
+                self.keyID = keyID
+                self.keyEpoch = keyEpoch
+                self.repositoryKind = repositoryKind
+                self.repositoryScope = repositoryScope
                 self.kind = kind
                 self.eventIdentifierSystem = eventIdentifierSystem
                 self.identifierRoot = identifierRoot
@@ -1581,7 +1647,10 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case id
-                case registrationID
+                case keyID
+                case keyEpoch
+                case repositoryKind
+                case repositoryScope
                 case kind
                 case eventIdentifierSystem
                 case identifierRoot
@@ -1595,9 +1664,21 @@ extension Components {
                     Swift.String.self,
                     forKey: .id
                 )
-                self.registrationID = try container.decode(
+                self.keyID = try container.decode(
                     Swift.String.self,
-                    forKey: .registrationID
+                    forKey: .keyID
+                )
+                self.keyEpoch = try container.decode(
+                    Swift.String.self,
+                    forKey: .keyEpoch
+                )
+                self.repositoryKind = try container.decode(
+                    Components.Schemas.NativeSourceRepository.self,
+                    forKey: .repositoryKind
+                )
+                self.repositoryScope = try container.decode(
+                    Components.Schemas.SourceBusinessIdentifier.self,
+                    forKey: .repositoryScope
                 )
                 self.kind = try container.decode(
                     Components.Schemas.ParticipantSource.KindPayload.self,
@@ -1625,13 +1706,156 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "id",
-                    "registrationID",
+                    "keyID",
+                    "keyEpoch",
+                    "repositoryKind",
+                    "repositoryScope",
                     "kind",
                     "eventIdentifierSystem",
                     "identifierRoot",
                     "participantIdentifier",
                     "createdAt",
                     "revokedAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation`.
+        public struct ParticipantSourceInstallation: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/registrationID`.
+            public var registrationID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/sourceID`.
+            public var sourceID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/createdAt`.
+            public var createdAt: Foundation.Date
+            /// Permanent installation revocation; other installations retain independent authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/revokedAt`.
+            public var revokedAt: Foundation.Date?
+            /// Creates a new `ParticipantSourceInstallation`.
+            ///
+            /// - Parameters:
+            ///   - registrationID:
+            ///   - sourceID:
+            ///   - createdAt:
+            ///   - revokedAt: Permanent installation revocation; other installations retain independent authority.
+            public init(
+                registrationID: Swift.String,
+                sourceID: Swift.String,
+                createdAt: Foundation.Date,
+                revokedAt: Foundation.Date? = nil
+            ) {
+                self.registrationID = registrationID
+                self.sourceID = sourceID
+                self.createdAt = createdAt
+                self.revokedAt = revokedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case registrationID
+                case sourceID
+                case createdAt
+                case revokedAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.registrationID = try container.decode(
+                    Swift.String.self,
+                    forKey: .registrationID
+                )
+                self.sourceID = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceID
+                )
+                self.createdAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .createdAt
+                )
+                self.revokedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .revokedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "registrationID",
+                    "sourceID",
+                    "createdAt",
+                    "revokedAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration`.
+        public struct ParticipantSourceRegistration: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration/source`.
+            public var source: Components.Schemas.ParticipantSource
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration/installation`.
+            public var installation: Components.Schemas.ParticipantSourceInstallation
+            /// Creates a new `ParticipantSourceRegistration`.
+            ///
+            /// - Parameters:
+            ///   - source:
+            ///   - installation:
+            public init(
+                source: Components.Schemas.ParticipantSource,
+                installation: Components.Schemas.ParticipantSourceInstallation
+            ) {
+                self.source = source
+                self.installation = installation
+            }
+            public enum CodingKeys: String, CodingKey {
+                case source
+                case installation
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.source = try container.decode(
+                    Components.Schemas.ParticipantSource.self,
+                    forKey: .source
+                )
+                self.installation = try container.decode(
+                    Components.Schemas.ParticipantSourceInstallation.self,
+                    forKey: .installation
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "source",
+                    "installation"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery`.
+        public struct ParticipantSourceIdentityRecovery: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery/registration`.
+            public var registration: Components.Schemas.ParticipantSourceRegistration
+            /// Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery/identityKeyBase64`.
+            public var identityKeyBase64: Swift.String
+            /// Creates a new `ParticipantSourceIdentityRecovery`.
+            ///
+            /// - Parameters:
+            ///   - registration:
+            ///   - identityKeyBase64: Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
+            public init(
+                registration: Components.Schemas.ParticipantSourceRegistration,
+                identityKeyBase64: Swift.String
+            ) {
+                self.registration = registration
+                self.identityKeyBase64 = identityKeyBase64
+            }
+            public enum CodingKeys: String, CodingKey {
+                case registration
+                case identityKeyBase64
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.registration = try container.decode(
+                    Components.Schemas.ParticipantSourceRegistration.self,
+                    forKey: .registration
+                )
+                self.identityKeyBase64 = try container.decode(
+                    Swift.String.self,
+                    forKey: .identityKeyBase64
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "registration",
+                    "identityKeyBase64"
                 ])
             }
         }

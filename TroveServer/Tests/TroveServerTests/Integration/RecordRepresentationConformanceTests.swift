@@ -77,8 +77,7 @@ extension RecordRepresentationConformanceTests {
         let scope = try EventDeliveryJournal.Scope(backend: Servers.Server1.url().absoluteString, issuer: TestApp.issuer, subject: "test-participant")
         let journalURL = directory.appendingPathComponent("journal.sqlite")
         try await ClientDeliveryRecoveryTests.withJournal(url: journalURL, scope: scope, mode: .createNew) { journal in
-            let setup = try await journal.createSource(localID: fixture.source.registrationID, queryDefinition: Data([1]))
-            try await journal.confirmSource(.init(fixture.source), for: setup)
+            try await SourceBindingFixture.registerJournal(journal, source: fixture.source, query: Data([1]), receiver: (application, token))
             let payloads = try (active + retractions).map { bytes in
                 let projection = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "fixture")
                 let targets = projection.retraction == nil ? fixture.targets(for: projection) : []

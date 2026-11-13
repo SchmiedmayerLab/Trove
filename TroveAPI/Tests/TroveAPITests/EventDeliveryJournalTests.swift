@@ -109,8 +109,9 @@ struct EventDeliveryJournalTests {
             }
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var changed = try #require(setup.binding)
-            changed.identifierRoot = "https://trove.test/replacement"
-            changed.eventIdentifierSystem = changed.identifierRoot + "/NamingSystem/grove-record-version-v0/\(DeliveryFixture.epoch.uuidString.lowercased())/1"
+            changed.source.identifierRoot = "https://trove.test/replacement"
+            changed.source.eventIdentifierSystem = changed.source.identifierRoot + "/NamingSystem/grove-record-version-v0/\(DeliveryFixture.epoch.uuidString.lowercased())/1"
+            changed.source.repositoryScope.system = changed.source.identifierRoot + "/repository"
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) { try await journal.confirmSource(changed, for: setup) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) {
                 try await journal.createSource(localID: DeliveryFixture.epoch, queryDefinition: Data("different-predicate".utf8))

@@ -37,7 +37,7 @@ struct ClientDeliveryRecoveryTests {
 
     @Test
     func authenticationFailureRetainsTheWholeBatchAndStopsFurtherRequests() async throws {
-        try await TestApp.withApp(token: .none, validator: ClinicalEventBatchTests.validator()) { app, token in
+        try await TestApp.withApp(token: .participant(subject: "test-participant"), validator: ClinicalEventBatchTests.validator()) { app, token in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
                 .appendingPathComponent("trove-client-auth-\(UUID())", isDirectory: true)
@@ -47,8 +47,8 @@ struct ClientDeliveryRecoveryTests {
                 backend: Servers.Server1.url().absoluteString, issuer: TestApp.issuer, subject: "test-participant"
             )
             try await Self.withJournal(url: directory.appendingPathComponent("delivery.sqlite"), scope: scope, mode: .createNew) { journal in
-                let staged = try await Self.stage(journal: journal, fixture: fixture, fullValidation: false)
-                let transport = ReceiverClientTransport(application: app, token: token)
+                let staged = try await Self.stage(journal: journal, fixture: fixture, fullValidation: false, receiver: (app, token))
+                let transport = ReceiverClientTransport(application: app, token: nil)
                 let drainer = try Self.drainer(journal: journal, transport: transport)
                 for _ in 0..<2 {
                     await #expect(throws: EventDeliveryDrainer.DeliveryError.authenticationRequired) { try await drainer.drain() }
@@ -83,7 +83,7 @@ extension ClientDeliveryRecoveryTests {
                 backend: Servers.Server1.url().absoluteString, issuer: TestApp.issuer, subject: "test-participant"
             )
             let staged = try await withJournal(url: url, scope: scope, mode: .createNew) { journal in
-                let staged = try await stage(journal: journal, fixture: fixture, fullValidation: fullValidation)
+                let staged = try await stage(journal: journal, fixture: fixture, fullValidation: fullValidation, receiver: (app, token))
                 try await loseReply(staged, journal: journal, on: app, token: token)
                 try await expectStored(fixture: fixture, payload: staged.payloads[0], on: app)
                 try await withdraw(fixture: fixture, on: app, token: token, revokeSource: revokeSource)
@@ -93,7 +93,8 @@ extension ClientDeliveryRecoveryTests {
                 try await configureServices(
                     for: reopened,
                     storageProvider: InMemoryObjectStorageProvider(),
-                    validator: fullValidation ? FHIRValidationClient(application: reopened) : ClinicalEventBatchTests.validator()
+                    validator: fullValidation ? FHIRValidationClient(application: reopened) : ClinicalEventBatchTests.validator(),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
                 try await expectSource(fixture.source, revoked: revokeSource, on: reopened, token: token)
@@ -111,7 +112,7 @@ extension ClientDeliveryRecoveryTests {
         try await app.test(.GET, "\(apiBasePath)/participant/sources/\(source.id)", beforeRequest: { $0.bearerAuth(token) }) { response in
             #expect(response.status == .ok)
             let binding = try response.content.decode(Components.Schemas.ParticipantSource.self)
-            let expectedSystems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+            let expectedSystems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID)
             #expect(try binding.identifierSystems() == expectedSystems)
             #expect((binding.revokedAt != nil) == revoked)
         }
@@ -134,10 +135,11 @@ extension ClientDeliveryRecoveryTests {
     }
 
     private static func stage(
-        journal: EventDeliveryJournal, fixture: ClinicalEventStoreTests.Fixture, fullValidation: Bool
+        journal: EventDeliveryJournal, fixture: ClinicalEventStoreTests.Fixture, fullValidation: Bool, receiver: (Application, String?)
     ) async throws -> Staged {
-        let setup = try await journal.createSource(localID: fixture.source.registrationID, queryDefinition: Data("recovery-fixture-v1".utf8))
-        try await journal.confirmSource(.init(fixture.source), for: setup)
+        try await SourceBindingFixture.registerJournal(
+            journal, source: fixture.source, query: Data("recovery-fixture-v1".utf8), receiver: receiver
+        )
         let payloads = try (1...2).map { sequence in
             let bytes = try fullValidation
                 ? ImmutablePointEventFixture.bytes(source: fixture.source, sequence: UInt64(sequence), recordID: "recovery-\(sequence)")

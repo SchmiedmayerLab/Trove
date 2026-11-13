@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Crypto
 import Fluent
 import JWTKit
 import NIOPosix
@@ -33,6 +34,10 @@ enum TestApp {
     static let apiAudience = "trove-api"
     static let researcherRole = "trove-researcher"
     static let participantRole = "trove-participant"
+
+    static func sourceKeyring() throws -> SourceIdentityKeyring {
+        try .init(currentKeyID: "synthetic-fixture", keys: ["synthetic-fixture": SymmetricKey(data: Data(repeating: 0x71, count: 32))])
+    }
 
     static func withApp(
         token tokenConfig: Token = .researcher(),
@@ -113,6 +118,7 @@ enum TestApp {
             for: app,
             storageProvider: storageProvider,
             validator: validator ?? FHIRValidationClient(application: app),
+            sourceKeyring: TestApp.sourceKeyring(),
             grantorAuthority: grantorAuthority
         )
 
