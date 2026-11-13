@@ -203,6 +203,10 @@ class VerificationInputTests(unittest.TestCase):
         self.assertEqual(ui_job.count("-onlyUsePackageVersionsFromResolvedFile"), 1)
         self.assertIn("git diff --exit-code -- Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved", ui_job)
         self.assertIn("name: Retain resolved iOS dependency lockfile", ui_job)
+        self.assertIn("name: Retain resolved Swift dependency lockfiles", ui_job)
+        for package in ("TroveAPI", "TroveServer"):
+            self.assertIn(f"swift package --package-path ../{package} resolve", ui_job)
+            self.assertIn(f"../{package}/Package.resolved", ui_job)
         self.assertLess(ui_job.index("git diff --exit-code"), ui_job.index("name: Install the native test stack"))
         self.assertIn("-resolvePackageDependencies", ui_job)
         self.assertIn("xcodebuild test", ui_job)

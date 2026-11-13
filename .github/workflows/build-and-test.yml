@@ -152,18 +152,30 @@ jobs:
         run: |
           DEVELOPER_DIR="$MD_APPLE_SDK_ROOT/Contents/Developer" bash scripts/check-xcode.sh
           echo "DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer" >> "$GITHUB_ENV"
-      - name: Resolve and verify iOS dependency lockfile
+      - name: Resolve and verify Apple dependency lockfiles
         id: ios-dependencies
         working-directory: TroveiOS
         run: |
           set -euo pipefail
+          swift package --package-path ../TroveAPI resolve
+          swift package --package-path ../TroveServer resolve
           xcodebuild \
             -project Trove.xcodeproj \
             -scheme Trove \
             -resolvePackageDependencies \
             -derivedDataPath .derivedData \
           | xcbeautify
+          git diff --exit-code -- ../TroveAPI/Package.resolved ../TroveServer/Package.resolved
           git diff --exit-code -- Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+      - name: Retain resolved Swift dependency lockfiles
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-Apple-Swift-Package.resolved
+          path: |
+            TroveAPI/Package.resolved
+            TroveServer/Package.resolved
+          if-no-files-found: error
       - name: Retain resolved iOS dependency lockfile
         if: success() || failure()
         uses: actions/upload-artifact@v7
