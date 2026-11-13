@@ -3,9 +3,8 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:3d3c58d8-455f-5a9a-8f3d-ee6bab809bf8",
             "type": {
               "coding": [
                 {
@@ -14,6 +13,7 @@
                 }
               ]
             },
+            "system": "urn:uuid:3d3c58d8-455f-5a9a-8f3d-ee6bab809bf8",
             "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:chC35jiEDrb8HvN8UUH5mKYVzkgtMiYKBSs746DTwSQ"
           }
         }
@@ -107,26 +107,26 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
             "type": {
               "coding": [
                 {
-                  "code": "device-snapshot",
-                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "device-snapshot"
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:cGjqpBiE3FKR1PhCQ6AdyMzs-bzzDFrvJDrTSAhqIEo"
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:acvDvrlZaK6hzuoOlkjMu0SBYttHQiMoLuuWgHtRewQ"
           }
         }
       ],
-      "fullUrl": "urn:uuid:f4c8967a-c759-5d2c-b3b3-8865fc39647a",
+      "fullUrl": "urn:uuid:cdc9daf5-b646-5656-9000-d0cdefb629b5",
       "resource": {
         "identifier": [
           {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
             "type": {
               "coding": [
                 {
@@ -135,7 +135,7 @@
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:cGjqpBiE3FKR1PhCQ6AdyMzs-bzzDFrvJDrTSAhqIEo"
+            "value": "v0:test-key:1:acvDvrlZaK6hzuoOlkjMu0SBYttHQiMoLuuWgHtRewQ"
           }
         ],
         "meta": {
@@ -164,22 +164,22 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
             "type": {
               "coding": [
                 {
-                  "code": "device-snapshot",
-                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "device-snapshot"
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:LJH3vk1D5cDP6VirAVMsE8Mj91BxQhXHm9QMG0zR6M8"
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:c8vT-KuWAqyLe27nCSS5r77WD7-virP-NxkBCCsq9F0"
           }
         }
       ],
-      "fullUrl": "urn:uuid:a9f0cf36-8f89-51dc-8d3c-73a5945fa41a",
+      "fullUrl": "urn:uuid:0876d5b4-82b9-523f-ba05-f05773fbf5cc",
       "resource": {
         "deviceName": [
           {
@@ -189,7 +189,7 @@
         ],
         "identifier": [
           {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
             "type": {
               "coding": [
                 {
@@ -198,7 +198,7 @@
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:LJH3vk1D5cDP6VirAVMsE8Mj91BxQhXHm9QMG0zR6M8"
+            "value": "v0:test-key:1:c8vT-KuWAqyLe27nCSS5r77WD7-virP-NxkBCCsq9F0"
           },
           {
             "system": "https://grovealliance.org/fhir/healthkit/NamingSystem/apple-bundle-id",
@@ -219,7 +219,7 @@
           ]
         },
         "parent": {
-          "reference": "urn:uuid:f4c8967a-c759-5d2c-b3b3-8865fc39647a"
+          "reference": "urn:uuid:cdc9daf5-b646-5656-9000-d0cdefb629b5"
         },
         "resourceType": "Device",
         "status": "active",
@@ -254,26 +254,26 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
             "type": {
               "coding": [
                 {
-                  "code": "device-snapshot",
-                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "device-snapshot"
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:VLnsLenlk19VkW3A3nUaxD0DD3Sp3i5eBtOeBB_2CMQ"
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:F7CQjMl1eRdkBAjfUSrW5wG2J1CrCBTmyr2UqzX7Lj4"
           }
         }
       ],
-      "fullUrl": "urn:uuid:617a9020-e056-5c07-9528-ea430b9a5bb2",
+      "fullUrl": "urn:uuid:70a382ff-eb57-5130-896b-e6b4d878c191",
       "resource": {
         "identifier": [
           {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
             "type": {
               "coding": [
                 {
@@ -282,7 +282,7 @@
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:VLnsLenlk19VkW3A3nUaxD0DD3Sp3i5eBtOeBB_2CMQ"
+            "value": "v0:test-key:1:F7CQjMl1eRdkBAjfUSrW5wG2J1CrCBTmyr2UqzX7Lj4"
           }
         ],
         "meta": {
@@ -312,22 +312,22 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
             "type": {
               "coding": [
                 {
-                  "code": "device-snapshot",
-                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "device-snapshot"
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:jikHT28lnEc2bW5hZM6TXgUjBAEjysaw26jKbKnX7YE"
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:3UuWu2SQKb6dCvux6bwNceF3XfdKrg_gT1altHVAu20"
           }
         }
       ],
-      "fullUrl": "urn:uuid:50adcc2d-11f0-5367-8fac-52abfc5d1918",
+      "fullUrl": "urn:uuid:33f30305-729b-58dc-a4de-dcc09082fdeb",
       "resource": {
         "deviceName": [
           {
@@ -337,7 +337,7 @@
         ],
         "identifier": [
           {
-            "system": "urn:uuid:62a11054-6c65-595a-976d-e98a03f08288",
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
             "type": {
               "coding": [
                 {
@@ -346,7 +346,7 @@
                 }
               ]
             },
-            "value": "v0:6547366f-d80f-4648-a8a7-2d90a37565b3:1:jikHT28lnEc2bW5hZM6TXgUjBAEjysaw26jKbKnX7YE"
+            "value": "v0:test-key:1:3UuWu2SQKb6dCvux6bwNceF3XfdKrg_gT1altHVAu20"
           },
           {
             "system": "https://grovealliance.org/fhir/healthkit/NamingSystem/apple-bundle-id",
@@ -367,7 +367,7 @@
           ]
         },
         "parent": {
-          "reference": "urn:uuid:617a9020-e056-5c07-9528-ea430b9a5bb2"
+          "reference": "urn:uuid:70a382ff-eb57-5130-896b-e6b4d878c191"
         },
         "resourceType": "Device",
         "status": "active",
@@ -390,22 +390,22 @@
     {
       "extension": [
         {
-          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key",
           "valueIdentifier": {
-            "system": "urn:uuid:75632a53-f286-55f0-b205-18f42862c4f0",
             "type": {
               "coding": [
                 {
-                  "code": "entry-node",
-                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "record-version"
                 }
               ]
             },
-            "value": "n0:conversion-provenance:0:RDuKl9_47_5WuTT8788gM928TK0up5fG7LcX5glXvQY"
+            "system": "https://study.example.org/fhir/NamingSystem/grove-record-version-v0/test-key/1",
+            "value": "v0:test-key:1:ZrKo_5_ZlZhlHDK1VXqNg493icci892L4zfYeHRI_58"
           }
         }
       ],
-      "fullUrl": "urn:uuid:07d493a4-e935-5213-ae5b-521a23fc8392",
+      "fullUrl": "urn:uuid:ca5d94f4-2f8d-5a28-b92e-7afddf62436e",
       "resource": {
         "activity": {
           "coding": [
@@ -428,7 +428,7 @@
               ]
             },
             "who": {
-              "reference": "urn:uuid:a9f0cf36-8f89-51dc-8d3c-73a5945fa41a"
+              "reference": "urn:uuid:0876d5b4-82b9-523f-ba05-f05773fbf5cc"
             }
           }
         ],
@@ -446,7 +446,7 @@
                   ]
                 },
                 "who": {
-                  "reference": "urn:uuid:50adcc2d-11f0-5367-8fac-52abfc5d1918"
+                  "reference": "urn:uuid:33f30305-729b-58dc-a4de-dcc09082fdeb"
                 }
               }
             ],
@@ -479,22 +479,27 @@
           {
             "reference": "urn:uuid:6f93f97e-4464-5f8e-98e0-f0cc3e5649fa"
           }
+        ],
+        "extension": [
+          {
+            "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-record-version",
+            "valueIdentifier": {
+              "type": {
+                "coding": [
+                  {
+                    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                    "code": "record-version"
+                  }
+                ]
+              },
+              "system": "https://study.example.org/fhir/NamingSystem/grove-record-version-v0/test-key/1",
+              "value": "v0:test-key:1:ZrKo_5_ZlZhlHDK1VXqNg493icci892L4zfYeHRI_58"
+            }
+          }
         ]
       }
     }
   ],
-  "identifier": {
-    "system": "urn:uuid:cae7a1af-f228-48ed-8d3d-3db4bdf8b7fa",
-    "type": {
-      "coding": [
-        {
-          "code": "event",
-          "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
-        }
-      ]
-    },
-    "value": "e0:cae7a1af-f228-48ed-8d3d-3db4bdf8b7fa:1"
-  },
   "meta": {
     "profile": [
       "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-exchange-bundle"

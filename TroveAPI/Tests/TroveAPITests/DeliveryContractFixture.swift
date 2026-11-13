@@ -96,7 +96,7 @@ extension FixtureDeliveryContract {
             id: binding.id,
             eventSystem: "urn:example:events",
             revokedAt: nil,
-            systems: .derived(root: "urn:example:fixture", keyID: localID.uuidString.lowercased(), epoch: EventSequence(1))
+            systems: .derived(root: "urn:example:fixture", keyID: localID.uuidString.lowercased(), epoch: KeyEpoch(1))
         )
     }
 

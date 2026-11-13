@@ -123,9 +123,10 @@ jobs:
       contents: read
     with:
       path: TroveiOS
+      xcodeversion: '27.2'
       runsonlabels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
       # Bind the runtime: OS:latest can select an installed runtime without this device.
-      destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
+      destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2'
       # The real-stack job owns UI testing and its service/simulator prerequisites.
       scheme: Trove-UnitTests
       resultBundle: Trove-iOS-Tests.xcresult
@@ -146,7 +147,30 @@ jobs:
       - uses: actions/checkout@v7
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '27.2'
+      - name: Verify and use stable Xcode
+        run: |
+          DEVELOPER_DIR="$MD_APPLE_SDK_ROOT/Contents/Developer" bash scripts/check-xcode.sh
+          echo "DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Resolve and verify iOS dependency lockfile
+        id: ios-dependencies
+        working-directory: TroveiOS
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Trove.xcodeproj \
+            -scheme Trove \
+            -resolvePackageDependencies \
+            -derivedDataPath .derivedData \
+          | xcbeautify
+          git diff --exit-code -- Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+      - name: Retain resolved iOS dependency lockfile
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Trove-iOS-Package.resolved
+          path: TroveiOS/Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+          if-no-files-found: error
       - name: Install the native test stack
         shell: bash
         env:
@@ -174,25 +198,16 @@ jobs:
         run: |
           dev_password="$(jq -r '.users[] | select(.username == "alice@example.com") | .credentials[] | select(.type == "password") | .value' TroveInfrastructure/docker/keycloak/realm.json)"
           KEYCLOAK_DEV_PASSWORD="$dev_password" TroveiOS/scripts/seed-ui-test.sh
-      - name: Resolve iOS dependencies
-        working-directory: TroveiOS
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project Trove.xcodeproj \
-            -scheme Trove \
-            -resolvePackageDependencies \
-            -onlyUsePackageVersionsFromResolvedFile \
-            -derivedDataPath .derivedData \
-          | xcbeautify
       - name: Prepare an isolated UI-test simulator
         id: simulator
         timeout-minutes: 5
         run: |
           set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
           udid="$(xcrun simctl create "Trove-UI-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
             com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
-            com.apple.CoreSimulator.SimRuntime.iOS-27-0)"
+            com.apple.CoreSimulator.SimRuntime.iOS-27-2)"
           # Record ownership before boot so cleanup also runs after preparation failure.
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
@@ -351,7 +366,11 @@ jobs:
       - uses: actions/checkout@v7
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '27.2'
+      - name: Verify and use stable Xcode
+        run: |
+          DEVELOPER_DIR="$MD_APPLE_SDK_ROOT/Contents/Developer" bash scripts/check-xcode.sh
+          echo "DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer" >> "$GITHUB_ENV"
       - name: Download native unit-test coverage
         if: needs.ios.result == 'success'
         uses: actions/download-artifact@v8

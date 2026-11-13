@@ -16,7 +16,7 @@ struct EventDeliveryGroupTests {
     func aQueryGroupCommitsEveryEventWithOneCursorAndReopensExactly() async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payloads = (1...3).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["add:\($0)"]) }
+            let payloads = try (1...3).map { try DeliveryFixture.payload(sequence: Int64($0), changes: ["add:\($0)"]) }
             let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             #expect(ids.count == 3 && Set(ids).count == 3)
             let originals = try await Self.attempts(ids, in: journal)
@@ -35,7 +35,7 @@ struct EventDeliveryGroupTests {
     func aMalformedMemberRollsBackEarlierMembersAndCursor(failingIndex: Int) async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            var payloads = (1...3).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
+            var payloads = try (1...3).map { try DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
             payloads[failingIndex] = .init(bytes: Data("invalid".utf8), targets: [])
             await #expect(throws: EventSubmissionCommitment.ValidationError.invalidEnvelope) {
                 try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
@@ -49,7 +49,7 @@ struct EventDeliveryGroupTests {
     func aGroupCannotPartiallyCommitAtCapacity() async throws {
         try await DeliveryFixture.withJournal(limits: .init(maximumEvents: 1)) { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payloads = (1...2).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
+            let payloads = try (1...2).map { try DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
             await #expect(throws: EventDeliveryJournal.JournalError.capacityExceeded) {
                 try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             }
@@ -62,7 +62,7 @@ struct EventDeliveryGroupTests {
     func oversizedGroupCannotAdvanceTheCursor() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payloads = (1...129).map { DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
+            let payloads = try (1...129).map { try DeliveryFixture.payload(sequence: Int64($0), changes: ["sample"]) }
             await #expect(throws: EventDeliveryJournal.JournalError.invalidConfiguration) {
                 try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: payloads)
             }
@@ -71,16 +71,19 @@ struct EventDeliveryGroupTests {
     }
 
     @Test
-    func wireSequenceBelongsToTheProducerNotTheQueue() async throws {
+    func recordVersionIsPreservedIndependentlyOfTheQueueSequence() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             let producer = UUID()
-            let payload = DeliveryFixture.payload(sequence: 42, changes: ["sample"], producerID: producer)
+            let payload = try DeliveryFixture.payload(sequence: 42, changes: ["sample"], producerID: producer)
             let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload])
             let id = try #require(ids.first)
             let attempt = try #require(await journal.prepareAttempt(id))
             #expect(attempt.bytes == payload.bytes)
-            #expect(attempt.commitment.producerEventIdentifier.value == "e0:\(producer.uuidString.lowercased()):42")
+            let original = try EventSubmissionCommitment(
+                sourceID: DeliveryFixture.sourceID, originalBytes: payload.bytes, targets: payload.targets
+            )
+            #expect(attempt.commitment.producerEventIdentifier == original.producerEventIdentifier)
         }
     }
 
@@ -88,7 +91,7 @@ struct EventDeliveryGroupTests {
     func anotherSourcesNamespaceCannotBeStaged() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"], sourceID: UUID())
+            let payload = try DeliveryFixture.payload(sequence: 1, changes: ["sample"], sourceID: UUID())
             await #expect(throws: DeliveryJournalError.eventIdentityMismatch) {
                 try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload])
             }
@@ -101,7 +104,7 @@ struct EventDeliveryGroupTests {
     func duplicateEventIdentityCannotCommitTwoQueueRows() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"])
+            let payload = try DeliveryFixture.payload(sequence: 1, changes: ["sample"])
             await #expect(throws: DeliverySQLite.Failure.self) {
                 try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload, payload])
             }

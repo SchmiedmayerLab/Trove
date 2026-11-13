@@ -77,7 +77,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE study_data_grants SET consent_id = consent_id WHERE false", "DELETE FROM study_data_grants WHERE false", "TRUNCATE study_data_grants",
         "UPDATE clinical_source_records SET identifier_value = identifier_value WHERE false",
         "DELETE FROM clinical_record_events WHERE false", "TRUNCATE clinical_output_bindings",
-        "UPDATE clinical_output_retractions SET kind = kind WHERE false", "TRUNCATE clinical_output_retractions",
+        "UPDATE clinical_record_retractions SET kind = kind WHERE false", "TRUNCATE clinical_record_retractions",
         "DELETE FROM clinical_questionnaire_contexts WHERE false", "TRUNCATE clinical_point_derivations",
         "UPDATE clinical_attribution_commands SET target_intent = target_intent WHERE false",
         "DELETE FROM clinical_attribution_commands WHERE false", "TRUNCATE clinical_attribution_commands",
@@ -176,7 +176,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (quantity_value) ON public.clinical_point_facts", "UPDATE (consent_id) ON public.study_data_grants",
         "UPDATE (identifier_value) ON public.clinical_source_records", "DELETE ON public.clinical_record_events",
         "UPDATE ON public.clinical_attribution_commands",
-        "TRUNCATE ON public.clinical_output_bindings", "UPDATE ON public.clinical_output_retractions",
+        "TRUNCATE ON public.clinical_output_bindings", "UPDATE ON public.clinical_record_retractions",
         "UPDATE ON public.clinical_questionnaire_contexts", "DELETE ON public.clinical_point_derivations"
     ])
     func excessiveDirectPrivilegesAreRejected(grant: String) async throws {
@@ -198,7 +198,7 @@ struct DatabaseRuntimePrivilegesTests {
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
         "SELECT (quantity_value) ON public.clinical_point_facts", "INSERT (consent_id) ON public.study_data_grants",
         "INSERT ON public.clinical_source_records", "SELECT ON public.clinical_record_events", "INSERT ON public.clinical_output_bindings",
-        "INSERT ON public.clinical_output_retractions",
+        "INSERT ON public.clinical_record_retractions",
         "INSERT ON public.clinical_questionnaire_contexts", "INSERT ON public.clinical_point_derivations",
         "INSERT ON public.clinical_attribution_commands"
     ])
@@ -266,7 +266,7 @@ struct DatabaseRuntimePrivilegesTests {
         "public.enrollment_consents", "public.source_bindings", "public.clinical_events",
         "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
-        "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_output_retractions",
+        "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
         "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
         "public.clinical_attribution_commands"
     ])
@@ -348,7 +348,7 @@ extension DatabaseRuntimePrivilegesTests {
                 public.enrollment_consents, public.source_bindings, public.clinical_events,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
-                public.clinical_output_retractions,
+                public.clinical_record_retractions,
                 public.clinical_questionnaire_contexts, public.clinical_point_derivations,
                 public.clinical_attribution_commands TO \(ident: role)
             """)

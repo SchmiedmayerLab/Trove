@@ -12,15 +12,10 @@ import GroveFHIRContract
 
 
 /// Identity required before a client can acknowledge durable custody of exact staged bytes.
-/// This validates bounded receipt commitments, not FHIR conformance or collection authority.
+/// This validates bounded record structure and receipt commitments, not full FHIR conformance or collection authority.
 public struct EventSubmissionCommitment: Sendable {
     private struct Envelope: Decodable {
         struct Entry: Decodable {}
-        struct Identifier: Decodable {
-            let system: String
-            let value: String
-        }
-        let identifier: Identifier
         let entry: [Entry]
     }
 
@@ -40,13 +35,15 @@ public struct EventSubmissionCommitment: Sendable {
         guard !originalBytes.isEmpty, originalBytes.count <= EventSubmissionLimits.maximumEventBytes,
               let envelope = try? JSONDecoder().decode(Envelope.self, from: originalBytes),
               (1...512).contains(envelope.entry.count) else { throw ValidationError.invalidEnvelope }
-        let identifier = envelope.identifier
-        guard (1...512).contains(identifier.system.utf8.count), (1...512).contains(identifier.value.utf8.count),
-              (try? ExchangeEventIdentifier(BusinessIdentifier(
-                system: IdentifierSystem(identifier.system), value: identifier.value
-              ))) != nil else { throw ValidationError.invalidEventIdentity }
+        guard let record = try? ExchangeRecord(validating: originalBytes), record.json == originalBytes else {
+            throw ValidationError.invalidEnvelope
+        }
+        let identifier = record.version.identifier.identifier
+        guard (1...512).contains(identifier.system.rawValue.utf8.count), (1...512).contains(identifier.value.utf8.count) else {
+            throw ValidationError.invalidEventIdentity
+        }
         self.sourceID = sourceID
-        producerEventIdentifier = .init(system: identifier.system, value: identifier.value)
+        producerEventIdentifier = .init(system: identifier.system.rawValue, value: identifier.value)
         payloadSHA256 = SHA256.hash(data: originalBytes).map { String(format: "%02x", $0) }.joined()
         targetIntent = try EventTargetIntent(targets: targets)
         nodeCount = envelope.entry.count

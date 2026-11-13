@@ -1,6 +1,6 @@
 {
-  "revision": "eff5af8f58cdd99bb8988c237f2996e9e1de75ff",
+  "revision": "cde0cdb92e4f63e96b463085f2a5765a77f5211f",
   "path": "Conformance/corpora/receiver-lifecycle",
-  "archiveSHA256": "d6ff4ceaf5db55931c83d3cc723eb502d4175ad75ba53d099e8db1fdde427ffd",
-  "sequences": 35
+  "archiveSHA256": "1d704ff117700d9cdc5e3c2e6e015e0173dc35e96c187d95c11ae035def6fe32",
+  "sequences": 43
 }

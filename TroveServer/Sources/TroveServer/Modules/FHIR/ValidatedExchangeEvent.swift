@@ -63,7 +63,6 @@ struct ValidatedExchangeEvent: Sendable {
 
     struct Retraction: Sendable {
         let sourceRecordIdentifier: Identifier
-        let outputIdentifiers: [Identifier]
     }
 
     struct QuestionnaireContext: Sendable {
@@ -82,10 +81,10 @@ struct ValidatedExchangeEvent: Sendable {
     }
 
     let rawBytes: Data
+    var recorded: RecordedInstant
     let validatorIdentity: String
     let eventIdentifierSystem: String
     let eventIdentifierValue: String
-    let producerInstance: UUID
     var deploymentIdentifiers: FHIRDeploymentIdentifiers
     let participants: Set<Identifier>
     let nodes: [Node]

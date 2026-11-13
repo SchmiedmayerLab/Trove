@@ -97,7 +97,7 @@ struct ClinicalEventReceiptHTTPTests {
             case .intent: fixture.body.targets.removeLast()
             case .missingEvent: fixture.body.producerEventIdentifier.value = "e0:\(fixture.domain.source.id.uuidString.lowercased()):999"
             case .namespace: fixture.body.producerEventIdentifier.system = "not a URI"
-            case .malformedEvent: fixture.body.producerEventIdentifier.value = "e0:invalid:1"
+            case .malformedEvent: fixture.body.producerEventIdentifier.value = ""
             case .uppercaseDigest: fixture.body.payloadSHA256 = String(repeating: "A", count: 64)
             case .duplicateIntent: fixture.body.targets.append(fixture.body.targets[0])
             case .excessiveIntent:

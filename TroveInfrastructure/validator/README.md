@@ -5,20 +5,17 @@ SPDX-License-Identifier: MIT
 
 # Offline FHIR Validation
 
-This worker validates one exchange Bundle against the pinned Grove FHIR 0.6.0 contract. It runs the IG's own profile, graph and identity checks, then the official FHIR Validator against the complete local package closure. Trove separately authorizes the participant, source, supported output shape, consent and study attribution. A valid FHIR graph is not permission to store or disclose it.
+This worker validates one exchange Bundle against the pinned Grove FHIR 0.8.0 contract. It runs the IG's own profile, graph and identity checks, then the official FHIR Validator against the complete local package closure. Trove separately authorizes the participant, source, supported output shape, consent and study attribution. A valid FHIR graph is not permission to store or disclose it.
 
-`manifest.json` records the exact companion source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are the checksum-verified assets of the published Grove FHIR 0.6.0 release identified by `guideRelease`; rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
+`manifest.json` records the exact companion source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are the checksum-verified assets of the published Grove FHIR 0.8.0 release identified by `guideRelease`; rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
 
-The runtime companion contract remains at `444e06fb25680c3af29e5d3ccbebeb0249be7318`.
-The published packages were built from release revision
-`83668d2d33325d2c1c9d42638fdc7557314f3d88`, not that earlier commit. All ten guide
-directories, catalogs, producer validators, Questionnaire companion and build-tool
-locks are identical at both revisions. The only source differences add an offline
-CI job and recognize one narrowly scoped BCP 47 Publisher QA warning in
-`Scripts/check-guide-qa.py`. These are compatible published package assets, not a
-new exchange contract. Their `ci-build`/`notForPublication` metadata remains an
-upstream preview designation; use here does not establish deployment approval or
-online terminology validation.
+The runtime companion and published packages use the same release source revision
+`cde0cdb92e4f63e96b463085f2a5765a77f5211f`. Package hashes are checked against both the release
+asset digests and its build provenance. The release is an offline structural preview;
+canonical publication and online terminology verification remain separate upstream gates.
+The published QA reports contain errors in the SensorKit and provider guide builds;
+these reports are not evidence that every adapter passes validation. Trove must execute
+its supported producer and receiver fixtures against this exact package set.
 
 Run `bash scripts/check validator-pin` to compare the locked Java tool with its
 official GitHub release asset. This online check is separate from offline context
@@ -60,7 +57,7 @@ and check `validator-pin` before preparing it. Never repin to make changed bytes
 pass.
 
 To reconstruct the locked inventory, download the named release assets
-`<packageId>-0.6.0.tgz` from the repository and release ID in `guideRelease`.
+`<packageId>-0.8.0.tgz` from the repository and release ID in `guideRelease`.
 Verify their SHA-256 against both the GitHub asset digest and each manifest entry,
 then place them under `packages/<file>` in the artifact directory. Keep the
 checksum-pinned validator JAR and bootstrap packages beside them. Preparation
@@ -76,10 +73,12 @@ validator manifest's contract commit. Preparation verifies the archive checksum,
 extracts it into `corpus/Conformance/corpora/receiver-lifecycle`, and retains its
 identity in `corpus/identity.json`. No working-tree fixture or moving branch is used.
 
-This corpus comes from the later receiver-lifecycle contract work. It supplies
-35 expected transition sequences; it does not replace the separately pinned
-validator source or published guide packages. CI runs each sequence through the
-actual validator and receiver. See the [server test setup](../../TroveServer/README.md#required-full-validator-ci-lane).
+This corpus supplies 43 expected revision transition sequences; it does not replace
+the separately pinned validator source or published guide packages. CI runs each
+sequence through the actual validator and receiver. The test adapter verifies
+fixture checksums and reproduces the original expectations with the pinned IG
+generator before binding fixtures to a synthetic enrollment. It preserves recorded
+lexemes and uses that same generator for the identifier tie-break after rebinding. See the [server test setup](../../TroveServer/README.md#required-full-validator-ci-lane).
 
 ## Deployment Boundary
 
@@ -121,7 +120,7 @@ The response is smaller than 2 KiB:
 {
   "valid": true,
   "sha256": "<digest of the exact request bytes>",
-  "contractRevision": "444e06fb25680c3af29e5d3ccbebeb0249be7318",
+  "contractRevision": "cde0cdb92e4f63e96b463085f2a5765a77f5211f",
   "validatorIdentity": "sha256:<manifest digest>"
 }
 ```

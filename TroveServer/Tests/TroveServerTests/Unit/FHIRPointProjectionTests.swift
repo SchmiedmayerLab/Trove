@@ -17,7 +17,8 @@ import Testing
 struct FHIRPointProjectionTests {
     @Test
     func acceptsTheRealHealthKitProducerWithoutDiscardingAcquisitionMetadata() throws {
-        // Captured from the owned simulator and independently accepted by the pinned full validator.
+        // Migrated from the earlier simulator capture to the record contract using the pinned IG fixture keyer.
+        // This is a fixture migration, not a new simulator capture or official validation result.
         let url = try #require(Foundation.Bundle.module.url(forResource: "HealthKitPointEvent", withExtension: "json"))
         let bytes = try Data(contentsOf: url)
         let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator")
@@ -27,7 +28,7 @@ struct FHIRPointProjectionTests {
         #expect(event.outputs.count == 1)
         #expect(point.quantityValue == "73")
         #expect(point.quantityCode == "/min")
-        #expect(Set(event.deploymentIdentifiers.systems.keys) == [.event, .entryNode, .sourceRecord, .sourceOutput, .deviceSnapshot])
+        #expect(Set(event.deploymentIdentifiers.systems.keys) == [.recordVersion, .sourceRecord, .sourceOutput, .deviceSnapshot])
     }
 
     @Test
@@ -48,9 +49,9 @@ struct FHIRPointProjectionTests {
         let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator")
         #expect(event.rawBytes == bytes)
         #expect(event.validatorIdentity == "test-validator")
-        #expect(event.eventIdentifierSystem == "https://study.example.org/fhir/NamingSystem/grove-event-v0")
-        #expect(event.eventIdentifierValue == "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:50")
-        #expect(event.producerInstance == UUID(uuidString: "1f5c58aa-6ec6-4e79-a682-829a9debd3f5"))
+        #expect(event.eventIdentifierSystem == "https://study.example.org/fhir/NamingSystem/grove-record-version-v0/test-key/1")
+        let record = try ExchangeRecord(validating: bytes)
+        #expect(event.eventIdentifierValue == record.version.identifier.identifier.value)
         #expect(event.nodes.count == 8)
         try #require(event.outputs.count == 1)
         #expect(event.outputs[0].quantityValue == "72.0000")
@@ -59,7 +60,7 @@ struct FHIRPointProjectionTests {
         #expect(event.participants == [.init(system: "https://study.example.org/fhir/identifiers/participant", value: "participant-001")])
     }
 
-    @Test(arguments: ["timestamp", "identifier"])
+    @Test(arguments: ["timestamp", "type"])
     func sharedRequiredHeadersCannotBeBypassed(field: String) throws {
         let bytes = try changed { $0.removeValue(forKey: field) }
         #expect {

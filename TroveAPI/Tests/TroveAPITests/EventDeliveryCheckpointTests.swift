@@ -44,7 +44,7 @@ struct EventDeliveryCheckpointTests {
             #expect(try await reopened.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             #expect(try await reopened.pendingDeliveryIDs() == [second])
             _ = try await reopened.stage(
-                from: checkpoint, nextCursor: Data([3]), payloads: [DeliveryFixture.payload(sequence: 3, changes: ["add:c"])]
+                from: checkpoint, nextCursor: Data([3]), payloads: [try DeliveryFixture.payload(sequence: 3, changes: ["add:c"])]
             )
             await reopened.close()
         }
@@ -56,7 +56,7 @@ struct EventDeliveryCheckpointTests {
             for sequence in 1...64 {
                 let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
                 let ids = try await journal.stage(from: checkpoint, nextCursor: Data("cursor-\(sequence)".utf8), payloads: [
-                    DeliveryFixture.payload(sequence: Int64(sequence), changes: ["add:\(sequence)"])
+                    try DeliveryFixture.payload(sequence: Int64(sequence), changes: ["add:\(sequence)"])
                 ])
                 let id = try #require(ids.first)
                 let attempt = try #require(await journal.prepareAttempt(id))
@@ -111,13 +111,15 @@ struct EventDeliveryCheckpointTests {
             let task = Task { @concurrent in
                 withUnsafeCurrentTask { $0?.cancel() }
                 return try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
-                    DeliveryFixture.payload(sequence: 1, changes: ["add:a"])
+                    try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])
                 ])
             }
             await #expect(throws: CancellationError.self) { try await task.value }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
-            _ = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [DeliveryFixture.payload(sequence: 1, changes: ["add:a"])])
+            _ = try await journal.stage(
+                from: checkpoint, nextCursor: Data([1]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+            )
         }
     }
 }

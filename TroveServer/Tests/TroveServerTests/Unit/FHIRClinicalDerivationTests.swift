@@ -14,15 +14,24 @@ import Testing
 
 
 struct FHIRClinicalDerivationTests {
+    private struct BundleIndex: Decodable {
+        struct Entry: Decodable {
+            let path: String
+            let sha256: String
+        }
+
+        let bundles: [String: Entry]
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["TROVE_TEST_LIFECYCLE_CORPUS"] != nil, "Requires the pinned IG corpus"))
     func pinnedPendingAndTargetKeepTheirReferenceSemantics() throws {
         let path = try #require(ProcessInfo.processInfo.environment["TROVE_TEST_LIFECYCLE_CORPUS"])
         let root = URL(fileURLWithPath: path, isDirectory: true)
         let index = try JSONDecoder().decode(
-            ReceiverRevisionCorpus.EventIndex.self, from: Data(contentsOf: root.appendingPathComponent("events.json"))
+            BundleIndex.self, from: Data(contentsOf: root.appendingPathComponent("bundles.json"))
         )
         let events = try ["pending", "target"].map { name in
-            let entry = try #require(index.events[name])
+            let entry = try #require(index.bundles[name])
             try #require(entry.path == "resources/\(name).json")
             let bytes = try Data(contentsOf: root.appendingPathComponent(entry.path))
             try #require(SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() == entry.sha256)
@@ -95,7 +104,9 @@ struct FHIRClinicalDerivationTests {
             entries[pointIndex]["resource"] = point
             entries[contextIndex]["resource"] = context
         }
-        _ = try ExchangeGraph(validating: bytes, kind: .active)
+        #expect(throws: ExchangeGraphError.self) {
+            try ExchangeGraph(validating: bytes, kind: .active)
+        }
         #expect {
             try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
         } throws: { ($0 as? ServerError)?.status.code == 422 }

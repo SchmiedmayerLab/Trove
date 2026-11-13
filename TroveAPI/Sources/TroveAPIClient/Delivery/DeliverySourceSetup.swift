@@ -118,7 +118,7 @@ extension DeliveryJournal {
         return try .init(
             systems: Contract.source(binding, localID: setup.localID, scope: scope).systems,
             keyID: setup.localID.uuidString.lowercased(),
-            epoch: EventSequence(1),
+            epoch: KeyEpoch(1),
             key: SymmetricKey(data: key)
         )
     }
@@ -126,6 +126,12 @@ extension DeliveryJournal {
 
 
 extension DeliveryJournal {
+    func activeDeliverySource(_ sourceID: UUID) throws -> DeliverySource {
+        let setup = try activeSource(sourceID)
+        guard let binding = setup.binding else { throw JournalError.corruptJournal }
+        return try Contract.source(binding, localID: setup.localID, scope: scope)
+    }
+
     func activeSource(_ sourceID: UUID) throws -> SourceSetup {
         try Task.checkCancellation()
         let rows = try database.query(

@@ -200,7 +200,10 @@ class VerificationInputTests(unittest.TestCase):
     def test_real_stack_ui_resolve_and_test_require_locked_versions(self):
         workflow = (ROOT / ".github/workflows/build-and-test.yml").read_text()
         ui_job = workflow.split("  ios-ui:\n", 1)[1].split("\n  web:\n", 1)[0]
-        self.assertEqual(ui_job.count("-onlyUsePackageVersionsFromResolvedFile"), 2)
+        self.assertEqual(ui_job.count("-onlyUsePackageVersionsFromResolvedFile"), 1)
+        self.assertIn("git diff --exit-code -- Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved", ui_job)
+        self.assertIn("name: Retain resolved iOS dependency lockfile", ui_job)
+        self.assertLess(ui_job.index("git diff --exit-code"), ui_job.index("name: Install the native test stack"))
         self.assertIn("-resolvePackageDependencies", ui_job)
         self.assertIn("xcodebuild test", ui_job)
 

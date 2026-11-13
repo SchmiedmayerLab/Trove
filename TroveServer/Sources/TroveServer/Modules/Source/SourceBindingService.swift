@@ -39,7 +39,7 @@ final class SourceBindingService: Module, Sendable {
                 INSERT INTO source_bindings (id, participant_id, registration_id, kind, identifier_root, event_identifier_system,
                     participant_identifier_system, participant_identifier_value, created_at)
                 VALUES (\(bind: id), \(bind: participantID), \(bind: registrationID), \(bind: SourceKind.participantApp.rawValue),
-                    \(bind: root), \(bind: systems.event.rawValue), \(bind: context.issuer + "/trove/participants"),
+                    \(bind: root), \(bind: systems.recordVersion.rawValue), \(bind: context.issuer + "/trove/participants"),
                     \(bind: participantID.uuidString.lowercased()), \(bind: createdAt))
                 """)
                 .run()

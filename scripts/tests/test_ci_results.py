@@ -208,13 +208,13 @@ class CIResultTests(unittest.TestCase):
     def test_fork_runner_routing_and_simulator_runtime_are_explicit(self) -> None:
         jobs = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())["jobs"]
         self.assertEqual(jobs["ios"]["with"]["destination"],
-                         "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0")
+                         "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2")
         ui_test = next(step["run"] for step in jobs["ios-ui"]["steps"]
                        if step.get("name") == "Run the real-stack UI test")
         prepare = next(step["run"] for step in jobs["ios-ui"]["steps"]
                        if step.get("id") == "simulator")
         self.assertIn("com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro", prepare)
-        self.assertIn("com.apple.CoreSimulator.SimRuntime.iOS-27-0", prepare)
+        self.assertIn("com.apple.CoreSimulator.SimRuntime.iOS-27-2", prepare)
         self.assertIn('platform=iOS Simulator,id=$TROVE_UI_SIMULATOR', ui_test)
         self.assertNotIn("--show-sdk-version", ui_test)
         for runner in (jobs["ios"]["with"]["runsonlabels"], jobs["ios-ui"]["runs-on"],
