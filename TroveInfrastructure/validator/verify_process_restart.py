@@ -126,6 +126,7 @@ class Checkpoint:
         # Never retain encryption keys with the evidence bundle or database backup.
         self.private_directory = tempfile.TemporaryDirectory(prefix="trove-restart-secrets-")
         self.name = "trove_restart_" + uuid.uuid4().hex[:12]
+        self.validator_container = args.validator_container or self.name + "-worker"
         self.bucket = self.name.replace("_", "-")
         self.runtime_password = "synthetic-" + uuid.uuid4().hex
         self.processes, self.containers = [], []
@@ -176,10 +177,17 @@ class Checkpoint:
                 process.wait(timeout=10)
         require(process.poll() is not None, "Owned process did not terminate")
 
-    def ready(self, url, process=None):
+    def ready(self, url, process=None, *, container=None):
+        require(container is None or container in self.containers, "Readiness may inspect only an owned container")
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
             require(process is None or process.poll() is None, "Owned service exited before readiness")
+            if container is not None:
+                state = json.loads(self.run(["docker", "inspect", "--format", "{{json .State}}", container]))
+                if not state.get("Running"):
+                    self.summary["failedService"] = {"container": container, "exitCode": state.get("ExitCode"),
+                                                     "outOfMemory": state.get("OOMKilled")}
+                    raise RuntimeError("Owned container exited before readiness; inspect failedService in summary.json")
             try:
                 with urllib.request.urlopen(url, timeout=2) as response:
                     if response.status == 200:
@@ -213,13 +221,15 @@ class Checkpoint:
         self.sql("CREATE EXTENSION IF NOT EXISTS timescaledb;")
         self.run([str(binary), "migrate", "--yes"], env=self.env, log="migrate.log")
         self.provision_runtime()
-        self.prepare_keycloak()
+        # Observe the validator's startup peak, and let it finish loading the offline
+        # package cache before starting the authentication JVM on a shared test host.
+        self.monitor = threading.Thread(target=self.sample_memory, daemon=True)
+        self.monitor.start()
         self.prepare_validator()
+        self.prepare_keycloak()
         self.env.update(S3_ENDPOINT=f"http://127.0.0.1:{self.args.s3_port}", S3_ACCESS_KEY="trove_test",
                         S3_SECRET_KEY="trove_test", S3_BUCKET=self.bucket, S3_REGION="us-east-1",
                         FHIR_VALIDATOR_URL=f"http://127.0.0.1:{self.args.validator_port}/validate", FHIR_VALIDATOR_IDENTITY=self.identity)
-        self.monitor = threading.Thread(target=self.sample_memory, daemon=True)
-        self.monitor.start()
 
     def prepare_identity_keyring(self, binary):
         keyring = Path(self.private_directory.name) / "keyring.secret"
@@ -305,7 +315,7 @@ class Checkpoint:
                         self.memory["backendSampledMaxRSSBytes"] = max(self.memory["backendSampledMaxRSSBytes"], int(result.stdout) * 1024)
                         self.memory["backendSamples"] += 1
             try:
-                result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self.name + "-worker"],
+                result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self.validator_container],
                                         capture_output=True, timeout=10, check=False)
                 value = result.stdout.decode().split("/")[0].strip()
                 for unit in ("GiB", "MiB", "KiB", "B"):
@@ -366,21 +376,39 @@ class Checkpoint:
                         KEYCLOAK_RESEARCHER_ROLE="trove-researcher", KEYCLOAK_PARTICIPANT_ROLE="trove-participant")
 
     def prepare_validator(self):
-        self.run(["docker", "network", "create", "--internal", self.name])
-        self.network_created = True
-        worker, relay = self.name + "-worker", self.name + "-relay"
-        limits = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "128",
-                  "--memory", "4g", "--cpus", "2", "--tmpfs", "/tmp:size=2g,mode=1777,noexec,nosuid,nodev"]
-        self.run(["docker", "create", "--name", worker, "--network", self.name, *limits, self.validator_image])
-        self.containers.append(worker)
-        self.run(["docker", "start", worker])
+        worker, relay = self.validator_container, self.name + "-relay"
+        if self.args.validator_container:
+            network = self.reusable_validator_network()
+        else:
+            network = self.name
+            self.run(["docker", "network", "create", "--internal", network])
+            self.network_created = True
+            limits = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "128",
+                      "--memory", "4g", "--cpus", "2", "--tmpfs", "/tmp:size=2g,mode=1777,noexec,nosuid,nodev"]
+            self.run(["docker", "create", "--name", worker, "--network", network, *limits, self.validator_image])
+            self.containers.append(worker)
+            self.run(["docker", "start", worker])
         self.run(["docker", "create", "--name", relay, "--network", "bridge", "-p", f"127.0.0.1:{self.args.validator_port}:8080",
                   "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--memory", "128m", "--pids-limit", "32",
                   "--entrypoint", "python3", self.validator_image, "-c", RELAY, worker])
         self.containers.append(relay)
-        self.run(["docker", "network", "connect", self.name, relay])
+        self.run(["docker", "network", "connect", network, relay])
         self.run(["docker", "start", relay])
-        self.ready(f"http://127.0.0.1:{self.args.validator_port}/health")
+        self.ready(f"http://127.0.0.1:{self.args.validator_port}/health", container=worker if worker in self.containers else None)
+
+    def reusable_validator_network(self):
+        """Inspect an explicitly selected stateless worker; never restart or remove it."""
+        container = json.loads(self.run(["docker", "inspect", "--type", "container", self.validator_container]))[0]
+        networks = container["NetworkSettings"]["Networks"]
+        require(container["Image"] == self.validator_image and container["State"]["Running"]
+                and container["HostConfig"]["ReadonlyRootfs"] and not container["HostConfig"].get("PortBindings")
+                and len(networks) == 1, "Reused validator must be running the selected image privately and read-only")
+        network = next(iter(networks))
+        configuration = json.loads(self.run(["docker", "network", "inspect", network]))[0]
+        require(configuration["Internal"], "Reused validator network must have no external egress")
+        self.summary["reusedValidator"] = {"containerID": container["Id"], "imageID": container["Image"],
+                                           "networkID": configuration["Id"], "startedAt": container["State"]["StartedAt"]}
+        return network
 
     def backend(self, number):
         process = self.start([str(self.evidence / "TroveServer"), "serve", "--hostname", "127.0.0.1",
@@ -511,7 +539,7 @@ class Checkpoint:
                 "A byte representation duplicated the record or lost its own receipt")
         request(self.api + path, "POST", {**submission, "targets": targets}, participant, headers=headers, expected=409)
         self.api_json(f"/participant/enrollments/{enrollments[0]}/withdraw", participant, "POST")
-        self.check_state(studies, event, withdrawn=True)
+        self.check_state(studies, event, withdrawn=True, representations=1)
         lookup_path = f'/participant/sources/{source["id"]}/event-receipts/lookup'
         lookup = {"producerEventIdentifier": accepted["producerEventIdentifier"],
                   "payloadSHA256": accepted["payloadSHA256"], "targets": submission["targets"]}
@@ -564,7 +592,7 @@ class Checkpoint:
         self.api_json(lookup_path, researcher, "POST", lookup, 403)
         require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.receipt.disclosure' AND outcome='disclosure_intent';") == "2",
                 "Receipt disclosures lack committed intent or denied lookups disclosed data")
-        self.check_state(studies, event, withdrawn=True)
+        self.check_state(studies, event, withdrawn=True, representations=1)
         for enrollment, consent in zip(enrollments, consents):
             actual = request(self.api + f'/participant/enrollments/{enrollment}/consents/{consent["id"]}/pdf', token=participant)
             require(actual == PDF, "Retained consent PDF changed across process restart")
@@ -583,7 +611,7 @@ class Checkpoint:
         require(self.memory["backendSamples"] > 0 and self.memory["validatorSamples"] > 0, "Missing observed memory samples")
         self.summary.update(passed=True, backendPIDs=[first.pid, second.pid], eventSHA256=hashlib.sha256(event).hexdigest(),
                             receipt=json.loads(receipt), events=1, facts=1, grants=2, effectiveGrantsAfterWithdrawal=[0, 1],
-                            nodeCount=len(json.loads(event)["entry"]), receiverAuditEvents=4,
+                            nodeCount=len(json.loads(event)["entry"]), representations=1, receiverAuditEvents=5,
                             lateAttributionReceipt=attribution_receipt,
                             receiptRecoveryAfterRevocation=True, receiptDisclosureIntents=2,
                             retainedConsentPDFs=2, runtimeRole=self.name)
@@ -631,13 +659,15 @@ class Checkpoint:
                 "Denied reads produced audit grants or successful page lacked a committed intent")
         return set(identifiers)
 
-    def check_state(self, studies, event, withdrawn):
+    def check_state(self, studies, event, withdrawn, representations=0):
         counts = self.sql("SELECT (SELECT count(*) FROM clinical_events), (SELECT count(*) FROM clinical_point_facts), (SELECT count(*) FROM study_data_grants);")
         require(counts == "1|1|2", "Unexpected retained event/fact/grant counts")
         require(self.sql("SELECT count(*) FROM clinical_event_nodes;") == str(len(json.loads(event)["entry"])),
                 "Retained node index is incomplete or duplicated")
-        require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.accepted';") == "1",
-                "Event acceptance audit was missing or duplicated")
+        require(self.sql("SELECT count(*) FROM clinical_event_representations;") == str(representations),
+                "Additional custody representations were lost or duplicated")
+        require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.accepted';") == str(1 + representations),
+                "Each original or additional custody representation requires one acceptance audit")
         require(self.sql("SELECT count(*) FROM audit_events WHERE action='study.data.granted';") == "2",
                 "Independent grant audits were missing or duplicated")
         require(self.sql("SELECT count(*) FROM clinical_attribution_commands;") == "1",
@@ -690,6 +720,7 @@ def add_stack_arguments(parser):
     parser.add_argument("--keycloak-archive", type=Path, required=True)
     parser.add_argument("--java-home", type=Path, required=True)
     parser.add_argument("--image", default="trove-fhir-validator:local-final")
+    parser.add_argument("--validator-container", help="Reuse a running stateless worker of exactly the selected image on one internal network")
     for name, port in (("pg", 58032), ("s3", 58033), ("server", 58080), ("keycloak", 58180), ("management", 59000), ("validator", 58081)):
         parser.add_argument("--" + name + "-port", type=int, default=port)
 

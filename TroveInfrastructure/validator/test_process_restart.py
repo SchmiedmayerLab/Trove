@@ -3,6 +3,7 @@
 # SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 # SPDX-License-Identifier: MIT
 
+import copy
 import json
 from pathlib import Path
 import tempfile
@@ -66,6 +67,54 @@ class ProcessRestartAuthoringTests(unittest.TestCase):
 
 
 class ProcessRestartIdentityTests(unittest.TestCase):
+    def test_reused_validator_requires_exact_image_and_private_network_without_mutations(self):
+        original = {"Id": "owned-fixture-id", "Image": "sha256:selected", "State": {"Running": True, "StartedAt": "fixture-start"},
+                    "NetworkSettings": {"Networks": {"fixture-network": {}}},
+                    "HostConfig": {"ReadonlyRootfs": True, "PortBindings": {}}}
+        for failure in (None, "image", "stopped", "writable", "published", "networks", "external-egress"):
+            with self.subTest(failure=failure):
+                container = copy.deepcopy(original)
+                network = {"Internal": failure != "external-egress", "Id": "fixture-network-id"}
+                if failure == "image": container["Image"] = "sha256:other"
+                if failure == "stopped": container["State"]["Running"] = False
+                if failure == "writable": container["HostConfig"]["ReadonlyRootfs"] = False
+                if failure == "published": container["HostConfig"]["PortBindings"] = {"8080/tcp": [{}]}
+                if failure == "networks": container["NetworkSettings"]["Networks"]["other"] = {}
+                checkpoint = object.__new__(Checkpoint)
+                checkpoint.validator_container = "fixture-worker"
+                checkpoint.validator_image = "sha256:selected"
+                checkpoint.summary = {}
+                checkpoint.run = Mock(side_effect=[json.dumps([container]).encode(), json.dumps([network]).encode()])
+                if failure:
+                    with self.assertRaises(RuntimeError):
+                        checkpoint.reusable_validator_network()
+                    self.assertNotIn("reusedValidator", checkpoint.summary)
+                else:
+                    self.assertEqual(checkpoint.reusable_validator_network(), "fixture-network")
+                    self.assertEqual(checkpoint.summary["reusedValidator"]["containerID"], "owned-fixture-id")
+                for call in checkpoint.run.call_args_list:
+                    self.assertIn("inspect", call.args[0])
+
+    def test_exited_owned_service_fails_before_polling_http_and_records_oom(self):
+        checkpoint = object.__new__(Checkpoint)
+        checkpoint.containers = ["owned-worker"]
+        checkpoint.summary = {}
+        checkpoint.run = Mock(return_value=b'{"Running":false,"ExitCode":137,"OOMKilled":true}')
+        with patch("verify_process_restart.urllib.request.urlopen") as urlopen:
+            with self.assertRaisesRegex(RuntimeError, "exited before readiness"):
+                checkpoint.ready("http://127.0.0.1/health", container="owned-worker")
+            urlopen.assert_not_called()
+        self.assertEqual(checkpoint.summary["failedService"],
+                         {"container": "owned-worker", "exitCode": 137, "outOfMemory": True})
+
+    def test_readiness_does_not_inspect_unowned_services(self):
+        checkpoint = object.__new__(Checkpoint)
+        checkpoint.containers = []
+        checkpoint.run = Mock()
+        with self.assertRaisesRegex(RuntimeError, "only an owned container"):
+            checkpoint.ready("http://127.0.0.1/health", container="unrelated-worker")
+        checkpoint.run.assert_not_called()
+
     def test_receipt_uses_conversion_entry_identity_and_rejects_multiple_records(self):
         bundle = json.loads((ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json").read_bytes())
         entry = next(item for item in bundle["entry"] if item["resource"]["resourceType"] == "Provenance")
