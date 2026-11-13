@@ -26,7 +26,7 @@ struct DatabaseRuntimePrivilegesTests {
             #expect(try row.decode(column: "effective", as: String.self) == fixture.role)
             #expect(try row.decode(column: "authenticated", as: String.self) == fixture.role)
             try await DatabaseRuntimePrivileges.validate(on: fixture.database)
-            for table in ["study_delegations", "study_publication_candidates"] {
+            for table in ["study_delegations", "study_publication_candidates", "source_identity_keys", "source_identity_key_envelopes"] {
                 let permissions = try #require(try await sql.raw("""
                     SELECT has_table_privilege(current_user, \(bind: table), 'SELECT')
                         AND has_table_privilege(current_user, \(bind: table), 'INSERT') AS allowed
@@ -65,6 +65,9 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM enrollment_consents WHERE false", "TRUNCATE enrollment_consents",
         "UPDATE source_bindings SET participant_id = participant_id WHERE false",
         "DELETE FROM source_bindings WHERE false", "TRUNCATE source_bindings",
+        "UPDATE source_identity_keys SET key_id = key_id WHERE false", "DELETE FROM source_identity_keys WHERE false",
+        "TRUNCATE source_identity_keys", "UPDATE source_identity_key_envelopes SET sealed_key = sealed_key WHERE false",
+        "DELETE FROM source_identity_key_envelopes WHERE false", "TRUNCATE source_identity_key_envelopes",
         "UPDATE study_delegations SET client_id = client_id WHERE false",
         "DELETE FROM study_delegations WHERE false", "TRUNCATE study_delegations",
         "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
@@ -168,6 +171,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (evidence_digest) ON public.enrollment_consents", "UPDATE ON public.source_bindings",
         "DELETE ON public.source_bindings", "TRUNCATE ON public.source_bindings", "MAINTAIN ON public.source_bindings",
         "UPDATE (participant_id) ON public.source_bindings",
+        "UPDATE (key_id) ON public.source_identity_keys", "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE ON public.study_delegations", "UPDATE (client_id) ON public.study_delegations",
         "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
         "UPDATE (bundle_digest) ON public.study_publication_candidates",
@@ -197,6 +201,7 @@ struct DatabaseRuntimePrivilegesTests {
         "INSERT ON public.enrollment_consents", "SELECT (bundle_digest) ON public.published_studies",
         "INSERT (evidence_digest) ON public.enrollment_consents", "UPDATE (revoked_at) ON public.source_bindings",
         "SELECT ON public.source_bindings", "INSERT (participant_id) ON public.source_bindings",
+        "SELECT ON public.source_identity_keys", "INSERT ON public.source_identity_key_envelopes",
         "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
         "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
         "SELECT ON public.clinical_event_representations", "INSERT ON public.clinical_event_representations",
@@ -228,6 +233,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (bundle_digest) ON public.published_studies", "DELETE ON public.enrollment_consents",
         "UPDATE (client_id) ON public.study_delegations", "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "UPDATE (participant_id) ON public.source_bindings",
+        "UPDATE (key_id) ON public.source_identity_keys", "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE (raw_sha256) ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
         "UPDATE (raw_bytes) ON public.clinical_event_representations",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "TRUNCATE ON public.study_data_grants"
@@ -274,7 +280,8 @@ struct DatabaseRuntimePrivilegesTests {
 extension DatabaseRuntimePrivilegesTests {
     @Test(arguments: [
         "public.audit_events", "public._fluent_migrations", "public.published_studies",
-        "public.enrollment_consents", "public.source_bindings", "public.clinical_events", "public.clinical_event_representations",
+        "public.enrollment_consents", "public.source_bindings", "public.source_identity_keys", "public.source_identity_key_envelopes",
+        "public.clinical_events", "public.clinical_event_representations",
         "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
@@ -294,7 +301,7 @@ extension DatabaseRuntimePrivilegesTests {
 
 
 extension DatabaseRuntimePrivilegesTests {
-    private struct RuntimeFixture: Sendable {
+    struct RuntimeFixture: Sendable {
         let database: any Database
         let operatorDatabase: any Database
         let admin: any SQLDatabase
@@ -313,7 +320,7 @@ extension DatabaseRuntimePrivilegesTests {
         }
     }
 
-    private static func withRuntime(_ body: @escaping @Sendable (RuntimeFixture) async throws -> Void) async throws {
+    static func withRuntime(_ body: @escaping @Sendable (RuntimeFixture) async throws -> Void) async throws {
         try await TestApp.withApp { app, _ in
             let admin = try #require(app.db as? any SQLDatabase)
             let result = try await admin.raw("SELECT current_database() AS name").first()
@@ -356,7 +363,8 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("""
             GRANT SELECT, INSERT ON public.audit_events, public.published_studies,
                 public.study_delegations, public.study_publication_candidates,
-                public.enrollment_consents, public.source_bindings, public.clinical_events, public.clinical_event_representations,
+                public.enrollment_consents, public.source_bindings, public.source_identity_keys, public.source_identity_key_envelopes,
+                public.clinical_events, public.clinical_event_representations,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
                 public.clinical_record_retractions,

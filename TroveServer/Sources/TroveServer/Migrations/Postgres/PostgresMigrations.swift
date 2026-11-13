@@ -23,6 +23,7 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateStudyPublicationCandidates())
     app.migrations.add(CreateParticipants())
     app.migrations.add(CreateSourceBindings())
+    app.migrations.add(CreateSourceIdentityKeys())
     app.migrations.add(CreateInvitationCodes())
     app.migrations.add(CreateEnrollments())
     app.migrations.add(CreateEnrollmentConsents())
