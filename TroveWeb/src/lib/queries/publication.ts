@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { draftHeaders } from "./draft";
 import { ApiError } from "../api/client";
 import type {
   PostStudiesByStudyIdPublishData,
   StudyDraftValidation,
   ValidateStudyDraftData,
 } from "../api/generated/types.gen";
+import { draftHeaders } from "./draft";
 
 export const validationRequest = (
   studyId: string,

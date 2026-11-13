@@ -16,9 +16,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { queryClient } from "../queryClient";
 import { getKeycloak, initKeycloak } from "./keycloak";
 import { bindKeycloakSession, type AuthUser } from "./keycloakSession";
-import { queryClient } from "../queryClient";
 
 export type { GroupRole } from "./groupMemberships";
 export type { AuthUser } from "./keycloakSession";
