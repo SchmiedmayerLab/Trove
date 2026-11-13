@@ -11,7 +11,7 @@ import Foundation
 
 struct CollectionRequirement: Codable, Sendable, Hashable {
     /// Receiver capability, not a duplicate measurement catalog or substitute for IG validation.
-    /// Grove FHIR 0.6.0: mobile/input/fsh/generated-measurement-profiles.fsh, GroveMobileHeartRate.
+    /// Grove FHIR 0.8.0: mobile/input/fsh/generated-measurement-profiles.fsh, GroveMobileHeartRate.
     static let supportedProfile = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 
     let profile: String
@@ -44,8 +44,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         try CollectionRequirement.validate(requirements)
         return Self(
             schemaVersion: 1,
-            contractVersion: "0.6.0",
-            contractRevision: "444e06fb25680c3af29e5d3ccbebeb0249be7318",
+            contractVersion: FHIRValidationClient.contractVersion,
+            contractRevision: FHIRValidationClient.contractRevision,
             studyID: studyID,
             revision: revision,
             valueShape: "point-quantity",
@@ -56,7 +56,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
 
     /// Unknown policy fails; an empty array explicitly means no collection.
     func validatedRequirements(studyID: UUID, revision: Int) throws -> [CollectionRequirement] {
-        guard schemaVersion == 1, contractVersion == "0.6.0", contractRevision == "444e06fb25680c3af29e5d3ccbebeb0249be7318",
+        guard schemaVersion == 1, contractVersion == FHIRValidationClient.contractVersion,
+              contractRevision == FHIRValidationClient.contractRevision,
               self.studyID == studyID, self.revision == revision,
               revision > 0, valueShape == "point-quantity", collectionWindow == "consent-forward",
               requirements.count <= 1, requirements.allSatisfy({ $0.profile == CollectionRequirement.supportedProfile }) else {

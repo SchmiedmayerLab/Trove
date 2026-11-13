@@ -16,6 +16,18 @@ struct PublishedCollectionPolicyTests {
     private static let acceptedAt = Date(timeIntervalSince1970: 1_750_000_000)
     private static let requirement = CollectionRequirement(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)
 
+    @Test
+    func publicationDeclaresThePinnedValidatorContract() throws {
+        var root = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { root.deleteLastPathComponent() }
+        let bytes = try Data(contentsOf: root.appendingPathComponent("TroveInfrastructure/validator/manifest.json"))
+        let manifest = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        let release = try #require(manifest["guideRelease"] as? [String: Any])
+        let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
+        #expect(policy.contractVersion == release["tag"] as? String)
+        #expect(policy.contractRevision == manifest["contractRevision"] as? String)
+    }
+
     @Test(arguments: [-1.0, 0, 1])
     func pointCollectionStartsAtExactConsentAcceptance(offset: Double) throws {
         let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
@@ -44,11 +56,16 @@ struct PublishedCollectionPolicyTests {
         ))
     }
 
-    @Test(arguments: ["contractVersion", "contractRevision", "valueShape", "collectionWindow", "schemaVersion"])
+    @Test(arguments: ["contractVersion", "contractRevision", "valueShape", "collectionWindow", "schemaVersion", "legacy-contract"])
     func unknownPersistedPolicyContractFailsClosed(field: String) throws {
         let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
         var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(policy)) as? [String: Any])
-        json[field] = field == "schemaVersion" ? 2 : "unsupported"
+        if field == "legacy-contract" {
+            json["contractVersion"] = "0.6.0"
+            json["contractRevision"] = "444e06fb25680c3af29e5d3ccbebeb0249be7318"
+        } else {
+            json[field] = field == "schemaVersion" ? 2 : "unsupported"
+        }
         let altered = try JSONDecoder().decode(PublishedCollectionPolicy.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(throws: ServerError.self) {
             try altered.validatedRequirements(studyID: Self.studyID, revision: 2)
