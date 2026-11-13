@@ -31,9 +31,10 @@ enum DeliveryJournalSchema {
         let sizes = try database.query("""
             SELECT
                 (SELECT coalesce(sum(coalesce(length(payload), 0) + length(targets)), 0) FROM delivery)
-                + (SELECT coalesce(sum(length(query_definition) + coalesce(length(cursor), 0)
-                    + coalesce(length(privacy_key), 0) + length(installation_credential) + coalesce(length(binding), 0)), 0) FROM source_state)
-                + (SELECT coalesce(sum(length(key) + length(value)), 0) FROM producer_ledger)
+                + (SELECT coalesce(sum(coalesce(length(privacy_key), 0)
+                    + length(installation_credential) + coalesce(length(binding), 0)), 0) FROM source_state)
+                + (SELECT coalesce(sum(length(definition) + coalesce(length(cursor), 0)
+                    + coalesce(length(conversion_instant), 0)), 0) FROM acquisition_query)
                 + (SELECT count(*) * 80 FROM deletion_detection)
             """) { sqlite3_column_int64($0, 0) }
         guard let size = sizes.first, size <= maximumBytes else { throw DeliveryJournalError.capacityExceeded }
@@ -83,7 +84,7 @@ enum DeliveryJournalSchema {
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
         if !create {
             let version = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard version == [9] else { throw DeliveryJournalError.unsupportedFormat }
+            guard version == [10] else { throw DeliveryJournalError.unsupportedFormat }
             let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
             guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
         }
@@ -114,7 +115,7 @@ enum DeliveryJournalSchema {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
-                try database.execute("PRAGMA user_version = 9")
+                try database.execute("PRAGMA user_version = 10")
             }
         }
     }
@@ -133,10 +134,7 @@ extension DeliveryJournalSchema {
             installation_credential BLOB NOT NULL CHECK (length(installation_credential) = 32),
             binding BLOB CHECK (binding IS NULL OR length(binding) BETWEEN 1 AND 16384),
             next_sequence INTEGER NOT NULL CHECK (next_sequence > 0),
-            query_definition BLOB NOT NULL CHECK (length(query_definition) BETWEEN 1 AND 16384),
-            checkpoint_revision TEXT NOT NULL CHECK (length(checkpoint_revision) = 36),
-            cursor BLOB CHECK (cursor IS NULL OR length(cursor) BETWEEN 1 AND 65536),
-            CHECK ((source_id IS NULL AND producer_system IS NULL AND binding IS NULL AND next_sequence = 1 AND cursor IS NULL)
+            CHECK ((source_id IS NULL AND producer_system IS NULL AND binding IS NULL AND next_sequence = 1)
                 OR (source_id IS NOT NULL AND length(source_id) = 36 AND producer_system IS NOT NULL
                     AND length(producer_system) BETWEEN 1 AND 512 AND binding IS NOT NULL))
         ) STRICT
@@ -164,19 +162,21 @@ extension DeliveryJournalSchema {
         ) STRICT
         """,
         """
-        CREATE TABLE producer_ledger (
-            source_id TEXT NOT NULL REFERENCES source_state(source_id),
-            key TEXT NOT NULL CHECK (length(key) BETWEEN 1 AND 64),
-            value BLOB NOT NULL CHECK (length(value) BETWEEN 1 AND 1048576),
-            PRIMARY KEY (source_id, key)
+        CREATE TABLE acquisition_query (
+            id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36),
+            local_id TEXT NOT NULL REFERENCES source_state(local_id),
+            definition BLOB NOT NULL CHECK (length(definition) BETWEEN 1 AND 16384),
+            checkpoint_revision TEXT NOT NULL CHECK (length(checkpoint_revision) = 36),
+            cursor BLOB CHECK (cursor IS NULL OR length(cursor) BETWEEN 1 AND 65536),
+            conversion_instant BLOB CHECK (conversion_instant IS NULL OR length(conversion_instant) BETWEEN 1 AND 128)
         ) STRICT
         """,
         """
         CREATE TABLE deletion_detection (
-            source_id TEXT NOT NULL REFERENCES source_state(source_id),
+            query_id TEXT NOT NULL REFERENCES acquisition_query(id),
             record_id TEXT NOT NULL CHECK (length(record_id) = 36),
             detected_at REAL NOT NULL CHECK (detected_at BETWEEN 0 AND 253402300799),
-            PRIMARY KEY (source_id, record_id)
+            PRIMARY KEY (query_id, record_id)
         ) STRICT
         """
     ]

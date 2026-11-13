@@ -130,7 +130,10 @@ struct HeartRateAcquisitionTests {
     func malformedAnchorNeverRestartsHistoryFromAnEmptyAnchor() async throws {
         try await Self.withFixture { fixture, url in
             let connection = try DeliverySQLite(url: url)
-            try connection.execute("UPDATE source_state SET cursor = x'00' WHERE source_id = ?", [.text(fixture.sourceID.uuidString.lowercased())])
+            try connection.execute(
+                "UPDATE acquisition_query SET cursor = x'00' WHERE local_id IN (SELECT local_id FROM source_state WHERE source_id = ?)",
+                [.text(fixture.sourceID.uuidString.lowercased())]
+            )
             connection.close()
             await #expect(throws: DecodingError.self) {
                 try await fixture.collect { _, _ in

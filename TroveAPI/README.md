@@ -66,7 +66,7 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 9 rejects earlier or unknown formats without
+later response. Journal format 10 rejects earlier or unknown formats without
 migration or deletion.
 
 The private journal retains both secrets under its OS/app storage protections;
@@ -93,6 +93,18 @@ heart-rate query and FHIR converter to the delivery journal. The server and
 cross-platform API client do not link this adapter. The app's
 `makeHeartRateAcquisition` factory supplies the existing captured-session client;
 constructing it does not request HealthKit access or start collection.
+
+The journal can retain several immutable query definitions for one registered source.
+`createQuery(for:queryID:definition:)` adds a separate cursor and pending conversion
+instant; `checkpoints(for:)` restores them without resetting the original query.
+The original query remains the default of `checkpoint(for:)`. Staging advances only
+its selected checkpoint while all queries share the source identity, credentials,
+delivery sequence and exact-payload deduplication. Pending deletion bounds are
+also query-specific so another page cannot retire them. Query count and bytes are
+bounded; a rejected creation or page leaves every existing checkpoint intact.
+
+This storage support does not yet schedule historical ranges or authorize offline
+acquisition. The native adapter still uses its original query and online refreshes.
 
 Explicitly create a stream with `HeartRateAcquisition.queryDefinition(start:)`,
 then reuse that immutable definition and the journal's retained anchor. One pass

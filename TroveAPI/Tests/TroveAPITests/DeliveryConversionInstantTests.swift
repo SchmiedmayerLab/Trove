@@ -77,7 +77,10 @@ struct DeliveryConversionInstantTests {
                 try await journal.conversionInstant(from: checkpoint)
             }
             try writer.execute("ROLLBACK")
-            #expect(try writer.query("SELECT key FROM producer_ledger") { try DeliverySQLite.text($0, 0) }.isEmpty)
+            let pending = try writer.query("SELECT conversion_instant FROM acquisition_query WHERE conversion_instant IS NOT NULL") {
+                try DeliverySQLite.blob($0, 0)
+            }
+            #expect(pending.isEmpty)
             let instant = Date(timeIntervalSince1970: 1_800_000_000)
             #expect(try await journal.conversionInstant(from: checkpoint, at: instant) == instant)
         }
@@ -98,7 +101,11 @@ struct DeliveryConversionInstantTests {
             try await journal.confirmSource(binding, for: setup)
             let connection = try DeliverySQLite(url: url)
             defer { connection.close() }
-            let sources = try connection.query("SELECT source_id FROM deletion_detection") { try DeliverySQLite.text($0, 0) }
+            let sources = try connection.query("""
+                SELECT source_id FROM deletion_detection
+                JOIN acquisition_query ON query_id = acquisition_query.id
+                JOIN source_state ON acquisition_query.local_id = source_state.local_id
+                """) { try DeliverySQLite.text($0, 0) }
             #expect(sources == [otherID.uuidString.lowercased()])
         }
     }

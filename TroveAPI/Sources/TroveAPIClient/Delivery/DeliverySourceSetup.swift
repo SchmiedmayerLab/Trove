@@ -39,11 +39,12 @@ extension DeliveryJournal {
             let credential = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
             try database.execute(
                 """
-                INSERT INTO source_state(local_id, installation_credential, query_definition, next_sequence, checkpoint_revision)
-                VALUES (?, ?, ?, 1, ?)
+                INSERT INTO source_state(local_id, installation_credential, next_sequence)
+                VALUES (?, ?, 1)
                 """,
-                [.text(localID.uuidString.lowercased()), .blob(credential), .blob(queryDefinition), .text(UUID().uuidString.lowercased())]
+                [.text(localID.uuidString.lowercased()), .blob(credential)]
             )
+            try insertQuery(id: localID, localID: localID, definition: queryDefinition)
             try checkByteLimit()
             try Task.checkCancellation()
             return try sourceSetup(for: localID)
@@ -108,7 +109,10 @@ extension DeliveryJournal {
             if source.revokedAt != nil {
                 // No future query may use this checkpoint. Retain custody payloads and receipts,
                 // but release auxiliary deletion bounds that can no longer be staged.
-                try database.execute("DELETE FROM deletion_detection WHERE source_id = ?", [.text(source.id.uuidString.lowercased())])
+                try database.execute(
+                    "DELETE FROM deletion_detection WHERE query_id IN (SELECT id FROM acquisition_query WHERE local_id = ?)",
+                    [.text(expected.localID.uuidString.lowercased())]
+                )
             }
             try checkByteLimit()
             try Task.checkCancellation()
@@ -172,8 +176,12 @@ extension DeliveryJournal {
 extension DeliveryJournal {
     private static var maximumSources: Int64 { 512 }
     private static var sourceSetupSelection: String { """
-        SELECT local_id, query_definition, binding, source_id, producer_system, length(privacy_key), typeof(privacy_key),
-            length(installation_credential), typeof(installation_credential)
+        SELECT local_id,
+            (SELECT definition FROM acquisition_query WHERE id = source_state.local_id AND local_id = source_state.local_id),
+            binding, source_id, producer_system, length(privacy_key), typeof(privacy_key),
+            length(installation_credential), typeof(installation_credential),
+            (SELECT cursor FROM acquisition_query WHERE id = source_state.local_id AND local_id = source_state.local_id),
+            (SELECT conversion_instant FROM acquisition_query WHERE id = source_state.local_id AND local_id = source_state.local_id)
         FROM source_state
         """ }
 
@@ -199,7 +207,8 @@ extension DeliveryJournal {
                 throw JournalError.corruptJournal
             }
         } else if sqlite3_column_type(statement, 3) != SQLITE_NULL || sqlite3_column_type(statement, 4) != SQLITE_NULL
-            || sqlite3_column_type(statement, 5) != SQLITE_NULL {
+            || sqlite3_column_type(statement, 5) != SQLITE_NULL || sqlite3_column_type(statement, 9) != SQLITE_NULL
+            || sqlite3_column_type(statement, 10) != SQLITE_NULL {
             throw JournalError.corruptJournal
         }
         return SourceSetup(localID: localID, queryDefinition: query, binding: binding, scope: scope)

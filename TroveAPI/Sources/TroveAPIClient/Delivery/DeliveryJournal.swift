@@ -21,15 +21,18 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
     public struct Limits: Sendable {
         public var maximumBytes: Int
         public var maximumEvents: Int
+        public var maximumQueries: Int
         public var maximumDatabaseBytes: Int
 
         public init(
             maximumBytes: Int = 64 * 1024 * 1024,
             maximumEvents: Int = 2048,
+            maximumQueries: Int = 2048,
             maximumDatabaseBytes: Int = 128 * 1024 * 1024
         ) {
             self.maximumBytes = maximumBytes
             self.maximumEvents = maximumEvents
+            self.maximumQueries = maximumQueries
             self.maximumDatabaseBytes = maximumDatabaseBytes
         }
     }
@@ -47,6 +50,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
     /// A snapshot for exactly one registered query. Only the journal constructs checkpoints.
     public struct Checkpoint: Sendable, Equatable {
         public let sourceID: UUID
+        public let queryID: UUID
         public let epoch: UUID
         public let queryDefinition: Data
         public let cursor: Data?
@@ -92,6 +96,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
               [Contract.identifier, scope.backend, scope.issuer, scope.subject].allSatisfy({ (1...2048).contains($0.utf8.count) }),
               (1...512 * 1024 * 1024).contains(limits.maximumBytes),
               (1...65_536).contains(limits.maximumEvents),
+              (1...65_536).contains(limits.maximumQueries),
               (65_536...1024 * 1024 * 1024).contains(limits.maximumDatabaseBytes) else {
             throw JournalError.invalidConfiguration
         }
@@ -123,24 +128,6 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         database.close()
     }
 
-    /// Read this checkpoint before a bounded query; query semantics must match its immutable definition.
-    public func checkpoint(for sourceID: UUID) throws -> Checkpoint {
-        let rows = try database.query(
-            "SELECT local_id, query_definition, cursor, checkpoint_revision FROM source_state WHERE source_id = ?", [.text(sourceID.lowercase)]
-        ) { statement in
-            Checkpoint(
-                sourceID: sourceID,
-                epoch: try Self.identifier(statement, 0),
-                queryDefinition: try DeliverySQLite.blob(statement, 1),
-                cursor: sqlite3_column_type(statement, 2) == SQLITE_NULL ? nil : try DeliverySQLite.blob(statement, 2),
-                scope: scope,
-                revision: try Self.identifier(statement, 3)
-            )
-        }
-        guard let checkpoint = rows.first else { throw JournalError.unknownSource }
-        return checkpoint
-    }
-
     /// Commit prepared payloads and their next cursor together. Grove owns wire identities;
     /// the queue sequence only orders local deliveries. Conversion must visit every change:
     /// omit explicit policy exclusions, but never advance past a malformed or refused record.
@@ -157,7 +144,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
               observedDeletions.count <= 128 else { throw JournalError.invalidConfiguration }
         return try database.transaction {
             let registered = try activeDeliverySource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
+            guard try checkpoint(for: expected.sourceID, queryID: expected.queryID) == expected else { throw JournalError.staleCheckpoint }
             let source = try database.query(
                 "SELECT next_sequence, producer_system FROM source_state WHERE source_id = ?", [.text(expected.sourceID.lowercase)]
             ) {
@@ -165,12 +152,11 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
             }
             guard let (sequence, system) = source.first else { throw JournalError.unknownSource }
             let deliveryIDs = try stagePayloads(payloads, source: registered, sequence: sequence, system: system)
-            try retireDeletionDetections(observedDeletions, sourceID: expected.sourceID)
+            try retireDeletionDetections(observedDeletions, queryID: expected.queryID)
             // Retire the conversion instant only after record bytes and the cursor are durable.
-            try database.execute("DELETE FROM producer_ledger WHERE source_id = ?", [.text(expected.sourceID.lowercase)])
             try database.execute(
-                "UPDATE source_state SET cursor = ?, checkpoint_revision = ? WHERE source_id = ?",
-                [.blob(nextCursor), .text(UUID().lowercase), .text(expected.sourceID.lowercase)]
+                "UPDATE acquisition_query SET cursor = ?, checkpoint_revision = ?, conversion_instant = NULL WHERE id = ?",
+                [.blob(nextCursor), .text(UUID().lowercase), .text(expected.queryID.lowercase)]
             )
             try checkByteLimit()
             try Task.checkCancellation()
@@ -178,10 +164,10 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         }
     }
 
-    private func retireDeletionDetections(_ recordIDs: [UUID], sourceID: UUID) throws {
+    private func retireDeletionDetections(_ recordIDs: [UUID], queryID: UUID) throws {
         for id in recordIDs {
             try database.execute(
-                "DELETE FROM deletion_detection WHERE source_id = ? AND record_id = ?", [.text(sourceID.lowercase), .text(id.lowercase)]
+                "DELETE FROM deletion_detection WHERE query_id = ? AND record_id = ?", [.text(queryID.lowercase), .text(id.lowercase)]
             )
         }
     }
@@ -457,7 +443,7 @@ extension DeliveryJournal {
 
 
 extension DeliveryJournal {
-    private static func identifier(_ statement: OpaquePointer, _ column: Int32) throws -> UUID {
+    static func identifier(_ statement: OpaquePointer, _ column: Int32) throws -> UUID {
         guard let value = UUID(uuidString: try DeliverySQLite.text(statement, column)) else { throw JournalError.corruptJournal }
         return value
     }

@@ -23,20 +23,20 @@ extension DeliveryJournal {
         }
         return try database.transaction {
             _ = try activeSource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
+            guard try checkpoint(for: expected.sourceID, queryID: expected.queryID) == expected else { throw JournalError.staleCheckpoint }
             var detections: [UUID: Date] = [:]
             for id in recordIDs {
                 let parameters: [DeliverySQLite.Value] = [
-                    .text(expected.sourceID.uuidString.lowercased()), .text(id.uuidString.lowercased())
+                    .text(expected.queryID.uuidString.lowercased()), .text(id.uuidString.lowercased())
                 ]
                 try database.execute(
                     """
-                    INSERT INTO deletion_detection(source_id, record_id, detected_at) VALUES (?, ?, ?)
-                    ON CONFLICT(source_id, record_id) DO NOTHING
+                    INSERT INTO deletion_detection(query_id, record_id, detected_at) VALUES (?, ?, ?)
+                    ON CONFLICT(query_id, record_id) DO NOTHING
                     """, parameters + [.real(instant.timeIntervalSince1970)]
                 )
                 let dates = try database.query(
-                    "SELECT detected_at FROM deletion_detection WHERE source_id = ? AND record_id = ?", parameters
+                    "SELECT detected_at FROM deletion_detection WHERE query_id = ? AND record_id = ?", parameters
                 ) { sqlite3_column_double($0, 0) }
                 guard let date = dates.first else { throw JournalError.corruptJournal }
                 detections[id] = Date(timeIntervalSince1970: date)
