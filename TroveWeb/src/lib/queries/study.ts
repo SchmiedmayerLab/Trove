@@ -6,7 +6,6 @@
 // SPDX-License-Identifier: MIT
 //
 
-import { createMutationHook } from "./mutationCallbacks";
 import {
   deleteStudiesByStudyIdMutation,
   getGroupsByGroupIdStudiesOptions,
@@ -17,6 +16,7 @@ import {
   postStudiesByStudyIdPublishMutation,
   validateStudyDraftMutation,
 } from "../api/generated/@tanstack/react-query.gen";
+import { createMutationHook } from "./mutationCallbacks";
 
 // --- Queries ---
 
