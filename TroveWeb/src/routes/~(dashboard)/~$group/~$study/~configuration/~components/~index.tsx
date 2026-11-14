@@ -9,8 +9,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { componentListQueryOptions } from "@/lib/queries/component";
-import { ComponentsLayout } from "./components/ComponentsLayout";
 import { ComponentsCard } from "../components/ComponentsCard/ComponentsCard";
+import { ComponentsLayout } from "./components/ComponentsLayout";
 
 const ComponentsRoute = () => {
   const params = Route.useParams();

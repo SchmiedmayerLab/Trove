@@ -18,8 +18,8 @@ import { FieldLabel } from "@/components/ui/FieldLabel";
 import { IconPicker } from "@/components/ui/IconPicker";
 import { cn } from "@/utils/cn";
 import { enhanceField } from "@/utils/enhanceField";
-import { LocaleSuffix } from "./LocaleSuffix";
 import type { GeneralForm as GeneralFormType } from "../lib/useGeneralForm";
+import { LocaleSuffix } from "./LocaleSuffix";
 
 interface GeneralFormProps {
   form: GeneralFormType;

@@ -12,13 +12,13 @@ import { Plus } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { type ComponentSummary, normalizeComponentType } from "@/lib/api/types";
 import { cn } from "@/utils/cn";
+import { getComponentLabel } from "../../lib/formatComponent";
 import { ComponentsCardEmpty } from "./ComponentsCardEmpty";
 import {
   ComponentsCardRowActions,
   ComponentsCardRowLabel,
 } from "./ComponentsCardRow";
 import { NewComponentDialog } from "./NewComponentDialog";
-import { getComponentLabel } from "../../lib/formatComponent";
 
 const columnHelper = createColumnHelper<ComponentSummary>();
 

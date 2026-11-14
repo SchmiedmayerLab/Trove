@@ -3,8 +3,8 @@
 
 import { toast } from "@schmiedmayerlab/grove-design-system";
 import { afterEach, expect, it, vi } from "vitest";
-import { onMutationError } from "./mutationCallbacks";
 import { ApiError } from "../api/client";
+import { onMutationError } from "./mutationCallbacks";
 
 vi.mock("@schmiedmayerlab/grove-design-system", () => ({
   toast: { error: vi.fn() },
