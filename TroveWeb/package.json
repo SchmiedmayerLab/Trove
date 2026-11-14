@@ -73,14 +73,14 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^10.8.0",
     "nyc": "^18.0.0",
     "prettier": "^3",
     "typescript": "^5",
     "vite": "^7.3.2",
     "vite-plugin-istanbul": "^9.0.1",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "@firebase/firestore": {
@@ -91,6 +91,8 @@
     },
     "@hey-api/json-schema-ref-parser": {
       "js-yaml": "4.3.2"
-    }
+    },
+    "glob@>=9 <14.0.2": "14.0.6",
+    "minimatch@>=7 <11.0.1": "11.0.8"
   }
 }
