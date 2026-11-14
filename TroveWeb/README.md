@@ -22,6 +22,12 @@ screens, and the [capture guide](../docs/images/README.md) to reproduce them.
 3. Start the API server and Keycloak from [`TroveInfrastructure/docker`](../TroveInfrastructure/docker)
 4. Start the development server: `npm run dev`
 
+The version-scoped `glob` and `minimatch` overrides select patched releases while
+the lint and coverage tools still request vulnerable major versions. Keep
+`eslint-plugin-import-x` at 4.18.1 or later for minimatch 11 compatibility. Remove
+the overrides when the upstream dependency ranges select patched versions, and
+rerun the shared web and dependency vulnerability checks.
+
 ## Container transport
 
 The image defaults to `APP_ENVIRONMENT=production` and serves HTTPS on port 8080.
