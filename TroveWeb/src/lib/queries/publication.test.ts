@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 import { expect, it, vi } from "vitest";
+import { ApiError } from "../api/client";
+import type { StudyDraftValidation } from "../api/generated/types.gen";
 import {
   publicationNeedsReview,
   publicationRequest,
   validationRequest,
 } from "./publication";
-import { ApiError } from "../api/client";
-import type { StudyDraftValidation } from "../api/generated/types.gen";
 
 vi.mock("../env", () => ({
   env: { VITE_API_BASE_PATH: "https://api.example.test" },
