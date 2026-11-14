@@ -45,7 +45,7 @@ struct ClinicalEventHTTPIntegrationTests {
                 let retry = try await Self.upload(bytes, fixture: fixture, token: token, on: app)
                 #expect(receipt == retry)
                 try await Self.expectState(fixture, receipt: receipt, bytes: bytes, withdrawn: false, on: app)
-                try await Self.expectConflict(bytes + Data(" ".utf8), fixture: fixture, token: token, on: app)
+                try await Self.expectRepresentationAndConflict(bytes, receipt: receipt, fixture: fixture, token: token, on: app)
                 try await Self.expectConflict(bytes, fixture: fixture, token: token, on: app, oneTarget: true)
                 try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(fixture.enrollmentIDs[0])/withdraw", beforeRequest: {
                     $0.bearerAuth(token)
@@ -101,6 +101,19 @@ extension ClinicalEventHTTPIntegrationTests {
             receipt = try response.content.decode(Components.Schemas.EventReceipt.self)
         }
         return try #require(receipt)
+    }
+
+    /// Equivalent bytes add a custody representation of the retained version; changed clinical content conflicts.
+    private static func expectRepresentationAndConflict(
+        _ bytes: Data, receipt: Components.Schemas.EventReceipt, fixture: ClinicalEventStoreTests.Fixture, token: String?, on app: Application
+    ) async throws {
+        let representation = try await upload(bytes + Data(" ".utf8), fixture: fixture, token: token, on: app)
+        #expect(representation.producerEventIdentifier == receipt.producerEventIdentifier)
+        #expect(representation.payloadSHA256 != receipt.payloadSHA256)
+        try await expectState(fixture, receipt: receipt, bytes: bytes, withdrawn: false, on: app)
+        let changed = try #require(String(data: bytes, encoding: .utf8)).replacingOccurrences(of: "\"value\":72", with: "\"value\":73")
+        try #require(Data(changed.utf8) != bytes)
+        try await expectConflict(Data(changed.utf8), fixture: fixture, token: token, on: app)
     }
 
     private static func expectConflict(
