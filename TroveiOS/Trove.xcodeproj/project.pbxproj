@@ -652,7 +652,7 @@
 			repositoryURL = "https://github.com/SchmiedmayerLab/Grove.git";
 			requirement = {
 				kind = revision;
-				revision = 79155e1b1831f61c765b349e6587a876402f6c5e;
+				revision = 7193096b38960ea71af54b28c3a49369ddb37b21;
 			};
 		};
 		DFBAF4732FA5300000CCAEAA /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */ = {
