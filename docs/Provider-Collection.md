@@ -14,7 +14,7 @@ The runtime currently qualifies the Withings numeric `getmeas` client. The capab
 
 ## Deployment configuration
 
-Set `PROVIDER_CONFIGURATION_FILE` and `PROVIDER_SECRETS_FILE` together to absolute, operator-managed files. Without both settings, participant linking is unavailable and provider capability lists are empty. Invalid configuration fails explicitly; startup never invents a vault key, subject namespace or converter identity.
+Set `PROVIDER_CONFIGURATION_FILE` and `PROVIDER_SECRETS_FILE` together to absolute, operator-managed files. Without both settings, participant linking is unavailable, and provider capability and participant connection lists are empty; the app then offers no wearable services. Invalid configuration fails explicitly; startup never invents a vault key, subject namespace or converter identity.
 
 The public configuration is version 1 and contains:
 
