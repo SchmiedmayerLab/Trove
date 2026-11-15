@@ -14,7 +14,7 @@ name="$2"
 case "$name" in
     studies|study) expected='Daily Activity Study' ;;
     consent) expected='About this study' ;;
-    health-data) expected='Heart Rate' ;;
+    health-data) expected='HealthKit Data' ;;
     *) echo "Unknown documentation capture: $name" >&2; exit 2 ;;
 esac
 root="$(cd "$(dirname "$0")/../.." && pwd)"

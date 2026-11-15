@@ -20,7 +20,9 @@ test("capture the synthetic researcher walkthrough", async ({
   const capture = async (name: string, title: string) => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.evaluate(() => document.fonts.ready);
-    if (["enrollment", "consent", "consent-editor"].includes(name)) {
+    if (
+      ["enrollment", "consent", "consent-editor", "collection"].includes(name)
+    ) {
       // Resize the real viewport, not just the screenshot canvas: fixed navigation
       // must remain attached to the window while the complete form stays visible.
       const height = await page.evaluate(
@@ -166,4 +168,21 @@ test("capture the synthetic researcher walkthrough", async ({
     page.getByRole("heading", { name: "Schedule", exact: true }),
   ).toBeVisible();
   await capture("schedule", "Component Schedule");
+
+  // Illustrate the collection controls without saving them to the draft.
+  await page.goto(
+    `/${seeded.groupId}/${seeded.studyId}/configuration/collection`,
+  );
+  await page
+    .getByRole("searchbox", { name: "Find a measurement or wearable service" })
+    .fill("Workout");
+  await page.getByRole("checkbox", { name: "Collect workouts" }).click();
+  await page
+    .getByRole("checkbox", { name: "Include workout location routes" })
+    .click();
+  await page.getByRole("radio", { name: "Calendar lookback" }).click();
+  await expect(page.getByRole("spinbutton", { name: "Months" })).toHaveValue(
+    "6",
+  );
+  await capture("collection", "Health Collection");
 });

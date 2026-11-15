@@ -37,7 +37,7 @@ TROVE_DOCUMENTATION_FIXTURE=disposable npx playwright test --config documentatio
 
 The fixture requires an empty development group. It creates the study and participant
 through authenticated APIs, edits and publishes through the dashboard, then captures
-eight researcher views in both light and dark appearances (16 PNGs). Rerun against a fresh backend; the fixture deliberately refuses
+nine researcher views in both light and dark appearances (18 PNGs). The health-collection view shows unsaved example settings; the draft is not changed. Rerun against a fresh backend; the fixture deliberately refuses
 to delete or reuse existing studies. It does not contain a Questionnaire, so no capture
 depends on bypassing FHIR validation.
 The capture backend still needs `FHIR_VALIDATOR_IDENTITY` set to `sha256:` followed
@@ -51,7 +51,7 @@ and dashboard use that port; the empty-group safeguard still applies. Keycloak s
 on 8180. Stop only the extra backend when capture finishes.
 
 The capture configuration starts with a 1440 × 960 viewport, English and Pacific time.
-Long enrollment and consent forms increase the actual viewport height before capture,
+Long enrollment, consent and health-collection forms increase the actual viewport height before capture,
 so the sidebar footer remains at the bottom of the browser window. The capture test
 checks that alignment in both appearances; it does not stretch or reposition the sidebar.
 Each view is captured in the application's actual light and dark appearances;
