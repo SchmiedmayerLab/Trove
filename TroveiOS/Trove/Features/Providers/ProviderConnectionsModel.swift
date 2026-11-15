@@ -42,6 +42,10 @@ final class ProviderConnectionsModel: Module, EnvironmentAccessible {
     var registrations: [Components.Schemas.ProviderRegistration] { loadedSession == sessionSnapshot ? storedRegistrations : [] }
     var connections: [Components.Schemas.ProviderConnection] { loadedSession == sessionSnapshot ? storedConnections : [] }
     var hasFailed: Bool { loadedSession == sessionSnapshot && storedFailure }
+    /// Whether the deployment offers wearable services to this participant, or a configured deployment failed to report them.
+    ///
+    /// A deployment without provider integration answers with empty lists, which is a normal state rather than a failure.
+    var offersWearableServices: Bool { hasFailed || !registrations.isEmpty || !connections.isEmpty }
     var isBusy: Bool { operationSession == sessionSnapshot && operationID != nil }
 
     init(transport: Transport? = nil, configuredRedirect: @escaping @MainActor () -> URL? = { Config.providerRedirectURI }) {
