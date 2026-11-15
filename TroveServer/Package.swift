@@ -103,13 +103,15 @@ let package = Package(
             exclude: [
                 "Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license",
                 "Resources/HealthKitSleepEvent.json.license", "Resources/HealthKitWorkoutEvent.json.license",
-                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license"
+                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license",
+                "Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json.license"
             ],
             resources: [
                 .copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json"),
                 .copy("Resources/HealthKitSleepEvent.json"), .copy("Resources/HealthKitWorkoutEvent.json"),
                 .copy("Resources/HealthKitWorkoutRouteEvent.json"), .copy("Resources/HealthKitBodyWeightEvent.json"),
-                .copy("Resources/HealthKitComponentEvents"), .copy("Resources/HealthKitClinicalDocuments")
+                .copy("Resources/HealthKitComponentEvents"), .copy("Resources/HealthKitClinicalDocuments"),
+                .copy("Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json")
             ],
             swiftSettings: swiftSettings,
             plugins: [] + swiftLintPlugin()

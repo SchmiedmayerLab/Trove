@@ -36,10 +36,11 @@ struct EnrollmentConsentSection: View {
                 }
             }
             if let locale, !locale.isEmpty {
+                // A withdrawn or ended enrollment still restores its recorded receipt; only new submissions stop.
                 Button("Review Consent") {
                     review = .init(enrollmentID: enrollment.id, revision: enrollment.currentRevision, locale: locale)
                 }
-                .disabled(!isEnabled || !canAcceptConsent)
+                .disabled(!isEnabled)
                 if canAcceptConsent, latestRevision > enrollment.currentRevision {
                     Button("Review Revision \(latestRevision)") {
                         review = .init(enrollmentID: enrollment.id, revision: latestRevision, locale: locale, adoptsRevision: true)
