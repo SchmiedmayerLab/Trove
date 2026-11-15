@@ -43,7 +43,7 @@ struct FHIRSensorKitObservationTests {
         var observation = try FHIRSensorKitFixture.observation(await FHIRSensorKitFixture.bytes(.onWrist))
         let other = try #require(SensorKitCatalog.current.entries.first { $0.structuredContract == .phoneUsage })
         observation.extension = [
-            Extension(url: Canonicals.sensorKitSourceTypeExtension, value: .code(FHIRPrimitive(FHIRString(other.sourceTypeCode))))
+            Extension(url: SensorKitContract.sourceTypeExtensionURI, value: .code(FHIRPrimitive(FHIRString(other.sourceTypeCode))))
         ]
         #expect(throws: (any Error).self) { try FHIRObservationValueProjection(observation: observation, quantityText: nil) }
     }
