@@ -57,16 +57,23 @@ extension RecordingTransferStreamingTests {
             request.headers.contentType = .binary
             request.headers.add(name: "Trove-Source-Installation-ID", value: fixture.installationID.uuidString)
             request.headers.add(name: "Trove-Source-Credential", value: SourceBindingFixture.credentialBase64(fixture.installationID))
-            request.body = .stream(input.map { ByteBuffer(bytes: $0) }, length: .known(Int64(input.byteCount)))
-            let baseline = try Self.peakResidentBytes()
-            let response = try await app.http.client.shared.execute(request, timeout: .seconds(90))
-            _ = try await response.body.collect(upTo: 16 * 1024)
+            // The test client shares the server's single event loop. Pace its body like the storage upload, so the
+            // measurement covers the server path rather than chunks the client queued ahead of its own connection.
+            let paced = EventLoopPacedBody(base: input.body, eventLoop: app.eventLoopGroup.next())
+            request.body = .stream(paced.map { ByteBuffer(bytes: $0) }, length: .known(Int64(input.byteCount)))
+            // Sample the current resident memory: the process's peak (`VmHWM`) also carries earlier tests' high-water mark,
+            // which would hide growth below it.
+            let (response, growth) = try await ResidentMemory.growth {
+                let response = try await app.http.client.shared.execute(request, timeout: .seconds(90))
+                _ = try await response.body.collect(upTo: 16 * 1024)
+                return response
+            }
             #expect(response.status == .ok)
             let receipt = try await RecordingTransferHTTPTests.lookup(client, fixture: fixture, id: id)
             #expect(receipt.storedByteCount == Int64(input.byteCount) && receipt.storedSHA256 == digest)
-            if let baseline, let peak = try Self.peakResidentBytes() {
-                print("HTTP_RECORDING_MEMORY payloadBytes=\(input.byteCount) baselineBytes=\(baseline) peakBytes=\(peak)")
-                #expect(peak - baseline < 64 * 1024 * 1024)
+            if let growth {
+                print("HTTP_RECORDING_MEMORY payloadBytes=\(input.byteCount) residentGrowthBytes=\(growth)")
+                #expect(growth < 64 * 1024 * 1024)
             }
             try await RecordingTransferHTTPTests.expectRows(transfers: 1, attempts: 1, receipts: 1, on: app)
             try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -75,15 +82,5 @@ extension RecordingTransferStreamingTests {
             await app.server.shutdown()
             throw error
         }
-    }
-
-    private static func peakResidentBytes() throws -> Int? {
-        #if os(Linux)
-        let status = try String(contentsOfFile: "/proc/self/status", encoding: .utf8)
-        let line = try #require(status.split(separator: "\n").first { $0.hasPrefix("VmHWM:") })
-        return try #require(Int(line.split(whereSeparator: \.isWhitespace)[1])) * 1024
-        #else
-        return nil
-        #endif
     }
 }
