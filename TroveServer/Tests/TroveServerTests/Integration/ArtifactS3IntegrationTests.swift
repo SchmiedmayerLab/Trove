@@ -6,11 +6,6 @@
 // SPDX-License-Identifier: MIT
 //
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 import Fluent
 import Foundation
 import Testing
@@ -20,32 +15,34 @@ import Vapor
 
 
 struct ArtifactS3IntegrationTests {
-    /// The bytes the process's heap allocations currently occupy, or `nil` where the platform reports no such count.
+    /// The process's current resident memory, or `nil` where `/proc` does not report it.
     ///
-    /// This counts live allocations only: memory the allocator keeps after a free and the process's peak resident memory,
-    /// both of which earlier tests in the same process shape, do not contribute.
-    private static func liveAllocatedBytes() -> Int? {
-        #if canImport(Darwin)
-        var statistics = malloc_statistics_t()
-        malloc_zone_statistics(nil, &statistics)
-        return statistics.size_in_use
-        #elseif canImport(Glibc)
-        let info = mallinfo2()
-        return Int(info.uordblks + info.hblkhd)
+    /// Unlike the peak resident memory (`VmHWM`), the current value does not carry the high-water mark that earlier tests
+    /// in the same process left behind.
+    private static func residentBytes() -> Int? {
+        #if os(Linux)
+        guard let statm = try? String(contentsOfFile: "/proc/self/statm", encoding: .utf8) else {
+            return nil
+        }
+        let fields = statm.split(separator: " ")
+        guard fields.count > 1, let pages = Int(fields[1]) else {
+            return nil
+        }
+        return pages * Int(getpagesize())
         #else
         return nil
         #endif
     }
 
-    /// Runs `operation` while sampling the live allocations, and returns its result with their highest observed count.
-    private static func peakLiveAllocatedBytes<Result: Sendable>(
+    /// Runs `operation` while sampling the resident memory, and returns its result with the highest observed value.
+    private static func peakResidentBytes<Result: Sendable>(
         during operation: () async throws -> Result
     ) async throws -> (result: Result, peakBytes: Int?) {
         let sampler = Task.detached { () -> Int? in
-            var peak = liveAllocatedBytes()
+            var peak = residentBytes()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(2))
-                peak = max(peak ?? 0, liveAllocatedBytes() ?? 0)
+                peak = max(peak ?? 0, residentBytes() ?? 0)
             }
             return peak
         }
@@ -89,11 +86,11 @@ struct ArtifactS3IntegrationTests {
                         )
                     }
                 }
-                // The bound covers what the transfer itself holds, not what the process accumulated before it. A warm-up
+                // The bound covers what the transfer itself adds, not what the process accumulated before it. A warm-up
                 // through the same path first creates the storage client, connection and lazily initialized state that
-                // stay allocated afterwards. The measured upload is then compared with the live allocations after the
-                // warm-up, sampled throughout the transfer: a transfer that buffered the payload instead of streaming it
-                // would hold at least its 96 MiB at once.
+                // stay resident afterwards, and leaves the allocator's pools sized for a transfer. The measured upload is
+                // then compared with the resident memory after the warm-up, sampled throughout the transfer: a transfer
+                // that buffered the payload instead of streaming it would hold at least its 96 MiB at once.
                 let warmUpInput = GeneratedObjectStorageBody(byteCount: 1024 * 1024 + 1)
                 let warmUpDeclaration = try Self.declaration(
                     byteCount: warmUpInput.byteCount,
@@ -102,15 +99,15 @@ struct ArtifactS3IntegrationTests {
                     output: "urn:uuid:5d0c4f43-6f1e-4c2b-9a51-0f4d4c8f7a21"
                 )
                 _ = try await upload(warmUpInput, declaration: warmUpDeclaration)
-                let baseline = Self.liveAllocatedBytes()
-                let (receipt, peak) = try await Self.peakLiveAllocatedBytes {
+                let baseline = Self.residentBytes()
+                let (receipt, peak) = try await Self.peakResidentBytes {
                     try await upload(input, declaration: declaration)
                 }
                 let stored = try #require(try await StoredArtifact.find(receipt.artifactID, on: app.db))
                 let reference = try stored.reference()
                 #expect(receipt.declarationSHA256 == declaration.sha256 && receipt.storedSHA256 == digest)
                 if let baseline, let peak {
-                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) baselineLiveBytes=\(baseline) peakLiveBytes=\(peak)")
+                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) baselineResidentBytes=\(baseline) peakResidentBytes=\(peak)")
                     #expect(peak - baseline < 64 * 1024 * 1024)
                 }
                 #expect(stored.state == .ready)

@@ -148,10 +148,10 @@ TROVE_TEST_S3_PORT=18333 swift test --package-path TroveServer \
 
 It generates 96 MiB plus one byte in 64 KiB chunks, uploads and verifies the complete
 object, and deletes it. A 1 MiB warm-up upload through the same path runs first. The
-test then samples the process's live heap allocations throughout the large upload and
-requires their peak to stay less than 64 MiB above the count after the warm-up. Freed
-memory the allocator retains and earlier tests' peak memory do not count; concurrent
-tests in the same process would, so measure with `--no-parallel` or alone. This is
+test then samples the process's resident memory throughout the large upload on Linux
+and requires its peak to stay less than 64 MiB above the value after the warm-up.
+Earlier tests' peak memory does not count; concurrent tests in the same process
+would, so measure with `--no-parallel` or alone. This is
 storage-transport evidence, not a measurement of the complete mobile collection and
 durable-queue pipeline.
 
