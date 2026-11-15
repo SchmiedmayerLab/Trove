@@ -37,7 +37,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.4"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "79155e1b1831f61c765b349e6587a876402f6c5e"),
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "7193096b38960ea71af54b28c3a49369ddb37b21"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),
