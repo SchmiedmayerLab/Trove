@@ -99,3 +99,35 @@ esac
         grants = source.split("GRANT SELECT, INSERT ON public.recording_transfers,", 1)[1].split("TO", 1)[0]
         actual = {"recording_transfers", *re.findall(r"public\.([a-z_]+)", grants)}
         self.assertEqual(actual, expected)
+
+    def test_provider_grants_cover_every_provider_table_without_deletion(self):
+        sources = ROOT / "TroveServer/Sources/TroveServer"
+        schemas = [*sources.glob("Migrations/Postgres/*Provider*.swift"), sources / "Modules/Provider/ProviderWorkerSchema.swift"]
+        expected = {table for path in schemas for table in re.findall(r'schema\("(provider_[a-z_]+)"\)', path.read_text())}
+        append_only = set(re.findall(
+            r'protect\(table: "(provider_[a-z_]+)"', "".join(path.read_text() for path in schemas)
+        ))
+        source = (SCRIPT.parent / "grant-runtime.sql").read_text()
+        privileges = {}
+        for statement in re.findall(r"^GRANT ([^;]+?) TO :\"runtime_name\";", source, re.MULTILINE | re.DOTALL):
+            granted, tables = statement.split(" ON ", 1)
+            for table in re.findall(r"public\.(provider_[a-z_]+)", tables):
+                privileges.setdefault(table, set()).add(" ".join(granted.split()))
+        self.assertEqual(set(privileges), expected)
+        self.assertEqual(append_only, {"provider_global_scopes", "provider_query_coverage", "provider_conversion_instants"})
+        self.assertEqual(privileges, {
+            "provider_registrations": {"SELECT, INSERT, UPDATE"}, "provider_connections": {"SELECT, INSERT, UPDATE"},
+            "provider_link_intents": {"SELECT, INSERT, UPDATE"}, "provider_checkpoints": {"SELECT, INSERT, UPDATE"},
+            "provider_worker_states": {"SELECT, INSERT, UPDATE"},
+            "provider_staged_records": {"SELECT, INSERT", "UPDATE (event_id)"},
+            "provider_query_coverage": {"SELECT, INSERT"}, "provider_conversion_instants": {"SELECT, INSERT"},
+            "provider_global_scopes": {"SELECT, INSERT"}, "provider_dispatch_budgets": {"SELECT, UPDATE"},
+        })
+        for table in append_only:
+            self.assertEqual(privileges[table], {"SELECT, INSERT"})
+        # Startup refuses a runtime login that could rewrite, delete or delegate append-only provider evidence.
+        check = (sources / "Core/DatabaseRuntimePrivileges.swift").read_text()
+        protected = re.search(r"c\.relname IN \(([^)]*)\)", check).group(1)
+        protected_tables = re.findall(r"'([a-z_]+)'", protected)
+        self.assertLessEqual(append_only, set(protected_tables))
+        self.assertIn(f"(SELECT count(*) FROM protected_relations) = {len(set(protected_tables))}", check)

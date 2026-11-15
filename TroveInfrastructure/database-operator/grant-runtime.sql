@@ -61,6 +61,14 @@ GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representa
     public.clinical_attribution_commands TO :"runtime_name";
 GRANT SELECT, INSERT ON public.recording_transfers, public.recording_transfer_attempts, public.recording_transfer_receipts,
     public.clinical_recording_attachments TO :"runtime_name";
+-- Provider collection state is updated in place; its identity scopes, coverage and conversion instants are append-only.
+-- Nothing provider-related is deleted at runtime, and dispatch budgets are seeded by the migration.
+GRANT SELECT, INSERT, UPDATE ON public.provider_registrations, public.provider_connections, public.provider_link_intents,
+    public.provider_checkpoints, public.provider_worker_states TO :"runtime_name";
+GRANT SELECT, INSERT ON public.provider_staged_records, public.provider_query_coverage, public.provider_conversion_instants,
+    public.provider_global_scopes TO :"runtime_name";
+GRANT UPDATE (event_id) ON public.provider_staged_records TO :"runtime_name";
+GRANT SELECT, UPDATE ON public.provider_dispatch_budgets TO :"runtime_name";
 
 -- The only definer bridge reveals a Boolean, never settings, paths or privileged operations.
 CREATE OR REPLACE FUNCTION public.trove_timescale_preloaded() RETURNS boolean
