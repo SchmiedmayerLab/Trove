@@ -13,7 +13,8 @@ import uuid
 
 from rekey_fixture import recovered_arguments
 from test_rekey_fixture import recovery_fixture
-from verify_process_restart import Checkpoint, ROOT, record_version_identifier, request, response_uuid
+from verify_process_restart import Checkpoint, RELAY, ROOT, record_version_identifier, request, response_uuid
+import worker
 
 
 class ProcessRestartAuthoringTests(unittest.TestCase):
@@ -67,6 +68,10 @@ class ProcessRestartAuthoringTests(unittest.TestCase):
 
 
 class ProcessRestartIdentityTests(unittest.TestCase):
+    def test_relay_forwards_every_body_the_worker_accepts(self):
+        # CI and this verifier reach the isolated worker only through this relay.
+        self.assertIn(f"if not 0 <= size <= {worker.MAX_BODY}:", RELAY)
+
     def test_reused_validator_requires_exact_image_and_private_network_without_mutations(self):
         original = {"Id": "owned-fixture-id", "Image": "sha256:selected", "State": {"Running": True, "StartedAt": "fixture-start"},
                     "NetworkSettings": {"Networks": {"fixture-network": {}}},
