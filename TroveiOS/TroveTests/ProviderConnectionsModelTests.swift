@@ -19,11 +19,23 @@ struct ProviderConnectionsModelTests {
     private actor HTTP: ClientTransport {
         let intent: Components.Schemas.ProviderLinkIntent
         let connection: Components.Schemas.ProviderConnection
+        let registrations: [Components.Schemas.ProviderRegistration]
+        let connections: [Components.Schemas.ProviderConnection]
+        let failingOperation: String?
         var operations: [String] = []
 
-        init(intent: Components.Schemas.ProviderLinkIntent, connection: Components.Schemas.ProviderConnection) {
+        init(
+            intent: Components.Schemas.ProviderLinkIntent,
+            connection: Components.Schemas.ProviderConnection,
+            registrations: [Components.Schemas.ProviderRegistration] = [],
+            connections: [Components.Schemas.ProviderConnection] = [],
+            failingOperation: String? = nil
+        ) {
             self.intent = intent
             self.connection = connection
+            self.registrations = registrations
+            self.connections = connections
+            self.failingOperation = failingOperation
         }
 
         func send(
@@ -32,8 +44,13 @@ struct ProviderConnectionsModelTests {
             operations.append(operationID)
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
+            if operationID == failingOperation {
+                return (.init(status: .serviceUnavailable), nil)
+            }
             let bytes: Data
             switch operationID {
+            case "getParticipantProviderRegistrations": bytes = try encoder.encode(registrations)
+            case "getParticipantProviderConnections": bytes = try encoder.encode(connections)
             case "startParticipantProviderLink": bytes = try encoder.encode(intent)
             case "completeParticipantProviderLink": bytes = try encoder.encode(connection)
             default: throw ProviderConnectionsModel.Failure.unavailable
@@ -111,6 +128,65 @@ struct ProviderConnectionsModelTests {
         }
         #expect(await http.operations == ["startParticipantProviderLink"])
         #expect(model.connections.isEmpty && !model.hasFailed && !model.isBusy)
+    }
+
+    @Test
+    func deploymentWithoutProviderIntegrationOffersNoWearableServicesWithoutFailure() async throws {
+        let model = try await refreshedModel(registrations: [], connections: [])
+        #expect(!model.offersWearableServices)
+        #expect(!model.hasFailed && !model.isBusy)
+        #expect(model.registrations.isEmpty && model.connections.isEmpty)
+    }
+
+    @Test
+    func offeredRegistrationShowsWearableServices() async throws {
+        let model = try await refreshedModel(registrations: [Self.registration], connections: [])
+        #expect(model.offersWearableServices)
+        #expect(!model.hasFailed)
+        #expect(model.registrations == [Self.registration])
+    }
+
+    @Test(arguments: ["getParticipantProviderRegistrations", "getParticipantProviderConnections"])
+    func failureInConfiguredDeploymentIsReported(failingOperation: String) async throws {
+        let model = try await refreshedModel(registrations: [Self.registration], connections: [], failingOperation: failingOperation)
+        #expect(model.hasFailed)
+        #expect(model.offersWearableServices)
+        #expect(!model.isBusy)
+    }
+
+    private func refreshedModel(
+        registrations: [Components.Schemas.ProviderRegistration],
+        connections: [Components.Schemas.ProviderConnection],
+        failingOperation: String? = nil
+    ) async throws -> ProviderConnectionsModel {
+        let lifecycle = KeycloakSessionLifecycle()
+        try lifecycle.install(subject: "first", issuer: Self.issuer, for: lifecycle.generation)
+        let http = HTTP(
+            intent: .init(
+                id: UUID().uuidString,
+                authorizationUrl: "https://provider.example.org/authorize",
+                redirectUri: Self.redirect.absoluteString,
+                expiresAt: .now.addingTimeInterval(600)
+            ),
+            connection: .init(
+                id: UUID().uuidString,
+                registrationId: Self.registration.id,
+                sourceId: UUID().uuidString,
+                state: .active,
+                generation: 1,
+                requiresReauthorization: false
+            ),
+            registrations: registrations,
+            connections: connections,
+            failingOperation: failingOperation
+        )
+        let model = makeModel(lifecycle: lifecycle, http: http)
+        #expect(!model.offersWearableServices)
+        await model.refresh()
+        if failingOperation == nil {
+            #expect(Set(await http.operations) == ["getParticipantProviderRegistrations", "getParticipantProviderConnections"])
+        }
+        return model
     }
 
     private func makeModel(lifecycle: KeycloakSessionLifecycle, http: HTTP) -> ProviderConnectionsModel {
