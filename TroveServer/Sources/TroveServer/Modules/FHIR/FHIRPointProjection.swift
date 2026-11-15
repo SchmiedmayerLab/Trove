@@ -145,16 +145,7 @@ enum FHIRPointProjection {
         _ observation: Observation, identifiers: [RoledIdentifier], fullURL: String, quantityText: String?
     ) throws -> ValidatedExchangeEvent.Output {
         let value = try FHIRObservationValueProjection(observation: observation, quantityText: quantityText)
-        let writers = identifiers.filter { $0.role == .writerRecord }
-        let versions = (observation.extension ?? []).filter { $0.url == Canonicals.writerRecordVersion }
-        guard writers.count <= 1, writers.count == versions.count else { throw FHIRValidationClient.invalid }
-        let writerVersion: String?
-        if let version = versions.first {
-            guard case .string(let raw)? = version.value, let text = raw.value?.string else { throw FHIRValidationClient.invalid }
-            writerVersion = text
-        } else {
-            writerVersion = nil
-        }
+        let writer = try writerRevision(identifiers: identifiers, extensions: observation.extension ?? [])
         return try .init(
             fullURL: fullURL,
             profile: value.profile,
@@ -162,8 +153,8 @@ enum FHIRPointProjection {
             effectiveEnd: value.end,
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
-            writerIdentifier: writers.first.map { .init(system: $0.identifier.system.rawValue, value: $0.identifier.value) },
-            writerVersion: writerVersion,
+            writerIdentifier: writer.identifier,
+            writerVersion: writer.version,
             value: value.value,
             codeSystem: value.codeSystem,
             code: value.code
@@ -177,7 +168,8 @@ enum FHIRPointProjection {
         let bounds = try FHIRRecordingProjection.routeBounds(document, external: external)
         // The exact source-artifact identity remains in the immutable document and study view.
         _ = try oneIdentifier(identifiers, role: .sourceArtifact)
-        guard !identifiers.contains(where: { $0.role == .writerRecord }) else { throw FHIRValidationClient.invalid }
+        // A recording record's sole document is its primary output and states the writer revision like an Observation.
+        let writer = try writerRevision(identifiers: identifiers, extensions: document.extension ?? [])
         return try .init(
             fullURL: fullURL,
             profile: FHIRRecordingProjection.profile,
@@ -185,12 +177,27 @@ enum FHIRPointProjection {
             effectiveEnd: bounds.1,
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
-            writerIdentifier: nil,
-            writerVersion: nil,
+            writerIdentifier: writer.identifier,
+            writerVersion: writer.version,
             value: .recording,
             codeSystem: FHIRRecordingProjection.formatSystem,
             code: FHIRRecordingProjection.routeFormat
         )
+    }
+
+    /// The writer-record identity and its version travel as one complete pair or not at all; ``ClinicalRecordRevision``
+    /// checks the canonical version text and that every output of the record states the same pair.
+    private static func writerRevision(
+        identifiers: [RoledIdentifier], extensions: [Extension]
+    ) throws -> (identifier: Identity?, version: String?) {
+        let writers = identifiers.filter { $0.role == .writerRecord }
+        let versions = extensions.filter { $0.url == Canonicals.writerRecordVersion }
+        guard writers.count <= 1, writers.count == versions.count else { throw FHIRValidationClient.invalid }
+        guard let writer = writers.first, let version = versions.first else {
+            return (nil, nil)
+        }
+        guard case .string(let raw)? = version.value, let text = raw.value?.string else { throw FHIRValidationClient.invalid }
+        return (.init(system: writer.identifier.system.rawValue, value: writer.identifier.value), text)
     }
 
     private static func oneIdentifier(_ identifiers: [RoledIdentifier], role: GroveIdentifierRole) throws -> Identity {

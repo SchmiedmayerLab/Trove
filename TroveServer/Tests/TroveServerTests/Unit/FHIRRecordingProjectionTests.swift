@@ -33,6 +33,49 @@ struct FHIRRecordingProjectionTests {
         #expect(output.code == FHIRRecordingProjection.routeFormat)
     }
 
+    @Test("A recording's sole document states its writer revision like an Observation")
+    func admitsTheWriterRevisionPairOnTheRecordingDocument() throws {
+        let pair = try Self.goldenWriterRevision()
+        let bytes = try Self.mutated { document in
+            document["identifier"] = try #require(document["identifier"] as? [Any]) + [pair.identifier]
+            document["extension"] = (document["extension"] as? [Any] ?? []) + [pair.version]
+        }
+        let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "synthetic-shape-only")
+        let output = try #require(event.outputs.first)
+        #expect(event.outputs.count == 1 && output.value == .recording)
+        #expect(output.writerIdentifier?.system == pair.identifier["system"] as? String)
+        #expect(output.writerIdentifier?.value == pair.identifier["value"] as? String)
+        #expect(output.writerVersion == pair.version["valueString"] as? String)
+        let revision = try ClinicalRecordRevision(event)
+        #expect(revision.writer == output.writerIdentifier && revision.version == output.writerVersion)
+    }
+
+    @Test(arguments: ["identifier-only", "version-only", "two-identifiers", "two-versions", "non-canonical-version"])
+    func refusesAnIncompleteOrNonCanonicalWriterRevision(corruption: String) throws {
+        let pair = try Self.goldenWriterRevision()
+        let bytes = try Self.mutated { document in
+            var identifiers = try #require(document["identifier"] as? [Any])
+            var extensions = document["extension"] as? [Any] ?? []
+            var version = pair.version
+            var secondIdentifier = pair.identifier
+            secondIdentifier["value"] = "v0:test:1:" + String(repeating: "A", count: 43)
+            switch corruption {
+            case "identifier-only": identifiers.append(pair.identifier)
+            case "version-only": extensions.append(version)
+            case "two-identifiers": identifiers += [pair.identifier, secondIdentifier]; extensions.append(version)
+            case "two-versions": identifiers.append(pair.identifier); extensions += [version, version]
+            default:
+                version["valueString"] = "03"
+                identifiers.append(pair.identifier)
+                extensions.append(version)
+            }
+            document["identifier"] = identifiers
+            document["extension"] = extensions
+        }
+        #expect { try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "synthetic-shape-only") }
+            throws: { ($0 as? ServerError)?.status.code == 422 }
+    }
+
     @Test(arguments: ["url", "format", "source-type", "header", "empty", "timestamp"])
     func refusesUnselectableOrUnsupportedRecordings(corruption: String) throws {
         let bytes = try Self.mutated { document in
@@ -68,6 +111,23 @@ struct FHIRRecordingProjectionTests {
 extension FHIRRecordingProjectionTests {
     static func fixtureURL() throws -> URL {
         try #require(Bundle.module.url(forResource: "HealthKitWorkoutRouteEvent", withExtension: "json"))
+    }
+
+    /// The writer-record identity and its version as Grove states them on a heartbeat series' primary document.
+    private static func goldenWriterRevision() throws -> (identifier: [String: Any], version: [String: Any]) {
+        let url = try #require(Bundle.module.url(forResource: "HealthKitHeartbeatSeriesWriterRecordEvent", withExtension: "json"))
+        let bundle = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let entries = try #require(bundle["entry"] as? [[String: Any]])
+        let document = try #require(entries.lazy.compactMap { $0["resource"] as? [String: Any] }.first {
+            $0["resourceType"] as? String == "DocumentReference"
+        })
+        let identifiers = try #require(document["identifier"] as? [[String: Any]])
+        let writer = try #require(identifiers.first { identifier in
+            ((identifier["type"] as? [String: Any])?["coding"] as? [[String: Any]])?.contains { $0["code"] as? String == "writer-record" } == true
+        })
+        let extensions = try #require(document["extension"] as? [[String: Any]])
+        let version = try #require(extensions.first { $0["url"] as? String == Canonicals.writerRecordVersion.value?.url.absoluteString })
+        return (writer, version)
     }
 
     private static func mutated(_ change: (inout [String: Any]) throws -> Void) throws -> Data {
