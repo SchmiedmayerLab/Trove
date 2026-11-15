@@ -4,7 +4,7 @@
 [project]
 site_name = "Trove"
 site_description = "Open-source study management: study authoring, enrollment, consent, and health-data collection. Built with Swift and Grove."
-site_url = "https://schmiedmayerlab.github.io/Trove/"
+site_url = "https://troveplatform.org/"
 repo_url = "https://github.com/SchmiedmayerLab/Trove"
 repo_name = "SchmiedmayerLab/Trove"
 docs_dir = "docs"

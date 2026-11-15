@@ -35,8 +35,9 @@ HTML images that Markdown validation may not cover. Repository files outside
 The Documentation workflow builds pull requests without deploying them. After
 merge to `main`, it uploads the exact checked `site/` output and deploys through
 the `github-pages` environment. GitHub Pages must use **GitHub Actions** as its
-source in the repository settings. The site is served at
-`https://schmiedmayerlab.github.io/Trove/` once the first deployment completes.
+source in the repository settings, with `troveplatform.org` as its custom domain
+and HTTPS enforced. The site is served at `https://troveplatform.org/`; the
+domain's apex A and AAAA records point to GitHub Pages.
 
 Only the deployment job receives Pages write and identity-token permissions.
 This publishes public documentation, not application images or study services;
