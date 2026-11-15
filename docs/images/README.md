@@ -82,10 +82,10 @@ First run the web-capture workflow above against the same development stack.
 It seeds and publishes the synthetic Daily Activity Study used by the mobile
 captures. A fresh UI-test stack alone does not contain that published study.
 
-Build and install the same revision of the iOS app on a dedicated iPhone 17 Pro
-Simulator. Use the CI build settings and `xcbeautify`; do not take screenshots while
-automated tests own the simulator. Sign in as the synthetic Alice participant from
-the development realm. Open RocketSim's live preview for visual review.
+Build and install the same revision of the iOS app on a dedicated iPhone 18 Pro
+Simulator with iOS 27.2. Use the CI build settings and `xcbeautify`; do not take
+screenshots while automated tests own the simulator. Sign in as the synthetic Alice
+participant from the development realm. Open RocketSim's live preview for visual review.
 
 Explicitly install the built `Trove.app` with `xcrun simctl install` after tests.
 Do not assume that launching the ordinary app uses the test build: Xcode's test
@@ -108,9 +108,11 @@ For each state, run from the repository root:
 bash TroveiOS/scripts/capture-documentation.sh SIMULATOR_UDID consent
 ```
 
-Replace `consent` with the corresponding capture name. RocketSim supplies the device
-bezel; the script captures light and dark appearances, uses a consistent status bar,
-and checks that both outputs decode before replacing existing files. Review every
+Replace `consent` with the corresponding capture name. The script refuses any other
+device or runtime. RocketSim supplies its default Black iPhone 18 Pro frame on a
+transparent background; the images are direct captures without compositing. The
+script captures light and dark appearances, uses a consistent status bar, and checks
+that both outputs are 1350 × 2760 PNGs before replacing existing files. Review every
 image for the expected content, visible errors, clipping and stale branding. A valid
 PNG is not proof that the app is on the correct screen.
 
