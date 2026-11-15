@@ -303,7 +303,7 @@ extension AuthIntegrationTests {
                 ))
             ),
             participant(.GET, "\(base)/participant/provider-registrations", successStatus: .ok),
-            participant(.GET, "\(base)/participant/provider-connections", successStatus: .serviceUnavailable),
+            participant(.GET, "\(base)/participant/provider-connections", successStatus: .ok),
             participant(
                 .POST,
                 "\(base)/participant/provider-registrations/\(dummyId)/link-intents",
