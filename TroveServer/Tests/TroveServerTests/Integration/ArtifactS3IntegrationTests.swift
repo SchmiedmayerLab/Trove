@@ -52,6 +52,38 @@ struct ArtifactS3IntegrationTests {
         return (result, await sampler.value)
     }
 
+    /// Uploads a 1 MiB warm-up and then `input` through `upload`, and returns the receipt of `input` with how far the
+    /// resident memory sampled during its upload rose above the resident memory after the warm-up.
+    ///
+    /// The bound covers what the transfer itself adds, not what the process accumulated before it. The warm-up through the
+    /// same path first creates the storage client, connection and lazily initialized state that stay resident afterwards,
+    /// and leaves the allocator's pools sized for a transfer. The measured upload is then compared with the resident memory
+    /// after the warm-up, sampled throughout the transfer: a transfer that buffered the payload instead of streaming it
+    /// would hold at least its 96 MiB at once.
+    private static func uploadAfterWarmUp(
+        _ input: GeneratedObjectStorageBody,
+        _ declaration: RecordingTransferDeclaration,
+        consentID: UUID,
+        upload: (GeneratedObjectStorageBody, RecordingTransferDeclaration) async throws -> RecordingTransferReceipt
+    ) async throws -> (receipt: RecordingTransferReceipt, growthBytes: Int?) {
+        let warmUpInput = GeneratedObjectStorageBody(byteCount: 1024 * 1024 + 1)
+        let warmUpDeclaration = try Self.declaration(
+            byteCount: warmUpInput.byteCount,
+            digest: try await warmUpInput.digest(),
+            consentID: consentID,
+            output: "urn:uuid:5d0c4f43-6f1e-4c2b-9a51-0f4d4c8f7a21"
+        )
+        _ = try await upload(warmUpInput, warmUpDeclaration)
+        let baseline = Self.residentBytes()
+        let (receipt, peak) = try await Self.peakResidentBytes {
+            try await upload(input, declaration)
+        }
+        guard let baseline, let peak else {
+            return (receipt, nil)
+        }
+        return (receipt, peak - baseline)
+    }
+
     @Test(.enabled(if: Environment.get("TROVE_TEST_S3_PORT") != nil, "Requires a disposable loopback S3 test service"))
     func largeSidecarStreamsThroughRealStorageWithBoundedMemory() async throws {
         let port = try #require(Environment.get("TROVE_TEST_S3_PORT").flatMap(Int.init))
@@ -79,36 +111,19 @@ struct ArtifactS3IntegrationTests {
                     storage: app.grove[ObjectStorageService.self],
                     limits: try .init(storedBytes: input.byteCount, sourceBytes: input.byteCount)
                 )
-                func upload(_ input: GeneratedObjectStorageBody, declaration: RecordingTransferDeclaration) async throws -> RecordingTransferReceipt {
+                let (receipt, growth) = try await Self.uploadAfterWarmUp(input, declaration, consentID: fixture.consentIDs[0]) { input, declaration in
                     try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                         try await service.upload(
                             input.body, sourceID: fixture.source.id, transferID: UUID(), declaration: declaration, installation: fixture.installation
                         )
                     }
                 }
-                // The bound covers what the transfer itself adds, not what the process accumulated before it. A warm-up
-                // through the same path first creates the storage client, connection and lazily initialized state that
-                // stay resident afterwards, and leaves the allocator's pools sized for a transfer. The measured upload is
-                // then compared with the resident memory after the warm-up, sampled throughout the transfer: a transfer
-                // that buffered the payload instead of streaming it would hold at least its 96 MiB at once.
-                let warmUpInput = GeneratedObjectStorageBody(byteCount: 1024 * 1024 + 1)
-                let warmUpDeclaration = try Self.declaration(
-                    byteCount: warmUpInput.byteCount,
-                    digest: try await warmUpInput.digest(),
-                    consentID: fixture.consentIDs[0],
-                    output: "urn:uuid:5d0c4f43-6f1e-4c2b-9a51-0f4d4c8f7a21"
-                )
-                _ = try await upload(warmUpInput, declaration: warmUpDeclaration)
-                let baseline = Self.residentBytes()
-                let (receipt, peak) = try await Self.peakResidentBytes {
-                    try await upload(input, declaration: declaration)
-                }
                 let stored = try #require(try await StoredArtifact.find(receipt.artifactID, on: app.db))
                 let reference = try stored.reference()
                 #expect(receipt.declarationSHA256 == declaration.sha256 && receipt.storedSHA256 == digest)
-                if let baseline, let peak {
-                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) baselineResidentBytes=\(baseline) peakResidentBytes=\(peak)")
-                    #expect(peak - baseline < 64 * 1024 * 1024)
+                if let growth {
+                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) residentGrowthBytes=\(growth)")
+                    #expect(growth < 64 * 1024 * 1024)
                 }
                 #expect(stored.state == .ready)
                 #expect(stored.byteCount == input.byteCount && stored.digest == digest)
