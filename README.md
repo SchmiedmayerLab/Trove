@@ -26,6 +26,8 @@ health-data collection into one platform.
 Set up eligibility and enrollment, edit consent documents, and add study components.
 Preview what participants will see before publishing. Each published revision keeps
 the study definition and consent terms together, separate from later draft edits.
+Choose the health measurements and history a study collects, then retrieve its
+authorized data and recordings from the results page or the [CLI](TroveAPI/CLI.md).
 
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details.png#gh-light-mode-only)
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details~dark.png#gh-dark-mode-only)
@@ -33,7 +35,8 @@ the study definition and consent terms together, separate from later draft edits
 ## For Participants
 
 Discover a study, review its requirements, and enroll. Review and sign its consent
-document before authorizing health-data collection.
+document before authorizing health-data collection. Collection continues offline
+under the accepted study settings, and withdrawal stops it on the device at once.
 
 <table>
   <tr>
@@ -70,7 +73,7 @@ flowchart TB
     S["Trove server<br/>HTTPS API · Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
-    S --> OS[("S3-compatible storage<br/>Bundles and consent PDFs")]
+    S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]
 ```
 
 [`TroveAPI/openapi.yaml`](TroveAPI/openapi.yaml) defines the HTTP contract.
@@ -86,8 +89,8 @@ for storage, authorization and synchronization details.
 |------|-----------|-------|
 | [`TroveAPI/`](TroveAPI) | The shared OpenAPI contract and the Swift libraries generated from it | Swift, swift-openapi-generator |
 | [`TroveServer/`](TroveServer) | Study lifecycle, enrolment, consent, and clinical data authority | Swift, Vapor, Fluent |
-| [`TroveWeb/`](TroveWeb) | The researcher portal for composing and publishing studies | React, TypeScript, Vite |
-| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrolment | Swift, SwiftUI |
+| [`TroveWeb/`](TroveWeb) | The researcher portal for composing and publishing studies and retrieving study data | React, TypeScript, Vite |
+| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrolment, consent and health-data collection | Swift, SwiftUI |
 | [`TroveInfrastructure/`](TroveInfrastructure) | GitOps deployment onto Kubernetes | Kustomize, ArgoCD, OpenTofu |
 
 ## Studies and revisions
@@ -99,7 +102,7 @@ A study is a set of components a researcher configures and combines: information
 One **PostgreSQL database with TimescaleDB** owns study definitions, enrolments, consent,
 audit and the clinical data boundary. Repositories participating in one accepted operation
 share its explicit transaction; two separate database pools cannot provide that guarantee.
-**S3-compatible object storage** holds immutable study bundles and signed consent PDFs.
+**S3-compatible object storage** holds immutable study bundles, collected recordings and signed consent PDFs.
 
 During the beta, schema changes target fresh development databases, with no upgrade
 or legacy-data import path. Recreate disposable development databases when their schema
@@ -130,10 +133,11 @@ full matrix of its upstream Grove repository.
 | Job | Runs when |
 |----------|-------------|
 | API | `TroveAPI/**` |
-| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit acquisition tests that Linux cannot build |
+| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit and SensorKit acquisition tests that Linux cannot build |
 | Server | `TroveServer/**`, `TroveAPI/**` |
 | Web | `TroveWeb/**`, `TroveAPI/openapi.yaml` |
 | iOS | `TroveiOS/**`, `TroveAPI/**` |
+| iOS Real Stack UI | `TroveiOS/**`, `TroveAPI/**`, `TroveServer/**` |
 | Infrastructure | `TroveInfrastructure/**` |
 | Dev Stack | `TroveServer/**`, `TroveWeb/**`, `TroveInfrastructure/**` |
 | Secret Scan | Every run, including documentation-only changes |

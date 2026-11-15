@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT
 
 Trove's Swift server handles study operations and data access for the dashboard,
 command-line client and participant app. PostgreSQL with TimescaleDB stores study
-and clinical records; S3-compatible storage holds bundles and consent PDFs.
+and clinical records; S3-compatible storage holds bundles, recordings and consent PDFs.
 Keycloak handles authentication.
 
 ## Components
@@ -25,18 +25,19 @@ flowchart TB
     S["Trove server<br/>HTTPS API · Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
-    S --> OS[("S3-compatible storage<br/>Bundles and consent PDFs")]
+    S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]
 ```
 
 The diagram also appears in the [repository README](https://github.com/SchmiedmayerLab/Trove#how-it-fits-together).
 OpenAPI defines the shared server interface and generated client types.
 All clients use the server's authorization checks; none receives direct database
-or object-store credentials. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/4273560d0c3e6454219995b649d56dce1e234135/TroveAPI/CLI.md)
+or object-store credentials. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)
 accepts an already-issued token; it does not yet provide a login flow.
 
 The implemented foundation covers study publication, enrollment and consent,
-source-event custody, independent study grants and scoped audit reads. Task
-synchronization, conversations, generalized artifacts, exports and erasure are
+record-based health-data collection, source-event custody, independent study
+grants, study-scoped data retrieval and scoped audit reads. Task synchronization,
+conversations, generalized artifacts, frozen research exports and erasure are
 extensions to that foundation; their design is described below. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
 [issues](https://github.com/SchmiedmayerLab/Trove/issues) track implementation.
 
@@ -130,6 +131,7 @@ Trove preserves source events, exact resource versions and graph references alon
 - Changing content under an existing immutable event identity is a conflict.
 - A correction creates explicit version history using the admitted writer's ordering.
 - A retraction can arrive before its target; a later upload must not resurrect it.
+- A retraction comes only from a participant's HealthKit deletion report and applies to every study holding the record. It remains a tombstone; only an audited operator command can reverse it, without rewriting custody.
 - Late study attribution changes permission metadata, not the original producer event.
 
 Some references may arrive later than their dependent data. The receiver can keep an authorized but incomplete graph pending. Missing authorization is not a reason to accept data provisionally as though permission existed.
@@ -163,7 +165,7 @@ Study-interaction profiles are separate from the mobile measurement exchange. Sc
 
 ## Artifact Storage
 
-Bundles and consent PDFs already use object storage. The planned common artifact interface extends staging, ownership, size limits, checksum verification and authorized retrieval to instruments, recordings and other immutable files.
+Bundles, consent PDFs and collected recordings use object storage. A participant client declares a recording transfer, uploads the file and binds it to its clinical record only after the server verifies the content against the declaration and returns a receipt. Authorized study readers download recordings through the study data API under the same grant and audit checks as other study data. The planned common artifact interface extends staging, ownership, size limits, checksum verification and authorized retrieval to instruments and other immutable files.
 
 The same mechanics can serve a consent document, a raw recording and a retrieval corpus without giving them the same readers or retention rules. Feature modules decide which purpose and permissions apply.
 

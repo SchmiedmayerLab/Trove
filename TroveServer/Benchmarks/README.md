@@ -237,7 +237,7 @@ must not be described as a larger-than-memory test.
 
 This comparison concerns the database container's RAM, including its charged page
 cache, not the host's total RAM. It does not establish cold storage latency,
-multi-day history or production capacity. The workload also does not yet measure
+multi-day history or production capacity. The workload also does not measure
 large recordings, query/export latency, lifecycle cleanup under independent
 traffic or backup restore. These bounds are not supported participant counts or
 an admission envelope.

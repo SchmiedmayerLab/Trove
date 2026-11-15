@@ -52,6 +52,8 @@ the attachment and save a media-appropriate suffix without rendering a preview.
 The optional iOS `TroveSensorKit` product stages Grove's anchored SensorKit batches in
 the same delivery journal. `SensorKitCollectionCapabilities` lists the sources with an
 implemented acquisition and receiver path; guide inventory alone enables nothing.
+The app links it but keeps SensorKit disabled unless the `TROVE_SENSORKIT_ENABLED`
+build setting (default `NO`) and a privacy policy URL are set; see [SensorKit deployment](../TroveiOS/README.md#sensorkit-deployment).
 Structured sources and native sessions (on-wrist state, visits, usage reports, sleep
 sessions, electrocardiograms, device usage, wrist temperature, photoplethysmogram
 samples) select whole overlapping records. Each native photoplethysmogram sample is
@@ -89,6 +91,9 @@ Run `bash scripts/check swift TroveAPI` from the repository root with Swift 6.4.
 Linux builds of `TroveAPIClient` require SQLite development files; on Ubuntu,
 install `libsqlite3-dev` and `pkg-config`. The shared CI workflow installs these dependencies before
 running the same check. Apple platforms use their system SQLite library.
+Linux cannot build the `TroveHealthKit` and `TroveSensorKit` targets or their tests,
+so CI also builds and tests the package natively on macOS with Xcode 27.2
+(`swift build --build-tests` and `swift test`, both with `--force-resolved-versions`).
 
 ## Date Encoding
 
@@ -163,8 +168,7 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 20 upgrades formats 17 to 19 in place and rejects earlier or
-unknown formats without migration or deletion.
+later response.
 
 Recording files are staged beside the journal in an owner-only directory. The
 journal commits empty-file reservations before consuming recording chunks, then
@@ -222,7 +226,8 @@ symptoms read; Grove converts it into one record with the lead's voltages as Sam
 and the average heart rate as a second Observation derived from it. Both outputs are selected together under the
 ECG requirement. The waveform names each symptom by output identity only: a symptom stays its own record and is
 collected only through its own consented symptom stream. The permission request for the ECG stream includes the
-correlated symptom types, because an ECG that reports symptoms cannot be converted without reading them. Heartbeat series stream
+correlated symptom types. When an ECG reports symptoms but none can be read, it still uploads, stating its
+symptoms with data-absent reason `unknown`. Heartbeat series stream
 into the registered beat-interval CSV format with original gap markers and a separate
 source-bound recording scope. Their complete files use the same bounded compression and
 resumable delivery path as workout routes. The server and cross-platform
@@ -295,8 +300,11 @@ The adapter includes the original lowercase HealthKit sample UUID by default,
 using Grove's existing native-identifier option. Its clear identifier system is
 `<identifierRoot>/NamingSystem/healthkit-native-record`, separate from Grove's
 keyed identity systems and stable across installations and derivation-key epochs.
-The same UUID accompanies a retraction target. It does not replace the opaque
-source-record/output identities, authorize access, or establish source authenticity.
+The same UUID accompanies a retraction target. For a sample with a HealthKit sync
+identifier and version, the primary output also carries the exact sync identifier
+under `<native identifier system>/healthkit-sync-identifier/<bundle identifier>`,
+which discloses the writing application's bundle identifier. Neither identifier replaces the opaque
+source-record/output identities, authorizes access, or establishes source authenticity.
 Published collection consent describes this baseline disclosure. Original queued
 bytes remain unchanged; upgrading the adapter never rewrites a pending record.
 Native conversion regressions require the Apple verification lane.
@@ -321,20 +329,17 @@ before export and reused after interruption until the page commits.
 
 Source registration assigns an immutable `identifierRoot`; Grove derives the full
 namespace set using the retained registration ID and key epoch. Record-version
-and retraction identifiers replace producer-instance event sequences; queue ordering
-is local to the journal. The receiver authenticates ownership and checks the assigned
-namespace for each lifecycle kind. Journal schema 14 and query definition 6 reject earlier local formats
-without removing queued work; this development change includes no data migration.
+and retraction identifiers identify each event; queue ordering is local to the
+journal. The receiver authenticates ownership and checks the assigned namespace for
+each lifecycle kind.
 
 Collection requires participant setup and HealthKit permission UI. The app connects
-foreground sync and observer capture to the same journal owner. Native offline and
-query-scheduling changes still require Apple-platform build and runtime verification.
+foreground sync and observer capture to the same journal owner.
 Saved plans include the study identity and title from the adopted publication. The
 local Health Data screen can read these settings without remote profile discovery,
-including locally stopped plans. Withdrawal persists the local stop before server
-requests; a retry reconciles an already completed server withdrawal. Displayed
-settings do not grant acquisition permission, and account changes hide prior settings.
-These native UI changes remain subject to the Apple-platform verification above.
+including locally stopped plans. Displayed settings do not grant acquisition
+permission, and account changes hide prior settings. Local withdrawal is described
+under [Enrollment Revision Adoption](#enrollment-revision-adoption).
 
 Synthetic adapter tests exercise the converter and journal, not a live HealthKit
 store or physical-device background execution. An empty query result does not prove
@@ -379,8 +384,7 @@ Accept a reviewed consent presentation through
 `POST /participant/enrollments/{enrollmentId}/consents` to adopt its exact revision.
 The command checks the enrollment state version and records consent, adoption and
 audit evidence atomically. There is no separate consent-free enrollment upgrade
-operation; the former `PATCH /participant/enrollments/{enrollmentId}` route has
-been removed, including its generated client types.
+operation.
 
 `GET /participant/enrollments/{enrollmentId}/collection-plan` returns only the
 owned enrollment's exact consent/publication windows, collection requirements,
@@ -459,14 +463,15 @@ first requiring a token refresh. Expired access tokens alone do not end local
 collection; authenticated requests still obtain a usable token. A temporarily
 unavailable keychain leaves credentials intact and restoration retries after device
 unlock. SDK state changes persist token rotation or clear a confirmed invalid
-session even after a waiting request was cancelled. These native changes still
-require Apple-platform verification. Offline profile/navigation availability is a
+session even after a waiting request was cancelled. This behavior requires
+Apple-platform verification. Offline profile/navigation availability is a
 separate remaining acceptance check; restoring identity does not establish that a
 server profile was loaded successfully.
 
 The enrollment UI persists a local stop before its withdrawal request, including
 before device setup. A failed network request leaves collection stopped and shows
-withdrawal as pending until the server confirms it. Reopening restores that state
+withdrawal as pending until the server confirms it; a retry reconciles an already
+completed server withdrawal. Reopening restores that state
 from the same account-bound journal. New settings and remote withdrawals become
 known through foreground refresh; the receiver checks current authority
 independently at upload.
@@ -511,11 +516,12 @@ cross a boundary. `ParticipantCollectionSnapshot` applies that same rule when se
 consent IDs and selects at most one consent per study. Query and source identity must
 not depend on clipping a record to a study window.
 
-Query definition version 7 applies these temporal rules to each exact native stream.
-Retained version 6 queries and anchors remain readable and immutable. A version 7
-query safely replays authorized history using a new cursor; shared native-record and
-conversion identities deduplicate unchanged samples across the transition. Pending
-version 6 delivery bytes are never reinterpreted or rewritten.
+Query definitions for profiles that permit both points and intervals, such as heart
+rate, use version 7 with the overlap rule; other streams use version 6. A retained
+version 6 definition of such a profile keeps its point-only predicate and anchor, and
+does not count toward coverage: a version 7 query replays authorized history with its
+own cursor, while shared native-record and conversion identities deduplicate unchanged
+samples. Pending delivery bytes are never reinterpreted or rewritten.
 
 Published collection-policy schema 4 includes the explicit enrollment period: an
 optional Gregorian calendar duration from enrollment, a fixed closing date, or
@@ -619,7 +625,7 @@ The native app reads these decimal-string values from the signed Info.plist
 `TroveCollectionCapacity` dictionary. Debug launches may override individual keys
 with environment values. Server upload stored/decoded limits and study-export and
 recording-download budgets remain independent and must be sized for the deployment.
-Defaults retain existing behavior; the larger bounded options are not claims of
+The larger bounded options are not claims of
 measured peak-memory suitability. Verify representative complete-record and
 continued-collection workloads before selecting larger deployment values.
 
@@ -639,7 +645,9 @@ One query delta can stage up to 128 independently identified events atomically;
 conversion or storage failure in any member rolls back the entire group and cursor.
 Stale checkpoint snapshots cannot stage another event. Failed transactions advance
 neither the cursor nor local queue ordering. Established journals must
-be opened explicitly and are never silently recreated or migrated.
+be opened explicitly and are never silently recreated. Journal format 20 upgrades
+formats 17 to 19 in place with additive tables, leaving queued work intact; earlier
+or unknown formats fail with `unsupportedFormat` without modification or deletion.
 
 The caller owns source registration, FHIR transformation, authenticated transport
 and bounded source queries. Register an immutable query definition with each
@@ -653,10 +661,10 @@ Verified custody replaces the event payload with a receipt. `pruneDelivered`
 reclaims verified delivered rows without touching pending work, source identity,
 cursor or sequence. There is no per-change retry ledger or cross-store cleanup
 protocol. The iOS Health Data screen uses this journal for explicit device setup,
-Health access requests and bounded foreground sync. Setup selects the earliest
-eligible consent window once; restoring a source never replaces its query or key.
-An empty query does not establish read permission or complete collection. Automatic
-and background collection remain disabled and require separate device verification.
+Health access requests, bounded foreground sync and background observer capture.
+Setup fixes the live query boundary once; restoring a source never replaces its
+query or key. An empty query does not establish read permission or complete
+collection. Physical-device background delivery requires separate device verification.
 
 Supply an application-owned directory with mode `0700`. New journal files receive
 mode `0600` before any identity or event bytes are written. Existing files must
@@ -702,8 +710,7 @@ storing the response's sibling receipts. Accepted receipts can still be recovere
 later using a newly authenticated, correctly scoped drainer.
 
 The caller schedules passes. There is no internal timer, independent token manager
-or separate collector checkpoint authority. Formats 17 and 18 upgrade in place; any earlier
-journal format requires a fresh development journal.
+or separate collector checkpoint authority.
 
 ## Grove Development Dependency
 

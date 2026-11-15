@@ -46,19 +46,25 @@ through the shared API with the revision that populated the form. Concurrent edi
 are rejected without replacing unsaved values. Saving a draft does not change an
 accepted participant scope; publish and obtain acceptance of the new version.
 
-The editor configures independent heart-rate, body-weight, sleep-stage and workout windows from participant
-acceptance, a Gregorian calendar lookback (six months initially), a fixed start, or
-all available history. Sleep records and complete workouts are included whole when they overlap their
+The editor offers the HealthKit and SensorKit outputs listed by the server's
+`/collection-capabilities` endpoint, plus the measurements of each approved wearable
+service registration returned for the study. Each selected source stream has an
+independent window from participant acceptance, a Gregorian calendar lookback (six
+months initially), a fixed start, or all available history. Interval records such as
+sleep sessions and complete workouts are included whole when they overlap their
 window; the form and scope summary disclose that they may extend outside it.
 Choose an explicit IANA time zone for lookbacks and an optional exclusive end.
 Fixed times use UTC strings, preserving the API's six fractional-second digits
 through unrelated edits. Relative dates resolve once at acceptance on the server.
 Unsupported settings remain unchanged and cannot be saved through this editor.
 
-Native health-data components remain separate app configuration; adding a component
-does not authorize server collection. The receiver admits heart-rate, body-weight, sleep-stage and complete workout
-records. The native path implements these measurements; Apple-platform sleep and workout verification
-remains outstanding. Route and metadata controls are not available in this editor.
+Workout location routes are a separate opt-in. Outputs carrying an original source
+recording are selected separately from structured summaries. Clinical records are
+selected by when HealthKit downloaded them; CDA documents by the dates their creator
+assigned, and participants review each document in HealthKit. Where an output needs
+companion outputs from the same source, the form names them; each must be selected
+explicitly and is not granted implicitly. Native health-data components remain
+separate app configuration; adding a component does not authorize server collection.
 
 The browser regressions in `e2e/collection-authoring.spec.ts` use the real authenticated
 API to verify save/reload, exact date retention, invalid input, and stale revisions.
@@ -88,9 +94,14 @@ External original recordings have a separate **Save recording** action. It reque
 generated, authenticated study-recording endpoint for the selected grant and
 version view; attachment URLs cannot redirect credentials to other endpoints.
 The server verifies the original recording before disclosure. The browser checks
-the binary transport, declared original media type and exact attachment byte count without parsing or
-rewriting the payload. The closed recording-format/media registry permits CSV, typed native JSON, binary PPG, FHIR JSON (preserving declared release parameters), and CDA XML; unknown or mismatched representations fail. Files receive a safe media-derived suffix and are downloaded without inline previews. FHIR downloads retain the original numeric tokens even when
-the page inspects attachment metadata.
+the `application/octet-stream` transport, the original media type declared in
+`X-Recording-Content-Type` and the exact attachment byte count without parsing or
+rewriting the payload. The closed recording-format/media registry permits CSV,
+native and provider JSON, binary PPG, FHIR JSON (preserving its declared FHIR
+version parameter), and CDA XML; unknown or mismatched representations fail. Files
+receive a safe media-derived suffix and are downloaded without inline previews.
+FHIR downloads retain the original numeric tokens even when the page inspects
+attachment metadata.
 
 Where the browser exposes the File System Access save picker, source bytes stream
 to a temporary destination with backpressure; the destination is committed only
@@ -110,10 +121,8 @@ handed to the browser's download manager. Unit tests cover stream backpressure,
 size mismatches, cancellation, session replacement and fallback capacity; native
 save-picker and operating-system disk behavior require browser verification.
 
-The server exports heart-rate, body-weight, sleep and complete workout records. Pages count records
-and do not split workout segments. Routes, full metadata adoption and final dataset
-snapshots remain separate implementation work. A page
-capacity refusal offers smaller page sizes; it never offers a partial download.
+Pages count records and do not split workout segments. A page capacity refusal
+offers smaller page sizes; it never offers a partial download.
 
 ## Container transport
 

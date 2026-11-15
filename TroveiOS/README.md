@@ -17,18 +17,31 @@ RocketSim captures of study discovery, eligibility and consent, in light and dar
 appearance. The [capture guide](../docs/images/README.md#mobile-captures) describes
 the synthetic fixture and reproduction steps.
 
-Open `Trove.xcodeproj` in Xcode and run the `Trove` scheme. The Swift package dependencies resolve on the first build.
+Open `Trove.xcodeproj` in Xcode 27.2 and run the `Trove` scheme. The Swift package dependencies resolve on the first build.
+The `Trove-UnitTests` scheme runs the unit tests; `Trove` also contains the UI tests.
+[Build and Test](../.github/workflows/build-and-test.yml) runs both on an iPhone 18 Pro
+simulator with iOS 27.2, after [`scripts/check-xcode.sh`](../scripts/check-xcode.sh) confirms Xcode 27.2 (27B52).
 
 ## Native UI Test Boundary
 
 The real-stack UI scenario exercises sign-in, enrollment, revised consent, device
-setup, withdrawal and restored participant state. Its synthetic study has no
+setup, withdrawal and participant state after relaunch. Its synthetic study has no
 Questionnaires. The native launcher binds publication receipts to the checked-in
 validator manifest, but deliberately leaves the validator endpoint unconfigured.
 Adding a Questionnaire therefore requires a real pinned worker; it must fail
 closed without one. This scenario does not establish FHIR validation or clinical
 event admission. The separate validator and receiver checks cover those paths.
 
+## Health Data
+
+Health Data sets up the device as a HealthKit source, reviews Health access, starts
+Health's per-document approval for the clinical documents that accepted studies
+request, and syncs available data. Background capture runs locally under the saved
+study collection settings; a foreground sync refreshes them once. The saved settings
+remain visible offline, and withdrawal stops collection on this device before
+contacting the study. The status reports pending data, changed settings, revoked
+sources, full local storage and data that could not be processed safely; the last
+two preserve the saved data.
 
 ## Wearable service authorization
 

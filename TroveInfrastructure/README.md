@@ -36,12 +36,12 @@ startup, not trigger a development-mode fallback.
 
 Development and verification SeaweedFS instances use 32 volume slots and disable
 anonymous telemetry. The explicit slot limit permits separate test collections;
-the default allocation exhausted available slots when two database test lanes
-shared one store. This is not additional disk capacity: existing data-volume and
+the default allocation can exhaust available slots when two database test lanes
+share one store. This is not additional disk capacity: existing data-volume and
 container limits still apply. Production object storage needs its own provisioned
 capacity and security acceptance.
 
-Development now uses one digest-pinned PostgreSQL/Timescale StatefulSet for the server,
+Development uses one digest-pinned PostgreSQL/Timescale StatefulSet for the server,
 plus the separate Keycloak database. Database and object-store data use retained volume
 claims instead of ephemeral pod storage. These claims survive pod replacement, not
 deletion of the namespace or KIND cluster; they are not backups or high availability.
@@ -91,8 +91,8 @@ The Cluster preloads TimescaleDB and disables its telemetry. The `Database/trove
 resource installs the extension at the pinned SQL version. On first installation,
 wait for the Cluster to become Ready and the Database's `status.applied` to be true
 before running the schema Job. The server verifies these prerequisites and fails
-closed if they are missing. These are fresh-database definitions, not an in-place
-upgrade of the former PostgreSQL 17 setup.
+closed if they are missing. These are fresh-database definitions, not in-place
+upgrades.
 
 The maintained extension image contains the Apache-2 edition. It supports the
 current receiver and basic hypertables; it does not provide the additional

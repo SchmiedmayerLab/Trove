@@ -180,7 +180,7 @@ python3 TroveInfrastructure/validator/verify_healthkit_acquisition.py \
   --image trove-fhir-validator:local \
   --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
-  --runtime com.apple.CoreSimulator.SimRuntime.iOS-26-5
+  --runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
 
 Select an installed runtime explicitly. Optional `--workspace` and `--derived-data`

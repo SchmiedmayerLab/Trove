@@ -19,15 +19,19 @@ delivery status is maintained in [GitHub milestones](https://github.com/Schmiedm
 ## Current Clients
 
 The iOS app uses Grove for shared application components and FHIR conversion.
-HealthKit acquisition policy belongs to TroveHealthKit and the app; the durable
-delivery journal belongs to TroveAPIClient. This separates collection from
-transport and allows uploads to resume after interruption.
+HealthKit acquisition policy belongs to TroveHealthKit, SensorKit acquisition to
+TroveSensorKit, and the durable delivery journal to TroveAPIClient. This separates
+collection from transport and allows uploads to resume after interruption.
+SensorKit collection is built only when the `TROVE_SENSORKIT_ENABLED` build
+setting is on; it is off by default and requires Apple's research entitlement.
 
-The dashboard provides study configuration, consent editing and publication.
-The [researcher CLI](https://github.com/SchmiedmayerLab/Trove/blob/4273560d0c3e6454219995b649d56dce1e234135/TroveAPI/CLI.md)
-uses Swift Argument Parser and the generated OpenAPI client. It accepts an
-already-issued access token; interactive login and token renewal are not yet
-provided. Its guide lists the supported commands and output formats.
+The dashboard provides study configuration, health-collection settings, consent
+editing, publication and a results page for study-scoped data and recording
+downloads. The [researcher CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)
+uses Swift Argument Parser and the generated OpenAPI client; `trove study data`
+retrieves the same study-scoped data. It accepts an already-issued access token;
+interactive login and token renewal are not yet provided. Its guide lists the
+supported commands and output formats.
 
 Custom applications can use the API without adopting Trove's navigation or
 branding. Specialized acquisition interfaces and scoring remain application-owned.
@@ -50,6 +54,19 @@ than silently dropping work, and cancellation does not delete caller-owned files
 Reinstall can restore server-acknowledged records, not unsynchronized work erased
 with the application.
 
+Accepted collection plans are retained on the device, so collection continues
+offline until the enrollment ends. Withdrawing in the app stops local collection
+immediately, before the server is reached; other devices learn of it when they
+reconnect. Sleep and workout sessions that finalize after an enrollment ended are
+collected once through a bounded, server-issued reconciliation instruction rather
+than by ordinary planning.
+
+The server keeps one logical source per participant and native repository.
+Each installation registers its own credential and recovers the server-held
+identity context, so a reinstall or second iPhone produces the same source and
+record identifiers for the same HealthKit sample. Revoking one installation does
+not replace the shared identity.
+
 ## Planned Scheduler Synchronization
 
 The synchronization design treats GroveScheduler as the Apple client's persistent
@@ -71,7 +88,7 @@ SwiftData history can help discover local changes, but it does not preserve the
 original commands and its tokens are not server cursors. A separate outbox is
 therefore necessary even when history is available.
 
-## Planned Device and Wearable Connections
+## Device and Wearable Connections
 
 Study definitions separate the requested data from permitted acquisition routes:
 a mobile health store, an app-specific collector or a server connection to a
@@ -107,6 +124,13 @@ accepted-through time and provider delay. An empty response does not establish
 deletion or complete coverage. Grove FHIR mappings for providers such as Oura,
 Withings and Google Health API inform conversion; each connection also needs its
 own provider access and operational verification.
+
+Registrations, participant connections, link intents and polling workers are
+implemented, but a deployment collects from a provider only after an operator
+configures approved registrations, secrets and an HTTPS callback. Without that
+configuration, provider capability lists are empty and the app explains that
+connecting is unavailable. [Provider collection](Provider-Collection.md)
+describes the configuration and the currently qualified acquisition client.
 
 ## Planned Questionnaire and Android Integration
 

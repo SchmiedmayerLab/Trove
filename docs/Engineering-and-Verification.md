@@ -64,7 +64,8 @@ physical-device background collection or data protection.
 ## CI and Release Artifacts
 
 The aggregate verification job checks that selected component jobs ran and
-succeeded. Repository standards and security checks remain separate required
+succeeded. The API package runs on Linux and natively on macOS; only the macOS job
+can build and test the HealthKit and SensorKit acquisition targets. Repository standards and security checks remain separate required
 checks. Workflow files do not themselves configure branch protection or
 independent review.
 

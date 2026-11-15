@@ -12,7 +12,8 @@ A study definition specifies content, activities and collection requirements.
 Published revisions connect that definition to enrollment, consent and results.
 Specialized procedures remain in study applications.
 
-Study revisions, enrollment and consent are implemented. Server-assigned tasks,
+Study revisions, enrollment, consent and health-data collection requirements are
+implemented. Server-assigned tasks,
 multilingual questionnaire authoring, randomization and the research operations
 below describe the intended design, not currently available end-to-end workflows.
 [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
@@ -24,7 +25,9 @@ A study definition contains reusable components: participant-facing content, que
 
 Collection requirements refer to admitted Grove FHIR concepts, profiles, output forms and source capabilities. A requirement for granular step observations is different from a requirement for a daily total. A server-linked wearable route is different from a collector running on a participant's phone.
 
-The definition therefore separates the desired information from the allowed acquisition routes. An application reports its capabilities; the platform rejects an unsupported required path rather than silently substituting a different measurement. Optional unavailable capabilities remain visible as unavailable.
+The definition therefore separates the desired information from the allowed acquisition routes. An application reports its capabilities; the platform rejects an unsupported required path rather than silently substituting a different measurement. Optional unavailable capabilities remain visible as unavailable. The server's collection-capability endpoint lists the outputs a deployment can collect, and the dashboard offers only those.
+
+Each requirement declares its measurement window: from acceptance, a calendar lookback in a declared time zone, a specific start or all available history. The server resolves that window once when the participant consents and retains it with the exact accepted consent and revision. Admission evaluates every record against the accepted window of each study independently, and a later publication cannot broaden it. Sleep and workout sessions that overlap a window are collected complete.
 
 Custom components use registered, namespaced identifiers and versioned configuration schemas. They describe an integration contract, not executable code supplied to the server. A bounded structured editor is sufficient for configuration that does not warrant a dedicated authoring interface.
 

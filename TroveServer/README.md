@@ -10,15 +10,16 @@ SPDX-License-Identifier: MIT
 
 The Vapor backend: a REST API for studies, components, schedules, and enrollments. It conforms to the generated `APIProtocol` from [`TroveAPI/`](../TroveAPI), takes its study configuration types from `GroveStudyDefinition`, and exposes Grove's module system to route handlers through the local `GroveVapor` target.
 
-For approved account integrations, configuration and durable collection behavior, see
-[Provider collection](../docs/Provider-Collection.md).
+Provider account connections are available only when a deployment sets both
+`PROVIDER_CONFIGURATION_FILE` and `PROVIDER_SECRETS_FILE`; without them, participant linking
+is unavailable. For approved account integrations, configuration and durable collection
+behavior, see [Provider collection](../docs/Provider-Collection.md).
 
 ## Getting started
 
 Use the single [local infrastructure setup](../TroveInfrastructure/docker/README.md)
-for database initialization and runtime grants. Schema changes currently require a fresh
-development database, not a data migration. The former server-only Compose file has been
-removed so it cannot drift from this setup.
+for database initialization and runtime grants. Schema changes require a fresh
+development database, not a data migration. There is no separate server-only Compose file.
 
 For native development, copy `.env.example` to `.env` in `TroveServer/`, configure the
 same restricted runtime login, and run from that directory after the backing services
@@ -36,10 +37,10 @@ changing the runtime does not waive findings or change the compiler toolchain.
 
 ## Commands
 
-Serving and artifact cleanup use restricted credentials. Schema creation uses a
+Serving, artifact cleanup and `reverse-retraction` use restricted credentials. Schema creation uses a
 separate operator login; never copy that login into the serving environment. Startup
 rejects database owners, elevated roles and permissions to mutate audit, published
-study, accepted consent, clinical event or data-grant history. Source records permit only their one-way revocation
+study, accepted consent, clinical event, recording transfer, data-grant or append-only provider history. Source records permit only their one-way revocation
 update; their ownership and identity remain fixed. Installing Timescale and granting privileges are operator responsibilities,
 not actions the application performs while serving.
 
@@ -69,7 +70,7 @@ unaccepted and eligible for cleanup.
 
 Raw storage streams contain unverified bytes. Authorization, audit and integrity
 checks belong to the domain service before disclosure. The small-artifact `Data`
-conveniences and the in-memory development/test provider still buffer their payloads.
+conveniences and the in-memory development/test provider buffer their payloads.
 Recording objects use participant/source ownership independently of study grants.
 Their storage rows cannot contain a study or group, and retention matches the exact
 participant and source as well as the bytes. Cleanup records a participant/source
@@ -106,10 +107,10 @@ Recording HTTP operations are under
 - `GET /receipt` recovers a committed transport receipt, including after a lost
   upload response. It does not renew the receipt or authorize another upload.
 
-Registration and upload require the existing source-installation proof headers
+Registration and upload require the source-installation proof headers
 and current collection authority. Receipt lookup requires participant ownership.
 A changed declaration returns 409; an unknown declaration or receipt returns 404.
-The current collection policy admits workout-route outputs only with route consent.
+Collection policy admits workout-route outputs only with route consent.
 
 `RECORDING_MAX_STORED_BYTES` defaults to 134217728 (128 MiB), and
 `RECORDING_MAX_SOURCE_BYTES` to 536870912 (512 MiB). Each accepts a positive decimal
@@ -150,30 +151,6 @@ Study recording downloads use `GET /studies/{studyId}/data/recordings/{grantId}`
 per download, defaults to 536870912 (512 MiB), and accepts positive decimal integers
 up to 2147483647. Invalid settings prevent startup. Capacity failure is explicit
 and does not change upload or collection authority.
-
-### Ended sleep and workout windows
-
-`POST /participant/enrollments/{enrollmentId}/collection-reconciliations` lets an
-installation finish a bounded sweep for sessions that were finalized after the
-enrollment ended. The request names the participant's HealthKit source and carries
-the installation proof. Under the participant and enrollment locks the server checks
-ownership, an active source and installation, and that the enrollment has ended and
-is not withdrawn. It then resolves the accepted consent timeline exactly as the
-collection plan does and issues one instruction per closed sleep or workout
-requirement, plus one for workout routes where that consent accepted them. Heart
-rate and other point streams are not eligible. `native_collection_reconciliations`
-keeps one row per source, enrollment and exact scope; a repeated request renews the
-lease of an unfinished row under the same identity, and
-`.../{reconciliationId}/complete` marks it complete idempotently. A completed scope
-is never issued again. Both operations record a study-scoped audit event
-(`collection.reconciliation.issued`, `collection.reconciliation.completed`).
-Issuance grants no upload authority: admission still checks every submitted record
-against its consent window.
-
-`NATIVE_RECONCILIATION_LEASE_SECONDS` sets the lease, 900 seconds by default. It
-must be a positive finite number; an invalid value prevents startup. A lease only
-bounds how long one online request authorizes local querying; unfinished work
-resumes at its retained position after the next request.
 
 The development SeaweedFS service receives the same `S3_ACCESS_KEY` and
 `S3_SECRET_KEY` as the server, through its standard AWS credential variables.
@@ -422,7 +399,8 @@ credential against that source. Reinstalling or registering another device
 preserves the source's key ID/epoch, identifier root and repository scope.
 Registration returns public source and installation descriptors, without key bytes.
 Retries require the original credential and return retained state, including
-permanent revocation.
+permanent revocation. An approved provider connection uses a separate server-worker
+source bound to its registration.
 
 `POST /participant/source-installations/{registrationId}/identity` requires both
 verified account ownership and the installation credential. It recovers the
@@ -475,10 +453,9 @@ writes. Attribution commands require the same proof; a revoked installation can
 replay a retained command but cannot create new grants. Receipt lookup remains an
 owner-authorized read and requires no installation credential.
 
-Before activating shared-source collection, finish cross-device deletion authority
-and verify deployment recovery and the complete client lifecycle.
-The registration endpoints accept no health data; the retired resource-upload
-endpoint remains absent.
+Before activating shared-source collection, verify cross-device deletion, deployment
+recovery and the complete client lifecycle on physical devices.
+The registration endpoints accept no health data.
 
 ## Event Admission
 
@@ -488,10 +465,10 @@ original Grove Mobile record as a one-record Bundle; no FHIR values are re-encod
 Targets name immutable consent records and exact clinical output addresses, not
 mutable enrollment revisions. Default budgets are 6 MiB for the envelope and
 4 MiB for decoded event bytes; configured ceilings are 24 MiB and 16 MiB
-respectively. Structural limits remain 512 resource nodes, 16 distinct consents and 512 KiB for
+respectively. Structural limits are 512 resource nodes, 16 distinct consents and 512 KiB for
 normalized target intent. Study targets do not appear in URLs.
 
-HealthKit point records may also carry the original lowercase sample UUID as an
+HealthKit records may also carry the original lowercase sample UUID as an
 unroled identifier under the registered source's
 `<identifierRoot>/NamingSystem/healthkit-native-record` namespace. Retraction
 targets use Grove's existing native-identifier extension. The receiver retains
@@ -510,7 +487,7 @@ derived exports preserve it. A sync identifier anywhere else, more than one, or
 one under a Grove identity system fails the record. Requiring the native UUID
 beside it remains a guide and validator invariant.
 
-`StudyDataQuery` provides the internal selection layer for that work. It returns
+`StudyDataQuery` provides the internal selection layer for the study data endpoint. It returns
 at most 100 exact output addresses per page, deduplicates overlapping consent
 grants, and applies the same study, withdrawal, retraction and derivation rules as
 the grant-count diagnostic. Current-version selection never falls back to an older
@@ -559,8 +536,7 @@ The [study data endpoint](#study-data-access) combines these building blocks wit
 researcher authorization, committed audit and a whole-response byte budget. An
 output grant never authorizes returning its entire original custody Bundle or a
 supporting QuestionnaireResponse. Internal source addresses are not raw-data access
-capabilities. Frozen dataset finalization and the remaining collection types are
-not implemented by this point-data route.
+capabilities. Frozen dataset finalization is not implemented by this route.
 
 `POST /participant/sources/{sourceId}/record-bundles` packs several records with
 shared entries into one transport. Each member supplies its original ordered entry
@@ -578,21 +554,28 @@ bodies never reach validation or storage. A client retains staged bytes after an
 reply and retries the same event identity, bytes and consent/output intent with bounded backoff.
 HTTP 413 requires explicit size-limit handling, not repeated unchanged requests or silent
 discard. The [client journal and bounded batch drainer](../TroveAPI/README.md)
-implement these retry rules. The native acquisition path supports heart-rate samples
-and complete overlapping sleep intervals and workouts under retained consent authority. Apple-platform
-verification of sleep and workout acquisition remains outstanding.
+implement these retry rules. Native [HealthKit](../TroveAPI/README.md#healthkit-acquisition)
+and [SensorKit](../TroveAPI/README.md#sensorkit-acquisition) acquisition stage records under
+retained consent authority; physical-device acceptance is recorded separately in
+[Collection acceptance](../docs/Collection-Acceptance.md).
 
 The private validator checks the complete pinned Grove FHIR contract before the server
 decodes any FHIR models. Its result must match the exact input digest, contract revision,
 and operator-configured validator identity. An unavailable or mismatched validator causes
 a refusal; there is no structural-only fallback. See the [validator setup](../TroveInfrastructure/validator/).
 
-The receiver supports immutable, single-owner Mobile heart-rate point quantities
-sleep-stage intervals, and complete workout sessions with their segments and statistics, including supported HealthKit and questionnaire-derived
-source graphs, and whole-source-record retractions. A HealthKit ECG is one source record: a waveform Observation with
+The receiver supports immutable, single-owner records for the native profiles that
+`GET /collection-capabilities` lists (HealthKit quantities and categories, blood pressure,
+state of mind, GAD-7 and PHQ-9 assessments, sleep stages, complete workout sessions with
+their segments and statistics, audiograms, ECGs, food correlations, clinical documents,
+heartbeat-series and workout-route recordings, and the implemented SensorKit outputs) and
+for the outputs of approved provider registrations. It also supports questionnaire-derived source graphs and
+whole-source-record retractions. A HealthKit ECG is one source record: a waveform Observation with
 one lead of millivolt SampledData, one classification, an optional algorithm version and its symptoms status and source
 period, plus at most one average heart rate derived from it over exactly its period. The waveform names correlated
-symptoms only by output identity; each symptom is its own record with its own requirement. Revision selection first removes versions
+symptoms only by output identity; each symptom is its own record with its own requirement. When a present symptoms
+status could not be read, the waveform instead carries one member with only the data-absent reason `unknown`; it
+names and grants nothing. Revision selection first removes versions
 dominated by a higher writer version under the same complete writer-record identity.
 It then selects the latest exact `Provenance.recorded`; equal instants use the
 bytewise-greater record-version identifier value, then system. Selection preserves
@@ -610,7 +593,7 @@ mandatory `clinical.retraction.reversed` audit event. It is idempotent, rewrites
 history, and is not reachable through HTTP. The retraction of a source record has
 one identity, so a repeated report of the same deletion replays the retained
 receipt and does not suppress a reversed record again. Other clinical profiles
-and arbitrary supporting reference shapes remain unsupported.
+and arbitrary supporting reference shapes are unsupported.
 Unsupported input is refused,
 even when it is otherwise valid FHIR. A study must explicitly publish the matching collection
 requirement; a native HealthKit component alone grants no backend collection permission.
@@ -632,9 +615,10 @@ and an optional exclusive end. For example, `last` with `components: {month: 6}`
 uses six calendar months before acceptance, including month-end and daylight-saving
 rules; it is not a 180-day interval. An omitted start retains consent-forward
 collection. `oldestSample` authorizes all available history; an absolute start and
-end define a fixed measurement range. Heart-rate points must lie inside the half-open
-window. A sleep interval or workout session is included whole when it overlaps the window; an interval
-that only touches a boundary is excluded. The receiver preserves the original
+end define a fixed measurement range. Point measurements must lie inside the half-open
+window. An interval record, such as a sleep stage, workout, ECG or native SensorKit session, is included
+whole when it overlaps the window; an interval that only touches a boundary is excluded. SensorKit
+query batches follow the every-row rule under [Artifact storage](#artifact-storage). The receiver preserves the original
 start and end without clipping or changing the source identity. Workout selection includes every segment,
 including segments outside the selected window. Partial workout grants and exports are rejected. An ECG's
 average heart rate is collected under the ECG requirement and its waveform's interval; partial ECG grants and
@@ -645,16 +629,17 @@ append-only consent record. Later uploads and plan reads use those literal bound
 not the current draft, device time zone or a newly computed lookback. A historical
 scope can grant an already retained eligible measurement to another study through
 late attribution without copying or uploading the event again. The published
-policy archive uses schema version 4 and RFC 3339 dates at API microsecond precision;
+policy archive uses schema version 5 and RFC 3339 dates at API microsecond precision;
 unknown or older policy contracts fail explicitly.
 
 The selected scope is included in the retained consent markdown and therefore its
-presentation digest and exported document. Collection summaries currently support
+presentation digest and exported document. Collection summaries support
 English and German; another requested consent locale fails publication instead of
-silently substituting a language. Sleep and workout consent explain that complete records may
-start before or end after the selected window. The web editor configures independent
-heart-rate, sleep and workout windows through the shared draft API. The native path retains
-offline plans and independent live/backfill cursors per measurement profile.
+silently substituting a language. Consent for interval records explains that complete records may
+start before or end after the selected window; clinical document consent states which document
+time the window refers to. The web editor configures an independent window per requirement
+through the shared draft API. The native path retains offline plans and independent
+live/backfill cursors per native stream.
 
 For the authenticated owner of an active source, an exact-byte retry with the same study
 targets returns the original receipt without adding grants. Revoked sources cannot retry.
@@ -695,6 +680,30 @@ receipt, even after withdrawal or revocation, without recreating access. Changin
 its event or targets conflicts. Adding a grant never makes an older revision current;
 current selection occurs before intersecting exact study permissions.
 
+### Ended sleep and workout windows
+
+`POST /participant/enrollments/{enrollmentId}/collection-reconciliations` lets an
+installation finish a bounded sweep for sessions that were finalized after the
+enrollment ended. The request names the participant's HealthKit source and carries
+the installation proof. Under the participant and enrollment locks the server checks
+ownership, an active source and installation, and that the enrollment has ended and
+is not withdrawn. It then resolves the accepted consent timeline exactly as the
+collection plan does and issues one instruction per closed sleep or workout
+requirement, plus one for workout routes where that consent accepted them. Other
+streams are not eligible. `native_collection_reconciliations`
+keeps one row per source, enrollment and exact scope; a repeated request renews the
+lease of an unfinished row under the same identity, and
+`.../{reconciliationId}/complete` marks it complete idempotently. A completed scope
+is never issued again. Both operations record a study-scoped audit event
+(`collection.reconciliation.issued`, `collection.reconciliation.completed`).
+Issuance grants no upload authority: admission checks every submitted record
+against its consent window.
+
+`NATIVE_RECONCILIATION_LEASE_SECONDS` sets the lease, 900 seconds by default. It
+must be a positive finite number; an invalid value prevents startup. A lease only
+bounds how long one online request authorizes local querying; unfinished work
+resumes at its retained position after the next request.
+
 ## Tests
 
 ```bash
@@ -726,7 +735,7 @@ the client journal; the shared entry point checks this before compiling.
 
 The real-store job in `swift-package.yml` runs the full server suite with the
 checksum-pinned offline validator and the separately pinned receiver lifecycle
-corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the six named clinical test groups
+corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the nine named clinical test groups
 to execute; missing or skipped groups fail verification. The parameterized
 receiver group covers all 43 declared sequences, and the retraction group covers
 both arrival orders. Deployment binding preserves recorded lexemes and writer
@@ -772,9 +781,7 @@ Feature modules use controllers, services, repositories and mappers where those 
 are useful. All core repositories use the same authoritative database; multi-record
 operations pass an explicit transaction to their repositories and audit writes.
 
-The former `/participant/fhir/resource` route is removed, including its unversioned
-mapper and generated clients. It is not a compatibility fallback for the new IG receiver.
-No legacy-data import or compatibility schema is included.
+There is no generic FHIR resource upload route, legacy-data import or compatibility schema.
 
 
 ## Collection capacity configuration
@@ -788,17 +795,16 @@ Bundle, JSON request envelope and batch-count settings are
 whole-record restoration and validation retain the hard ceiling so lowering a
 new-admission budget does not make existing custody unreadable. The private
 validator accepts up to 16 MiB per event; a worker change requires its matching
-manifest and validator identity. Questionnaire operating limits remain unchanged.
+manifest and validator identity. Questionnaire operating limits are separate.
 
 `STUDY_EXPORT_MAX_BUNDLE_BYTES` and `STUDY_EXPORT_MAX_PAGE_BYTES` independently
 bound derived serialization and complete encoded pages. Defaults are 16 MiB and
 24 MiB; maxima are 64 MiB and 96 MiB. Page budgets must accommodate base64 expansion
 and framing. Serialization stops at the configured limit without dropping
-outputs or references. Existing `RECORDING_MAX_STORED_BYTES`,
-`RECORDING_MAX_SOURCE_BYTES` and `RECORDING_MAX_DOWNLOAD_BYTES` remain independent.
+outputs or references. `RECORDING_MAX_STORED_BYTES`,
+`RECORDING_MAX_SOURCE_BYTES` and `RECORDING_MAX_DOWNLOAD_BYTES` are independent.
 No setting authorizes collection, grants study access, or splits a source record.
 
-Defaults retain the existing policy. Larger options are bounded implementation
-choices, not measured memory guarantees. Complete-record and combined compressed
+Larger options are bounded implementation choices, not measured memory guarantees. Complete-record and combined compressed
 recording/backlog workload evidence is needed when selecting deployment values;
 chunked storage measurements alone do not establish JSON graph memory use.
