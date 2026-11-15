@@ -11,6 +11,7 @@ import GroveFHIRContract
 import GroveSensorKitFHIR
 import ModelsR4
 import Testing
+import TroveAPITypes
 @testable import TroveServer
 
 
@@ -62,6 +63,53 @@ struct FHIRSensorKitCompanionTests {
         #expect(throws: (any Error).self) {
             try FHIRSensorKitCompanions.relatedPeriod(document, fullURL: fullURL, resources: resources)
         }
+    }
+
+    @Test("A photoplethysmogram sample keeps its binary recording beside a separately selectable coverage summary")
+    func photoplethysmogramHybridProjectsBothOutputs() async throws {
+        let recording = SensorKitPPGRecording(records: [
+            .init(
+                startDate: FHIRSensorKitFixture.start,
+                nanosecondsSinceStart: 0,
+                temperature: 31.5,
+                usage: ["deep-breathing"],
+                opticalSamples: [
+                    .init(
+                        emitter: 1,
+                        activePhotodiodeIndexes: [0, 2],
+                        signalIdentifier: 7,
+                        nominalWavelength: 525,
+                        effectiveWavelength: 526.5,
+                        samplingFrequency: 256,
+                        nanosecondsSinceStart: 1_000_000_000,
+                        conditions: ["signal-saturation"],
+                        noiseTerms: nil,
+                        normalizedReflectance: 0.42
+                    )
+                ],
+                accelerometerSamples: [.init(nanosecondsSinceStart: 500_000_000, samplingFrequency: 100, x: 0.1, y: -0.2, z: 0.9)]
+            )
+        ])
+        let record = try recording.prepared().sensorKitRecord(
+            sourceRecordID: FHIRSensorKitFixture.sourceID, title: "Synthetic recording", location: .inline, admission: .verifiedSanitizedInput
+        )
+        let event = try FHIRPointProjection.project(
+            validatedBytes: await FHIRSensorKitFixture.bytes(record), validatorIdentity: "synthetic-receiver-test"
+        )
+        let definition = try #require(SensorKitCatalog.current.entries.first { $0.structuredContract == .ppg }?.implementedOutput)
+        let summary = try #require(event.outputs.first { $0.value != .recording })
+        let original = try #require(event.outputs.first { $0.value == .recording })
+        #expect(event.outputs.count == 2 && summary.value == .components)
+        #expect(summary.profile == definition.observation?.primaryProfile && summary.sourceTypeIdentifier == definition.sourceToken)
+        #expect(original.code == RegisteredRecordingFormat.photoplethysmogramSamples.rawValue)
+        #expect(original.measurementBounds == summary.measurementBounds)
+        let start = FHIRSensorKitFixture.start
+        #expect(summary.measurementBounds == (try .init(start: start, end: start.addingTimeInterval(1))))
+        // A native sample is one record: it keeps whole-overlap selection instead of row coverage.
+        #expect(event.collectionOutputs.allSatisfy { $0.rowExtent == nil && !$0.lacksRowEvidence })
+        let outputs = SensorKitCollectionCapabilities.outputs(for: definition.sourceToken)
+        #expect(outputs.map(\.isRecording) == [false, true])
+        #expect(outputs.first?.requiredCompanionProfiles == [SensorKitContract.recordingDocumentProfile])
     }
 
     private func fixtureBytes() async throws -> Data {

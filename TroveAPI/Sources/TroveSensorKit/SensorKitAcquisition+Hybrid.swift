@@ -90,12 +90,29 @@ extension SensorKitAcquisition {
         }
     }
 
+    /// Retains every native photoplethysmogram sample as its registered recording and coverage summary.
+    public func catchUpPhotoplethysmogram(
+        localID: UUID, sensorKit: GroveSensorKit.SensorKit, application: ApplicationDevice, host: HostDevice
+    ) async throws -> Bool {
+        try await catchUpRecordedSamples(
+            Sensor.ppg, sensorKit: sensorKit, context: RecordingContext(localID: localID, application: application, host: host)
+        ) { sample, entry, sourceID, maximumBytes in
+            try await Self.photoplethysmogramInput(
+                SensorKitPPGRecording(samples: [sample]).prepared(),
+                entry: entry,
+                sourceID: sourceID,
+                title: Sensor.ppg.displayName,
+                maximumByteCount: maximumBytes
+            )
+        }
+    }
+
     private func catchUpRecordedSamples<Sample: SensorKitSampleProtocol>(
         _ sensor: Sensor<Sample>,
         sensorKit: GroveSensorKit.SensorKit,
         context: RecordingContext,
         ecgProcessingLimits: SensorKitECGProcessingLimits? = nil,
-        prepare: @escaping @Sendable (Sample.SafeRepresentation, SensorKitCatalogEntry, SensorKitSourceRecordID, Int) throws -> Input
+        prepare: @escaping @Sendable (Sample.SafeRepresentation, SensorKitCatalogEntry, SensorKitSourceRecordID, Int) async throws -> Input
     ) async throws -> Bool {
         try await catchUp(
             localID: context.localID, sensorKit: sensorKit, sensor: sensor, ecgProcessingLimits: ecgProcessingLimits
@@ -122,7 +139,7 @@ extension SensorKitAcquisition {
         _ batch: GroveSensorKit.SensorKit.AnchoredBatch<Sample.SafeRepresentation>,
         for sensor: Sensor<Sample>,
         context: RecordingBatchContext,
-        prepare: @Sendable (Sample.SafeRepresentation, SensorKitCatalogEntry, SensorKitSourceRecordID, Int) throws -> Input
+        prepare: @Sendable (Sample.SafeRepresentation, SensorKitCatalogEntry, SensorKitSourceRecordID, Int) async throws -> Input
     ) async throws -> Page {
         try await checkSession()
         guard batch.samples.count <= 128, let replayToken = batch.info.replayToken,
@@ -132,7 +149,8 @@ extension SensorKitAcquisition {
         // Original files share the configured pending-file budget. Compression can retain at most
         // another copy of those original bytes; durable queue storage has its own atomic capacity check.
         var remainingBytes = limits.maximumPendingRecordingBytes
-        let inputs = try batch.samples.enumerated().map { ordinal, sample in
+        var inputs: [Input] = []
+        for (ordinal, sample) in batch.samples.enumerated() {
             try Task.checkCancellation()
             let sourceID = SensorKitSourceRecordID.derived(
                 acquisitionBatch: batch.info.acquisitionBatch,
@@ -143,7 +161,7 @@ extension SensorKitAcquisition {
             guard remainingBytes > 0 else { throw EventDeliveryJournal.JournalError.capacityExceeded }
             let input: Input
             do {
-                input = try prepare(sample, entry, sourceID, min(maximumBytes, remainingBytes))
+                input = try await prepare(sample, entry, sourceID, min(maximumBytes, remainingBytes))
             } catch RecordingFile.FileError.byteLimitExceeded {
                 throw EventDeliveryJournal.JournalError.capacityExceeded
             } catch RecordingCSVFileWriter.FileWriterError.payloadLimitExceeded {
@@ -153,7 +171,7 @@ extension SensorKitAcquisition {
                 guard recording.file.byteCount <= remainingBytes else { throw EventDeliveryJournal.JournalError.capacityExceeded }
                 remainingBytes -= recording.file.byteCount
             }
-            return input
+            inputs.append(input)
         }
         return try await stage(
             Batch(

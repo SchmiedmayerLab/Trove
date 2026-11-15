@@ -124,6 +124,20 @@ struct SensorKitRecordingFixture {
         return .init(inputs: inputs, state: state, slices: slices)
     }
 
+    /// One native sample whose last accelerometer value lies one second after its start.
+    func photoplethysmogram() -> SensorKitPPGRecording {
+        SensorKitPPGRecording(records: [
+            .init(
+                startDate: rowInstant,
+                nanosecondsSinceStart: 0,
+                temperature: nil,
+                usage: [],
+                opticalSamples: [],
+                accelerometerSamples: [.init(nanosecondsSinceStart: 1_000_000_000, samplingFrequency: 100, x: 0.1, y: 0.2, z: 0.3)]
+            )
+        ])
+    }
+
     func rowInterval(_ row: Int) -> Range<Date> {
         let instant = rowInstant.addingTimeInterval(Double(row) / 100)
         return instant..<instant

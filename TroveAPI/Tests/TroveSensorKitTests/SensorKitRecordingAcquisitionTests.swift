@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import GroveFHIRContract
+import GroveSensorKitFHIR
 import Testing
 import TroveAPIClient
 @testable import TroveSensorKit
@@ -149,6 +151,42 @@ struct SensorKitRecordingAcquisitionTests {
                 deviceProductType: batch.deviceProductType,
                 coordinate: batch.coordinate
             ) == slices)
+        }
+    }
+
+    @Test
+    func photoplethysmogramSampleStagesItsBinaryRecordingAndSummaryForSeparateStudies() async throws {
+        let fixture = SensorKitRecordingFixture(contract: .ppg)
+        try await fixture.journal.withJournal(sourceToken: fixture.entry.sourceToken, collectionSnapshot: fixture.snapshot()) { journal, _ in
+            let prepared = try fixture.photoplethysmogram().prepared()
+            let input = try await SensorKitAcquisition.photoplethysmogramInput(
+                prepared, entry: fixture.entry, sourceID: .init(fixture.journal.recordID), title: "PPG", maximumByteCount: 1024 * 1024
+            )
+            #expect(input.start == fixture.rowInstant && input.end == fixture.rowInstant.addingTimeInterval(1))
+            await #expect(throws: (any Error).self) {
+                try await SensorKitAcquisition.photoplethysmogramInput(
+                    prepared, entry: fixture.entry, sourceID: .init(UUID()), title: "PPG", maximumByteCount: prepared.data.count - 1
+                )
+            }
+            let batch = try SensorKitAcquisition.Batch(
+                coordinate: "ppg-batch-one",
+                sourceToken: fixture.entry.sourceToken,
+                deviceProductType: "Watch1,1",
+                inputs: [input],
+                facts: fixture.journal.batch().facts,
+                acknowledge: {},
+                replayToken: Data([1]),
+                nativeSampleCount: 1
+            )
+            let acquisition = try SensorKitAcquisition(journal: journal, scope: fixture.journal.scope, validateSession: {})
+            _ = try await acquisition.stage(batch, localID: fixture.journal.localID, queryID: fixture.journal.localID)
+            let eventID = try #require(await journal.pendingDeliveryIDs().first)
+            let reference = try #require(await journal.recordingReferences(for: eventID).first)
+            let declaration = try #require(await journal.recordingTransfer(for: reference.id)).commitment.declaration
+            #expect(declaration.format == RegisteredRecordingFormat.photoplethysmogramSamples.rawValue)
+            #expect(declaration.content.sourceByteCount == Int64(prepared.data.count))
+            #expect(declaration.targets.map(\.consentId) == [fixture.recordingConsentID.uuidString.lowercased()])
+            #expect(try await journal.prepareAttempt(eventID)?.commitment.targetIntent.targets.count == 2)
         }
     }
 

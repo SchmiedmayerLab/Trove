@@ -53,8 +53,17 @@ The optional iOS `TroveSensorKit` product stages Grove's anchored SensorKit batc
 the same delivery journal. `SensorKitCollectionCapabilities` lists the sources with an
 implemented acquisition and receiver path; guide inventory alone enables nothing.
 Structured sources and native sessions (on-wrist state, visits, usage reports, sleep
-sessions, electrocardiograms, device usage, wrist temperature) select whole
-overlapping records.
+sessions, electrocardiograms, device usage, wrist temperature, photoplethysmogram
+samples) select whole overlapping records. Each native photoplethysmogram sample is
+retained in Grove's registered binary format beside a coverage summary; the two
+outputs are consented separately.
+
+Keyboard metrics, face metrics, media events, odometer, rotation rate and the Siri
+and telephony speech metrics are not collected. Grove's FHIR converter accepts
+caller-built records for them, but it has no bridge from the SensorKit values to a
+registered payload for keyboard, face, media and speech metrics or to the odometer
+rows, and its rotation-rate series requires exactly uniform sample timing. Acoustic
+settings are deferred in the guide.
 
 Acceleration, ambient light, ambient pressure, heart rate, pedometer and headphone
 recordings arrive as query batches of independent rows. The client divides a retained

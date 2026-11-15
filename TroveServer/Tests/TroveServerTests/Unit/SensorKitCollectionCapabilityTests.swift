@@ -11,8 +11,8 @@ struct SensorKitCollectionCapabilityTests {
     @Test
     func sensorCapabilitiesExposeOnlyImplementedExactScopesWithConsentTranslations() throws {
         let values = try NativeCollectionCapabilities.values().filter { $0.repositoryKind == .sensorkit }
-        #expect(values.count == 19)
-        #expect(values.filter { $0.isOriginalRecording == true }.count == 10)
+        #expect(values.count == 21)
+        #expect(values.filter { $0.isOriginalRecording == true }.count == 11)
         for value in values {
             let outputs = SensorKitCollectionCapabilities.outputs(for: value.sourceTypeIdentifier)
             let output = try #require(outputs.first { $0.profile == value.profile })
