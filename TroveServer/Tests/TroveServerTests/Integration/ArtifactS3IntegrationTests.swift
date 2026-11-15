@@ -15,43 +15,6 @@ import Vapor
 
 
 struct ArtifactS3IntegrationTests {
-    /// The process's current resident memory, or `nil` where `/proc` does not report it.
-    ///
-    /// Unlike the peak resident memory (`VmHWM`), the current value does not carry the high-water mark that earlier tests
-    /// in the same process left behind.
-    private static func residentBytes() -> Int? {
-        #if os(Linux)
-        guard let statm = try? String(contentsOfFile: "/proc/self/statm", encoding: .utf8) else {
-            return nil
-        }
-        let fields = statm.split(separator: " ")
-        guard fields.count > 1, let pages = Int(fields[1]) else {
-            return nil
-        }
-        return pages * Int(getpagesize())
-        #else
-        return nil
-        #endif
-    }
-
-    /// Runs `operation` while sampling the resident memory, and returns its result with the highest observed value.
-    private static func peakResidentBytes<Result: Sendable>(
-        during operation: () async throws -> Result
-    ) async throws -> (result: Result, peakBytes: Int?) {
-        let sampler = Task.detached { () -> Int? in
-            var peak = residentBytes()
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(2))
-                peak = max(peak ?? 0, residentBytes() ?? 0)
-            }
-            return peak
-        }
-        defer { sampler.cancel() }
-        let result = try await operation()
-        sampler.cancel()
-        return (result, await sampler.value)
-    }
-
     /// Uploads a 1 MiB warm-up and then `input` through `upload`, and returns the receipt of `input` with how far the
     /// resident memory sampled during its upload rose above the resident memory after the warm-up.
     ///
@@ -59,7 +22,8 @@ struct ArtifactS3IntegrationTests {
     /// same path first creates the storage client, connection and lazily initialized state that stay resident afterwards,
     /// and leaves the allocator's pools sized for a transfer. The measured upload is then compared with the resident memory
     /// after the warm-up, sampled throughout the transfer: a transfer that buffered the payload instead of streaming it
-    /// would hold at least its 96 MiB at once.
+    /// would hold at least its 96 MiB at once, and an upload that ran ahead of a busy storage connection could queue most
+    /// of it.
     private static func uploadAfterWarmUp(
         _ input: GeneratedObjectStorageBody,
         _ declaration: RecordingTransferDeclaration,
@@ -74,14 +38,10 @@ struct ArtifactS3IntegrationTests {
             output: "urn:uuid:5d0c4f43-6f1e-4c2b-9a51-0f4d4c8f7a21"
         )
         _ = try await upload(warmUpInput, warmUpDeclaration)
-        let baseline = Self.residentBytes()
-        let (receipt, peak) = try await Self.peakResidentBytes {
+        let (receipt, growth) = try await ResidentMemory.growth {
             try await upload(input, declaration)
         }
-        guard let baseline, let peak else {
-            return (receipt, nil)
-        }
-        return (receipt, peak - baseline)
+        return (receipt, growth)
     }
 
     @Test(.enabled(if: Environment.get("TROVE_TEST_S3_PORT") != nil, "Requires a disposable loopback S3 test service"))
