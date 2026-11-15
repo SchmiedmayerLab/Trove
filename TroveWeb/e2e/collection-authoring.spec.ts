@@ -6,6 +6,9 @@ import { zStudyResponse } from "../src/lib/api/generated/zod.gen";
 import { heartRateProfile } from "../src/routes/~(dashboard)/~$group/~$study/~configuration/lib/collectionForm";
 import { expect, openNewStudyDialog, test } from "./fixtures";
 
+const heartRate = (page: Page) =>
+  page.getByRole("checkbox", { name: "Collect heart rate", exact: true });
+
 const openCollection = async (page: Page) => {
   await openNewStudyDialog(page);
   await page.getByLabel("Study title").fill(`Collection E2E ${Date.now()}`);
@@ -23,9 +26,7 @@ const openCollection = async (page: Page) => {
   await expect(
     page.getByRole("link", { name: "Health collection", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("radio", { name: "None", exact: true }),
-  ).toBeChecked();
+  await expect(heartRate(page)).not.toBeChecked();
   return study;
 };
 
@@ -53,7 +54,7 @@ test("authors, reloads and preserves exact historical collection windows", async
 }, testInfo) => {
   test.slow();
   const initial = await openCollection(page);
-  await page.getByRole("radio", { name: "Heart rate", exact: true }).check();
+  await heartRate(page).check();
   await page
     .getByRole("radio", { name: "Calendar lookback", exact: true })
     .check();
@@ -102,7 +103,9 @@ test("authors, reloads and preserves exact historical collection windows", async
   await page.getByRole("spinbutton", { name: "Months", exact: true }).fill("0");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
-    page.getByText("Enter a lookback greater than zero.", { exact: true }),
+    page.getByText("Enter a calendar period greater than zero.", {
+      exact: true,
+    }),
   ).toBeVisible();
   expect(patchCount).toBe(0);
 
@@ -156,7 +159,7 @@ test("authors, reloads and preserves exact historical collection windows", async
     forward.collectionRequirements[0].measurementWindow?.start,
   ).toBeUndefined();
   expect(forward.collectionRequirements[0].measurementWindow?.end).toBe(end);
-  await page.getByRole("radio", { name: "None", exact: true }).check();
+  await heartRate(page).uncheck();
   const none = zStudyResponse.parse(
     await (await saveCollection(page, forward.draftRevision)).json(),
   );
@@ -171,14 +174,12 @@ test("keeps an unsaved collection scope and refuses a stale revision", async ({
   const other = await page.context().newPage();
   try {
     await other.goto(page.url());
-    await expect(
-      other.getByRole("radio", { name: "None", exact: true }),
-    ).toBeChecked();
-    await page.getByRole("radio", { name: "Heart rate", exact: true }).check();
+    await expect(heartRate(other)).not.toBeChecked();
+    await heartRate(page).check();
     await page
       .getByRole("radio", { name: "Calendar lookback", exact: true })
       .check();
-    await other.getByRole("radio", { name: "Heart rate", exact: true }).check();
+    await heartRate(other).check();
     await other
       .getByRole("radio", { name: "All available history", exact: true })
       .check();

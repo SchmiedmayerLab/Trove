@@ -50,7 +50,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path not in ('/health','/validate'):
             self.send_error(404); return
         size=int(self.headers.get('Content-Length','0'))
-        if not 0 <= size <= 4194304:
+        if not 0 <= size <= 16777216:
             self.send_error(413); return
         self.connection.settimeout(10)
         body=self.rfile.read(size)
