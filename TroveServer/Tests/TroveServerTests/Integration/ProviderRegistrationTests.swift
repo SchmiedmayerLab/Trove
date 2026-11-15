@@ -16,6 +16,16 @@ import Vapor
 
 
 struct ProviderRegistrationTests {
+    private static func service(on app: Application, registrationID: UUID) -> ProviderRegistrationService {
+        .init(
+            database: app.db,
+            clients: [WithingsMeasurementClient(transport: .init { _, _, _, _ in throw ProviderFailure.unavailable }, limits: .standard)],
+            registrationIDs: [registrationID],
+            authorization: app.grove[AuthorizationService.self],
+            studies: app.grove[StudyRepository.self]
+        )
+    }
+
     @Test
     func configuredAcquisitionAndStudyEditAuthorityBoundCapabilityDisclosure() async throws {
         try await TestApp.withApp { app, _ in
@@ -41,9 +51,11 @@ struct ProviderRegistrationTests {
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect(throws: (any Error).self) { try await service.registrations(studyID: study.requireId()) }
             }
-            let rows = try await ProviderSQL.sql(app.db).raw("""
-                SELECT action FROM audit_events WHERE action IN ('provider.registration.disclosure', 'study.draft.disclosure')
-                """).all()
+            let rows = try await ProviderSQL.sql(app.db)
+                .raw("""
+                    SELECT action FROM audit_events WHERE action IN ('provider.registration.disclosure', 'study.draft.disclosure')
+                    """)
+                .all()
             #expect(rows.count == 2)
         }
     }
@@ -57,13 +69,17 @@ struct ProviderRegistrationTests {
             )
             let service = Self.service(on: app, registrationID: registration.id)
             let allowed = CollectionRequirement(
-                profile: CollectionObservationProfile.bodyWeight.rawValue, sourceKind: .serverWorker,
-                providerRegistrationID: registration.id, sourceTypeIdentifier: "getmeas:1"
+                profile: CollectionObservationProfile.bodyWeight.rawValue,
+                sourceKind: .serverWorker,
+                providerRegistrationID: registration.id,
+                sourceTypeIdentifier: "getmeas:1"
             )
             try await app.db.transaction { try await service.validate(requirements: [allowed], on: $0) }
             let mismatched = CollectionRequirement(
-                profile: CollectionObservationProfile.heartRate.rawValue, sourceKind: .serverWorker,
-                providerRegistrationID: registration.id, sourceTypeIdentifier: "getmeas:1"
+                profile: CollectionObservationProfile.heartRate.rawValue,
+                sourceKind: .serverWorker,
+                providerRegistrationID: registration.id,
+                sourceTypeIdentifier: "getmeas:1"
             )
             await #expect(throws: ProviderFailure.scopeLost) {
                 try await app.db.transaction { try await service.validate(requirements: [mismatched], on: $0) }
@@ -75,13 +91,5 @@ struct ProviderRegistrationTests {
                 try await app.db.transaction { try await service.validate(requirements: [allowed], on: $0) }
             }
         }
-    }
-
-    private static func service(on app: Application, registrationID: UUID) -> ProviderRegistrationService {
-        .init(
-            database: app.db,
-            clients: [WithingsMeasurementClient(transport: .init { _, _, _, _ in throw ProviderFailure.unavailable }, limits: .standard)],
-            registrationIDs: [registrationID], authorization: app.grove[AuthorizationService.self], studies: app.grove[StudyRepository.self]
-        )
     }
 }

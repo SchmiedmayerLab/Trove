@@ -56,7 +56,8 @@ extension ProviderConnectionService {
             guard let row = try await sql.raw("""
                 SELECT * FROM provider_link_intents
                 WHERE id = \(bind: id) AND participant_id = \(bind: participantID) AND state_digest = \(bind: Self.digest(state))
-                """).first() else { throw ProviderFailure.invalidLink }
+                """)
+                .first() else { throw ProviderFailure.invalidLink }
             let status = try row.decode(column: "status", as: String.self)
             if status == "complete", let connectionID = try row.decode(column: "connection_id", as: UUID?.self) {
                 return try await .replay(Self.status(ProviderSQL.connection(connectionID, on: transaction), on: transaction))
@@ -68,22 +69,33 @@ extension ProviderConnectionService {
             guard approved.generation == (try row.decode(column: "registration_generation", as: Int64.self)) else {
                 throw ProviderFailure.fenced
             }
-            let envelope: ProviderCredentialVault.Envelope = try ProviderSQL.decode(row.decode(column: "verifier_envelope", as: String.self))
-            let bytes = try self.vault.open(envelope, context: .init(
-                participantID: participantID, registrationID: registrationID, recordID: id, version: 1, purpose: .authorizationVerifier
-            ))
-            guard let verifier = String(data: bytes, encoding: .utf8), verifier.utf8.count == 43 else { throw ProviderFailure.unavailable }
+            let verifier = try self.verifier(row, participantID: participantID, registrationID: registrationID, id: id)
             try await sql.raw("UPDATE provider_link_intents SET status = 'dispatched' WHERE id = \(bind: id)").run()
             try await AuditRepository.recordMutation(.init(
-                context: actor.auditContext, action: .providerLinkDispatched,
-                scope: .participantProvider(participantID: participantID, registrationID: registrationID), target: .init(id: id)
+                context: actor.auditContext,
+                action: .providerLinkDispatched,
+                scope: .participantProvider(participantID: participantID, registrationID: registrationID),
+                target: .init(id: id)
             ), on: transaction)
             return .exchange(Prepared(
-                id: id, participantID: participantID, approved: approved,
+                id: id,
+                participantID: participantID,
+                approved: approved,
                 redirect: try approved.configuration.redirect(id: row.decode(column: "redirect_id", as: String.self)),
                 verifier: approved.configuration.supportsPKCE ? verifier : nil
             ))
         }
+    }
+
+    private func verifier(_ row: any SQLRow, participantID: UUID, registrationID: UUID, id: UUID) throws -> String {
+        let envelope: ProviderCredentialVault.Envelope = try ProviderSQL.decode(row.decode(column: "verifier_envelope", as: String.self))
+        let bytes = try vault.open(envelope, context: .init(
+            participantID: participantID, registrationID: registrationID, recordID: id, version: 1, purpose: .authorizationVerifier
+        ))
+        guard let verifier = String(data: bytes, encoding: .utf8), verifier.utf8.count == 43 else {
+            throw ProviderFailure.unavailable
+        }
+        return verifier
     }
 
     private func commit(_ credentials: ProviderCredentials, prepared: Prepared, actor: AuthContext) async throws -> Status {
@@ -94,16 +106,19 @@ extension ProviderConnectionService {
             let sql = try ProviderSQL.sql(transaction)
             guard let row = try await sql.raw("""
                 SELECT id FROM provider_link_intents WHERE id = \(bind: prepared.id) AND status = 'dispatched'
-                """).first(), try row.decode(column: "id", as: UUID.self) == prepared.id else { throw ProviderFailure.fenced }
+                """)
+                .first(), try row.decode(column: "id", as: UUID.self) == prepared.id else { throw ProviderFailure.fenced }
             let connection = try await self.connect(
                 credentials, participantID: prepared.participantID, registration: approved.configuration, actor: actor, on: transaction
             )
             try await sql.raw("""
                 UPDATE provider_link_intents SET status = 'complete', connection_id = \(bind: connection.id)
                 WHERE id = \(bind: prepared.id)
-                """).run()
+                """)
+                .run()
             try await AuditRepository.recordMutation(.init(
-                context: actor.auditContext, action: .providerLinkCompleted,
+                context: actor.auditContext,
+                action: .providerLinkCompleted,
                 scope: .participantProvider(participantID: prepared.participantID, registrationID: approved.configuration.id),
                 target: .init(id: connection.id, version: String(connection.generation))
             ), on: transaction)
@@ -114,13 +129,18 @@ extension ProviderConnectionService {
     private func markUncertain(_ prepared: Prepared, actor: AuthContext) async throws {
         try await database.transaction { transaction in
             try await ProviderSQL.lockParticipant(prepared.participantID, on: transaction)
-            let row = try await ProviderSQL.sql(transaction).raw("""
-                UPDATE provider_link_intents SET status = 'uncertain'
-                WHERE id = \(bind: prepared.id) AND status = 'dispatched' RETURNING id
-                """).first()
-            guard row != nil else { return }
+            let row = try await ProviderSQL.sql(transaction)
+                .raw("""
+                    UPDATE provider_link_intents SET status = 'uncertain'
+                    WHERE id = \(bind: prepared.id) AND status = 'dispatched' RETURNING id
+                    """)
+                .first()
+            guard row != nil else {
+                return
+            }
             try await AuditRepository.recordMutation(.init(
-                context: actor.auditContext, action: .providerCredentialUncertain,
+                context: actor.auditContext,
+                action: .providerCredentialUncertain,
                 scope: .participantProvider(participantID: prepared.participantID, registrationID: prepared.approved.configuration.id),
                 target: .init(id: prepared.id)
             ), on: transaction)

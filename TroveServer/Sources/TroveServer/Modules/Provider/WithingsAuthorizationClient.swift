@@ -11,23 +11,24 @@ import Foundation
 
 /// Withings' documented confidential-client flow. Account identity comes from the token endpoint's userid.
 struct WithingsAuthorizationClient: ProviderAuthorizationClient {
-    private struct Response: Decodable {
-        struct Body: Decodable {
-            enum CodingKeys: String, CodingKey {
-                case userid, scope
-                case accessToken = "access_token"
-                case refreshToken = "refresh_token"
-                case expiresIn = "expires_in"
-                case tokenType = "token_type"
-            }
-
-            let userid: Int64
-            let accessToken: String
-            let refreshToken: String
-            let expiresIn: Int64
-            let scope: String
-            let tokenType: String
+    private struct Body: Decodable {
+        enum CodingKeys: String, CodingKey {
+            case userid, scope
+            case accessToken = "access_token"
+            case refreshToken = "refresh_token"
+            case expiresIn = "expires_in"
+            case tokenType = "token_type"
         }
+
+        let userid: Int64
+        let accessToken: String
+        let refreshToken: String
+        let expiresIn: Int64
+        let scope: String
+        let tokenType: String
+    }
+
+    private struct Response: Decodable {
         let status: Int
         let body: Body?
     }
@@ -59,9 +60,11 @@ struct WithingsAuthorizationClient: ProviderAuthorizationClient {
               let body = response.body, body.userid > 0, (1...31_536_000).contains(body.expiresIn),
               body.tokenType.lowercased() == "bearer" else { throw ProviderFailure.reauthorizationRequired }
         let credentials = ProviderCredentials(
-            accessToken: body.accessToken, refreshToken: body.refreshToken,
+            accessToken: body.accessToken,
+            refreshToken: body.refreshToken,
             expiresAt: Date().addingTimeInterval(TimeInterval(body.expiresIn)),
-            scopes: Set(body.scope.split { $0 == "," || $0 == " " }.map(String.init)), accountID: String(body.userid)
+            scopes: Set(body.scope.split { $0 == "," || $0 == " " }.map(String.init)),
+            accountID: String(body.userid)
         )
         try credentials.validate(requiredScopes: registration.scopes, at: Date())
         return credentials

@@ -53,8 +53,11 @@ struct ProviderCredentialVaultTests {
         #expect(Mirror(reflecting: rotated).children.isEmpty)
         #expect(String(reflecting: rotated) == "ProviderCredentialVault(redacted)")
         let credentials = ProviderCredentials(
-            accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date().addingTimeInterval(600),
-            scopes: ["user.metrics"], accountID: "123"
+            accessToken: "synthetic-access",
+            refreshToken: "synthetic-refresh",
+            expiresAt: Date().addingTimeInterval(600),
+            scopes: ["user.metrics"],
+            accountID: "123"
         )
         #expect(String(reflecting: credentials) == "ProviderCredentials(redacted)")
         #expect(Mirror(reflecting: credentials).children.isEmpty)

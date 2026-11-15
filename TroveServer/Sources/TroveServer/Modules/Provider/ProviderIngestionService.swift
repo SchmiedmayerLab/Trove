@@ -96,16 +96,19 @@ struct ProviderIngestionService: Sendable {
                         \(bind: UUID()), \(bind: dispatch.authority.checkpointID), \(bind: dispatch.pageSequence),
                         \(bind: ordinal), \(bind: bytes), \(bind: digest), 'current-demand'
                     )
-                    """).run()
+                    """)
+                    .run()
             }
             try await sql.raw("""
                 UPDATE provider_checkpoints SET status = 'staged', next_cursor = \(bind: page.nextCursor),
                     page_complete = \(bind: page.complete), excluded_rows = \(bind: page.excludedRows)
                 WHERE id = \(bind: dispatch.authority.checkpointID)
-                """).run()
+                """)
+                .run()
             // An empty page is still an audited fetch outcome; it cannot synthesize clinical data.
             try await AuditRepository.recordMutation(.init(
-                context: authorized.audit, action: .providerPageStaged,
+                context: authorized.audit,
+                action: .providerPageStaged,
                 scope: .participantProvider(participantID: dispatch.authority.participantID, registrationID: dispatch.authority.registrationID),
                 target: .init(id: dispatch.authority.checkpointID, version: String(dispatch.pageSequence))
             ), on: transaction)
@@ -118,7 +121,8 @@ struct ProviderIngestionService: Sendable {
             SELECT id, record_bytes, record_digest FROM provider_staged_records
             WHERE checkpoint_id = \(bind: dispatch.authority.checkpointID) AND page_sequence = \(bind: dispatch.pageSequence)
                 AND event_id IS NULL ORDER BY ordinal LIMIT 1
-            """).first() {
+            """)
+            .first() {
             try Task.checkCancellation()
             let id = try row.decode(column: "id", as: UUID.self)
             let bytes = try row.decode(column: "record_bytes", as: Data.self)
@@ -130,9 +134,11 @@ struct ProviderIngestionService: Sendable {
                 let receipt = try await ClinicalEventStore(database: transaction).accept(
                     event, commandID: id, worker: dispatch.authority, on: transaction
                 )
-                try await ProviderSQL.sql(transaction).raw("""
-                    UPDATE provider_staged_records SET event_id = \(bind: receipt.eventID) WHERE id = \(bind: id) AND event_id IS NULL
-                    """).run()
+                try await ProviderSQL.sql(transaction)
+                    .raw("""
+                        UPDATE provider_staged_records SET event_id = \(bind: receipt.eventID) WHERE id = \(bind: id) AND event_id IS NULL
+                        """)
+                    .run()
             }
         }
         let exhausted = try await complete(dispatch)
@@ -143,13 +149,7 @@ struct ProviderIngestionService: Sendable {
         try await database.transaction { transaction in
             let authorized = try await dispatch.authority.lock(on: transaction)
             let sql = try ProviderSQL.sql(transaction)
-            guard let row = try await sql.raw("""
-                SELECT page_complete, next_cursor FROM provider_checkpoints WHERE id = \(bind: dispatch.authority.checkpointID) AND status = 'staged'
-                """).first(),
-                  try await sql.raw("""
-                    SELECT id FROM provider_staged_records WHERE checkpoint_id = \(bind: dispatch.authority.checkpointID)
-                        AND page_sequence = \(bind: dispatch.pageSequence) AND event_id IS NULL LIMIT 1
-                    """).first() == nil else { throw ProviderFailure.fenced }
+            let row = try await stagedPage(dispatch, on: sql)
             let complete = try row.decode(column: "page_complete", as: Bool.self)
             guard dispatch.pageSequence < Int64.max else { throw ProviderFailure.capacityExceeded }
             let exhausted = !complete && dispatch.pageSequence >= ProviderCheckpoint.maximumPages
@@ -160,17 +160,37 @@ struct ProviderIngestionService: Sendable {
                     accepted_through = \(bind: complete ? dispatch.request.window.upperBound : nil),
                     lease_id = NULL, lease_until = NULL, acquired_at = NULL, acquisition_facts = NULL,
                     page_sequence = page_sequence + 1 WHERE id = \(bind: dispatch.authority.checkpointID)
-                """).run()
+                """)
+                .run()
             try await sql.raw("""
                 UPDATE provider_connections SET last_successful_fetch = \(bind: Date()), next_attempt = \(bind: Date().addingTimeInterval(60))
                 WHERE id = \(bind: dispatch.authority.connectionID)
-                """).run()
+                """)
+                .run()
             try await AuditRepository.recordMutation(.init(
-                context: authorized.audit, action: .providerPageAccepted,
+                context: authorized.audit,
+                action: .providerPageAccepted,
                 scope: .participantProvider(participantID: dispatch.authority.participantID, registrationID: dispatch.authority.registrationID),
                 target: .init(id: dispatch.authority.checkpointID, version: String(dispatch.pageSequence))
             ), on: transaction)
             return exhausted
         }
+    }
+
+    /// The staged checkpoint row, once every record of the dispatched page has been accepted.
+    private func stagedPage(_ dispatch: Dispatch, on sql: any SQLDatabase) async throws -> any SQLRow {
+        let row = try await sql.raw("""
+            SELECT page_complete, next_cursor FROM provider_checkpoints WHERE id = \(bind: dispatch.authority.checkpointID) AND status = 'staged'
+            """)
+            .first()
+        let unaccepted = try await sql.raw("""
+            SELECT id FROM provider_staged_records WHERE checkpoint_id = \(bind: dispatch.authority.checkpointID)
+                AND page_sequence = \(bind: dispatch.pageSequence) AND event_id IS NULL LIMIT 1
+            """)
+            .all()
+        guard let row, unaccepted.isEmpty else {
+            throw ProviderFailure.fenced
+        }
+        return row
     }
 }

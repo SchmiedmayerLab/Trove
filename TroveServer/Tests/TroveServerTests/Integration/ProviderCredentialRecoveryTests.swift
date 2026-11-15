@@ -14,6 +14,14 @@ import Testing
 
 
 struct ProviderCredentialRecoveryTests {
+    private static func expectDurableOutcome(_ current: ProviderConnection, sourceID: UUID, fails: Bool) {
+        #expect(current.sourceID == sourceID)
+        #expect(current.credentialVersion == (fails ? 1 : 2))
+        #expect((current.credentialEnvelope == nil) == fails)
+        #expect(current.refreshState == (fails ? .uncertain : .ready))
+        #expect(current.status == (fails ? .reauthorizationRequired : .active))
+    }
+
     @Test(arguments: [false, true])
     func refreshOutcomeIsDurableAndNeverReplaysAnUncertainRotation(fails: Bool) async throws {
         try await TestApp.withApp { app, _ in
@@ -23,8 +31,11 @@ struct ProviderCredentialRecoveryTests {
             await authorization.setCredentialLifetime(600)
             if fails { await authorization.setRefreshFailure() }
             let worker = try ProviderIngestionFixture.worker(
-                on: app, prepared: prepared, authorization: authorization,
-                upstream: .init(measuredAt: Date()), validator: ClinicalEventBatchTests.validator()
+                on: app,
+                prepared: prepared,
+                authorization: authorization,
+                upstream: .init(measuredAt: Date()),
+                validator: ClinicalEventBatchTests.validator()
             )
             let dispatch = try #require(try await worker.prepare(connectionID: prepared.connection.id, sourceToken: "getmeas:1", now: Date()))
             let service = worker.credentialService
@@ -37,16 +48,10 @@ struct ProviderCredentialRecoveryTests {
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 let service = ProviderCredentialService(database: reopened.db, vault: prepared.vault, authorization: authorization)
                 let current = try await ProviderSQL.connection(prepared.connection.id, on: reopened.db)
-                #expect(current.sourceID == prepared.connection.sourceID)
-                #expect(current.credentialVersion == (fails ? 1 : 2))
-                #expect((current.credentialEnvelope == nil) == fails)
+                Self.expectDurableOutcome(current, sourceID: prepared.connection.sourceID, fails: fails)
                 if fails {
-                    #expect(current.refreshState == .uncertain)
-                    #expect(current.status == .reauthorizationRequired)
                     await #expect(throws: (any Error).self) { try await service.credentials(for: dispatch.authority) }
                 } else {
-                    #expect(current.refreshState == .ready)
-                    #expect(current.status == .active)
                     _ = try await service.credentials(for: dispatch.authority)
                 }
                 #expect(await authorization.refreshes == 1)
@@ -60,15 +65,20 @@ struct ProviderCredentialRecoveryTests {
             let authorization = ProviderFixture.Authorization()
             let prepared = try await ProviderIngestionFixture.prepare(on: app, authorization: authorization)
             let worker = try ProviderIngestionFixture.worker(
-                on: app, prepared: prepared, authorization: authorization,
-                upstream: .init(measuredAt: Date()), validator: ClinicalEventBatchTests.validator()
+                on: app,
+                prepared: prepared,
+                authorization: authorization,
+                upstream: .init(measuredAt: Date()),
+                validator: ClinicalEventBatchTests.validator()
             )
             let dispatch = try #require(try await worker.prepare(connectionID: prepared.connection.id, sourceToken: "getmeas:1", now: Date()))
             // The process can stop after persisting this fence and before learning whether the provider rotated its token.
-            try await ProviderSQL.sql(app.db).raw("""
-                UPDATE provider_connections SET refresh_state = 'dispatched', refresh_id = \(bind: UUID())
-                WHERE id = \(bind: prepared.connection.id)
-                """).run()
+            try await ProviderSQL.sql(app.db)
+                .raw("""
+                    UPDATE provider_connections SET refresh_state = 'dispatched', refresh_id = \(bind: UUID())
+                    WHERE id = \(bind: prepared.connection.id)
+                    """)
+                .run()
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 let service = ProviderCredentialService(database: reopened.db, vault: prepared.vault, authorization: authorization)
                 await #expect(throws: ProviderFailure.reauthorizationRequired) { try await service.credentials(for: dispatch.authority) }

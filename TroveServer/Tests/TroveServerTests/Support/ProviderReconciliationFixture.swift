@@ -26,7 +26,9 @@ enum ProviderReconciliationFixture {
         func fetch(_ request: ProviderAcquisitionRequest) async throws -> ProviderAcquisitionPage {
             requests += 1
             snapshots.append(request.queryAsOf)
-            guard let interval else { return .init(records: [], nextCursor: nil, complete: true, excludedRows: 0) }
+            guard let interval else {
+                return .init(records: [], nextCursor: nil, complete: true, excludedRows: 0)
+            }
             let bounds = try ClinicalMeasurementBounds(start: interval.start, end: interval.end)
             guard try request.demands.contains(where: {
                 try bounds.includes(windowStart: $0.start, windowEnd: $0.end, asOf: $0.asOf)
@@ -34,7 +36,9 @@ enum ProviderReconciliationFixture {
             let evidence = try JSONEncoder().encode(interval)
             let instant = try await request.conversionInstant("late-session", evidence)
             let context = ProviderConversionContext(
-                producer: request.producer, scope: request.scope, instant: instant,
+                producer: request.producer,
+                scope: request.scope,
+                instant: instant,
                 sourceTimeZone: try #require(TimeZone(secondsFromGMT: 0))
             )
             let result = try WithingsFHIR.convert(
@@ -59,12 +63,21 @@ enum ProviderReconciliationFixture {
         on app: Application, prepared: ProviderIngestionFixture.Prepared, authorization: ProviderFixture.Authorization, upstream: Upstream
     ) throws -> ProviderIngestionService {
         let original = try ProviderIngestionFixture.worker(
-            on: app, prepared: prepared, authorization: authorization, upstream: .init(measuredAt: Date()),
+            on: app,
+            prepared: prepared,
+            authorization: authorization,
+            upstream: .init(measuredAt: Date()),
             validator: ClinicalEventBatchTests.validator()
         )
         return .init(
-            database: original.database, validator: original.validator, credentialService: original.credentialService,
-            keyring: original.keyring, worker: original.worker, facts: original.facts, limits: original.limits, client: Client(upstream: upstream)
+            database: original.database,
+            validator: original.validator,
+            credentialService: original.credentialService,
+            keyring: original.keyring,
+            worker: original.worker,
+            facts: original.facts,
+            limits: original.limits,
+            client: Client(upstream: upstream)
         )
     }
 

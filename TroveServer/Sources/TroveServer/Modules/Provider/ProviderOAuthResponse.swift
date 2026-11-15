@@ -45,8 +45,11 @@ struct ProviderOAuthResponse: Decodable {
         }
         let scopes = scope.map { Set($0.split(separator: " ").map(String.init)) } ?? prior?.scopes ?? registration.scopes
         let credentials = ProviderCredentials(
-            accessToken: accessToken, refreshToken: refreshToken,
-            expiresAt: Date().addingTimeInterval(TimeInterval(expiresIn)), scopes: scopes, accountID: accountID
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval(TimeInterval(expiresIn)),
+            scopes: scopes,
+            accountID: accountID
         )
         try credentials.validate(requiredScopes: registration.scopes, at: Date())
         return credentials

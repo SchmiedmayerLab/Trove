@@ -39,13 +39,17 @@ enum ProviderIngestionFixture {
             requests += 1
             return try JSONSerialization.data(withJSONObject: [
                 "status": 0,
-                "body": ["timezone": "UTC", "more": 0, "measuregrps": (0..<recordCount).map { index in
-                    [
-                        "grpid": 12345 + index, "attrib": 0, "category": 1,
-                        "date": Int64(measuredAt.timeIntervalSince1970),
-                        "measures": [["type": 1, "value": 725, "unit": -1]]
-                    ] as [String: Any]
-                }]
+                "body": [
+                    "timezone": "UTC",
+                    "more": 0,
+                    "measuregrps": (0..<recordCount).map { index in
+                        [
+                            "grpid": 12345 + index, "attrib": 0, "category": 1,
+                            "date": Int64(measuredAt.timeIntervalSince1970),
+                            "measures": [["type": 1, "value": 725, "unit": -1]]
+                        ] as [String: Any]
+                    }
+                ]
             ])
         }
     }
@@ -60,8 +64,11 @@ enum ProviderIngestionFixture {
     }
 
     static func prepare(
-        on app: Application, authorization: ProviderFixture.Authorization,
-        profile: CollectionObservationProfile = .bodyWeight, sourceToken: String = "getmeas:1", registration: ProviderRegistration? = nil
+        on app: Application,
+        authorization: ProviderFixture.Authorization,
+        profile: CollectionObservationProfile = .bodyWeight,
+        sourceToken: String = "getmeas:1",
+        registration: ProviderRegistration? = nil
     ) async throws -> Prepared {
         try await ParticipantFixtures.createParticipant(on: app.db)
         let group = try await GroupFixtures.createGroup(on: app.db)
@@ -74,15 +81,17 @@ enum ProviderIngestionFixture {
             for _ in 0..<2 {
                 let study = try await StudyFixtures.createStudy(on: app.db, groupId: group.requireId())
                 study.consent[.enUS] = ConsentContent(title: "Consent", content: "<toggle id=\"agree\" expected-value=\"true\">I agree.</toggle>")
-                study.collectionRequirements = [.init(
-                    profile: profile.rawValue,
-                    sourceKind: .serverWorker,
-                    measurementWindow: .init(
-                        calendar: .gregorian, timeZone: "UTC", start: .absolute(.init(_type: .absolute, date: Date().addingTimeInterval(-3600)))
-                    ),
-                    providerRegistrationID: registration.id,
-                    sourceTypeIdentifier: sourceToken
-                )]
+                study.collectionRequirements = [
+                    .init(
+                        profile: profile.rawValue,
+                        sourceKind: .serverWorker,
+                        measurementWindow: .init(
+                            calendar: .gregorian, timeZone: "UTC", start: .absolute(.init(_type: .absolute, date: Date().addingTimeInterval(-3600)))
+                        ),
+                        providerRegistrationID: registration.id,
+                        sourceTypeIdentifier: sourceToken
+                    )
+                ]
                 try await study.save(on: app.db)
                 try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study.requireId())
                 ids.append(try study.requireId())
@@ -105,16 +114,22 @@ enum ProviderIngestionFixture {
     }
 
     static func worker(
-        on app: Application, prepared: Prepared, authorization: ProviderFixture.Authorization,
-        upstream: Upstream, validator: FHIRValidationClient
+        on app: Application,
+        prepared: Prepared,
+        authorization: ProviderFixture.Authorization,
+        upstream: Upstream,
+        validator: FHIRValidationClient
     ) throws -> ProviderIngestionService {
         try .init(
-            database: app.db, validator: validator,
+            database: app.db,
+            validator: validator,
             credentialService: .init(database: app.db, vault: prepared.vault, authorization: authorization),
             keyring: TestApp.sourceKeyring(),
             worker: .init(issuer: "https://example.test/workers", clientID: "provider-worker", applicationRevision: "synthetic-revision"),
-            facts: .init(application: .init(name: "Trove", bundleIdentifier: "org.example.Trove", version: "1"),
-                         host: .init(operatingSystemName: "Linux", operatingSystemVersion: "6")),
+            facts: .init(
+                application: .init(name: "Trove", bundleIdentifier: "org.example.Trove", version: "1"),
+                host: .init(operatingSystemName: "Linux", operatingSystemVersion: "6")
+            ),
             limits: .standard,
             client: WithingsMeasurementClient(
                 transport: .init { endpoint, _, bearer, _ in try await upstream.reply(endpoint: endpoint, bearer: bearer) },

@@ -47,7 +47,7 @@ struct ProviderRegistrationIsolationTests {
             }
             #expect(try await worker.run(connectionID: second.id, sourceToken: "getmeas:1") == false)
             #expect(await upstream.requests == 0)
-            #expect(try await ProviderSQL.sql(app.db).raw("SELECT id FROM clinical_events LIMIT 1").first() == nil)
+            #expect(try await ProviderSQL.sql(app.db).raw("SELECT id FROM clinical_events LIMIT 1").all().isEmpty)
         }
     }
 }

@@ -41,13 +41,47 @@ struct ProviderOAuthTests {
         }
     }
 
+    private static func registration(_ provider: ConnectedProvider) throws -> ProviderRegistration {
+        .init(
+            id: UUID(),
+            provider: provider,
+            displayName: "Synthetic",
+            controller: "test-controller",
+            region: "test-region",
+            clientID: "synthetic-client",
+            redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
+            scopes: provider == .oura ? ["personal", "daily"] : ["https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"],
+            sourceTokens: provider == .oura ? ["vO2_max"] : ["weight"],
+            supportsPKCE: true
+        )
+    }
+
+    private static func client(_ registration: ProviderRegistration, upstream: Upstream) throws -> ProviderAuthorizationRouter {
+        try .init(
+            transport: .init { endpoint, body, bearer, limit in try await upstream.send(endpoint, body: body, bearer: bearer, limit: limit) },
+            secrets: .init([registration.id: "synthetic-secret"])
+        )
+    }
+
+    private static func credentials(_ registration: ProviderRegistration) -> ProviderCredentials {
+        .init(
+            accessToken: "old-access",
+            refreshToken: "old-refresh",
+            expiresAt: Date().addingTimeInterval(60),
+            scopes: registration.scopes,
+            accountID: "source-account"
+        )
+    }
+
     @Test("OAuth exchange verifies the provider account with the acquired token", arguments: [ConnectedProvider.oura, .googleHealthAPI])
     func verifiedAccount(_ provider: ConnectedProvider) async throws {
         let registration = try Self.registration(provider)
         let upstream = Upstream(provider: provider)
         let client = try Self.client(registration, upstream: upstream)
         let credentials = try await client.exchange(
-            registration: registration, code: "synthetic-code", redirect: registration.redirect(id: "native"),
+            registration: registration,
+            code: "synthetic-code",
+            redirect: registration.redirect(id: "native"),
             verifier: String(repeating: "x", count: 43)
         )
         #expect(credentials.accountID == "source-account")
@@ -94,26 +128,5 @@ struct ProviderOAuthTests {
         ])
         let response = try ProviderOAuthResponse.decode(bytes)
         #expect(throws: ProviderFailure.scopeLost) { try response.credentials(accountID: "source-account", prior: nil, registration: registration) }
-    }
-
-    private static func registration(_ provider: ConnectedProvider) throws -> ProviderRegistration {
-        .init(
-            id: UUID(), provider: provider, displayName: "Synthetic", controller: "test-controller", region: "test-region",
-            clientID: "synthetic-client", redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
-            scopes: provider == .oura ? ["personal", "daily"] : ["https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"],
-            sourceTokens: provider == .oura ? ["vO2_max"] : ["weight"], supportsPKCE: true
-        )
-    }
-
-    private static func client(_ registration: ProviderRegistration, upstream: Upstream) throws -> ProviderAuthorizationRouter {
-        try .init(
-            transport: .init { endpoint, body, bearer, limit in try await upstream.send(endpoint, body: body, bearer: bearer, limit: limit) },
-            secrets: .init([registration.id: "synthetic-secret"])
-        )
-    }
-
-    private static func credentials(_ registration: ProviderRegistration) -> ProviderCredentials {
-        .init(accessToken: "old-access", refreshToken: "old-refresh", expiresAt: Date().addingTimeInterval(60),
-              scopes: registration.scopes, accountID: "source-account")
     }
 }

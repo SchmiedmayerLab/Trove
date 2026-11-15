@@ -14,8 +14,11 @@ import SQLKit
 extension ProviderConnectionService {
     /// Upstream account identity is verified by the OAuth adapter, never supplied by a participant request.
     func connect(
-        _ credentials: ProviderCredentials, participantID: UUID, registration: ProviderRegistration,
-        actor: AuthContext, on database: any Database
+        _ credentials: ProviderCredentials,
+        participantID: UUID,
+        registration: ProviderRegistration,
+        actor: AuthContext,
+        on database: any Database
     ) async throws -> ProviderConnection {
         guard database.inTransaction else { throw AuditError.transactionRequired }
         let sql = try ProviderSQL.sql(database)
@@ -23,7 +26,8 @@ extension ProviderConnectionService {
             SELECT * FROM provider_connections
             WHERE participant_id = \(bind: participantID) AND registration_id = \(bind: registration.id)
             ORDER BY created_at, id LIMIT 129
-            """).all()
+            """)
+            .all()
         guard rows.count <= 128 else { throw ProviderFailure.capacityExceeded }
         var matching: ProviderConnection?
         for row in rows {
@@ -55,8 +59,11 @@ extension ProviderConnectionService {
         )
         let version = matching.credentialVersion + 1
         let context = ProviderCredentialVault.Context(
-            participantID: participantID, registrationID: registration.id, recordID: matching.id,
-            version: version, purpose: .participantCredential
+            participantID: participantID,
+            registrationID: registration.id,
+            recordID: matching.id,
+            version: version,
+            purpose: .participantCredential
         )
         let sealed = try credentialEnvelope(credentials, context: context)
         let account = try vault.seal(identityBytes(credentials), context: matching.accountContext)
@@ -65,17 +72,22 @@ extension ProviderConnectionService {
                 credential_envelope = \(bind: sealed), account_envelope = \(bind: try ProviderSQL.encode(account)),
                 status = 'active', refresh_state = 'ready', refresh_id = NULL, next_attempt = \(bind: Date()),
                 dormant_until = \(bind: Date().addingTimeInterval(dormantRetention)) WHERE id = \(bind: matching.id)
-            """).run()
+            """)
+            .run()
         try await sql.raw("""
             UPDATE provider_checkpoints SET status = 'blocked', lease_id = NULL, lease_until = NULL
             WHERE connection_id = \(bind: matching.id) AND status <> 'complete'
-            """).run()
+            """)
+            .run()
         return try await ProviderSQL.connection(matching.id, on: database)
     }
 
     private func createConnection(
-        _ credentials: ProviderCredentials, participantID: UUID, registration: ProviderRegistration,
-        actor: AuthContext, on database: any Database
+        _ credentials: ProviderCredentials,
+        participantID: UUID,
+        registration: ProviderRegistration,
+        actor: AuthContext,
+        on database: any Database
     ) async throws -> ProviderConnection {
         let sql = try ProviderSQL.sql(database)
         let source = try await ProviderSourceStore.create(
@@ -98,7 +110,8 @@ extension ProviderConnectionService {
                 \(bind: try credentialEnvelope(credentials, context: context)), \(bind: try ProviderSQL.encode(account)),
                 'active', 'ready', \(bind: Date()), \(bind: Date()), \(bind: Date().addingTimeInterval(dormantRetention))
             )
-            """).run()
+            """)
+            .run()
         return try await ProviderSQL.connection(id, on: database)
     }
 

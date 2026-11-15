@@ -14,8 +14,11 @@ import SQLKit
 enum ProviderSourceStore {
     /// The participant and registration are locked by the linking transaction before this call.
     static func create(
-        participantID: UUID, registration: ProviderRegistration, actor: AuthContext,
-        keyring: SourceIdentityKeyring, on database: any Database
+        participantID: UUID,
+        registration: ProviderRegistration,
+        actor: AuthContext,
+        keyring: SourceIdentityKeyring,
+        on database: any Database
     ) async throws -> SourceBinding {
         guard database.inTransaction else { throw AuditError.transactionRequired }
         let sql = try ProviderSQL.sql(database)
@@ -23,7 +26,8 @@ enum ProviderSourceStore {
             SELECT * FROM source_bindings WHERE participant_id = \(bind: participantID)
                 AND repository_kind = \(bind: registration.provider.repositoryKind.rawValue) AND kind = 'server-worker'
             ORDER BY created_at, id LIMIT 2
-            """).all()
+            """)
+            .all()
         // Conflicting historical authorities require explicit reconciliation; never discard or replace their keys.
         guard existing.count <= 1 else { throw ProviderFailure.invalidConfiguration }
         if let row = existing.first {
@@ -47,15 +51,18 @@ enum ProviderSourceStore {
                 'server-worker', \(bind: registration.id), \(bind: root), \(bind: namespaces.recordVersion.rawValue),
                 \(bind: actor.issuer + "/trove/participants"), \(bind: participantID.uuidString.lowercased()), \(bind: Date())
             )
-            """).run()
+            """)
+            .run()
         guard let row = try await sql.raw("SELECT * FROM source_bindings WHERE id = \(bind: id)").first() else {
             throw ProviderFailure.unavailable
         }
         let source = try SourceBinding(row: row)
         _ = try await SourceIdentityKeyStore(keyring: keyring).provision(context: source.keyContext, on: database)
         try await AuditRepository.recordMutation(.init(
-            context: actor.auditContext, action: .sourceRegistered,
-            scope: .participantSource(participantID: participantID, sourceBindingID: id), target: .init(id: id)
+            context: actor.auditContext,
+            action: .sourceRegistered,
+            scope: .participantSource(participantID: participantID, sourceBindingID: id),
+            target: .init(id: id)
         ), on: database)
         return source
     }

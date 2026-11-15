@@ -31,9 +31,11 @@ extension ProviderConnectionService {
 
     /// Reports one exact source's latest attempt, never a claim that every source on the account is caught up.
     static func collectionAttempt(_ connection: ProviderConnection, on database: any Database) async throws -> CollectionAttempt? {
-        guard let row = try await ProviderSQL.sql(database).raw("""
-            SELECT last_source_token, outcome, failure_kind FROM provider_worker_states WHERE connection_id = \(bind: connection.id)
-            """).first() else { return nil }
+        guard let row = try await ProviderSQL.sql(database)
+            .raw("""
+                SELECT last_source_token, outcome, failure_kind FROM provider_worker_states WHERE connection_id = \(bind: connection.id)
+                """)
+            .first() else { return nil }
         let source = try row.decode(column: "last_source_token", as: String.self)
         let outcome: CollectionAttempt.Outcome
         switch try row.decode(column: "outcome", as: String.self) {

@@ -70,7 +70,8 @@ struct ClinicalEventStore: Sendable {
         if let retained = try await sql.raw("""
             SELECT * FROM clinical_events WHERE identifier_system = \(bind: event.eventIdentifierSystem)
                 AND identifier_value = \(bind: event.eventIdentifierValue) AND source_id = \(bind: authorization.source.id)
-            """).first() {
+            """)
+            .first() {
             let eventID = try retained.decode(column: "id", as: UUID.self)
             let bytes = try retained.decode(column: "raw_bytes", as: Data.self)
             guard try ClinicalRecordEquivalence.accepts(event.rawBytes, asRepresentationOf: bytes) else {
@@ -82,8 +83,12 @@ struct ClinicalEventStore: Sendable {
             return try ClinicalEventReceipt(row: retained)
         }
         return try await acceptAuthorized(
-            event, source: authorization.source, targets: targets, auditContext: authorization.audit,
-            providerRegistrationID: authorization.registrationID, on: transaction
+            event,
+            source: authorization.source,
+            targets: targets,
+            auditContext: authorization.audit,
+            on: transaction,
+            providerRegistrationID: authorization.registrationID
         )
     }
 

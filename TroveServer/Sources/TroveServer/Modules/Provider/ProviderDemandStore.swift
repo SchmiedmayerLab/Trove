@@ -43,14 +43,16 @@ enum ProviderDemandStore {
         case closedWindowReconciliation
 
         func permits(_ enrollment: Enrollment, asOf: Date) -> Bool {
-            guard enrollment.withdrawnAt == nil else { return false }
+            guard enrollment.withdrawnAt == nil else {
+                return false
+            }
             return self != .acquisition || (enrollment.endsAt.map { $0 > asOf } ?? true)
         }
     }
 
     static let maximumDemands = 2048
 
-    /// Caller holds participant → registration locks before any enrollment lock.
+    // Caller holds participant → registration locks before any enrollment lock.
     // The authority kind remains explicit at both dispatch and commit-time checks.
     // swiftlint:disable:next function_parameter_count
     static func load(
@@ -81,23 +83,35 @@ enum ProviderDemandStore {
                     throw ProviderFailure.unavailable
                 }
                 let requirements = try publication.collectionPolicy.resolvedRequirements(
-                    studyID: enrollment.$study.id, revision: acceptance.revision, acceptedAt: acceptance.acceptedAt,
-                    scope: acceptance.collectionScope, adoptionEnd: window.end
+                    studyID: enrollment.$study.id,
+                    revision: acceptance.revision,
+                    acceptedAt: acceptance.acceptedAt,
+                    scope: acceptance.collectionScope,
+                    adoptionEnd: window.end
                 )
-                for requirement in requirements where requirement.sourceKind == .serverWorker
-                    && requirement.providerRegistrationID == registration.id && requirement.sourceTypeIdentifier == sourceToken {
-                    guard profiles.contains(requirement.profile) else { throw ProviderFailure.scopeLost }
-                    if purpose == .closedWindowReconciliation {
-                        guard let end = requirement.end, end <= asOf else { continue }
-                    }
-                    let end = min(requirement.end ?? asOf, asOf)
-                    guard requirement.start < end else { continue }
-                    result.append(try .init(
-                        consentID: acceptance.consentID, profile: requirement.profile, start: requirement.start, end: end, asOf: asOf
-                    ))
-                    guard result.count <= maximumDemands else { throw ProviderFailure.capacityExceeded }
+                let selected = requirements.filter {
+                    $0.sourceKind == .serverWorker && $0.providerRegistrationID == registration.id && $0.sourceTypeIdentifier == sourceToken
                 }
+                result += try demands(for: selected, consentID: acceptance.consentID, profiles: profiles, purpose: purpose, asOf: asOf)
+                guard result.count <= maximumDemands else { throw ProviderFailure.capacityExceeded }
             }
+        }
+        return result
+    }
+
+    /// Bounds each already selected requirement by the query instant; a reconciliation only considers closed windows.
+    private static func demands(
+        for requirements: [PublishedCollectionPolicy.ResolvedRequirement], consentID: UUID, profiles: Set<String>, purpose: Purpose, asOf: Date
+    ) throws -> [ProviderDemand] {
+        var result: [ProviderDemand] = []
+        for requirement in requirements {
+            guard profiles.contains(requirement.profile) else { throw ProviderFailure.scopeLost }
+            if purpose == .closedWindowReconciliation {
+                guard let end = requirement.end, end <= asOf else { continue }
+            }
+            let end = min(requirement.end ?? asOf, asOf)
+            guard requirement.start < end else { continue }
+            result.append(try .init(consentID: consentID, profile: requirement.profile, start: requirement.start, end: end, asOf: asOf))
         }
         return result
     }

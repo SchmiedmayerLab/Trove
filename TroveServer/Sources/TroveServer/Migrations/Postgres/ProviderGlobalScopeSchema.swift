@@ -28,13 +28,15 @@ enum ProviderGlobalScopeSchema {
             try await sql.raw("""
                 CREATE TRIGGER \(ident: table + "_no_mutation") BEFORE UPDATE OR DELETE OR TRUNCATE
                 ON \(ident: table) FOR EACH STATEMENT EXECUTE FUNCTION trove_reject_source_identity_mutation()
-                """).run()
+                """)
+                .run()
         } else {
             for operation in ["UPDATE", "DELETE"] {
                 try await sql.raw("""
                     CREATE TRIGGER \(ident: table + "_no_" + operation.lowercased()) BEFORE \(unsafeRaw: operation)
                     ON \(ident: table) BEGIN SELECT RAISE(ABORT, 'Provider identity scope is immutable'); END
-                    """).run()
+                    """)
+                    .run()
             }
         }
     }

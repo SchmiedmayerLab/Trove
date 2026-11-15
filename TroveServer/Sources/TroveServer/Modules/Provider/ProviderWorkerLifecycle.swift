@@ -16,7 +16,9 @@ actor ProviderWorkerLoop {
     init(service: ProviderWorkerService) { self.service = service }
 
     func start(logger: Logger) {
-        guard task == nil else { return }
+        guard task == nil else {
+            return
+        }
         let service = self.service
         task = Task {
             while !Task.isCancelled {

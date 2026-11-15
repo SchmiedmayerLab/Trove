@@ -27,7 +27,9 @@ struct ProviderCredentialService: Sendable {
 
     func credentials(for authority: ProviderWorkerAuthority, now: Date = Date()) async throws -> ProviderCredentials {
         let dispatch = try await prepare(authority, now: now)
-        guard let refreshID = dispatch.refreshID else { return dispatch.credentials }
+        guard let refreshID = dispatch.refreshID else {
+            return dispatch.credentials
+        }
         do {
             let refreshed = try await authorization.refresh(registration: dispatch.registration, credentials: dispatch.credentials)
             try refreshed.validate(requiredScopes: dispatch.registration.scopes, at: Date())
@@ -41,17 +43,23 @@ struct ProviderCredentialService: Sendable {
                       current.credentialVersion < Int64.max else { throw ProviderFailure.fenced }
                 let version = current.credentialVersion + 1
                 let context = ProviderCredentialVault.Context(
-                    participantID: current.participantID, registrationID: current.registrationID, recordID: current.id,
-                    version: version, purpose: .participantCredential
+                    participantID: current.participantID,
+                    registrationID: current.registrationID,
+                    recordID: current.id,
+                    version: version,
+                    purpose: .participantCredential
                 )
                 let bytes = Data(try ProviderSQL.encode(refreshed, maximumBytes: 65_536).utf8)
                 let sealed = try ProviderSQL.encode(self.vault.seal(bytes, context: context), maximumBytes: 90_000)
-                try await ProviderSQL.sql(transaction).raw("""
-                    UPDATE provider_connections SET credential_version = \(bind: version), credential_envelope = \(bind: sealed),
-                        refresh_state = 'ready', refresh_id = NULL WHERE id = \(bind: current.id)
-                    """).run()
+                try await ProviderSQL.sql(transaction)
+                    .raw("""
+                        UPDATE provider_connections SET credential_version = \(bind: version), credential_envelope = \(bind: sealed),
+                            refresh_state = 'ready', refresh_id = NULL WHERE id = \(bind: current.id)
+                        """)
+                    .run()
                 try await AuditRepository.recordMutation(.init(
-                    context: dispatch.audit, action: .providerCredentialRotated,
+                    context: dispatch.audit,
+                    action: .providerCredentialRotated,
                     scope: .participantProvider(participantID: current.participantID, registrationID: current.registrationID),
                     target: .init(id: current.id, version: String(version))
                 ), on: transaction)
@@ -76,25 +84,28 @@ struct ProviderCredentialService: Sendable {
             let credentials: ProviderCredentials
             do { credentials = try JSONDecoder().decode(ProviderCredentials.self, from: bytes) } catch { throw ProviderFailure.unavailable }
             guard approved.configuration.scopes.isSubset(of: credentials.scopes) else { throw ProviderFailure.scopeLost }
-            if credentials.expiresAt > now.addingTimeInterval(120) {
-                return Dispatch(
-                    connection: connection, registration: approved.configuration, credentials: credentials,
-                    refreshID: nil, audit: authorized.audit
-                )
+            // Credentials that remain valid beyond the dispatch need no refresh fence.
+            let refreshID: UUID? = credentials.expiresAt > now.addingTimeInterval(120) ? nil : UUID()
+            if let refreshID {
+                try await ProviderSQL.sql(transaction)
+                    .raw("""
+                        UPDATE provider_connections SET refresh_state = 'dispatched', refresh_id = \(bind: refreshID), last_attempt = \(bind: now)
+                        WHERE id = \(bind: connection.id)
+                        """)
+                    .run()
+                try await AuditRepository.recordMutation(.init(
+                    context: authorized.audit,
+                    action: .providerRefreshDispatched,
+                    scope: .participantProvider(participantID: connection.participantID, registrationID: connection.registrationID),
+                    target: .init(id: refreshID, version: String(connection.credentialVersion))
+                ), on: transaction)
             }
-            let refreshID = UUID()
-            try await ProviderSQL.sql(transaction).raw("""
-                UPDATE provider_connections SET refresh_state = 'dispatched', refresh_id = \(bind: refreshID), last_attempt = \(bind: now)
-                WHERE id = \(bind: connection.id)
-                """).run()
-            try await AuditRepository.recordMutation(.init(
-                context: authorized.audit, action: .providerRefreshDispatched,
-                scope: .participantProvider(participantID: connection.participantID, registrationID: connection.registrationID),
-                target: .init(id: refreshID, version: String(connection.credentialVersion))
-            ), on: transaction)
             return Dispatch(
-                connection: connection, registration: approved.configuration, credentials: credentials,
-                refreshID: refreshID, audit: authorized.audit
+                connection: connection,
+                registration: approved.configuration,
+                credentials: credentials,
+                refreshID: refreshID,
+                audit: authorized.audit
             )
         }
     }
@@ -107,12 +118,15 @@ struct ProviderCredentialService: Sendable {
             guard current.generation == dispatch.connection.generation,
                   current.credentialVersion == dispatch.connection.credentialVersion,
                   current.refreshState == .dispatched, current.refreshID == refreshID else { return }
-            try await ProviderSQL.sql(transaction).raw("""
-                UPDATE provider_connections SET refresh_state = 'uncertain', status = 'reauthorization-required',
-                    credential_envelope = NULL WHERE id = \(bind: current.id)
-                """).run()
+            try await ProviderSQL.sql(transaction)
+                .raw("""
+                    UPDATE provider_connections SET refresh_state = 'uncertain', status = 'reauthorization-required',
+                        credential_envelope = NULL WHERE id = \(bind: current.id)
+                    """)
+                .run()
             try await AuditRepository.recordMutation(.init(
-                context: dispatch.audit, action: .providerCredentialUncertain,
+                context: dispatch.audit,
+                action: .providerCredentialUncertain,
                 scope: .participantProvider(participantID: current.participantID, registrationID: current.registrationID),
                 target: .init(id: current.id, version: String(current.credentialVersion))
             ), on: transaction)

@@ -22,8 +22,10 @@ struct ProviderCredentialRetirementTests {
             let now = Date()
             let sql = try ProviderSQL.sql(app.db)
             let retirement = ProviderCredentialRetirement(
-                database: app.db, registrationIDs: [prepared.connection.registrationID],
-                worker: .init(issuer: "https://example.test/workers", clientID: "provider-worker", applicationRevision: "synthetic-revision"), retention: 0
+                database: app.db,
+                registrationIDs: [prepared.connection.registrationID],
+                worker: .init(issuer: "https://example.test/workers", clientID: "provider-worker", applicationRevision: "synthetic-revision"),
+                retention: 0
             )
             try await sql.raw("UPDATE provider_connections SET dormant_until = \(bind: now.addingTimeInterval(-1))").run()
             try await retirement.run(now: now)

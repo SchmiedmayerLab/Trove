@@ -35,23 +35,6 @@ struct ProviderRuntimeConfiguration: Sendable {
     let secrets: ProviderSecretConfiguration
     let ouraGlobalScope: ProviderGlobalScopeStore.Configuration?
 
-    func validateAcquisition(_ client: any ProviderAcquisitionClient) throws {
-        for entry in registrations where entry.approved {
-            guard entry.configuration.provider == client.provider,
-                  entry.configuration.sourceTokens.isSubset(of: client.qualifiedSourceTokens),
-                  !entry.configuration.supportsPKCE else { throw ProviderFailure.invalidConfiguration }
-        }
-    }
-
-    static func load(environment: [String: String]) throws -> Self? {
-        let configurationPath = environment["PROVIDER_CONFIGURATION_FILE"]
-        let secretPath = environment["PROVIDER_SECRETS_FILE"]
-        guard configurationPath != nil || secretPath != nil else { return nil }
-        guard let configurationPath, let secretPath else { throw ProviderFailure.invalidConfiguration }
-        let bytes = try ProviderConfigurationFile.read(path: configurationPath)
-        return try .init(bytes: bytes, secrets: .load(file: secretPath), revision: environment["APPLICATION_REVISION"])
-    }
-
     init(bytes: Data, secrets: ProviderSecretConfiguration, revision: String?) throws {
         guard (1...262_144).contains(bytes.count) else { throw ProviderFailure.invalidConfiguration }
         do {
@@ -78,5 +61,24 @@ struct ProviderRuntimeConfiguration: Sendable {
             self.registrations = document.registrations
             self.secrets = secrets
         } catch { throw ProviderFailure.invalidConfiguration }
+    }
+
+    static func load(environment: [String: String]) throws -> Self? {
+        let configurationPath = environment["PROVIDER_CONFIGURATION_FILE"]
+        let secretPath = environment["PROVIDER_SECRETS_FILE"]
+        guard configurationPath != nil || secretPath != nil else {
+            return nil
+        }
+        guard let configurationPath, let secretPath else { throw ProviderFailure.invalidConfiguration }
+        let bytes = try ProviderConfigurationFile.read(path: configurationPath)
+        return try .init(bytes: bytes, secrets: .load(file: secretPath), revision: environment["APPLICATION_REVISION"])
+    }
+
+    func validateAcquisition(_ client: any ProviderAcquisitionClient) throws {
+        for entry in registrations where entry.approved {
+            guard entry.configuration.provider == client.provider,
+                  entry.configuration.sourceTokens.isSubset(of: client.qualifiedSourceTokens),
+                  !entry.configuration.supportsPKCE else { throw ProviderFailure.invalidConfiguration }
+        }
     }
 }

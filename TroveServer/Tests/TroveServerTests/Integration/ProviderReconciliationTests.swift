@@ -14,13 +14,29 @@ import Testing
 
 
 struct ProviderReconciliationTests {
+    private static func verifyCompleteInterval(end: Date, on sql: any SQLDatabase) async throws {
+        let row = try #require(try await sql.raw("SELECT * FROM clinical_point_facts").first())
+        let bounds = try ClinicalMeasurementBounds(row: row)
+        #expect(bounds.startDate < end)
+        #expect(try !bounds.ends(onOrBefore: end))
+        let checkpoint = try #require(try await sql.raw("""
+            SELECT status, query_as_of FROM provider_checkpoints WHERE purpose = 'reconciliation'
+            """)
+            .first())
+        #expect(try checkpoint.decode(column: "status", as: String.self) == "complete")
+        #expect(try checkpoint.decode(column: "query_as_of", as: Date.self) > end)
+    }
+
     @Test(arguments: [0, 1, 2], [false, true])
     func aClosedWindowPassPreservesOverlapWithoutCollectingNewPostWindowSessions(withdrawals: Int, outside: Bool) async throws {
         try await TestApp.withApp { app, _ in
             let authorization = ProviderFixture.Authorization()
             let token = "getworkouts:interval"
             let prepared = try await ProviderIngestionFixture.prepare(
-                on: app, authorization: authorization, profile: .workout, sourceToken: token,
+                on: app,
+                authorization: authorization,
+                profile: .workout,
+                sourceToken: token,
                 registration: ProviderFixture.registration(sourceTokens: [token])
             )
             let upstream = ProviderReconciliationFixture.Upstream()
@@ -42,17 +58,5 @@ struct ProviderReconciliationTests {
             #expect(later != .accepted)
             #expect(await upstream.requests == (withdrawals < 2 ? 2 : 1))
         }
-    }
-
-    private static func verifyCompleteInterval(end: Date, on sql: any SQLDatabase) async throws {
-        let row = try #require(try await sql.raw("SELECT * FROM clinical_point_facts").first())
-        let bounds = try ClinicalMeasurementBounds(row: row)
-        #expect(bounds.startDate < end)
-        #expect(try !bounds.ends(onOrBefore: end))
-        let checkpoint = try #require(try await sql.raw("""
-            SELECT status, query_as_of FROM provider_checkpoints WHERE purpose = 'reconciliation'
-            """).first())
-        #expect(try checkpoint.decode(column: "status", as: String.self) == "complete")
-        #expect(try checkpoint.decode(column: "query_as_of", as: Date.self) > end)
     }
 }

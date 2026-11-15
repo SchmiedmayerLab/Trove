@@ -14,6 +14,14 @@ import Testing
 
 
 struct ProviderConnectionTests {
+    private static func expectOneWorkerSourceWithoutInstallations(on database: any Database) async throws {
+        let sql = try #require(database as? any SQLDatabase)
+        let sources = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM source_bindings WHERE kind = 'server-worker'").first())
+        #expect(try sources.decode(column: "count", as: Int.self) == 1)
+        let installations = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM source_installations").first())
+        #expect(try installations.decode(column: "count", as: Int.self) == 0)
+    }
+
     @Test
     func reconnectKeepsSourceIdentityAndDifferentAccountsRequireExplicitDisconnect() async throws {
         try await TestApp.withApp { app, _ in
@@ -85,10 +93,16 @@ struct ProviderConnectionTests {
             try await ParticipantFixtures.createParticipant(on: app.db)
             let service = try ProviderFixture.service(on: app, authorization: .init())
             let registration = ProviderRegistration(
-                id: UUID(), provider: .googleHealthAPI, displayName: "Synthetic Google", controller: "test-controller", region: "test-region",
-                clientID: "synthetic-client", redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
+                id: UUID(),
+                provider: .googleHealthAPI,
+                displayName: "Synthetic Google",
+                controller: "test-controller",
+                region: "test-region",
+                clientID: "synthetic-client",
+                redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
                 scopes: ["https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"],
-                sourceTokens: ["weight"], supportsPKCE: true
+                sourceTokens: ["weight"],
+                supportsPKCE: true
             )
             try await ProviderRegistrationStore(database: app.db).configure(
                 registration, approved: true, audit: ClinicalEventStoreTests.researcher.auditContext
@@ -104,13 +118,4 @@ struct ProviderConnectionTests {
             #expect(items.first(where: { $0.name == "code_challenge" })?.value?.count == 43)
         }
     }
-
-    private static func expectOneWorkerSourceWithoutInstallations(on database: any Database) async throws {
-        let sql = try #require(database as? any SQLDatabase)
-        let sources = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM source_bindings WHERE kind = 'server-worker'").first())
-        #expect(try sources.decode(column: "count", as: Int.self) == 1)
-        let installations = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM source_installations").first())
-        #expect(try installations.decode(column: "count", as: Int.self) == 0)
-    }
-
 }

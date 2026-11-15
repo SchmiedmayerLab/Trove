@@ -16,10 +16,12 @@ extension ProviderConnectionService {
         _ credentials: ProviderCredentials, participantID: UUID, sourceID: UUID, on database: any Database
     ) async throws -> UUID {
         guard database.inTransaction else { throw AuditError.transactionRequired }
-        let rows = try await ProviderSQL.sql(database).raw("""
-            SELECT * FROM provider_connections WHERE participant_id = \(bind: participantID) AND source_id = \(bind: sourceID)
-            ORDER BY created_at, id LIMIT 1025
-            """).all()
+        let rows = try await ProviderSQL.sql(database)
+            .raw("""
+                SELECT * FROM provider_connections WHERE participant_id = \(bind: participantID) AND source_id = \(bind: sourceID)
+                ORDER BY created_at, id LIMIT 1025
+                """)
+            .all()
         guard rows.count <= 1024 else { throw ProviderFailure.capacityExceeded }
         var matching: UUID?
         for row in rows {

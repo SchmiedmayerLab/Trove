@@ -23,7 +23,7 @@ struct ProviderWorkerTests {
             let now = Date()
             let candidate = try #require(try await store.candidates(now: now).first)
             let tokens = candidate.registration.sourceTokens
-            #expect(try await store.claim(candidate, tokens: tokens, now: now) == tokens.sorted().first)
+            #expect(try await store.claim(candidate, tokens: tokens, now: now) == tokens.min())
             let replica = ProviderWorkerStore(database: app.db, registrationIDs: store.registrationIDs, minimumDispatchInterval: 5)
             #expect(try await replica.claim(candidate, tokens: tokens, now: now) == nil)
             try await TestDatabase.withRestartedApplication(app) { reopened in
@@ -77,8 +77,8 @@ struct ProviderWorkerTests {
                 #expect(abs(connection.nextAttempt.timeIntervalSince(retry)) < 0.000_001)
                 let reopenedStore = ProviderWorkerStore(database: reopened.db, registrationIDs: store.registrationIDs, minimumDispatchInterval: 5)
                 #expect(try await reopenedStore.candidates(now: now.addingTimeInterval(3600)).isEmpty)
-                #expect(try await ProviderSQL.sql(reopened.db).raw("SELECT id FROM clinical_events").first() == nil)
-                #expect(try await ProviderSQL.sql(reopened.db).raw("SELECT id FROM provider_checkpoints").first() == nil)
+                #expect(try await ProviderSQL.sql(reopened.db).raw("SELECT id FROM clinical_events").all().isEmpty)
+                #expect(try await ProviderSQL.sql(reopened.db).raw("SELECT id FROM provider_checkpoints").all().isEmpty)
             }
         }
     }

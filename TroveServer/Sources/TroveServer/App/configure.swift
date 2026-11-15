@@ -197,8 +197,13 @@ func configureServices(
     let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
     let studies = StudyRepository(database: app.db(.psql))
     let providers = try await ProviderRuntime.configured(
-        application: app, configuration: providerConfiguration, sourceKeyring: sourceKeyring,
-        authorization: authorization, studies: studies, limits: collectionCapacity.admission, validator: validator
+        application: app,
+        configuration: providerConfiguration,
+        sourceKeyring: sourceKeyring,
+        authorization: authorization,
+        studies: studies,
+        limits: collectionCapacity.admission,
+        validator: validator
     )
     await app.grove.configure {
         providers

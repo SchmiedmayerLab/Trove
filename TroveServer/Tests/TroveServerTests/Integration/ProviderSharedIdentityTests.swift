@@ -17,6 +17,66 @@ import Vapor
 
 
 struct ProviderSharedIdentityTests {
+    private static func expectOtherParticipantIsDistinct(
+        registration: ProviderRegistration, service: ProviderConnectionService, comparedWith original: ExchangeRecord, on app: Application
+    ) async throws {
+        try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "other-participant")
+        let actor = AuthContext(
+            issuer: TestApp.issuer,
+            subject: "other-participant",
+            email: "other@example.test",
+            roles: [TestApp.participantRole],
+            groups: [],
+            researcherRole: TestApp.researcherRole,
+            participantRole: TestApp.participantRole
+        )
+        let status = try await AuthContext.$current.withValue(actor) {
+            let intent = try await service.start(registrationID: registration.id, redirectID: "native")
+            return try await service.complete(id: intent.id, state: ProviderFixture.state(intent), code: "synthetic")
+        }
+        let connection = try await ProviderSQL.connection(status.id, on: app.db)
+        let other = try await Self.record(connection: connection, on: app)
+        #expect(original.sourceRecord != other.sourceRecord)
+        #expect(original.outputFullURLs != other.outputFullURLs)
+    }
+
+    private static func record(connection: ProviderConnection, on app: Application) async throws -> ExchangeRecord {
+        try await app.db.transaction { transaction in
+            let row = try #require(try await ProviderSQL.sql(transaction).raw("SELECT * FROM source_bindings WHERE id = \(bind: connection.sourceID)").first())
+            let source = try SourceBinding(row: row)
+            let identity = try await SourceIdentityKeyStore(keyring: TestApp.sourceKeyring()).recover(
+                sourceID: source.id, participantID: source.participantID, on: transaction
+            )
+            let facts = try ProviderAcquisitionFacts(
+                application: .init(name: "Trove", bundleIdentifier: "org.example.Trove", version: "1"),
+                host: .init(operatingSystemName: "Linux", operatingSystemVersion: "6")
+            )
+            let date = Date(timeIntervalSince1970: 1_800_000_000)
+            let context = try await ProviderConversionContext(
+                producer: facts.producer(source: source, identity: identity),
+                scope: ProviderGlobalScopeStore.scope(provider: .oura, connection: connection, source: source, on: transaction),
+                instant: date.addingTimeInterval(60),
+                sourceTimeZone: .gmt
+            )
+            return try #require(OuraFHIR.convert(.vo2Max(id: "same-global-native-id", timestamp: date, value: 45), context: context).record)
+        }
+    }
+
+    private static func ouraRegistration() throws -> ProviderRegistration {
+        .init(
+            id: UUID(),
+            provider: .oura,
+            displayName: "Synthetic Oura",
+            controller: "test-controller",
+            region: "test-region",
+            clientID: "synthetic-client",
+            redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
+            scopes: ["personal", "daily"],
+            sourceTokens: ["vO2_max"],
+            supportsPKCE: true
+        )
+    }
+
     @Test("Two registrations retain one participant/provider identity and one verified-account scope")
     func registrationsShareIdentityWithoutSharingAuthority() async throws {
         try await TestApp.withApp { app, _ in
@@ -56,52 +116,5 @@ struct ProviderSharedIdentityTests {
             }
             #expect(try await ProviderGlobalScopeStore.load(on: app.db) == scope.identifier())
         }
-    }
-
-    private static func expectOtherParticipantIsDistinct(
-        registration: ProviderRegistration, service: ProviderConnectionService, comparedWith original: ExchangeRecord, on app: Application
-    ) async throws {
-        try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "other-participant")
-        let actor = AuthContext(
-            issuer: TestApp.issuer, subject: "other-participant", email: "other@example.test",
-            roles: [TestApp.participantRole], groups: [], researcherRole: TestApp.researcherRole, participantRole: TestApp.participantRole
-        )
-        let status = try await AuthContext.$current.withValue(actor) {
-            let intent = try await service.start(registrationID: registration.id, redirectID: "native")
-            return try await service.complete(id: intent.id, state: ProviderFixture.state(intent), code: "synthetic")
-        }
-        let connection = try await ProviderSQL.connection(status.id, on: app.db)
-        let other = try await Self.record(connection: connection, on: app)
-        #expect(original.sourceRecord != other.sourceRecord)
-        #expect(original.outputFullURLs != other.outputFullURLs)
-    }
-
-    private static func record(connection: ProviderConnection, on app: Application) async throws -> ExchangeRecord {
-        return try await app.db.transaction { transaction in
-            let row = try #require(try await ProviderSQL.sql(transaction).raw("SELECT * FROM source_bindings WHERE id = \(bind: connection.sourceID)").first())
-            let source = try SourceBinding(row: row)
-            let identity = try await SourceIdentityKeyStore(keyring: TestApp.sourceKeyring()).recover(
-                sourceID: source.id, participantID: source.participantID, on: transaction
-            )
-            let facts = try ProviderAcquisitionFacts(
-                application: .init(name: "Trove", bundleIdentifier: "org.example.Trove", version: "1"),
-                host: .init(operatingSystemName: "Linux", operatingSystemVersion: "6")
-            )
-            let date = Date(timeIntervalSince1970: 1_800_000_000)
-            let context = try await ProviderConversionContext(
-                producer: facts.producer(source: source, identity: identity),
-                scope: ProviderGlobalScopeStore.scope(provider: .oura, connection: connection, source: source, on: transaction),
-                instant: date.addingTimeInterval(60), sourceTimeZone: .gmt
-            )
-            return try #require(OuraFHIR.convert(.vo2Max(id: "same-global-native-id", timestamp: date, value: 45), context: context).record)
-        }
-    }
-
-    private static func ouraRegistration() throws -> ProviderRegistration {
-        .init(
-            id: UUID(), provider: .oura, displayName: "Synthetic Oura", controller: "test-controller", region: "test-region",
-            clientID: "synthetic-client", redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
-            scopes: ["personal", "daily"], sourceTokens: ["vO2_max"], supportsPKCE: true
-        )
     }
 }

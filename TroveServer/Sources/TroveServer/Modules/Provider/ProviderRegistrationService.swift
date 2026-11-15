@@ -39,8 +39,11 @@ final class ProviderRegistrationService: Module, Sendable {
     let registrationIDs: Set<UUID>
 
     init(
-        database: any Database, clients: [any ProviderAcquisitionClient], registrationIDs: Set<UUID>,
-        authorization: AuthorizationService, studies: StudyRepository
+        database: any Database,
+        clients: [any ProviderAcquisitionClient],
+        registrationIDs: Set<UUID>,
+        authorization: AuthorizationService,
+        studies: StudyRepository
     ) {
         self.database = database
         self.registrationIDs = registrationIDs
@@ -53,13 +56,18 @@ final class ProviderRegistrationService: Module, Sendable {
 
     func registrations() async throws -> [Available] {
         let actor = try AuthContext.checkIsParticipant()
-        guard let participant = try await Participant.query(on: database)
+        // swiftlint:disable:next first_where - Fluent query builder, not a Sequence
+        let participant = try await Participant.query(on: database)
             .filter(\.$identityProviderIssuer == actor.issuer)
-            .filter(\.$identityProviderId == actor.subject).first() else { throw ProviderFailure.fenced }
+            .filter(\.$identityProviderId == actor.subject)
+            .first()
+        guard let participant else { throw ProviderFailure.fenced }
         let participantID = try participant.requireID()
-        let rows = try await ProviderSQL.sql(database).raw("""
-            SELECT id FROM provider_registrations WHERE approved = \(bind: true) ORDER BY id LIMIT 129
-            """).all()
+        let rows = try await ProviderSQL.sql(database)
+            .raw("""
+                SELECT id FROM provider_registrations WHERE approved = \(bind: true) ORDER BY id LIMIT 129
+                """)
+            .all()
         guard rows.count <= 128 else { throw ProviderFailure.capacityExceeded }
         var available: [Available] = []
         for row in rows {
@@ -69,15 +77,20 @@ final class ProviderRegistrationService: Module, Sendable {
             let capabilities = capabilities(for: registration)
             guard !capabilities.isEmpty else { continue }
             let audit = AuditEvent(
-                context: actor.auditContext, action: .providerRegistrationDisclosure,
+                context: actor.auditContext,
+                action: .providerRegistrationDisclosure,
                 scope: .participantProvider(participantID: participantID, registrationID: id),
                 target: .init(id: id, version: String(approved.generation))
             )
             available.append(try await AuditRepository.disclose(audit, on: database) { _ in
                 Available(
-                    id: id, provider: registration.provider, displayName: registration.displayName,
-                    controller: registration.controller, region: registration.region,
-                    redirects: registration.redirects, capabilities: capabilities
+                    id: id,
+                    provider: registration.provider,
+                    displayName: registration.displayName,
+                    controller: registration.controller,
+                    region: registration.region,
+                    redirects: registration.redirects,
+                    capabilities: capabilities
                 )
             })
         }
@@ -90,9 +103,11 @@ final class ProviderRegistrationService: Module, Sendable {
         return try await database.transaction { transaction in
             let study = try await self.studies.lockStudy(id: studyID, on: transaction)
             let context = try await self.authorization.authorizeDraft(access, study: study, on: transaction)
-            let rows = try await ProviderSQL.sql(transaction).raw("""
-                SELECT id FROM provider_registrations WHERE approved = \(bind: true) ORDER BY id LIMIT 129
-                """).all()
+            let rows = try await ProviderSQL.sql(transaction)
+                .raw("""
+                    SELECT id FROM provider_registrations WHERE approved = \(bind: true) ORDER BY id LIMIT 129
+                    """)
+                .all()
             guard rows.count <= 128 else { throw ProviderFailure.capacityExceeded }
             var available: [Available] = []
             for row in rows {
@@ -101,13 +116,18 @@ final class ProviderRegistrationService: Module, Sendable {
                 let capabilities = self.capabilities(for: registration)
                 guard !capabilities.isEmpty else { continue }
                 available.append(Available(
-                    id: id, provider: registration.provider, displayName: registration.displayName,
-                    controller: registration.controller, region: registration.region,
-                    redirects: registration.redirects, capabilities: capabilities
+                    id: id,
+                    provider: registration.provider,
+                    displayName: registration.displayName,
+                    controller: registration.controller,
+                    region: registration.region,
+                    redirects: registration.redirects,
+                    capabilities: capabilities
                 ))
             }
             try await AuditRepository.recordDisclosureIntent(.init(
-                context: context, action: .studyDraftDisclosure,
+                context: context,
+                action: .studyDraftDisclosure,
                 scope: .study(studyID: studyID, groupID: study.$group.id),
                 target: .init(id: studyID, version: study.draftRevision.uuidString)
             ), on: transaction)
@@ -135,14 +155,20 @@ final class ProviderRegistrationService: Module, Sendable {
     }
 
     func capabilities(for registration: ProviderRegistration) -> [Capability] {
-        guard registrationIDs.contains(registration.id) else { return [] }
+        guard registrationIDs.contains(registration.id) else {
+            return []
+        }
         let qualified = qualifiedTokens[registration.provider, default: []].intersection(registration.sourceTokens)
-        return ProviderCapabilities.sources(for: registration.provider.converter).compactMap { source in
-            guard qualified.contains(source.token), source.conversionSupport == .structured, let effective = source.effective else { return nil }
+        let capabilities = ProviderCapabilities.sources(for: registration.provider.converter).compactMap { source -> Capability? in
+            guard qualified.contains(source.token), source.conversionSupport == .structured, let effective = source.effective else {
+                return nil
+            }
             return Capability(
                 sourceTypeIdentifier: source.token,
-                profiles: source.outputProfiles.compactMap { $0.value?.url.absoluteString }.sorted(), effective: effective
+                profiles: source.outputProfiles.compactMap { $0.value?.url.absoluteString }.sorted(),
+                effective: effective
             )
-        }.sorted { $0.sourceTypeIdentifier < $1.sourceTypeIdentifier }
+        }
+        return capabilities.sorted { $0.sourceTypeIdentifier < $1.sourceTypeIdentifier }
     }
 }

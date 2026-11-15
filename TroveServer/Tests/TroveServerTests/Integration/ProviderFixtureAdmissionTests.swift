@@ -14,15 +14,29 @@ import Testing
 
 
 struct ProviderFixtureAdmissionTests {
-    private struct Evidence: Decodable {
-        struct Result: Decodable {
-            struct Outcome: Decodable {
-                struct Issue: Decodable { let severity: String }
-                let issue: [Issue]?
-            }
-            let path: String
-            let outcome: Outcome
+    private struct Issue: Decodable {
+        let severity: String
+    }
+
+    /// A validator outcome without issues omits the list.
+    private struct Outcome: Decodable {
+        enum CodingKeys: CodingKey {
+            case issue
         }
+
+        let issue: [Issue]
+
+        init(from decoder: any Decoder) throws {
+            issue = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent([Issue].self, forKey: .issue) ?? []
+        }
+    }
+
+    private struct Result: Decodable {
+        let path: String
+        let outcome: Outcome
+    }
+
+    private struct Evidence: Decodable {
         let fixtureSHA256: [String: String]
         let outcomes: [Result]
     }
@@ -43,7 +57,7 @@ struct ProviderFixtureAdmissionTests {
                 let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
                 #expect(evidence.fixtureSHA256[path] == digest)
                 let result = try #require(evidence.outcomes.first { $0.path == path })
-                #expect(result.outcome.issue?.allSatisfy { !["error", "fatal"].contains($0.severity) } ?? true)
+                #expect(result.outcome.issue.allSatisfy { !["error", "fatal"].contains($0.severity) })
                 let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "verified-fixture-" + digest)
                 #expect(!event.outputs.isEmpty)
                 #expect(event.outputs.allSatisfy { $0.sourceTypeIdentifier == capability.token })

@@ -36,20 +36,7 @@ struct ProviderHTTPTransport: Sendable {
         for endpoint in Endpoint.allCases { try policy.validateEndpoint(endpoint.rawValue) }
         let client = application.http.client.shared
         send = { endpoint, body, bearer, maximumBytes in
-            var components = URLComponents(string: endpoint.rawValue)
-            if endpoint.method == .GET, !body.isEmpty {
-                guard body.count <= 131_072, let query = String(data: body, encoding: .utf8) else { throw ProviderFailure.invalidPayload }
-                components?.percentEncodedQuery = query
-            }
-            guard let url = components?.url else { throw ProviderFailure.invalidConfiguration }
-            var request = HTTPClientRequest(url: url.absoluteString)
-            request.method = endpoint.method
-            request.headers = ["Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"]
-            request.headers.add(name: "User-Agent", value: "Trove")
-            if let bearer { request.headers.add(name: "Authorization", value: "Bearer " + bearer) }
-            if endpoint.method == .POST {
-                request.body = .bytes(ByteBuffer(data: body))
-            }
+            let request = try Self.request(endpoint, body: body, bearer: bearer)
             do {
                 let response = try await client.execute(request, timeout: .seconds(30))
                 if response.status == .tooManyRequests || response.status == .serviceUnavailable {
@@ -71,6 +58,24 @@ struct ProviderHTTPTransport: Sendable {
     }
 
     init(send: @escaping @Sendable (Endpoint, Data, String?, Int) async throws -> Data) { self.send = send }
+
+    private static func request(_ endpoint: Endpoint, body: Data, bearer: String?) throws -> HTTPClientRequest {
+        var components = URLComponents(string: endpoint.rawValue)
+        if endpoint.method == .GET, !body.isEmpty {
+            guard body.count <= 131_072, let query = String(data: body, encoding: .utf8) else { throw ProviderFailure.invalidPayload }
+            components?.percentEncodedQuery = query
+        }
+        guard let url = components?.url else { throw ProviderFailure.invalidConfiguration }
+        var request = HTTPClientRequest(url: url.absoluteString)
+        request.method = endpoint.method
+        request.headers = ["Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"]
+        request.headers.add(name: "User-Agent", value: "Trove")
+        if let bearer { request.headers.add(name: "Authorization", value: "Bearer " + bearer) }
+        if endpoint.method == .POST {
+            request.body = .bytes(ByteBuffer(data: body))
+        }
+        return request
+    }
 
     static func form(_ fields: [String: String]) throws -> Data {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")

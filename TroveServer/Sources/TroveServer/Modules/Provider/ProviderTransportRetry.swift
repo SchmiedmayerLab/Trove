@@ -14,9 +14,13 @@ struct ProviderTransportRetry: Error, Sendable {
     let notBefore: Date
 
     static func parse(_ value: String?, now: Date = Date()) -> Self {
-        guard let value, value.utf8.count <= 128 else { return .init(notBefore: now.addingTimeInterval(3600)) }
+        guard let value, value.utf8.count <= 128 else {
+            return .init(notBefore: now.addingTimeInterval(3600))
+        }
         if !value.isEmpty, value.utf8.allSatisfy({ (48...57).contains($0) }) {
-            guard let seconds = UInt64(value), seconds <= 31_536_000 else { return .init(notBefore: .distantFuture) }
+            guard let seconds = UInt64(value), seconds <= 31_536_000 else {
+                return .init(notBefore: .distantFuture)
+            }
             return .init(notBefore: now.addingTimeInterval(TimeInterval(seconds)))
         }
         let formatter = DateFormatter()

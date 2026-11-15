@@ -40,8 +40,13 @@ enum ProviderFixture {
         }
 
         private func credentials(registration: ProviderRegistration) -> ProviderCredentials {
-            .init(accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: Date().addingTimeInterval(credentialLifetime),
-                  scopes: registration.scopes, accountID: accountID)
+            .init(
+                accessToken: "synthetic-access",
+                refreshToken: "synthetic-refresh",
+                expiresAt: Date().addingTimeInterval(credentialLifetime),
+                scopes: registration.scopes,
+                accountID: accountID
+            )
         }
     }
 
@@ -49,16 +54,25 @@ enum ProviderFixture {
         id: UUID = UUID(), sourceTokens: Set<String> = ["getmeas:1", "getmeas:9+10", "getmeas:11"]
     ) throws -> ProviderRegistration {
         .init(
-            id: id, provider: .withings, displayName: "Synthetic Withings", controller: "test-controller", region: "test-region",
-            clientID: "synthetic-client", redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
-            scopes: ["user.metrics"], sourceTokens: sourceTokens, supportsPKCE: false
+            id: id,
+            provider: .withings,
+            displayName: "Synthetic Withings",
+            controller: "test-controller",
+            region: "test-region",
+            clientID: "synthetic-client",
+            redirects: [.init(id: "native", uri: try #require(URL(string: "https://example.test/oauth/callback")))],
+            scopes: ["user.metrics"],
+            sourceTokens: sourceTokens,
+            supportsPKCE: false
         )
     }
 
     static func service(on app: Application, authorization: Authorization) throws -> ProviderConnectionService {
         try .init(
-            database: app.db, vault: .init(currentKeyID: "synthetic", keys: ["synthetic": SymmetricKey(data: Data(repeating: 0x35, count: 32))]),
-            sourceKeyring: TestApp.sourceKeyring(), authorization: authorization
+            database: app.db,
+            vault: .init(currentKeyID: "synthetic", keys: ["synthetic": SymmetricKey(data: Data(repeating: 0x35, count: 32))]),
+            sourceKeyring: TestApp.sourceKeyring(),
+            authorization: authorization
         )
     }
 

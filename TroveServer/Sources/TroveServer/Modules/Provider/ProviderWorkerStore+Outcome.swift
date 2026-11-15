@@ -12,6 +12,30 @@ import SQLKit
 
 
 extension ProviderWorkerStore {
+    /// The failure count, failure kind and next attempt that follow one finished dispatch.
+    private struct Retry {
+        let count: Int
+        let kind: String?
+        let next: Date
+
+        init(_ outcome: Outcome, previous: Int, now: Date) {
+            guard case .failed(let failure) = outcome else {
+                count = 0
+                kind = nil
+                next = now.addingTimeInterval(60)
+                return
+            }
+            count = min(previous + 1, ProviderCheckpoint.maximumFailures)
+            kind = failure.kind
+            if case .transient(let retryAfter) = failure {
+                next = max(now.addingTimeInterval(min(60 * pow(2, Double(count - 1)), 86_400)), retryAfter ?? now)
+            } else {
+                // Retained rows and checkpoints remain intact; a recoverable configuration/authority change can be rechecked.
+                next = now.addingTimeInterval(3600)
+            }
+        }
+    }
+
     enum Outcome: Sendable {
         case accepted
         case idle
@@ -44,7 +68,9 @@ extension ProviderWorkerStore {
         }
 
         static func classify(_ error: any Error) -> Self {
-            if let retry = error as? ProviderTransportRetry { return .transient(retry.notBefore) }
+            if let retry = error as? ProviderTransportRetry {
+                return .transient(retry.notBefore)
+            }
             switch error as? ProviderFailure {
             case .capacityExceeded: return .capacity
             case .invalidPayload, .invalidConfiguration: return .source
@@ -62,36 +88,26 @@ extension ProviderWorkerStore {
                 SELECT s.failure_count FROM provider_worker_states s JOIN provider_connections c ON c.id = s.connection_id
                 WHERE c.id = \(bind: candidate.connection.id) AND c.generation = \(bind: candidate.connection.generation)
                     AND (c.last_attempt IS NULL OR c.last_attempt <= \(bind: now))
-                """).first() else { return }
+                """)
+                .first() else { return }
             let previous = try row.decode(column: "failure_count", as: Int.self)
-            let count: Int
-            let kind: String?
-            let next: Date
-            switch outcome {
-            case .accepted, .idle, .deferred:
-                count = 0
-                kind = nil
-                next = now.addingTimeInterval(60)
-            case .failed(let failure):
-                count = min(previous + 1, ProviderCheckpoint.maximumFailures)
+            if case .failed = outcome {
                 try await recordFailure(connectionID: candidate.connection.id, sourceToken: sourceToken, on: sql)
-                kind = failure.kind
-                if case .transient(let retryAfter) = failure {
-                    next = max(now.addingTimeInterval(min(60 * pow(2, Double(count - 1)), 86_400)), retryAfter ?? now)
-                } else {
-                    // Retained rows and checkpoints remain intact; a recoverable configuration/authority change can be rechecked.
-                    next = now.addingTimeInterval(3600)
-                }
             }
+            let retry = Retry(outcome, previous: previous, now: now)
             try await sql.raw("""
-                UPDATE provider_worker_states SET failure_count = \(bind: count), failure_kind = \(bind: kind), outcome = \(bind: outcome.value)
+                UPDATE provider_worker_states SET failure_count = \(bind: retry.count), failure_kind = \(bind: retry.kind),
+                    outcome = \(bind: outcome.value)
                 WHERE connection_id = \(bind: candidate.connection.id)
-                """).run()
+                """)
+                .run()
             try await sql.raw("""
-                UPDATE provider_connections SET next_attempt = \(bind: next) WHERE id = \(bind: candidate.connection.id)
-                """).run()
+                UPDATE provider_connections SET next_attempt = \(bind: retry.next) WHERE id = \(bind: candidate.connection.id)
+                """)
+                .run()
         }
     }
+
     private func recordFailure(connectionID: UUID, sourceToken: String, on sql: any SQLDatabase) async throws {
         try await sql.raw("""
             UPDATE provider_checkpoints SET failure_count = failure_count + 1,
@@ -100,7 +116,7 @@ extension ProviderWorkerStore {
                 lease_until = CASE WHEN failure_count + 1 >= \(bind: ProviderCheckpoint.maximumFailures) THEN NULL ELSE lease_until END
             WHERE connection_id = \(bind: connectionID) AND source_token = \(bind: sourceToken)
                 AND status IN ('fetching', 'staged') AND failure_count < \(bind: ProviderCheckpoint.maximumFailures)
-            """).run()
+            """)
+            .run()
     }
-
 }

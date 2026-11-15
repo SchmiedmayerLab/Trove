@@ -33,8 +33,11 @@ struct ProviderConnection: Sendable {
 
     var credentialContext: ProviderCredentialVault.Context {
         .init(
-            participantID: participantID, registrationID: registrationID, recordID: id,
-            version: credentialVersion, purpose: .participantCredential
+            participantID: participantID,
+            registrationID: registrationID,
+            recordID: id,
+            version: credentialVersion,
+            purpose: .participantCredential
         )
     }
 

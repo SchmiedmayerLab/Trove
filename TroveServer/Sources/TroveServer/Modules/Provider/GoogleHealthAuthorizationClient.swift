@@ -19,9 +19,13 @@ struct GoogleHealthAuthorizationClient: ProviderAuthorizationClient {
     func exchange(registration: ProviderRegistration, code: String, redirect: URL, verifier: String?) async throws -> ProviderCredentials {
         guard registration.provider == .googleHealthAPI, registration.supportsPKCE, let verifier,
               (43...128).contains(verifier.utf8.count) else { throw ProviderFailure.invalidConfiguration }
-        return try await token(registration, fields: [
-            "grant_type": "authorization_code", "code": code, "redirect_uri": redirect.absoluteString, "code_verifier": verifier
-        ], prior: nil)
+        return try await token(
+            registration,
+            fields: [
+                "grant_type": "authorization_code", "code": code, "redirect_uri": redirect.absoluteString, "code_verifier": verifier
+            ],
+            prior: nil
+        )
     }
 
     func refresh(registration: ProviderRegistration, credentials: ProviderCredentials) async throws -> ProviderCredentials {

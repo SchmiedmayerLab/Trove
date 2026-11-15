@@ -22,46 +22,11 @@ struct ProviderIngestionTests {
         case endedWithoutCredentials
     }
 
-    @Test(arguments: [false, true], Recovery.allCases)
-    func stagedPageSurvivesRestartAndRechecksIndependentStudyDemand(withdrawFirstStudy: Bool, recovery: Recovery) async throws {
-        try await TestApp.withApp { app, _ in
-            let authorization = ProviderFixture.Authorization()
-            let prepared = try await ProviderIngestionFixture.prepare(on: app, authorization: authorization)
-            let upstream = ProviderIngestionFixture.Upstream(measuredAt: Date().addingTimeInterval(-30))
-            let interruption = ProviderIngestionFixture.ValidationInterruption()
-            let worker = try ProviderIngestionFixture.worker(
-                on: app, prepared: prepared, authorization: authorization, upstream: upstream,
-                validator: ClinicalEventBatchTests.validator { try await interruption.check() }
-            )
-            await #expect(throws: (any Error).self) {
-                try await worker.run(connectionID: prepared.connection.id, sourceToken: "getmeas:1")
-            }
-            #expect(await upstream.requests == 1)
-            let sql = try ProviderSQL.sql(app.db)
-            let exactBytes = try await Self.requireStagedRecord(on: sql)
-            let sourceEvidence = try await Self.sourceEvidence(on: app.db)
-            try await Self.changeEnrollmentAndExpireLease(
-                on: app, prepared: prepared, withdrawFirstStudy: withdrawFirstStudy, recovery: recovery
-            )
-            try await TestDatabase.withRestartedApplication(app) { reopened in
-                let recovered = try ProviderIngestionFixture.worker(
-                    on: reopened, prepared: prepared, authorization: authorization, upstream: upstream,
-                    validator: ClinicalEventBatchTests.validator()
-                )
-                #expect(try await recovered.run(connectionID: prepared.connection.id, sourceToken: "getmeas:1"))
-                #expect(await upstream.requests == 1)
-                #expect(try await Self.sourceEvidence(on: reopened.db) == sourceEvidence)
-                try await Self.verifyCustody(
-                    on: reopened, prepared: prepared, exactBytes: exactBytes, withdrawFirstStudy: withdrawFirstStudy
-                )
-                try await Self.verifyClosedWindowRecovery(recovered, upstream: upstream, prepared: prepared, recovery: recovery)
-            }
-        }
-    }
-
     private static func verifyClosedWindowRecovery(
-        _ recovered: ProviderIngestionService, upstream: ProviderIngestionFixture.Upstream,
-        prepared: ProviderIngestionFixture.Prepared, recovery: Recovery
+        _ recovered: ProviderIngestionService,
+        upstream: ProviderIngestionFixture.Upstream,
+        prepared: ProviderIngestionFixture.Prepared,
+        recovery: Recovery
     ) async throws {
         if recovery != .active {
             let next = Date().addingTimeInterval(120)
@@ -93,7 +58,8 @@ struct ProviderIngestionTests {
         if recovery == .endedWithoutCredentials {
             try await sql.raw("""
                 UPDATE provider_connections SET status = 'reauthorization-required', refresh_state = 'uncertain', credential_envelope = NULL
-                """).run()
+                """)
+                .run()
         }
         // Simulate expiry of the abandoned dispatch lease; queued bytes and identities are unchanged.
         let past = Date().addingTimeInterval(-1)
@@ -113,7 +79,7 @@ struct ProviderIngestionTests {
         #expect(try staged.decode(column: "accepted_through", as: Date?.self) == nil)
         let original = try #require(try await sql.raw("SELECT record_bytes FROM provider_staged_records").first())
         let exactBytes = try original.decode(column: "record_bytes", as: Data.self)
-        #expect(try await sql.raw("SELECT id FROM clinical_events").first() == nil)
+        #expect(try await sql.raw("SELECT id FROM clinical_events").all().isEmpty)
         return exactBytes
     }
 
@@ -134,9 +100,48 @@ struct ProviderIngestionTests {
         #expect(try checkpoint.decode(column: "accepted_through", as: Date?.self) != nil)
         let audit = try #require(try await reopenedSQL.raw("""
             SELECT actor_subject, initiator_subject FROM audit_events WHERE action = 'clinical.event.accepted'
-            """).first())
+            """)
+            .first())
         #expect(try audit.decode(column: "actor_subject", as: String.self) == "provider-worker")
         #expect(try audit.decode(column: "initiator_subject", as: String.self) == ClinicalEventStoreTests.participant.subject)
     }
 
+    @Test(arguments: [false, true], Recovery.allCases)
+    func stagedPageSurvivesRestartAndRechecksIndependentStudyDemand(withdrawFirstStudy: Bool, recovery: Recovery) async throws {
+        try await TestApp.withApp { app, _ in
+            let authorization = ProviderFixture.Authorization()
+            let prepared = try await ProviderIngestionFixture.prepare(on: app, authorization: authorization)
+            let upstream = ProviderIngestionFixture.Upstream(measuredAt: Date().addingTimeInterval(-30))
+            let interruption = ProviderIngestionFixture.ValidationInterruption()
+            let worker = try ProviderIngestionFixture.worker(
+                on: app,
+                prepared: prepared,
+                authorization: authorization,
+                upstream: upstream,
+                validator: ClinicalEventBatchTests.validator { try await interruption.check() }
+            )
+            await #expect(throws: (any Error).self) {
+                try await worker.run(connectionID: prepared.connection.id, sourceToken: "getmeas:1")
+            }
+            #expect(await upstream.requests == 1)
+            let sql = try ProviderSQL.sql(app.db)
+            let exactBytes = try await Self.requireStagedRecord(on: sql)
+            let sourceEvidence = try await Self.sourceEvidence(on: app.db)
+            try await Self.changeEnrollmentAndExpireLease(on: app, prepared: prepared, withdrawFirstStudy: withdrawFirstStudy, recovery: recovery)
+            try await TestDatabase.withRestartedApplication(app) { reopened in
+                let recovered = try ProviderIngestionFixture.worker(
+                    on: reopened,
+                    prepared: prepared,
+                    authorization: authorization,
+                    upstream: upstream,
+                    validator: ClinicalEventBatchTests.validator()
+                )
+                #expect(try await recovered.run(connectionID: prepared.connection.id, sourceToken: "getmeas:1"))
+                #expect(await upstream.requests == 1)
+                #expect(try await Self.sourceEvidence(on: reopened.db) == sourceEvidence)
+                try await Self.verifyCustody(on: reopened, prepared: prepared, exactBytes: exactBytes, withdrawFirstStudy: withdrawFirstStudy)
+                try await Self.verifyClosedWindowRecovery(recovered, upstream: upstream, prepared: prepared, recovery: recovery)
+            }
+        }
+    }
 }

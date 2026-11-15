@@ -71,11 +71,7 @@ final class ProviderConnectionService: Module, Sendable {
                 participantID: participantID, registrationID: registrationID, recordID: id, version: 1, purpose: .authorizationVerifier
             ))
             let sql = try ProviderSQL.sql(transaction)
-            let count = try await sql.raw("""
-                SELECT COUNT(*) AS count FROM provider_link_intents
-                WHERE participant_id = \(bind: participantID) AND status = 'pending' AND expires_at > \(bind: now)
-                """).first()
-            guard let count, try count.decode(column: "count", as: Int.self) < 16 else { throw ProviderFailure.capacityExceeded }
+            try await Self.requireIntentCapacity(participantID: participantID, now: now, on: sql)
             try await sql.raw("""
                 INSERT INTO provider_link_intents (
                     id, participant_id, registration_id, registration_generation, redirect_id, state_digest,
@@ -84,10 +80,13 @@ final class ProviderConnectionService: Module, Sendable {
                     \(bind: id), \(bind: participantID), \(bind: registrationID), \(bind: approved.generation),
                     \(bind: redirectID), \(bind: Self.digest(state)), \(bind: try ProviderSQL.encode(envelope)), \(bind: expiresAt), 'pending'
                 )
-                """).run()
+                """)
+                .run()
             try await AuditRepository.recordMutation(.init(
-                context: actor.auditContext, action: .providerLinkStarted,
-                scope: .participantProvider(participantID: participantID, registrationID: registrationID), target: .init(id: id)
+                context: actor.auditContext,
+                action: .providerLinkStarted,
+                scope: .participantProvider(participantID: participantID, registrationID: registrationID),
+                target: .init(id: id)
             ), on: transaction)
             return LinkIntent(id: id, authorizationURL: url, redirectURI: redirect, expiresAt: expiresAt)
         }
@@ -105,13 +104,16 @@ final class ProviderConnectionService: Module, Sendable {
                 try await sql.raw("""
                     UPDATE provider_connections SET status = 'disconnected', generation = generation + 1,
                         credential_envelope = NULL, refresh_state = 'ready', refresh_id = NULL WHERE id = \(bind: id)
-                    """).run()
+                    """)
+                    .run()
                 try await sql.raw("""
                     UPDATE provider_checkpoints SET status = 'blocked', lease_id = NULL, lease_until = NULL
                     WHERE connection_id = \(bind: id) AND status <> 'complete'
-                    """).run()
+                    """)
+                    .run()
                 try await AuditRepository.recordMutation(.init(
-                    context: actor.auditContext, action: .providerConnectionDisconnected,
+                    context: actor.auditContext,
+                    action: .providerConnectionDisconnected,
                     scope: .participantProvider(participantID: participantID, registrationID: connection.registrationID),
                     target: .init(id: id, version: String(connection.generation + 1))
                 ), on: transaction)
@@ -124,8 +126,25 @@ final class ProviderConnectionService: Module, Sendable {
 
 extension ProviderConnectionService {
     static func randomSecret() -> String {
-        SymmetricKey(size: .bits256).withUnsafeBytes { Data($0).base64EncodedString() }
-            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        base64URL(SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) })
+    }
+
+    private static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func requireIntentCapacity(participantID: UUID, now: Date, on sql: any SQLDatabase) async throws {
+        let count = try await sql.raw("""
+            SELECT COUNT(*) AS count FROM provider_link_intents
+            WHERE participant_id = \(bind: participantID) AND status = 'pending' AND expires_at > \(bind: now)
+            """)
+            .first()
+        guard let count, try count.decode(column: "count", as: Int.self) < 16 else {
+            throw ProviderFailure.capacityExceeded
+        }
     }
 
     static func digest(_ value: String) -> String {
@@ -142,8 +161,7 @@ extension ProviderConnectionService {
             .init(name: "scope", value: registration.scopes.sorted().joined(separator: registration.provider == .withings ? "," : " "))
         ]
         if registration.supportsPKCE {
-            let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
-                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            let challenge = base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
             components.queryItems?.append(contentsOf: [
                 .init(name: "code_challenge_method", value: "S256"), .init(name: "code_challenge", value: challenge)
             ])
@@ -156,13 +174,19 @@ extension ProviderConnectionService {
     }
 
     static func status(_ connection: ProviderConnection, on database: any Database) async throws -> Status {
-        let row = try await ProviderSQL.sql(database).raw("""
-            SELECT CASE WHEN COUNT(accepted_through) = COUNT(*) THEN MIN(accepted_through) ELSE NULL END AS accepted_through
-            FROM provider_checkpoints WHERE connection_id = \(bind: connection.id)
-            """).first()
+        let row = try await ProviderSQL.sql(database)
+            .raw("""
+                SELECT CASE WHEN COUNT(accepted_through) = COUNT(*) THEN MIN(accepted_through) ELSE NULL END AS accepted_through
+                FROM provider_checkpoints WHERE connection_id = \(bind: connection.id)
+                """)
+            .first()
         return Status(
-            id: connection.id, registrationID: connection.registrationID, sourceID: connection.sourceID,
-            state: connection.status, generation: connection.generation, lastAttempt: connection.lastAttempt,
+            id: connection.id,
+            registrationID: connection.registrationID,
+            sourceID: connection.sourceID,
+            state: connection.status,
+            generation: connection.generation,
+            lastAttempt: connection.lastAttempt,
             lastSuccessfulFetch: connection.lastSuccessfulFetch,
             acceptedThrough: try row?.decode(column: "accepted_through", as: Date?.self),
             requiresReauthorization: connection.status == .reauthorizationRequired || connection.refreshState != .ready,
