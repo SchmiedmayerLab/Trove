@@ -18,7 +18,7 @@ struct FHIRSourceTypeEvidence {
 
     static func extract(_ extensions: [Extension]) throws -> Self? {
         let healthKit = try code(extensions, url: Canonicals.healthKitSourceTypeExtension)
-        let sensorKit = try code(extensions, url: Canonicals.sensorKitSourceTypeExtension)
+        let sensorKit = try code(extensions, url: SensorKitContract.sourceTypeExtensionURI)
         let provider = try code(extensions, url: Canonicals.providerExtension)
         let providerType = try code(extensions, url: Canonicals.providerSourceTypeExtension)
         guard [healthKit, sensorKit, providerType].compactMap({ $0 }).count <= 1,
@@ -51,4 +51,10 @@ struct FHIRSourceTypeEvidence {
               let text = code.value?.string, (1...512).contains(text.utf8.count) else { throw FHIRValidationClient.invalid }
         return text
     }
+}
+
+
+extension SensorKitContract {
+    /// The SensorKit source-type extension URL in the form FHIR extensions carry.
+    static let sourceTypeExtensionURI = FHIRPrimitive(FHIRURI(stringLiteral: sourceTypeExtension))
 }
