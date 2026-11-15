@@ -71,6 +71,7 @@ test("authors, reloads and preserves exact historical collection windows", async
     {
       profile: heartRateProfile,
       sourceKind: "participant-app",
+      includeWorkoutRoutes: false,
       measurementWindow: {
         calendar: "gregorian",
         timeZone: "America/Los_Angeles",
