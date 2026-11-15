@@ -39,6 +39,28 @@ def recovered_arguments(recovery):
         raise ValueError("Invalid recovered fixture identity") from None
 
 
+def logical_participant(bundle, *, allow_absent=False):
+    """Resolve the one logical Patient subject when a fixture has no Patient resource."""
+    identities = set()
+    for entry in bundle["entry"]:
+        subject = entry["resource"].get("subject", {})
+        if not isinstance(subject, dict) or subject.get("type") != "Patient":
+            continue
+        identifier = subject.get("identifier", {})
+        if not isinstance(identifier, dict):
+            raise ValueError("Fixture requires one complete logical Patient identity")
+        pair = (identifier.get("system"), identifier.get("value"))
+        if not all(isinstance(value, str) and value for value in pair):
+            raise ValueError("Fixture requires one complete logical Patient identity")
+        identities.add(pair)
+    if not identities and allow_absent:
+        return None
+    if len(identities) != 1:
+        raise ValueError("Fixture requires one complete logical Patient identity")
+    system, value = identities.pop()
+    return {"system": system, "value": value}
+
+
 def rekey(bundle, *, participant_system, participant_value, effective_at, sequence,
           identifier_root, registration_id, preserve_recorded=False, native_record_id=None,
           identity_key=bytes(range(32)), epoch="1", repository_scope=None):
@@ -47,9 +69,11 @@ def rekey(bundle, *, participant_system, participant_value, effective_at, sequen
     from Scripts.canonical_json import JSONNumber
     from Scripts.exchange_fixtures import role_of
     from Scripts.exchange_protocol import derive_hmac_identity
+    from Scripts.producer_validation.context import RETRACTION_BUNDLE_PROFILE
     patient = next((entry["resource"] for entry in bundle["entry"] if entry["resource"]["resourceType"] == "Patient"), None)
     original_participant = (next(value for value in patient["identifier"] if role_of(value) is None)
-                            if patient is not None else None)
+                            if patient is not None else logical_participant(
+                                bundle, allow_absent=RETRACTION_BUNDLE_PROFILE in bundle.get("meta", {}).get("profile", [])))
     original_participant = copy.deepcopy(original_participant)
     recorded = (datetime.fromisoformat(effective_at.replace("Z", "+00:00")) + timedelta(milliseconds=sequence)).isoformat(
         timespec="milliseconds").replace("+00:00", "Z")

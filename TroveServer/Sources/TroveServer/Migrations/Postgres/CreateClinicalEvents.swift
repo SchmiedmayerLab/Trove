@@ -10,6 +10,7 @@ import Fluent
 import FluentPostgresDriver
 import FluentSQL
 import SQLKit
+import TroveAPITypes
 
 
 /// Immutable event custody, additional representations, lossless facts, and independent study decisions.
@@ -65,7 +66,7 @@ struct CreateClinicalEvents: AsyncMigration {
             .field("source_id", .uuid, .required, .references("source_bindings", "id", onDelete: .restrict))
             .field("identifier_system", .string, .required, ClinicalRecordSchema.identity("identifier_system", on: database))
             .field("identifier_value", .string, .required, ClinicalRecordSchema.identity("identifier_value", on: database))
-            .field("raw_bytes", .data, .required, .sql(unsafeRaw: "CHECK (\(byteLength) BETWEEN 1 AND 4194304)"))
+            .field("raw_bytes", .data, .required, .sql(unsafeRaw: "CHECK (\(byteLength) BETWEEN 1 AND \(EventSubmissionLimits.maximumEventBytes))"))
             .field("raw_sha256", .string, .required, .sql(unsafeRaw: "CHECK (length(raw_sha256) = 64 AND length(\(nonHex)) = 0)"))
             .field("validator_identity", .string, .required, boundedText("validator_identity"))
             .field("target_intent", .string, .required, boundedText("target_intent", maximum: ClinicalEventIntent.maximumBytes))
@@ -83,7 +84,7 @@ struct CreateClinicalEvents: AsyncMigration {
             .field("event_id", .uuid, .required, .references("clinical_events", "id", onDelete: .restrict))
             .field("raw_sha256", .string, .required, .sql(unsafeRaw: "CHECK (length(raw_sha256) = 64 AND length(\(nonHex)) = 0)"))
             .compositeIdentifier(over: "event_id", "raw_sha256")
-            .field("raw_bytes", .data, .required, .sql(unsafeRaw: "CHECK (\(byteLength) BETWEEN 1 AND 4194304)"))
+            .field("raw_bytes", .data, .required, .sql(unsafeRaw: "CHECK (\(byteLength) BETWEEN 1 AND \(EventSubmissionLimits.maximumEventBytes))"))
             .field("validator_identity", .string, .required, boundedText("validator_identity"))
             .field("received_at", .datetime, .required)
             .field("node_count", .int, .required, .sql(unsafeRaw: "CHECK (node_count BETWEEN 1 AND 512)"))
@@ -123,9 +124,13 @@ struct CreateClinicalEvents: AsyncMigration {
             .field("output_binding_id", .uuid, .required)
             .field("profile", .string, .required, boundedText("profile"))
             .field("effective_at", .datetime, .required)
-            .field("quantity_value", .string, .required, boundedText("quantity_value", maximum: 4096))
-            .field("quantity_system", .string, .required, boundedText("quantity_system"))
-            .field("quantity_code", .string, .required, boundedText("quantity_code"))
+            .field("effective_end", .datetime, .sql(unsafeRaw: "CHECK (effective_end IS NULL OR effective_end >= effective_at)"))
+            .field("value_kind", .string, .required, observationValueConstraint)
+            .field("quantity_value", .string, boundedText("quantity_value", maximum: 4096))
+            .field("quantity_system", .string, boundedText("quantity_system"))
+            .field("quantity_code", .string, boundedText("quantity_code"))
+            .field("value_code_system", .string, boundedText("value_code_system"))
+            .field("value_code", .string, boundedText("value_code"))
             .field("code_system", .string, .required, boundedText("code_system"))
             .field("code", .string, .required, boundedText("code"))
             .unique(on: "event_id", "output_binding_id", name: "clinical_point_output")
@@ -153,6 +158,7 @@ struct CreateClinicalEvents: AsyncMigration {
             )
             .create()
     }
+
 
     private func createGrants(on database: any Database) async throws {
         try await database.schema("study_data_grants")
@@ -260,5 +266,21 @@ struct CreateClinicalEvents: AsyncMigration {
                 }
             }
         }
+    }
+}
+
+
+extension CreateClinicalEvents {
+    private var observationValueConstraint: DatabaseSchema.FieldConstraint {
+        .sql(unsafeRaw: """
+            CHECK (
+                (value_kind = 'quantity' AND quantity_value IS NOT NULL AND quantity_system IS NOT NULL AND quantity_code IS NOT NULL
+                    AND value_code_system IS NULL AND value_code IS NULL)
+                OR (value_kind = 'coded' AND quantity_value IS NULL AND quantity_system IS NULL AND quantity_code IS NULL
+                    AND value_code_system IS NOT NULL AND value_code IS NOT NULL)
+                OR (value_kind IN ('components', 'recording') AND quantity_value IS NULL AND quantity_system IS NULL AND quantity_code IS NULL
+                    AND value_code_system IS NULL AND value_code IS NULL)
+            )
+            """)
     }
 }

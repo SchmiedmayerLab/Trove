@@ -105,3 +105,14 @@ extension DeliveryJournal {
         )
     }
 }
+
+
+extension DeliveryJournal {
+    /// Enrollment expiry does not mutate accepted evidence; it invalidates an in-flight acquisition.
+    func validateCheckpoint(_ expected: Checkpoint, at now: Date = .now) throws {
+        var current = try checkpoint(for: expected.sourceID, queryID: expected.queryID)
+        current.acquisitionDeadline = expected.acquisitionDeadline
+        guard current == expected, now.timeIntervalSince1970.isFinite,
+              expected.acquisitionDeadline.map({ now < $0 }) ?? true else { throw JournalError.staleCheckpoint }
+    }
+}

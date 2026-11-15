@@ -9,6 +9,7 @@
 import Fluent
 import Foundation
 import SQLKit
+import TroveAPITypes
 
 
 /// Shared by initial admission and late attribution inside the source-owner transaction.
@@ -17,6 +18,22 @@ struct ClinicalGrantStore: Sendable {
         let fullURL: String
         let profile: String
         let effectiveAt: Date
+        var effectiveEnd: Date?
+        var codeSystem: String?
+        var code: String?
+
+        var isWorkoutRoute: Bool {
+            profile == FHIRRecordingProjection.profile && codeSystem == FHIRRecordingProjection.formatSystem
+                && code == FHIRRecordingProjection.routeFormat
+        }
+
+        var collectionProfile: String? {
+            if profile == FHIRRecordingProjection.profile {
+                isWorkoutRoute ? CollectionObservationProfile.workout.rawValue : nil
+            } else {
+                profile
+            }
+        }
     }
 
     struct Authority: Sendable {
@@ -119,21 +136,29 @@ extension ClinicalGrantStore {
               let study = try await Study.find(enrollment.$study.id, on: database) else {
             throw ServerError.forbidden("Exact reviewed publication is required for study data")
         }
-        let permitted = Set(outputs.filter { output in
-            output.effectiveAt <= acceptedAt
+        let selection = try FHIRWorkoutProjection.collectionOutputs(outputs)
+        let permitted = Set(selection.filter { output in
+            guard let profile = output.collectionProfile else {
+                return false
+            }
+            return output.effectiveAt <= acceptedAt
+                && (output.effectiveEnd.map { $0 <= acceptedAt } ?? true)
                 && publication.collectionPolicy.permits(
                     studyID: enrollment.$study.id,
                     revision: consent.revision,
-                    profile: output.profile,
+                    profile: profile,
                     sourceKind: source.kind,
                     effectiveAt: output.effectiveAt,
                     consentAcceptedAt: consent.acceptedAt,
+                    effectiveEnd: output.effectiveEnd,
                     scope: consent.collectionScope,
-                    adoptionEnd: interval.end
+                    adoptionEnd: interval.end,
+                    requiresWorkoutRoute: output.isWorkoutRoute
                 )
         }
         .map(\.fullURL))
         let selected = Set(target.outputFullURLs)
+        try FHIRWorkoutProjection.requireCompleteSelection(selected, outputs: outputs)
         guard selected.isSubset(of: permitted) else {
             throw ServerError.forbidden("Requested output is absent or outside the exact consent's collection interval")
         }

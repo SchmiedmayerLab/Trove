@@ -126,6 +126,25 @@ struct ParticipantCollectionRefreshTests {
     }
 
     @Test
+    func mismatchedStudyCannotReplaceSavedSettingsOrAuthority() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let plan = Self.plan()
+            let initial = CollectionRefreshTransport(enrollments: [Self.enrollment(plan)], plans: [plan])
+            let before = try await Self.refresh(journal, transport: initial)
+            var mismatched = plan
+            mismatched.studyId = UUID().uuidString
+            mismatched.stateVersion += 1
+            let transport = CollectionRefreshTransport(enrollments: [Self.enrollment(plan)], plans: [mismatched])
+            await #expect(throws: DeliveryJournalError.staleCollectionState) {
+                try await Self.refresh(journal, transport: transport)
+            }
+            let after = try await journal.collectionState()
+            #expect(after.revision == before.revision)
+            #expect(after.collections.map(\.plan) == [plan])
+        }
+    }
+
+    @Test
     func duplicateDiscoveryAndStalePlanVersionDoNotChangeRetainedState() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let plan = Self.plan()
@@ -150,21 +169,28 @@ struct ParticipantCollectionRefreshTests {
 
 extension ParticipantCollectionRefreshTests {
     private static func plan() -> Components.Schemas.ParticipantCollectionPlan {
-        .init(enrollmentId: UUID().uuidString.lowercased(), stateVersion: 2, asOf: start.addingTimeInterval(10), windows: [
-            .init(
-                consentId: UUID().uuidString.lowercased(),
-                publicationId: UUID().uuidString.lowercased(),
-                revision: 1,
-                start: start,
-                requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
-            )
-        ])
+        .init(
+            enrollmentId: UUID().uuidString.lowercased(),
+            studyId: UUID().uuidString,
+            title: .init([.enUS: "Saved Study"]),
+            stateVersion: 2,
+            asOf: start.addingTimeInterval(10),
+            windows: [
+                .init(
+                    consentId: UUID().uuidString.lowercased(),
+                    publicationId: UUID().uuidString.lowercased(),
+                    revision: 1,
+                    start: start,
+                    requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
+                )
+            ]
+        )
     }
 
     private static func enrollment(_ plan: Components.Schemas.ParticipantCollectionPlan) -> Components.Schemas.EnrollmentResponse {
         .init(
             id: plan.enrollmentId,
-            studyId: UUID().uuidString.lowercased(),
+            studyId: plan.studyId,
             participantId: DeliveryFixture.scope.subject,
             currentRevision: 1,
             stateVersion: plan.stateVersion,

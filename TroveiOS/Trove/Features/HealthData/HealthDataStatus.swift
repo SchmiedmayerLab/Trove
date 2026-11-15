@@ -13,7 +13,7 @@ import TroveHealthKit
 
 enum HealthDataStatus: Equatable {
     case signedOut, notSetUp, ready, syncFinished, waiting, catchUpPending, blocked, revoked, notAuthorized, unavailable
-    case permissionRequested, permissionNeeded
+    case permissionRequested, permissionNeeded, refreshNeeded
 
     var message: LocalizedStringResource {
         switch self {
@@ -27,6 +27,7 @@ enum HealthDataStatus: Equatable {
         case .revoked: "Collection from this device has been revoked. Contact your study team."
         case .notAuthorized: "An active study consent for heart rate collection is required. Review your studies before continuing."
         case .unavailable: "Health data sync is unavailable. Check your connection and try again."
+        case .refreshNeeded: "Study collection settings changed. Collection will resume with the latest settings."
         case .permissionRequested: "The Health access request finished. You can review permissions in Health."
         case .permissionNeeded: "Review Health access before syncing data from this device."
         }
@@ -36,9 +37,10 @@ enum HealthDataStatus: Equatable {
         switch error {
         case ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized: self = .notAuthorized
         case EventDeliveryJournal.JournalError.sourceRevoked: self = .revoked
+        case EventDeliveryJournal.JournalError.staleCheckpoint, EventDeliveryJournal.JournalError.staleCollectionState: self = .refreshNeeded
         case is EventDeliveryJournal.JournalError, is CocoaError: self = .blocked
-        case HeartRateAcquisition.AcquisitionError.unsupportedDelta,
-             HeartRateAcquisition.AcquisitionError.invalidQueryDefinition: self = .blocked
+        case HealthKitAcquisition.AcquisitionError.unsupportedDelta,
+             HealthKitAcquisition.AcquisitionError.invalidQueryDefinition: self = .blocked
         default: self = .unavailable
         }
     }

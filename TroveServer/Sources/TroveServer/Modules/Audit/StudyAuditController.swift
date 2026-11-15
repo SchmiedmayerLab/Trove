@@ -72,7 +72,11 @@ extension Components.Schemas.StudyAuditAction {
         case .artifactDiscardScheduled: self = .artifact_discard_scheduled
         case .studyDataGranted: self = .study_data_granted
         case .studyAuditDisclosure: self = .study_audit_disclosure
-        case .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked, .sourceIdentityDisclosure,
+        case .studyDataDisclosure: self = .study_data_disclosure
+        case .studyRecordingDisclosure: self = .study_recording_disclosure
+        case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure,
+             .recordingArtifactDiscardScheduled, .sourceRegistered, .sourceRevoked,
+             .sourceInstallationRegistered, .sourceInstallationRevoked, .sourceIdentityDisclosure,
              .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
             throw AuditError.invalidScope
         }

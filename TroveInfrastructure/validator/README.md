@@ -112,7 +112,7 @@ a Questionnaire result does not replace exchange-admission evidence.
 
 ## Request and Result
 
-`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 4 MiB. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content, FHIR diagnostics or process output is logged or returned.
+`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 16 MiB. The application enforces its independently configured event-admission budget before calling the validator. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content, FHIR diagnostics or process output is logged or returned.
 
 The response is smaller than 2 KiB:
 

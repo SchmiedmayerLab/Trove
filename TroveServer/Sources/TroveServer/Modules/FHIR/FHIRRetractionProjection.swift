@@ -37,7 +37,8 @@ enum FHIRRetractionProjection {
             participants: [],
             nodes: nodes,
             outputs: [],
-            retraction: .init(sourceRecordIdentifier: .init(system: record.sourceRecord.system.rawValue, value: record.sourceRecord.value))
+            retraction: .init(sourceRecordIdentifier: .init(system: record.sourceRecord.system.rawValue, value: record.sourceRecord.value)),
+            nativeRecordIdentifiers: try FHIRNativeRecordIdentifiers.retraction(in: resources)
         )
         _ = try ClinicalRecordRevision(result)
         return result

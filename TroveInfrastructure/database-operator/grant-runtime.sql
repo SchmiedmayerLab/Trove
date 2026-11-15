@@ -56,6 +56,8 @@ GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representa
     public.clinical_record_events, public.clinical_output_bindings, public.clinical_record_retractions,
     public.clinical_questionnaire_contexts, public.clinical_point_derivations,
     public.clinical_attribution_commands TO :"runtime_name";
+GRANT SELECT, INSERT ON public.recording_transfers, public.recording_transfer_attempts, public.recording_transfer_receipts,
+    public.clinical_recording_attachments TO :"runtime_name";
 
 -- The only definer bridge reveals a Boolean, never settings, paths or privileged operations.
 CREATE OR REPLACE FUNCTION public.trove_timescale_preloaded() RETURNS boolean

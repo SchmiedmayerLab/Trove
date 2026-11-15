@@ -72,6 +72,7 @@ final class TroveAPIModule: Module, EnvironmentAccessible {
             journal: journal,
             scope: .init(backend: Config.apiBaseURL.absoluteString, issuer: snapshot.issuer.absoluteString, subject: snapshot.subject),
             client: client,
+            limits: Config.collectionCapacity().admission,
             validateSession: { try await service.validateSession(snapshot) }
         )
     }
@@ -91,14 +92,13 @@ final class TroveAPIModule: Module, EnvironmentAccessible {
         )
     }
 
-    /// Supplies the existing captured-session client; does not start acquisition or request HealthKit access.
-    func makeHeartRateAcquisition(journal: EventDeliveryJournal, for snapshot: KeycloakSessionSnapshot) throws -> HeartRateAcquisition {
-        let client = try requireClient(for: snapshot)
+    /// Supplies local session validation; acquisition does not need an access token or network client.
+    func makeHealthKitAcquisition(journal: EventDeliveryJournal, for snapshot: KeycloakSessionSnapshot) throws -> HealthKitAcquisition {
+        try validateSession(snapshot)
         let service = keycloak
-        return try HeartRateAcquisition(
+        return try HealthKitAcquisition(
             journal: journal,
             scope: .init(backend: Config.apiBaseURL.absoluteString, issuer: snapshot.issuer.absoluteString, subject: snapshot.subject),
-            client: client,
             validateSession: { try await service.validateSession(snapshot) }
         )
     }

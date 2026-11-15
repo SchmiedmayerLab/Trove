@@ -254,7 +254,7 @@ extension ClinicalRecordStoreTests {
             )
         }
         let points = outputs.map { output in
-            ValidatedExchangeEvent.PointOutput(
+            ValidatedExchangeEvent.Output(
                 fullURL: output == "primary" ? "urn:uuid:point" : "urn:point:" + output,
                 profile: CollectionRequirement.supportedProfile,
                 effectiveAt: Date(),
@@ -262,9 +262,7 @@ extension ClinicalRecordStoreTests {
                 sourceOutputIdentifier: .init(system: "urn:source-output", value: output),
                 writerIdentifier: writer.map { .init(system: "urn:writer-record", value: $0) },
                 writerVersion: version,
-                quantityValue: "72",
-                quantitySystem: "http://unitsofmeasure.org",
-                quantityCode: "/min",
+                value: .quantity(value: "72", system: "http://unitsofmeasure.org", code: "/min"),
                 codeSystem: "http://loinc.org",
                 code: "8867-4"
             )

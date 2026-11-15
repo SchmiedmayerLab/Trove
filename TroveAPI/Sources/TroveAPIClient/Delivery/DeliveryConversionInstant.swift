@@ -18,7 +18,7 @@ extension DeliveryJournal {
         guard (0...253_402_300_799).contains(now.timeIntervalSince1970) else { throw JournalError.invalidConfiguration }
         return try database.transaction {
             _ = try activeSource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID, queryID: expected.queryID) == expected else { throw JournalError.staleCheckpoint }
+            try validateCheckpoint(expected)
             let queryID = expected.queryID.uuidString.lowercased()
             let rows = try database.query(
                 "SELECT conversion_instant FROM acquisition_query WHERE id = ? AND conversion_instant IS NOT NULL", [.text(queryID)]

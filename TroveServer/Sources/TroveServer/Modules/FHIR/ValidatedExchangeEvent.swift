@@ -45,18 +45,16 @@ struct ValidatedExchangeEvent: Sendable {
         let resourceType: String
     }
 
-    struct PointOutput: Sendable {
+    struct Output: Sendable {
         let fullURL: String
         let profile: String
         let effectiveAt: Date
+        var effectiveEnd: Date?
         let sourceRecordIdentifier: Identifier
         let sourceOutputIdentifier: Identifier
         let writerIdentifier: Identifier?
         let writerVersion: String?
-        /// Lossless decimal text; no binary floating-point research projection.
-        let quantityValue: String
-        let quantitySystem: String
-        let quantityCode: String
+        let value: ClinicalOutputValue
         let codeSystem: String
         let code: String
     }
@@ -88,8 +86,27 @@ struct ValidatedExchangeEvent: Sendable {
     var deploymentIdentifiers: FHIRDeploymentIdentifiers
     let participants: Set<Identifier>
     let nodes: [Node]
-    let outputs: [PointOutput]
+    let outputs: [Output]
     var retraction: Retraction?
+    /// Informative native UUID evidence, never a source authority or deduplication key.
+    var nativeRecordIdentifiers: [Identifier] = []
+    var recordings: [ClinicalRecordingAttachment] = []
     var questionnaireContexts: [QuestionnaireContext] = []
     var derivations: [Derivation] = []
+}
+
+
+extension ValidatedExchangeEvent {
+    var collectionOutputs: [ClinicalGrantStore.Output] {
+        outputs.map {
+            .init(
+                fullURL: $0.fullURL,
+                profile: $0.profile,
+                effectiveAt: $0.effectiveAt,
+                effectiveEnd: $0.effectiveEnd,
+                codeSystem: $0.codeSystem,
+                code: $0.code
+            )
+        }
+    }
 }

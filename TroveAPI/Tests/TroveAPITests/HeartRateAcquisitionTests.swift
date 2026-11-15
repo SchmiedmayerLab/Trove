@@ -12,24 +12,23 @@ import Foundation
 import GroveFHIRContract
 import GroveHealthKit
 import HealthKit
-import HTTPTypes
 import ModelsR4
-import OpenAPIRuntime
 import Testing
 @testable import TroveAPIClient
 @testable import TroveHealthKit
 
 
-struct HeartRateAcquisitionTests {
+struct HealthKitAcquisitionTests {
     private enum Interruption: CaseIterable { case queryFailure, cancellation }
     private enum QueryFailure: Error { case unavailable }
 
     @Test(arguments: ["https://trove.test/events", "urn:uuid:19e5294b-859b-4670-8c58-9f34f5417cd1"])
     func groveConversionStagesOneEventForTwoStudiesAndRestoresExactBytes(identifierRoot: String) async throws {
         try await Self.withFixture(identifierRoot: identifierRoot) { fixture, url in
+            let sample = Self.sample()
             let ids = try await fixture.collect { _, anchor in
                 #expect(anchor == QueryAnchor())
-                return Self.delta([Self.sample()])
+                return Self.delta([sample])
             }
             #expect(ids.count == 1)
             let id = try #require(ids.first)
@@ -41,6 +40,9 @@ struct HeartRateAcquisitionTests {
             let entries = try #require(object["entry"] as? [[String: Any]])
             let observations = entries.compactMap { $0["resource"] as? [String: Any] }.filter { $0["resourceType"] as? String == "Observation" }
             #expect(observations.count == 1)
+            let native = try #require((observations.first?["identifier"] as? [[String: Any]])?.first { $0["type"] == nil })
+            #expect(native["value"] as? String == sample.uuid.uuidString.lowercased())
+            #expect(native["system"] as? String == identifierRoot + "/NamingSystem/healthkit-native-record")
             let checkpoint = try await fixture.journal.checkpoint(for: fixture.sourceID)
             #expect(try checkpoint.cursor.map { try JSONDecoder().decode(QueryAnchor.self, from: $0) } == Self.nextAnchor)
             await fixture.journal.close()
@@ -63,13 +65,13 @@ struct HeartRateAcquisitionTests {
     func withdrawalDuringQueryRollsBackThenNextPassUsesOnlyRemainingStudy() async throws {
         try await Self.withFixture { fixture, _ in
             let before = try await fixture.journal.checkpoint(for: fixture.sourceID)
-            await #expect(throws: HeartRateAcquisition.AcquisitionError.authorityChanged) {
+            await #expect(throws: EventDeliveryJournal.JournalError.staleCheckpoint) {
                 try await fixture.collect { _, _ in
-                    await fixture.transport.withdrawFirstStudy()
+                    try await fixture.journal.stopCollection(for: #require(fixture.enrollmentIDs.first))
                     return Self.delta([Self.sample()])
                 }
             }
-            #expect(try await fixture.journal.checkpoint(for: fixture.sourceID) == before)
+            #expect(try await fixture.journal.checkpoint(for: fixture.sourceID).cursor == before.cursor)
             #expect(try await fixture.journal.pendingDeliveryIDs().isEmpty)
             let ids = try await fixture.collect { _, _ in Self.delta([Self.sample()]) }
             let id = try #require(ids.first)
@@ -82,7 +84,7 @@ struct HeartRateAcquisitionTests {
     func sessionLossDuringQueryCannotStageIntoAnotherAccount() async throws {
         try await Self.withFixture { fixture, _ in
             let before = try await fixture.journal.checkpoint(for: fixture.sourceID)
-            await #expect(throws: HeartRateAcquisition.AcquisitionError.authenticationRequired) {
+            await #expect(throws: HealthKitAcquisition.AcquisitionError.authenticationRequired) {
                 try await fixture.collect { _, _ in
                     await fixture.session.invalidate()
                     return Self.delta([Self.sample()])
@@ -97,7 +99,7 @@ struct HeartRateAcquisitionTests {
     func unsupportedChangesNeverCommitAValidPrefixOrAdvanceTheAnchor(failure: String) async throws {
         try await Self.withFixture { fixture, _ in
             let before = try await fixture.journal.checkpoint(for: fixture.sourceID)
-            await #expect(throws: HeartRateAcquisition.AcquisitionError.unsupportedDelta) {
+            await #expect(throws: HealthKitAcquisition.AcquisitionError.unsupportedDelta) {
                 try await fixture.collect { _, _ in
                     switch failure {
                     case "oversized-mixed":
@@ -117,7 +119,8 @@ struct HeartRateAcquisitionTests {
     func roundingCannotCrossAnExactConsentBoundary(roundsUp: Bool) async throws {
         try await Self.withFixture { fixture, _ in
             let boundary = Self.start.addingTimeInterval(roundsUp ? 0.0006 : 0.0004)
-            await fixture.transport.setConsentStart(boundary)
+            await fixture.authority.setConsentStart(boundary)
+            try await fixture.retainPlans()
             let instant = Self.start.addingTimeInterval(roundsUp ? 0.00055 : 0.00045)
             let ids = try await fixture.collect { _, _ in Self.delta([Self.sample(at: instant)]) }
             #expect(ids.isEmpty)
@@ -180,7 +183,7 @@ struct HeartRateAcquisitionTests {
             do {
                 #expect(try await reopened.checkpoint(for: fixture.sourceID) == checkpoint)
                 let restored = try fixture.using(reopened)
-                let progress = try await HeartRateAcquisition.catchUp {
+                let progress = try await HealthKitAcquisition.catchUp {
                     try await restored.collectPage { _, anchor in
                         if anchor == Self.nextAnchor {
                             return .init(added: [Self.sample()], deletedIDs: [], nextAnchor: secondAnchor)
@@ -230,7 +233,13 @@ struct HeartRateAcquisitionTests {
                 return nil
             }.first)
             try Self.verifyRetraction(retracted, of: observation)
-            #expect(!String(decoding: deletion.bytes, as: UTF8.self).lowercased().contains(sample.uuid.uuidString.lowercased()))
+            let native = try #require(observation.identifier?.first { $0.type == nil })
+            #expect(native.value?.value?.string == sample.uuid.uuidString.lowercased())
+            let provenance = try #require(retracted.bundle.entry?.compactMap { entry -> Provenance? in
+                if case .provenance(let value)? = entry.resource { value } else { nil }
+            }.first)
+            let disclosed = try #require(provenance.target.first?.extension?.first { $0.url == Canonicals.retractionTargetNativeIdentifier })
+            #expect(disclosed.value == .identifier(native))
         }
     }
 
@@ -251,12 +260,12 @@ struct HeartRateAcquisitionTests {
 }
 
 
-extension HeartRateAcquisitionTests {
+extension HealthKitAcquisitionTests {
     @Test
     func exportBeforeFailedStagingRestoresExactActiveAndRetractionBytes() async throws {
         try await Self.withFixture { fixture, url in
             let sample = Self.sample()
-            let delta = HeartRateAcquisition.Delta(added: [sample], deletedIDs: [sample.uuid], nextAnchor: Self.nextAnchor)
+            let delta = HealthKitAcquisition.Delta(added: [sample], deletedIDs: [sample.uuid], nextAnchor: Self.nextAnchor)
             let checkpoint = try await fixture.journal.checkpoint(for: fixture.sourceID)
             let original = try await Self.uncommittedPayloads(delta, fixture: fixture, journal: fixture.journal)
             #expect(original.count == 2)
@@ -285,7 +294,7 @@ extension HeartRateAcquisitionTests {
 }
 
 
-extension HeartRateAcquisitionTests {
+extension HealthKitAcquisitionTests {
     private static func verifyRetraction(_ retracted: ExchangeGraph, of observation: Observation) throws {
         let provenance = try #require(retracted.bundle.entry?.compactMap { entry in
             if case .provenance(let value)? = entry.resource {
@@ -293,7 +302,7 @@ extension HeartRateAcquisitionTests {
             }
             return nil
         }.first)
-        let identities = try (observation.identifier ?? []).map(RoledIdentifier.init)
+        let identities = try (observation.identifier ?? []).filter { $0.type != nil }.map(RoledIdentifier.init)
         #expect(try provenance.target.map { try RoledIdentifier(#require($0.identifier)) } == identities.filter { $0.role == .sourceRecord })
         let source = try #require(provenance.entity?.first?.what.identifier)
         #expect(try RoledIdentifier(source) == identities.first { $0.role == .sourceRecord })
@@ -305,62 +314,66 @@ extension HeartRateAcquisitionTests {
     }
 
     private static func uncommittedPayloads(
-        _ delta: HeartRateAcquisition.Delta, fixture: Fixture, journal: EventDeliveryJournal
+        _ delta: HealthKitAcquisition.Delta, fixture: Fixture, journal: EventDeliveryJournal
     ) async throws -> [EventDeliveryJournal.Payload] {
-        let snapshot = try await ParticipantCollectionSnapshot(plans: fixture.transport.plans, enrollmentIDs: fixture.enrollmentIDs)
+        let snapshot = try await ParticipantCollectionSnapshot(plans: fixture.authority.plans, enrollmentIDs: fixture.enrollmentIDs)
         let checkpoint = try await journal.checkpoint(for: fixture.sourceID)
-        let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
-        let exporter = try await HeartRateAcquisition.exporter(
-            source: fixture.transport.binding.source,
+        let exporter = try await HealthKitAcquisition.exporter(
+            source: fixture.authority.binding.source,
             privacy: journal.identityScope(for: fixture.sourceID),
             application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
             host: .init(operatingSystemVersion: "27.2")
         )
-        // Retrying the same checkpoint reuses its persisted conversion time.
-        let instant = try await journal.conversionInstant(from: checkpoint)
-        return try await HeartRateAcquisition.prepare(
-            delta, exporter: exporter, snapshot: snapshot, detections: detections, instant: instant
+        let configuration = try HealthKitAcquisition.conversionConfiguration(
+            application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"), host: .init(operatingSystemVersion: "27.2")
+        )
+        let acquisition = try fixture.using(journal).acquisition
+        return try await acquisition.preparePage(
+            delta, checkpoint: checkpoint, snapshot: snapshot, exporter: exporter, configuration: configuration
         ).payloads
     }
 }
 
 
-extension HeartRateAcquisitionTests {
+extension HealthKitAcquisitionTests {
     private struct Fixture: Sendable {
         let journal: EventDeliveryJournal
         let sourceID: UUID
         let localID: UUID
-        let transport: Transport
+        let authority: Authority
         let session: DeliveryTestSession
         let enrollmentIDs: [UUID]
-        let acquisition: HeartRateAcquisition
+        let acquisition: HealthKitAcquisition
 
-        func collect(_ query: @Sendable (Date, QueryAnchor) async throws -> HeartRateAcquisition.Delta) async throws -> [UUID] {
+        func collect(_ query: @Sendable (HealthKitQueryDefinition, QueryAnchor) async throws -> HealthKitAcquisition.Delta) async throws -> [UUID] {
             try await collectPage(query).eventIDs
         }
 
         func collectPage(
-            _ query: @Sendable (Date, QueryAnchor) async throws -> HeartRateAcquisition.Delta
-        ) async throws -> HeartRateAcquisition.Page {
+            _ query: @Sendable (HealthKitQueryDefinition, QueryAnchor) async throws -> HealthKitAcquisition.Delta
+        ) async throws -> HealthKitAcquisition.Page {
             try await acquisition.collect(
                 localID: localID,
-                enrollmentIDs: enrollmentIDs,
                 application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
                 host: .init(operatingSystemVersion: "26.0"),
                 query: query
             )
         }
 
+        func retainPlans() async throws {
+            let snapshot = try await ParticipantCollectionSnapshot(plans: authority.plans, enrollmentIDs: enrollmentIDs)
+            try await journal.retainCollectionSnapshot(snapshot, replacing: journal.collectionState())
+        }
+
         func using(_ journal: EventDeliveryJournal) throws -> Self {
-            let client = Client(serverURL: try #require(URL(string: DeliveryFixture.scope.backend)), configuration: .trove, transport: transport)
-            let acquisition = try HeartRateAcquisition(journal: journal, scope: DeliveryFixture.scope, client: client) {
+            let acquisition = try HealthKitAcquisition(journal: journal, scope: DeliveryFixture.scope) {
                 try await session.validate()
             }
             return .init(
                 journal: journal,
                 sourceID: sourceID,
                 localID: localID,
-                transport: transport,
+                authority: authority,
                 session: session,
                 enrollmentIDs: enrollmentIDs,
                 acquisition: acquisition
@@ -368,8 +381,8 @@ extension HeartRateAcquisitionTests {
         }
 
         func interruptCatchUp(_ interruption: Interruption) async {
-            let task = Task {
-                try await HeartRateAcquisition.catchUp {
+            let task = _Concurrency.Task {
+                try await HealthKitAcquisition.catchUp {
                     try await collectPage { _, anchor in
                         if anchor == QueryAnchor() {
                             return delta([sample()])
@@ -408,14 +421,14 @@ extension HeartRateAcquisitionTests {
         )
     }
 
-    private static func delta(_ samples: [HKQuantitySample]) -> HeartRateAcquisition.Delta {
+    private static func delta(_ samples: [HKQuantitySample]) -> HealthKitAcquisition.Delta {
         .init(added: samples, deletedIDs: [], nextAnchor: nextAnchor)
     }
 
     private static func withFixture(identifierRoot: String? = nil, _ operation: (Fixture, URL) async throws -> Void) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let sourceID = UUID(), localID = UUID()
-            let definition = try HeartRateAcquisition.queryDefinition(start: start)
+            let definition = try HealthKitAcquisition.queryDefinition(start: start)
             var binding = DeliveryFixture.binding(sourceID: sourceID, registrationID: localID)
             binding.source.identifierRoot = identifierRoot ?? DeliveryFixture.identifierRoot(sourceID)
             binding.source.eventIdentifierSystem = binding.source.identifierRoot + "/NamingSystem/grove-record-version-v0/\(localID.uuidString.lowercased())/1"
@@ -423,17 +436,18 @@ extension HeartRateAcquisitionTests {
             let setup = try await journal.createSource(localID: localID, queryDefinition: definition)
             try await journal.confirmSource(binding, for: setup, identityKey: DeliveryFixture.identityKey)
             let enrollments = [UUID(), UUID()]
-            let transport = Transport(binding: binding, enrollmentIDs: enrollments)
+            let authority = Authority(binding: binding, enrollmentIDs: enrollments)
+            let snapshot = try await ParticipantCollectionSnapshot(plans: authority.plans, enrollmentIDs: enrollments)
+            try await journal.retainCollectionSnapshot(snapshot, replacing: journal.collectionState())
             let session = DeliveryTestSession()
-            let client = Client(serverURL: try #require(URL(string: DeliveryFixture.scope.backend)), configuration: .trove, transport: transport)
-            let acquisition = try HeartRateAcquisition(journal: journal, scope: DeliveryFixture.scope, client: client) {
+            let acquisition = try HealthKitAcquisition(journal: journal, scope: DeliveryFixture.scope) {
                 try await session.validate()
             }
             try await operation(.init(
                 journal: journal,
                 sourceID: sourceID,
                 localID: localID,
-                transport: transport,
+                authority: authority,
                 session: session,
                 enrollmentIDs: enrollments,
                 acquisition: acquisition
@@ -443,51 +457,39 @@ extension HeartRateAcquisitionTests {
 }
 
 
-extension HeartRateAcquisitionTests {
-    private actor Transport: ClientTransport {
+extension HealthKitAcquisitionTests {
+    private actor Authority {
         let binding: Components.Schemas.ParticipantSourceRegistration
         var plans: [Components.Schemas.ParticipantCollectionPlan]
 
         init(binding: Components.Schemas.ParticipantSourceRegistration, enrollmentIDs: [UUID]) {
             self.binding = binding
             self.plans = enrollmentIDs.map { id in
-                .init(enrollmentId: id.uuidString.lowercased(), stateVersion: 2, asOf: start.addingTimeInterval(10), windows: [
-                    .init(
-                        consentId: UUID().uuidString.lowercased(),
-                        publicationId: UUID().uuidString.lowercased(),
-                        revision: 1,
-                        start: start,
-                        requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
-                    )
-                ])
+                .init(
+                    enrollmentId: id.uuidString.lowercased(),
+                    studyId: UUID().uuidString,
+                    title: .init([.enUS: "Saved Study"]),
+                    stateVersion: 2,
+                    asOf: start.addingTimeInterval(10),
+                    windows: [
+                        .init(
+                            consentId: UUID().uuidString.lowercased(),
+                            publicationId: UUID().uuidString.lowercased(),
+                            revision: 1,
+                            start: start,
+                            requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
+                        )
+                    ]
+                )
             }
-        }
-
-        func withdrawFirstStudy() {
-            plans[0].stateVersion += 1
-            plans[0].windows = []
         }
 
         func setConsentStart(_ start: Date) {
-            for index in plans.indices { plans[index].windows[0].start = start }
-        }
-
-        func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String) async throws -> (HTTPResponse, HTTPBody?) {
-            #expect(request.method == .get && body == nil)
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .custom { date, encoder in
-                var container = encoder.singleValueContainer()
-                try container.encode(TroveDateTranscoder().encode(date))
+            for index in plans.indices {
+                plans[index].stateVersion += 1
+                plans[index].windows[0].start = start
+                plans[index].windows[0].requirements[0].start = start
             }
-            let bytes: Data
-            if operationID == "getParticipantCollectionPlan" {
-                let plan = try #require(plans.first { request.path?.contains($0.enrollmentId) == true })
-                bytes = try encoder.encode(plan)
-            } else {
-                #expect(operationID == "getParticipantSourceInstallation")
-                bytes = try encoder.encode(binding)
-            }
-            return (.init(status: .ok, headerFields: [.contentType: "application/json"]), HTTPBody(bytes))
         }
     }
 }

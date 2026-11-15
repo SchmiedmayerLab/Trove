@@ -8,6 +8,9 @@ import {
   collectionFormSchema,
   collectionSummary,
   newHeartRateRequirement,
+  sleepStageProfile,
+  workoutProfile,
+  setCollectionRequirement,
 } from "./collectionForm";
 
 const requirement = newHeartRateRequirement();
@@ -163,5 +166,97 @@ describe("collection authoring", () => {
     expect(summary).toContain("6 months from each participant's acceptance");
     expect(summary).toContain("Gregorian calendar, America/Los_Angeles");
     expect(summary).toContain("Before 2027-01-01T00:00:00.123456Z (exclusive)");
+  });
+});
+
+describe("independent measurement scopes", () => {
+  it("preserves heart rate when sleep is added, edited, or removed", () => {
+    const heartRate = {
+      ...requirement,
+      measurementWindow: {
+        calendar: "gregorian" as const,
+        timeZone: "UTC",
+        start: { type: "last" as const, components: { month: 6 } },
+      },
+    };
+    const sleep = {
+      profile: sleepStageProfile,
+      sourceKind: "participant-app" as const,
+    };
+    const both = setCollectionRequirement(
+      [heartRate],
+      sleepStageProfile,
+      sleep,
+    );
+    expect(
+      collectionFormSchema.parse({ collectionRequirements: both })
+        .collectionRequirements,
+    ).toEqual(both);
+    const edited = setCollectionRequirement(both, sleepStageProfile, {
+      ...sleep,
+      measurementWindow: {
+        calendar: "gregorian",
+        timeZone: "UTC",
+        start: { type: "oldestSample" },
+      },
+    });
+    expect(edited[0]).toEqual(heartRate);
+    expect(collectionSummary(edited)).toContain("6 months");
+    expect(collectionSummary(edited)).toContain(
+      "All available historical measurements",
+    );
+    expect(collectionSummary(edited)).toContain("Complete sleep records");
+    expect(setCollectionRequirement(edited, sleepStageProfile)).toEqual([
+      heartRate,
+    ]);
+    expect(canEditCollection([sleep, sleep])).toBe(false);
+  });
+});
+
+describe("workout scope", () => {
+  it("requests whole workouts independently alongside heart rate and sleep", () => {
+    const requirements = [
+      requirement,
+      { ...requirement, profile: sleepStageProfile },
+      { ...requirement, profile: workoutProfile },
+    ];
+    expect(canEditCollection(requirements)).toBe(true);
+    expect(collectionSummary(requirements)).toContain(
+      "Complete workouts include all segments and statistics",
+    );
+    expect(setCollectionRequirement(requirements, workoutProfile)).toEqual(
+      requirements.slice(0, 2),
+    );
+  });
+});
+
+describe("workout route scope", () => {
+  it("preserves an explicit route choice and explains both choices", () => {
+    for (const includeWorkoutRoutes of [false, true]) {
+      const routeRequirement = {
+        ...requirement,
+        profile: workoutProfile,
+        includeWorkoutRoutes,
+      };
+      const parsed = collectionFormSchema.parse({
+        collectionRequirements: [routeRequirement],
+      });
+      expect(parsed.collectionRequirements).toEqual([routeRequirement]);
+      expect(collectionSummary(parsed.collectionRequirements)).toContain(
+        includeWorkoutRoutes ?
+          "Precise workout location routes are collected for this study."
+        : "Workout location routes are not collected for this study.",
+      );
+    }
+  });
+
+  it("rejects routes on a non-workout requirement", () => {
+    expect(
+      collectionFormSchema.safeParse({
+        collectionRequirements: [
+          { ...requirement, includeWorkoutRoutes: true },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });

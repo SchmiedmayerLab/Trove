@@ -169,6 +169,122 @@ struct EnrollmentModelTests {
         #expect(model.state.value == [accepted])
         #expect(!model.isMutating)
     }
+
+    @Test
+    func offlineWithdrawalKeepsTheLocalStopWithoutClaimingServerSuccess() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let model = fixture.model()
+        await fixture.load(model, with: [Self.enrollment()])
+        let withdrawal = Task { try await model.withdraw(enrollmentId: "enrollment") }
+        try await fixture.withdrawals.waitForCount(1)
+        #expect(fixture.locallyStopped == ["enrollment"])
+        fixture.withdrawals.fail()
+        await #expect(throws: URLError.self) { try await withdrawal.value }
+        #expect(model.state.value?.first?.withdrawnAt == nil)
+        #expect(fixture.locallyStopped == ["enrollment"])
+        #expect(model.isWithdrawalPending(for: Self.enrollment()))
+        let reopened = fixture.model()
+        await fixture.load(reopened, with: [Self.enrollment()])
+        #expect(reopened.isWithdrawalPending(for: Self.enrollment()))
+        #expect(!reopened.isWithdrawalPending(for: Self.enrollment(withdrawn: true)))
+    }
+
+    @Test
+    func failedLocalStopDoesNotSendWithdrawalOrReportSuccess() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let model = fixture.model()
+        await fixture.load(model, with: [Self.enrollment()])
+        fixture.stopFailure = true
+        await #expect(throws: EnrollmentModelError.self) { try await model.withdraw(enrollmentId: "enrollment") }
+        #expect(fixture.withdrawals.started == 0 && fixture.locallyStopped.isEmpty)
+        #expect(model.state.value?.first?.withdrawnAt == nil)
+    }
+
+    @Test
+    func accountChangeAfterLocalStopCannotSendWithdrawalAsTheNewAccount() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let model = fixture.model()
+        await fixture.load(model, with: [Self.enrollment()])
+        fixture.onStop = { fixture.session = Self.session(subject: "other-participant") }
+        await #expect(throws: CancellationError.self) { try await model.withdraw(enrollmentId: "enrollment") }
+        #expect(fixture.withdrawals.started == 0)
+        #expect(model.state.value == nil)
+    }
+}
+
+
+extension EnrollmentModelTests {
+    @Test
+    func savedWithdrawalStopsBeforeOfflineDiscoveryWithoutLoadedProfileOrEnrollments() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let model = fixture.model()
+        let captured = try #require(fixture.session)
+        let withdrawal = Task { try await model.withdrawSavedCollection(enrollmentId: "enrollment", for: captured) }
+        try await fixture.lists.waitForCount(1)
+        #expect(fixture.locallyStopped == ["enrollment"])
+        #expect(model.isCollectionStopped(enrollmentId: "enrollment"))
+        #expect(fixture.withdrawals.started == 0)
+        await #expect(throws: EnrollmentModelError.self) {
+            try await model.withdrawSavedCollection(enrollmentId: "enrollment", for: captured)
+        }
+        fixture.lists.fail()
+        await #expect(throws: URLError.self) { try await withdrawal.value }
+        #expect(model.state.value == nil && model.state.error != nil)
+        #expect(model.isCollectionStopped(enrollmentId: "enrollment"))
+        #expect(fixture.withdrawals.started == 0)
+    }
+
+    @Test(arguments: [false, true])
+    func savedWithdrawalReconcilesLostReplyAndRetainsTheCompleteEnrollmentList(alreadyWithdrawn: Bool) async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let model = fixture.model()
+        let captured = try #require(fixture.session)
+        let withdrawal = Task { try await model.withdrawSavedCollection(enrollmentId: "enrollment", for: captured) }
+        try await fixture.lists.waitForCount(1)
+        var other = Self.enrollment(study: "other-study")
+        other.id = "other-enrollment"
+        let confirmed = Self.enrollment(version: 2, withdrawn: true)
+        fixture.lists.finish([alreadyWithdrawn ? confirmed : Self.enrollment(), other])
+        if !alreadyWithdrawn {
+            try await fixture.withdrawals.waitForCount(1)
+            fixture.withdrawals.finish(confirmed)
+        }
+        try await withdrawal.value
+        #expect(fixture.withdrawals.started == (alreadyWithdrawn ? 0 : 1))
+        #expect(model.state.value == [confirmed, other])
+        #expect(!model.isWithdrawalPending(for: confirmed))
+    }
+
+    @Test
+    func staleSavedConfirmationCannotStopOrContactTheReplacementAccount() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let captured = try #require(fixture.session)
+        let model = fixture.model()
+        fixture.session = Self.session(subject: "other")
+        await #expect(throws: CancellationError.self) {
+            try await model.withdrawSavedCollection(enrollmentId: "enrollment", for: captured)
+        }
+        #expect(fixture.locallyStopped.isEmpty && fixture.requestedSessions.isEmpty)
+    }
+
+    @Test
+    func failedSavedStopDoesNotStartServerDiscovery() async throws {
+        let fixture = Fixture()
+        defer { fixture.cancelAll() }
+        let captured = try #require(fixture.session)
+        let model = fixture.model()
+        fixture.stopFailure = true
+        await #expect(throws: EnrollmentModelError.self) {
+            try await model.withdrawSavedCollection(enrollmentId: "enrollment", for: captured)
+        }
+        #expect(fixture.locallyStopped.isEmpty && fixture.requestedSessions.isEmpty)
+    }
 }
 
 
@@ -201,6 +317,9 @@ extension EnrollmentModelTests {
         let enrollments = Replies<Trove.Enrollment>()
         let withdrawals = Replies<Trove.Enrollment>()
         var requestedSessions: [KeycloakSessionSnapshot] = []
+        var locallyStopped: [String] = []
+        var stopFailure = false
+        var onStop: (() -> Void)?
 
         func model() -> EnrollmentModel {
             EnrollmentModel(transport: .init(
@@ -213,7 +332,14 @@ extension EnrollmentModelTests {
                     self.requestedSessions.append(session)
                     return try await self.enrollments.request()
                 },
-                withdraw: { session, _ in
+                stopCollection: { _, enrollmentID in
+                    if self.stopFailure { throw EnrollmentModelError.enrollmentStateUnavailable }
+                    self.locallyStopped.append(enrollmentID)
+                    self.onStop?()
+                },
+                stoppedEnrollments: { _ in Set(self.locallyStopped) },
+                withdraw: { session, enrollmentID in
+                    #expect(self.locallyStopped.contains(enrollmentID))
                     self.requestedSessions.append(session)
                     return try await self.withdrawals.request()
                 }

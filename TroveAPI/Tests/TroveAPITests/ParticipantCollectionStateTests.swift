@@ -21,11 +21,14 @@ struct ParticipantCollectionStateTests {
             #expect(initial.snapshot == nil)
             let plan = Self.plan()
             let retained = try await journal.retainCollectionSnapshot(Self.snapshot([plan]), replacing: initial)
+            #expect(retained.collections.map(\.plan) == [plan])
+            #expect(retained.collections.allSatisfy { !$0.isStopped })
             let snapshot = try #require(retained.snapshot)
             #expect(snapshot.heartRateQueryStart == Self.start.addingTimeInterval(-15_552_000))
             await journal.close()
             let reopened = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
             let restored = try await reopened.collectionState()
+            #expect(restored.collections.map(\.plan) == [plan])
             #expect(restored.revision == retained.revision)
             #expect(try #require(restored.snapshot).hasSameAuthority(as: snapshot))
             // The synthetic acceptance is decades old. There is no wall-clock TTL or renewed relative window.
@@ -82,6 +85,9 @@ struct ParticipantCollectionStateTests {
             await journal.close()
             let reopened = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
             let stopped = try await reopened.collectionState()
+            let settings = try #require(stopped.collections.first)
+            #expect(settings.plan == plan && settings.isStopped)
+            #expect(stopped.collections.count == 1)
             // Even a subsequent successful server refresh cannot override the local withdrawal intent.
             let refreshed = try await reopened.retainCollectionSnapshot(Self.snapshot([plan]), replacing: stopped)
             #expect(refreshed.stoppedEnrollmentIDs == [id])
@@ -112,11 +118,13 @@ struct ParticipantCollectionStateTests {
         try await DeliveryFixture.withJournal { journal, _ in
             let plan = Self.plan()
             let retained = try await journal.retainCollectionSnapshot(Self.snapshot([plan]), replacing: journal.collectionState())
-            var olderVersion = plan, olderObservation = plan, changedPolicy = plan
+            var olderVersion = plan, olderObservation = plan, changedPolicy = plan, changedStudy = plan
             olderVersion.stateVersion -= 1
             olderObservation.asOf -= 1
             changedPolicy.windows[0].requirements[0].start -= 1
-            for invalid in [olderVersion, olderObservation, changedPolicy] {
+            changedStudy.studyId = UUID().uuidString
+            changedStudy.stateVersion += 1
+            for invalid in [olderVersion, olderObservation, changedPolicy, changedStudy] {
                 await #expect(throws: DeliveryJournalError.staleCollectionState) {
                     try await journal.retainCollectionSnapshot(Self.snapshot([invalid]), replacing: retained)
                 }
@@ -185,21 +193,28 @@ struct ParticipantCollectionStateTests {
 
 extension ParticipantCollectionStateTests {
     private static func plan() -> Components.Schemas.ParticipantCollectionPlan {
-        .init(enrollmentId: UUID().uuidString.lowercased(), stateVersion: 2, asOf: start.addingTimeInterval(10), windows: [
-            .init(
-                consentId: UUID().uuidString.lowercased(),
-                publicationId: UUID().uuidString.lowercased(),
-                revision: 1,
-                start: start,
-                requirements: [
-                    .init(
-                        profile: ParticipantCollectionSnapshot.heartRateProfile,
-                        sourceKind: .participantApp,
-                        start: start.addingTimeInterval(-15_552_000)
-                    )
-                ]
-            )
-        ])
+        .init(
+            enrollmentId: UUID().uuidString.lowercased(),
+            studyId: UUID().uuidString,
+            title: .init([.enUS: "Saved Study"]),
+            stateVersion: 2,
+            asOf: start.addingTimeInterval(10),
+            windows: [
+                .init(
+                    consentId: UUID().uuidString.lowercased(),
+                    publicationId: UUID().uuidString.lowercased(),
+                    revision: 1,
+                    start: start,
+                    requirements: [
+                        .init(
+                            profile: ParticipantCollectionSnapshot.heartRateProfile,
+                            sourceKind: .participantApp,
+                            start: start.addingTimeInterval(-15_552_000)
+                        )
+                    ]
+                )
+            ]
+        )
     }
 
     private static func snapshot(_ plans: [Components.Schemas.ParticipantCollectionPlan]) throws -> ParticipantCollectionSnapshot {

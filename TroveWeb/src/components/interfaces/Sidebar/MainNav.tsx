@@ -92,7 +92,7 @@ const navBarItems: NavBarItem[] = [
     id: "results",
     title: "Results",
     icon: ChartBar,
-    onClick: () => notImplementedToast("Results"),
+    linkOptions: { to: "/$group/$study/results" },
   },
 ];
 

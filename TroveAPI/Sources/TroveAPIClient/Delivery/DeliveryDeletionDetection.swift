@@ -23,7 +23,7 @@ extension DeliveryJournal {
         }
         return try database.transaction {
             _ = try activeSource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID, queryID: expected.queryID) == expected else { throw JournalError.staleCheckpoint }
+            try validateCheckpoint(expected)
             var detections: [UUID: Date] = [:]
             for id in recordIDs {
                 let parameters: [DeliverySQLite.Value] = [

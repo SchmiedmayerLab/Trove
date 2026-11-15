@@ -21,6 +21,10 @@ final class HealthDataModel: Module, EnvironmentAccessible {
     struct Transport {
         var session: @MainActor () -> KeycloakSessionSnapshot?
         var run: @MainActor (Action, KeycloakSessionSnapshot) async throws -> HealthDataStatus
+        var savedCollections: @MainActor (KeycloakSessionSnapshot) async throws -> [ParticipantCollectionState.Collection] = { _ in [] }
+        var stopCollection: @MainActor (String, KeycloakSessionSnapshot) async throws -> Void = { _, _ in
+            throw EventDeliveryJournal.JournalError.invalidConfiguration
+        }
     }
 
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
@@ -33,12 +37,22 @@ final class HealthDataModel: Module, EnvironmentAccessible {
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var session: KeycloakSessionSnapshot?
     private var operationID: UUID?
+    private var collectionGeneration = UUID()
+    private var pendingWithdrawal: KeycloakSessionSnapshot?
     private var storedStatus: HealthDataStatus = .signedOut
+    private var settingsSession: KeycloakSessionSnapshot?
+    private var settingsRequestID: UUID?
+    private var storedSettings: LoadingState<[ParticipantCollectionState.Collection]> = .idle
 
     var status: HealthDataStatus { currentSession == session && session != nil ? storedStatus : .signedOut }
-    var isBusy: Bool { currentSession == operationSession && operationSession != nil && operationID != nil }
+    var isBusy: Bool {
+        currentSession != nil && (currentSession == pendingWithdrawal || currentSession == operationSession && operationID != nil)
+    }
     var sessionSnapshot: KeycloakSessionSnapshot? { currentSession }
-    var needsAutomaticRetry: Bool { isBusy || [.waiting, .catchUpPending, .unavailable].contains(status) }
+    var savedCollections: LoadingState<[ParticipantCollectionState.Collection]> {
+        currentSession != nil && currentSession == settingsSession ? storedSettings : .idle
+    }
+    var needsAutomaticRetry: Bool { isBusy || [.waiting, .catchUpPending, .refreshNeeded, .unavailable].contains(status) }
 
     private var currentSession: KeycloakSessionSnapshot? {
         if let transport {
@@ -56,10 +70,71 @@ final class HealthDataModel: Module, EnvironmentAccessible {
     }
 
     func invalidateSession() {
+        collectionGeneration = UUID()
         operationTask?.cancel()
         session = nil
         storedStatus = .signedOut
+        if settingsSession != currentSession {
+            settingsSession = nil
+            settingsRequestID = nil
+            storedSettings = .idle
+        }
         resumeWaiters()
+    }
+
+    /// A read-only local operation; failure must not be presented as an empty collection plan.
+    func refreshCollectionSettings() async {
+        guard let captured = currentSession else {
+            return
+        }
+        if settingsSession != captured { storedSettings = .idle }
+        settingsSession = captured
+        let requestID = UUID()
+        settingsRequestID = requestID
+        storedSettings.beginLoading()
+        do {
+            let collections: [ParticipantCollectionState.Collection]
+            if let transport { collections = try await transport.savedCollections(captured) } else {
+                collections = try await api.savedCollections(for: captured)
+            }
+            guard currentSession == captured, settingsRequestID == requestID else {
+                return
+            }
+            if Task.isCancelled { storedSettings.cancelLoading() } else { storedSettings.resolve(with: collections) }
+        } catch {
+            guard currentSession == captured, settingsRequestID == requestID else {
+                return
+            }
+            if Task.isCancelled { storedSettings.cancelLoading() } else { storedSettings.reject(with: error) }
+        }
+    }
+
+    /// Exclude new passes while the current writer closes, then persist the local stop before HTTP.
+    func stopCollection(enrollmentId: String, for captured: KeycloakSessionSnapshot) async throws {
+        guard currentSession == captured else { throw CancellationError() }
+        guard pendingWithdrawal != captured else { throw EventDeliveryJournal.JournalError.invalidConfiguration }
+        if session != captured { invalidateSession(); session = captured }
+        pendingWithdrawal = captured
+        // A queued observer must remain invalid even after withdrawal finishes and clears the busy flag.
+        collectionGeneration = UUID()
+        operationTask?.cancel()
+        defer {
+            if pendingWithdrawal == captured { pendingWithdrawal = nil }
+            resumeWaiters()
+        }
+        while operationTask != nil, currentSession == captured, !Task.isCancelled {
+            await waitForOperation(for: captured)
+        }
+        try Task.checkCancellation()
+        guard currentSession == captured else { throw CancellationError() }
+        if let transport {
+            try await transport.stopCollection(enrollmentId, captured)
+        } else {
+            try await api.stopCollection(enrollmentId: enrollmentId, for: captured)
+        }
+        guard currentSession == captured else { throw CancellationError() }
+        session = captured
+        storedStatus = .refreshNeeded
     }
 
     func run(_ action: Action) async {
@@ -67,18 +142,21 @@ final class HealthDataModel: Module, EnvironmentAccessible {
             invalidateSession()
             return
         }
+        guard pendingWithdrawal != captured else {
+            return
+        }
         if session != captured { invalidateSession(); session = captured }
         // Repeated UI actions are ignored, but a replacement account waits for old cleanup.
         guard operationSession != captured || operationID == nil else {
             return
         }
-        await perform(action, for: captured)
+        await perform(action, for: captured, generation: collectionGeneration)
     }
 
     /// The observer may acknowledge this wake only after this method returns. A wake
     /// arriving during a query needs a subsequent query, not a join on its earlier snapshot.
     func receiveHealthUpdate(for captured: KeycloakSessionSnapshot, context: WakeContext) async {
-        guard !Task.isCancelled, currentSession == captured else {
+        guard !Task.isCancelled, currentSession == captured, pendingWithdrawal != captured else {
             return
         }
         if session != captured { invalidateSession(); session = captured }
@@ -87,8 +165,9 @@ final class HealthDataModel: Module, EnvironmentAccessible {
             operationTask?.cancel()
         }
         let waitForDeadline = waitForCaptureDeadline
+        let generation = collectionGeneration
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.perform(.capture, for: captured) }
+            group.addTask { await self.perform(.capture, for: captured, generation: generation) }
             group.addTask { await waitForDeadline() }
             await group.next()
             group.cancelAll()
@@ -97,11 +176,12 @@ final class HealthDataModel: Module, EnvironmentAccessible {
         }
     }
 
-    private func perform(_ action: Action, for captured: KeycloakSessionSnapshot) async {
+    private func perform(_ action: Action, for captured: KeycloakSessionSnapshot, generation: UUID) async {
         while operationTask != nil, currentSession == captured, !Task.isCancelled {
             await waitForOperation(for: captured)
         }
-        guard !Task.isCancelled, currentSession == captured, session == captured else {
+        guard !Task.isCancelled, currentSession == captured, session == captured,
+              collectionGeneration == generation, pendingWithdrawal != captured else {
             return
         }
         let identifier = UUID()

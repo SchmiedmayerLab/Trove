@@ -27,6 +27,7 @@ const EnrollmentRouteComponent = () => {
         path: { studyId: params.study },
         headers: getDraftHeaders(),
         body: {
+          enrollmentPeriod: data.enrollmentPeriod,
           enrollmentConditions: data.enrollmentConditions,
           visibility: data.visibility,
           participationCriterion: data.participationCriterion ?? {
@@ -38,6 +39,7 @@ const EnrollmentRouteComponent = () => {
       {
         onSuccess: (updatedStudy) => {
           form.reset({
+            enrollmentPeriod: updatedStudy.enrollmentPeriod,
             enrollmentConditions: updatedStudy.enrollmentConditions,
             visibility: updatedStudy.visibility,
             participationCriterion: updatedStudy.participationCriterion,

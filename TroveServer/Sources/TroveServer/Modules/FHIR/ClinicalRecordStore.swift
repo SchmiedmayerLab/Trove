@@ -74,19 +74,20 @@ struct ClinicalRecordRevision: Sendable {
 struct ClinicalRecordStore: Sendable {
     let sql: any SQLDatabase
 
-    func insertPoint(
-        _ output: ValidatedExchangeEvent.PointOutput,
+    func insertOutput(
+        _ output: ValidatedExchangeEvent.Output,
         nodeID: UUID,
         recordID: UUID,
         bindingID: UUID,
         receipt: ClinicalEventReceipt
     ) async throws {
         try await sql.raw("""
-            INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                quantity_value, quantity_system, quantity_code, code_system, code)
+            INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at, effective_end,
+                value_kind, quantity_value, quantity_system, quantity_code, value_code_system, value_code, code_system, code)
             VALUES (\(bind: nodeID), \(bind: receipt.sourceID), \(bind: receipt.eventID), \(bind: recordID), \(bind: bindingID),
-                \(bind: output.profile), \(bind: output.effectiveAt),
-                \(bind: output.quantityValue), \(bind: output.quantitySystem), \(bind: output.quantityCode), \(bind: output.codeSystem), \(bind: output.code))
+                \(bind: output.profile), \(bind: output.effectiveAt), \(bind: output.effectiveEnd),
+                \(bind: output.value.kind), \(bind: output.value.quantityValue), \(bind: output.value.quantitySystem), \(bind: output.value.quantityCode),
+                \(bind: output.value.codingSystem), \(bind: output.value.codingCode), \(bind: output.codeSystem), \(bind: output.code))
             """)
             .run()
     }

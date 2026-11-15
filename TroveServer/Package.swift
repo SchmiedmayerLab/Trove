@@ -37,7 +37,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.4"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.11"),
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "79155e1b1831f61c765b349e6587a876402f6c5e"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),
@@ -62,6 +62,7 @@ let package = Package(
                 .product(name: "GroveFoundation", package: "Grove"),
                 .product(name: "GroveConsent", package: "Grove"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
                 .product(name: "GroveQuestionnaireFHIR", package: "Grove"),
                 .target(name: "GroveVapor"),
                 .product(name: "JWTKit", package: "jwt-kit"),
@@ -96,8 +97,16 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "JWTKit", package: "jwt-kit")
             ],
-            exclude: ["Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license"],
-            resources: [.copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json")],
+            exclude: [
+                "Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license",
+                "Resources/HealthKitSleepEvent.json.license", "Resources/HealthKitWorkoutEvent.json.license",
+                "Resources/HealthKitWorkoutRouteEvent.json.license"
+            ],
+            resources: [
+                .copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json"),
+                .copy("Resources/HealthKitSleepEvent.json"), .copy("Resources/HealthKitWorkoutEvent.json"),
+                .copy("Resources/HealthKitWorkoutRouteEvent.json")
+            ],
             swiftSettings: swiftSettings,
             plugins: [] + swiftLintPlugin()
         )

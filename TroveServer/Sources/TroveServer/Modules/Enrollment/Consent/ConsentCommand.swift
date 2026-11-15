@@ -59,8 +59,8 @@ struct ConsentCommand: Sendable {
     }
 
     func validateNewSubmission(for enrollment: Enrollment) throws {
-        guard enrollment.withdrawnAt == nil else {
-            throw ServerError.conflict("Cannot submit consent for a withdrawn enrollment")
+        guard enrollment.withdrawnAt == nil, enrollment.endsAt.map({ Date() < $0 }) ?? true else {
+            throw ServerError.conflict("Cannot submit consent for a withdrawn or ended enrollment")
         }
         guard expectedVersion > 0, expectedVersion < Int64.max, enrollment.stateVersion == expectedVersion else {
             throw ServerError.preconditionFailed("Enrollment state changed before consent could be accepted")

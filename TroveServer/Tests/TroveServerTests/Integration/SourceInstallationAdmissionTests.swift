@@ -24,7 +24,7 @@ struct SourceInstallationAdmissionTests {
             }
             let submission = try ClinicalEventBatchTests.submission(LocalPointEventFixture.bytes(source: fixture.source), fixture: fixture)
             await #expect {
-                try await ClinicalEventService(database: app.db, validator: validator).accept(
+                try await TestApp.clinicalService(database: app.db, validator: validator).accept(
                     submission: submission, sourceID: fixture.source.id, installation: fixture.installation
                 )
             } throws: { ($0 as? ServerError)?.status.code == 409 }
@@ -47,7 +47,7 @@ struct SourceInstallationAdmissionTests {
                     LocalPointEventFixture.bytes(source: fixture.source, sequence: UInt64($0), recordID: "sample-\($0)"), fixture: fixture
                 )
             }
-            let service = ClinicalEventService(database: app.db, validator: validator)
+            let service = TestApp.clinicalService(database: app.db, validator: validator)
             let results = if bundle {
                 try await service.acceptBundle(
                     ClinicalRecordBundleTests.bundle(submissions, sourceID: fixture.source.id),

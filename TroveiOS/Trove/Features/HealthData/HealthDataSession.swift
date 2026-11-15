@@ -45,12 +45,15 @@ struct HealthDataSession {
     }
 
     private func perform(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus {
-        let acquisition = try api.makeHeartRateAcquisition(journal: journal, for: session)
+        let acquisition = try api.makeHealthKitAcquisition(journal: journal, for: session)
         var sources = try await journal.sourceSetups()
         try checkSession()
         guard sources.count <= 1 else { throw EventDeliveryJournal.JournalError.sourceConflict }
+        if action == .setUp {
+            try await api.refreshCollectionPlans(journal: journal, for: session)
+        }
         if action == .setUp, sources.isEmpty {
-            let definition = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollmentIDs())
+            let definition = try await acquisition.prepareQueryDefinition()
             try checkSession()
             sources = [try await journal.createSource(localID: UUID(), queryDefinition: definition)]
         }
@@ -65,13 +68,14 @@ struct HealthDataSession {
             return try await queueStatus(journal, source: restored)
         }
         if action == .requestAccess {
-            _ = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollmentIDs())
-            let refreshed = try await api.synchronizeSource(localID: source.localID, journal: journal, for: session)
+            _ = try await acquisition.prepareQueryDefinition()
             try checkSession()
-            guard refreshed.binding?.isRevoked != true else {
+            guard source.binding != nil, source.binding?.isRevoked != true else {
                 return .revoked
             }
-            try await healthKit.askForAuthorization(for: .init(read: [HKQuantityType(.heartRate)]))
+            let streams = try await requestedStreams(journal)
+            let types = streams.map { HealthKitAcquisition.sampleType(for: $0) as HKObjectType }
+            try await healthKit.askForAuthorization(for: .init(read: types))
             try checkSession()
             return .permissionRequested
         }
@@ -80,50 +84,94 @@ struct HealthDataSession {
 
     private func collect(
         _ action: HealthDataModel.Action,
-        acquisition: HeartRateAcquisition,
+        acquisition: HealthKitAcquisition,
         source: EventDeliveryJournal.SourceSetup,
         journal: EventDeliveryJournal
     ) async throws -> HealthDataStatus {
+        // Background observer capture is entirely local. Foreground sync refreshes once;
+        // an unavailable network cannot prevent capture under a previously accepted plan.
+        let refreshed = action == .sync ? try await refreshAuthority(journal, localID: source.localID) : false
+        try checkSession()
+        let currentSource = try await journal.sourceSetup(for: source.localID)
+        var progress = HealthKitAcquisition.Progress.caughtUp
+        var collectionStatus: HealthDataStatus?
+        do {
+            if currentSource.binding?.isRevoked == true { throw EventDeliveryJournal.JournalError.sourceRevoked }
+            if try await hasRequestedAccess(journal) {
+                try checkSession()
+                progress = try await acquisition.catchUp(localID: source.localID, healthKit: healthKit)
+                if try await requestedStreams(journal).isEmpty { collectionStatus = .notAuthorized }
+            } else {
+                collectionStatus = .permissionNeeded
+            }
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            // Preserve the uncommitted page. Delivery can free space without resetting its anchor.
+            progress = .needsAnotherPass
+        } catch ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized {
+            collectionStatus = .notAuthorized
+        } catch EventDeliveryJournal.JournalError.sourceRevoked {
+            collectionStatus = .revoked
+        }
+        // Receipt recovery and server disposition remain useful even after collection has stopped.
         if action == .sync {
             let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
             _ = try await drainer.drain(limit: 128)
             _ = try await journal.pruneDelivered()
         }
-        try checkSession()
-        guard source.binding?.isRevoked != true else {
-            return .revoked
+        let status = try await queueStatus(journal, source: currentSource, finished: action == .sync && refreshed, progress: progress)
+        if status == .blocked {
+            return status
         }
-        let enrollments = try await enrollmentIDs()
-        guard await healthKit.didAskForAuthorization(toRead: SampleType.heartRate) else {
-            _ = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollments)
-            return .permissionNeeded
+        if let collectionStatus {
+            return collectionStatus
         }
-        try checkSession()
-        let progress = try await acquisition.catchUp(localID: source.localID, enrollmentIDs: enrollments, healthKit: healthKit)
-        if action == .capture {
-            return try await queueStatus(journal, source: source, progress: progress)
-        }
-        let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
-        _ = try await drainer.drain(limit: 128)
-        _ = try await journal.pruneDelivered()
-        return try await queueStatus(journal, source: source, finished: true, progress: progress)
+        return action == .sync && !refreshed && status == .ready ? .unavailable : status
     }
 
-    private func enrollmentIDs() async throws -> [UUID] {
-        try checkSession()
-        let enrollments = try await api.requireClient(for: session).getParticipantEnrollments(.init()).ok.body.json
-        try checkSession()
-        return try enrollments.filter { $0.withdrawnAt == nil }.map {
-            guard let id = UUID(uuidString: $0.id) else { throw ParticipantCollectionSnapshot.CollectionError.invalidPlan }
-            return id
+    private func refreshAuthority(_ journal: EventDeliveryJournal, localID: UUID) async throws -> Bool {
+        do {
+            _ = try await api.synchronizeSource(localID: localID, journal: journal, for: session)
+            try await api.refreshCollectionPlans(journal: journal, for: session)
+            try checkSession()
+            return true
+        } catch SourceRegistration.RegistrationError.unavailable {
+            try checkSession()
+            return false
+        } catch SourceRegistration.RegistrationError.rejected(let status) where status == 429 || status >= 500 {
+            try checkSession()
+            return false
+        } catch ParticipantCollectionRefresh.RefreshError.unavailable {
+            try checkSession()
+            return false
         }
+    }
+
+    private func requestedStreams(_ journal: EventDeliveryJournal) async throws -> [HealthKitQueryDefinition.Stream] {
+        let state = try await journal.collectionState()
+        return try state.snapshot?.active().acquisitionStreams ?? []
+    }
+
+    private func hasRequestedAccess(_ journal: EventDeliveryJournal) async throws -> Bool {
+        for stream in try await requestedStreams(journal) {
+            let requested: Bool
+            switch stream {
+            case .heartRate: requested = await healthKit.didAskForAuthorization(toRead: SampleType.heartRate)
+            case .sleepStage: requested = await healthKit.didAskForAuthorization(toRead: SampleType.sleepAnalysis)
+            case .workout: requested = await healthKit.didAskForAuthorization(toRead: SampleType.workout)
+            case .workoutRoute: requested = await healthKit.didAskForAuthorization(toRead: SampleType.workoutRoute)
+            }
+            if !requested {
+                return false
+            }
+        }
+        return true
     }
 
     private func queueStatus(
         _ journal: EventDeliveryJournal,
         source: EventDeliveryJournal.SourceSetup,
         finished: Bool = false,
-        progress: HeartRateAcquisition.Progress = .caughtUp
+        progress: HealthKitAcquisition.Progress = .caughtUp
     ) async throws -> HealthDataStatus {
         if source.binding?.isRevoked == true {
             return .revoked

@@ -121,8 +121,15 @@ struct EnrollmentView: View {
             Section("Enrollment") {
                 LabeledContent("Status", value: statusText(for: enrollment))
                 LabeledContent("Enrolled since", value: enrollment.enrolledAt, format: .dateTime)
+                if let end = enrollment.endsAt {
+                    LabeledContent("Enrollment ends", value: end, format: .dateTime)
+                }
                 if let withdrawnAt = enrollment.withdrawnAt {
                     LabeledContent("Withdrawn on", value: withdrawnAt, format: .dateTime)
+                }
+                if enrollments.isWithdrawalPending(for: enrollment) {
+                    Text("Collection has stopped on this device. Connect and retry withdrawal to confirm it with the study.")
+                        .foregroundStyle(.secondary)
                 }
                 LabeledContent("Current revision", value: "\(enrollment.currentRevision)")
             }
@@ -149,7 +156,10 @@ struct EnrollmentView: View {
         } else if enrollments.isMutating {
             ProgressView("Updating Enrollment…")
                 .frame(maxWidth: .infinity)
-        } else if activeEnrollment != nil {
+        } else if let latest = enrollments.latestEnrollment(forStudy: item.studyId), latest.withdrawnAt == nil {
+            if latest.endsAt.map({ $0 <= Date() }) == true {
+                Text("Your enrollment has ended.").foregroundStyle(.secondary)
+            }
             Button("Withdraw from Study", role: .destructive) {
                 isPresentingWithdrawConfirmation = true
             }
@@ -188,7 +198,7 @@ struct EnrollmentView: View {
         if activeEnrollment != nil {
             return false
         }
-        if let latest = enrollments.latestEnrollment(forStudy: item.studyId), latest.withdrawnAt != nil {
+        if enrollments.latestEnrollment(forStudy: item.studyId) != nil {
             return false
         }
         return true
@@ -285,7 +295,10 @@ extension EnrollmentView {
     }
 
     private func statusText(for enrollment: Trove.Enrollment) -> String {
-        enrollment.withdrawnAt == nil ? String(localized: "Active") : String(localized: "Withdrawn")
+        if enrollment.withdrawnAt != nil {
+            return String(localized: "Withdrawn")
+        }
+        return enrollment.endsAt.map { $0 <= Date() } == true ? String(localized: "Ended") : String(localized: "Active")
     }
     private func performEnroll() {
         let trimmed = enteredInvitationCode.trimmingCharacters(in: .whitespaces)
@@ -295,7 +308,7 @@ extension EnrollmentView {
         }
     }
     private func performWithdraw() {
-        guard let enrollment = activeEnrollment else {
+        guard let enrollment = enrollments.latestEnrollment(forStudy: item.studyId), enrollment.withdrawnAt == nil else {
             return
         }
         catchingTask {

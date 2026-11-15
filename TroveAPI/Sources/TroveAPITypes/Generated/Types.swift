@@ -68,6 +68,22 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /studies/{studyId}/delegations/{delegationId}/revoke`.
     /// - Remark: Generated from `#/paths//studies/{studyId}/delegations/{delegationId}/revoke/post(revokeStudyDelegation)`.
     func revokeStudyDelegation(_ input: Operations.RevokeStudyDelegation.Input) async throws -> Operations.RevokeStudyDelegation.Output
+    /// Read an authorized page of derived study data
+    ///
+    /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/get(getStudyData)`.
+    func getStudyData(_ input: Operations.GetStudyData.Input) async throws -> Operations.GetStudyData.Output
+    /// Download an authorized recording's original source bytes
+    ///
+    /// Requires the same interactive researcher membership and explicit data-reader capability as study data pages. The grant identifier is an exact study grant from export Provenance, not an authorization token. Current and history selection exclude withdrawn and retracted data. The server checks authority before storage access and again after preparing the complete verified file, then commits disclosure intent before returning any bytes. The response is the original decoded CSV, matching the FHIR attachment hash and size even when the stored transport representation is compressed. Transfer expiry does not expire retained clinical custody. Storage, integrity or configured capacity failures return no partial successful response and can be retried.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data/recordings/{grantId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/recordings/{grantId}/get(getStudyRecording)`.
+    func getStudyRecording(_ input: Operations.GetStudyRecording.Input) async throws -> Operations.GetStudyRecording.Output
     /// Read a bounded page of study audit history
     ///
     /// Requires researcher identity plus both admin and audit-reader membership in the study's group. Administration alone does not grant audit access. Includes only that study's group-scoped history, never participant/source history. Ordered by occurredAt and id descending. A cursor is an existing event ID in the same scope, not an authorization token. Each page requires committed disclosure intent before release; identifiers remain governed study data. New records require a fresh first page; this is not a frozen export snapshot.
@@ -254,6 +270,27 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/revoke`.
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/revoke/post`.
     func postParticipantSourcesSourceIdRevoke(_ input: Operations.PostParticipantSourcesSourceIdRevoke.Input) async throws -> Operations.PostParticipantSourcesSourceIdRevoke.Output
+    /// Register an immutable recording transfer declaration
+    ///
+    /// Requires current participant source ownership, installation proof and collection authority. Persist a transfer UUID and the unchanged declaration before sending. Replays return the same declaration commitment; changing it under the same source/UUID returns 409. The JSON envelope is limited to 64 KiB. Registration is audited and does not store recording bytes, accept a clinical record or create study grants. Retain the declaration commitment for matching upload and recovery receipts. Workout consent alone does not authorize route collection.
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/recording-transfers/{transferId}/declaration`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)`.
+    func declareParticipantRecordingTransfer(_ input: Operations.DeclareParticipantRecordingTransfer.Input) async throws -> Operations.DeclareParticipantRecordingTransfer.Output
+    /// Stream the exact bytes of a registered recording transfer
+    ///
+    /// Send application/octet-stream with Content-Length equal to storedByteCount. For zstd, send the declared Zstandard frame without an HTTP Content-Encoding header. Current source/installation and collection authority are checked before body consumption and before issuing a receipt. Stored count and SHA-256 are verified by readback. An active attempt returns 409; failed attempts can be retried and crashed attempts expire. Late attempts cannot replace newer uploads. Recover a lost response before resending bytes. This receipt attests stored transport bytes only, not decoded-source validity, FHIR admission or researcher access. Keep the source recording until its clinical record has a custody receipt.
+    ///
+    /// - Remark: HTTP `PUT /participant/sources/{sourceId}/recording-transfers/{transferId}/content`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)`.
+    func uploadParticipantRecordingTransfer(_ input: Operations.UploadParticipantRecordingTransfer.Input) async throws -> Operations.UploadParticipantRecordingTransfer.Output
+    /// Recover the latest completed recording transfer receipt
+    ///
+    /// Requires participant source ownership and a committed disclosure audit. Works after withdrawal or source revocation without admitting bytes or restoring access. Returns 404 when the latest attempt has no committed receipt or the source is not owned. Match the source/transfer identity, retained declaration commitment and stored byte count/digest. expiresAt bounds attachment acceptance; an expired receipt proves the past transfer, not current retention.
+    ///
+    /// - Remark: HTTP `GET /participant/sources/{sourceId}/recording-transfers/{transferId}/receipt`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)`.
+    func lookupParticipantRecordingTransferReceipt(_ input: Operations.LookupParticipantRecordingTransferReceipt.Input) async throws -> Operations.LookupParticipantRecordingTransferReceipt.Output
     /// Recover an immutable receipt for an event owned by the participant
     ///
     /// Matches an accepted representation by event identifier, payload digest and exact consent/output intent. Works after source revocation or enrollment withdrawal without admitting data, restoring access or returning samples. Requires source ownership and a committed audit disclosure intent. An unknown or foreign-owned event or an unaccepted payload digest returns 404; a different consent/output intent returns 409. Unknown bytes must be submitted for validation. A receipt proves past custody only; clients must match its identity and digest to their staged bytes before retirement. The JSON request is limited to 1 MiB.
@@ -272,7 +309,7 @@ public protocol APIProtocol: Sendable {
     func attributeParticipantEvent(_ input: Operations.AttributeParticipantEvent.Input) async throws -> Operations.AttributeParticipantEvent.Output
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant heart-rate point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -280,7 +317,7 @@ public protocol APIProtocol: Sendable {
     func postParticipantSourcesSourceIdEvents(_ input: Operations.PostParticipantSourcesSourceIdEvents.Input) async throws -> Operations.PostParticipantSourcesSourceIdEvents.Output
     /// Admit a bounded batch with independent event outcomes
     ///
-    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope is limited to 6 MiB and the sum of eventBase64 UTF-8 lengths to 5592408 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
+    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB). The sum of eventBase64 UTF-8 lengths is bounded by the configured record-byte budget after Base64 expansion, with a hard ceiling of 22369624 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/batch`.
@@ -288,7 +325,7 @@ public protocol APIProtocol: Sendable {
     func submitParticipantEventBatch(_ input: Operations.SubmitParticipantEventBatch.Input) async throws -> Operations.SubmitParticipantEventBatch.Output
     /// Admit a Grove Bundle with independent record outcomes
     ///
-    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The configured JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), the decoded Bundle budget to 4 MiB plus 1 KiB (hard ceiling 16 MiB plus 1 KiB), and each restored record budget to 4 MiB (hard ceiling 16 MiB). A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
@@ -503,6 +540,42 @@ extension APIProtocol {
     ) async throws -> Operations.RevokeStudyDelegation.Output {
         try await revokeStudyDelegation(Operations.RevokeStudyDelegation.Input(
             path: path,
+            headers: headers
+        ))
+    }
+    /// Read an authorized page of derived study data
+    ///
+    /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/get(getStudyData)`.
+    public func getStudyData(
+        path: Operations.GetStudyData.Input.Path,
+        query: Operations.GetStudyData.Input.Query = .init(),
+        headers: Operations.GetStudyData.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyData.Output {
+        try await getStudyData(Operations.GetStudyData.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Download an authorized recording's original source bytes
+    ///
+    /// Requires the same interactive researcher membership and explicit data-reader capability as study data pages. The grant identifier is an exact study grant from export Provenance, not an authorization token. Current and history selection exclude withdrawn and retracted data. The server checks authority before storage access and again after preparing the complete verified file, then commits disclosure intent before returning any bytes. The response is the original decoded CSV, matching the FHIR attachment hash and size even when the stored transport representation is compressed. Transfer expiry does not expire retained clinical custody. Storage, integrity or configured capacity failures return no partial successful response and can be retried.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data/recordings/{grantId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/recordings/{grantId}/get(getStudyRecording)`.
+    public func getStudyRecording(
+        path: Operations.GetStudyRecording.Input.Path,
+        query: Operations.GetStudyRecording.Input.Query = .init(),
+        headers: Operations.GetStudyRecording.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyRecording.Output {
+        try await getStudyRecording(Operations.GetStudyRecording.Input(
+            path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -974,6 +1047,55 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Register an immutable recording transfer declaration
+    ///
+    /// Requires current participant source ownership, installation proof and collection authority. Persist a transfer UUID and the unchanged declaration before sending. Replays return the same declaration commitment; changing it under the same source/UUID returns 409. The JSON envelope is limited to 64 KiB. Registration is audited and does not store recording bytes, accept a clinical record or create study grants. Retain the declaration commitment for matching upload and recovery receipts. Workout consent alone does not authorize route collection.
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/recording-transfers/{transferId}/declaration`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)`.
+    public func declareParticipantRecordingTransfer(
+        path: Operations.DeclareParticipantRecordingTransfer.Input.Path,
+        headers: Operations.DeclareParticipantRecordingTransfer.Input.Headers,
+        body: Operations.DeclareParticipantRecordingTransfer.Input.Body
+    ) async throws -> Operations.DeclareParticipantRecordingTransfer.Output {
+        try await declareParticipantRecordingTransfer(Operations.DeclareParticipantRecordingTransfer.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stream the exact bytes of a registered recording transfer
+    ///
+    /// Send application/octet-stream with Content-Length equal to storedByteCount. For zstd, send the declared Zstandard frame without an HTTP Content-Encoding header. Current source/installation and collection authority are checked before body consumption and before issuing a receipt. Stored count and SHA-256 are verified by readback. An active attempt returns 409; failed attempts can be retried and crashed attempts expire. Late attempts cannot replace newer uploads. Recover a lost response before resending bytes. This receipt attests stored transport bytes only, not decoded-source validity, FHIR admission or researcher access. Keep the source recording until its clinical record has a custody receipt.
+    ///
+    /// - Remark: HTTP `PUT /participant/sources/{sourceId}/recording-transfers/{transferId}/content`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)`.
+    public func uploadParticipantRecordingTransfer(
+        path: Operations.UploadParticipantRecordingTransfer.Input.Path,
+        headers: Operations.UploadParticipantRecordingTransfer.Input.Headers,
+        body: Operations.UploadParticipantRecordingTransfer.Input.Body
+    ) async throws -> Operations.UploadParticipantRecordingTransfer.Output {
+        try await uploadParticipantRecordingTransfer(Operations.UploadParticipantRecordingTransfer.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Recover the latest completed recording transfer receipt
+    ///
+    /// Requires participant source ownership and a committed disclosure audit. Works after withdrawal or source revocation without admitting bytes or restoring access. Returns 404 when the latest attempt has no committed receipt or the source is not owned. Match the source/transfer identity, retained declaration commitment and stored byte count/digest. expiresAt bounds attachment acceptance; an expired receipt proves the past transfer, not current retention.
+    ///
+    /// - Remark: HTTP `GET /participant/sources/{sourceId}/recording-transfers/{transferId}/receipt`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)`.
+    public func lookupParticipantRecordingTransferReceipt(
+        path: Operations.LookupParticipantRecordingTransferReceipt.Input.Path,
+        headers: Operations.LookupParticipantRecordingTransferReceipt.Input.Headers = .init()
+    ) async throws -> Operations.LookupParticipantRecordingTransferReceipt.Output {
+        try await lookupParticipantRecordingTransferReceipt(Operations.LookupParticipantRecordingTransferReceipt.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Recover an immutable receipt for an event owned by the participant
     ///
     /// Matches an accepted representation by event identifier, payload digest and exact consent/output intent. Works after source revocation or enrollment withdrawal without admitting data, restoring access or returning samples. Requires source ownership and a committed audit disclosure intent. An unknown or foreign-owned event or an unaccepted payload digest returns 404; a different consent/output intent returns 409. Unknown bytes must be submitted for validation. A receipt proves past custody only; clients must match its identity and digest to their staged bytes before retirement. The JSON request is limited to 1 MiB.
@@ -1012,7 +1134,7 @@ extension APIProtocol {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant heart-rate point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -1030,7 +1152,7 @@ extension APIProtocol {
     }
     /// Admit a bounded batch with independent event outcomes
     ///
-    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope is limited to 6 MiB and the sum of eventBase64 UTF-8 lengths to 5592408 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
+    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB). The sum of eventBase64 UTF-8 lengths is bounded by the configured record-byte budget after Base64 expansion, with a hard ceiling of 22369624 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/batch`.
@@ -1048,7 +1170,7 @@ extension APIProtocol {
     }
     /// Admit a Grove Bundle with independent record outcomes
     ///
-    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The configured JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), the decoded Bundle budget to 4 MiB plus 1 KiB (hard ceiling 16 MiB plus 1 KiB), and each restored record budget to 4 MiB (hard ceiling 16 MiB). A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.

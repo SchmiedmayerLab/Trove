@@ -12,6 +12,7 @@ import Testing
 @testable import Trove
 
 
+@Suite(.timeLimit(.minutes(1)))
 struct KeycloakAuthStateBindingTests {
     @Test(arguments: ["auth", "registrations"])
     func archivedStateRetainsMatchingConfiguration(endpoint: String) throws {
@@ -65,6 +66,61 @@ struct KeycloakAuthStateBindingTests {
         }
     }
 
+    @Test
+    func archivedExpiredTokensRemainUsableForLocalAccountRestoration() throws {
+        let configuration = try configuration()
+        let response = response(configuration)
+        let state = try archivedState(authorization: response, tokenSource: response, expired: true)
+        #expect(try #require(state.lastTokenResponse?.accessTokenExpirationDate) < .now)
+        try KeycloakAuthStateBinding.validate(state, configuration: configuration)
+    }
+
+    @Test
+    func networkFailureDoesNotInvalidateTheRetainedAccount() throws {
+        let configuration = try configuration()
+        let response = response(configuration)
+        let state = try archivedState(authorization: response, tokenSource: response, expired: true)
+        state.update(with: Optional<OIDTokenResponse>.none, error: URLError(.notConnectedToInternet))
+        try KeycloakAuthStateBinding.validate(state, configuration: configuration)
+    }
+
+    @Test
+    func confirmedAuthorizationFailureCannotRestoreEvenWithRetainedIdentityClaims() throws {
+        let configuration = try configuration()
+        let response = response(configuration)
+        let state = try archivedState(authorization: response, tokenSource: response)
+        state.update(withAuthorizationError: NSError(domain: OIDOAuthTokenErrorDomain, code: -1))
+        let data = try NSKeyedArchiver.archivedData(withRootObject: state, requiringSecureCoding: true)
+        let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClass: OIDAuthState.self, from: data)
+        let restored = try #require(decoded)
+        #expect(restored.lastTokenResponse?.idToken != nil)
+        #expect(throws: KeycloakAccountError.self) { try KeycloakAuthStateBinding.validate(restored, configuration: configuration) }
+    }
+
+    @Test
+    @MainActor
+    func sdkAuthorizationChangeIsObservedEvenWhenItsCallingTaskWasCancelled() async throws {
+        let configuration = try configuration()
+        let response = response(configuration)
+        let state = try archivedState(authorization: response, tokenSource: response)
+        let changes = AsyncStream<Void>.makeStream()
+        let observer = KeycloakAuthStateObserver {
+            #expect(!state.isAuthorized)
+            changes.continuation.yield(())
+            changes.continuation.finish()
+        }
+        state.stateChangeDelegate = observer
+        let task = Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            state.update(withAuthorizationError: NSError(domain: OIDOAuthTokenErrorDomain, code: -1))
+        }
+        await task.value
+        var notifications = 0
+        for await _ in changes.stream { notifications += 1 }
+        #expect(notifications == 1)
+        withExtendedLifetime(observer) {}
+    }
+
     private func configuration() throws -> KeycloakConfiguration {
         KeycloakConfiguration(
             issuer: try #require(URL(string: "https://identity.example.test/realms/trove")),
@@ -101,12 +157,13 @@ struct KeycloakAuthStateBindingTests {
         tokenSource: OIDAuthorizationResponse,
         identityIssuer: URL? = nil,
         identityAudience: String? = nil,
-        missingIdentity: Bool = false
+        missingIdentity: Bool = false,
+        expired: Bool = false
     ) throws -> OIDAuthState {
         let request = try #require(tokenSource.tokenExchangeRequest())
         let issuer = try #require(identityIssuer ?? request.configuration.issuer)
         let idToken = try syntheticIDToken(issuer: issuer, clientID: identityAudience ?? request.clientID)
-        var parameters = [
+        var parameters: [String: any NSCopying & NSObjectProtocol] = [
             // swiftlint:disable:next legacy_objc_type
             "access_token": "synthetic-token" as NSString,
             // swiftlint:disable:next legacy_objc_type
@@ -116,6 +173,11 @@ struct KeycloakAuthStateBindingTests {
         ]
         if missingIdentity {
             parameters.removeValue(forKey: "id_token")
+        }
+        if expired {
+            // A real AppAuth token response with an already elapsed lifetime, without a network request.
+            // swiftlint:disable:next legacy_objc_type
+            parameters["expires_in"] = NSNumber(value: -3600)
         }
         let token = OIDTokenResponse(request: request, parameters: parameters)
         let state = OIDAuthState(authorizationResponse: authorization, tokenResponse: token)

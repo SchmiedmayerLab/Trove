@@ -70,7 +70,7 @@ Real-stack simulator tests use ad-hoc signing: `CODE_SIGNING_ALLOWED=YES CODE_SI
 
 ## Artifact Recovery Verification
 
-The artifact storage lane additionally requires a disposable S3-compatible service on loopback. It uses synthetic credentials and a fresh test bucket, never deployment storage configuration:
+The artifact storage lane additionally requires a disposable S3-compatible service on loopback. It uses synthetic credentials and fresh test buckets, never deployment storage configuration. Configure the service with `AWS_ACCESS_KEY_ID=trove_test` and `AWS_SECRET_ACCESS_KEY=trove_test`; signed streaming uploads require authentication. The workflow also checks that unsigned requests are rejected. The tests include a generated 96 MiB recording and verify its exact byte count and SHA-256 without collecting the object in memory:
 
 ```sh
 TROVE_TEST_POSTGRES_PORT=15432 TROVE_TEST_S3_PORT=18333 bash scripts/check swift TroveServer

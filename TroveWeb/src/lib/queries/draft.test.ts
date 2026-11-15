@@ -62,6 +62,7 @@ describe("revision-bound form snapshots", () => {
         data: {
           ...initial,
           id: "study",
+          enrollmentPeriod: { calendar: "gregorian" as const, timeZone: "UTC" },
           collectionRequirements: [],
           locales: ["en-US"],
           icon: "",

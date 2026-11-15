@@ -97,7 +97,16 @@ extension ClinicalEventRepresentationStore {
         // Producer enrollment snapshots confer no authority and cannot refresh existing grants.
         let grants = ClinicalGrantStore(database: database, source: source, context: context, acceptedAt: receivedAt)
         _ = try await grants.authorities(
-            outputs: event.outputs.map { .init(fullURL: $0.fullURL, profile: $0.profile, effectiveAt: $0.effectiveAt) },
+            outputs: event.outputs.map {
+                .init(
+                            fullURL: $0.fullURL,
+                            profile: $0.profile,
+                            effectiveAt: $0.effectiveAt,
+                            effectiveEnd: $0.effectiveEnd,
+                            codeSystem: $0.codeSystem,
+                            code: $0.code
+                        )
+            },
             intent: intent,
             requireCustodyCoverage: true
         )

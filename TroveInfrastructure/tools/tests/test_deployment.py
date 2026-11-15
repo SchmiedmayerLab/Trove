@@ -44,16 +44,17 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(values["ports"]["web"]["nodePort"], 30080)
         self.assertEqual(values["ports"]["websecure"]["nodePort"], 30443)
 
-    def test_audit_reader_capability_is_available_but_never_assigned_by_default(self):
+    def test_data_reader_capabilities_are_available_but_never_assigned_by_default(self):
         for path in (ROOT / "docker/keycloak/realm.json", ROOT / "infrastructure/dev/realm/00-realm.json"):
             with self.subTest(path=path):
                 realm = json.loads(path.read_text())
                 group = next(item for item in realm["groups"] if item["name"] == "Schmiedmayer Lab")
-                readers = [item for item in group["subGroups"] if item["name"] == "audit-reader"]
-                self.assertEqual(readers, [{"name": "audit-reader", "subGroups": []}])
-                for user in realm.get("users", []):
-                    self.assertFalse(any(value.endswith("/audit-reader") for value in user.get("groups", [])))
-                self.assertFalse(any(value.endswith("/audit-reader") for value in realm.get("defaultGroups", [])))
+                for capability in ("audit-reader", "data-reader"):
+                    readers = [item for item in group["subGroups"] if item["name"] == capability]
+                    self.assertEqual(readers, [{"name": capability, "subGroups": []}])
+                    for user in realm.get("users", []):
+                        self.assertFalse(any(value.endswith("/" + capability) for value in user.get("groups", [])))
+                    self.assertFalse(any(value.endswith("/" + capability) for value in realm.get("defaultGroups", [])))
 
     def test_local_cluster_uses_the_verified_extension_compatible_node(self):
         configuration = yaml.safe_load((ROOT / "tools/kind-config.yaml").read_text())

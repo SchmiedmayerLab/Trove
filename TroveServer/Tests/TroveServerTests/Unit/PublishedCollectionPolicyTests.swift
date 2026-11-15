@@ -8,6 +8,7 @@
 
 import Foundation
 import Testing
+import TroveAPITypes
 @testable import TroveServer
 
 
@@ -56,6 +57,20 @@ struct PublishedCollectionPolicyTests {
         ))
     }
 
+    @Test
+    func pointPolicyDoesNotDiscardAnIntervalEnd() throws {
+        let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
+        #expect(!policy.permits(
+            studyID: Self.studyID,
+            revision: 2,
+            profile: Self.requirement.profile,
+            sourceKind: .participantApp,
+            effectiveAt: Self.acceptedAt,
+            consentAcceptedAt: Self.acceptedAt,
+            effectiveEnd: Self.acceptedAt.addingTimeInterval(60)
+        ))
+    }
+
     @Test(arguments: ["contractVersion", "contractRevision", "valueShape", "collectionWindow", "schemaVersion", "legacy-contract"])
     func unknownPersistedPolicyContractFailsClosed(field: String) throws {
         let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
@@ -64,7 +79,7 @@ struct PublishedCollectionPolicyTests {
             json["contractVersion"] = "0.6.0"
             json["contractRevision"] = "444e06fb25680c3af29e5d3ccbebeb0249be7318"
         } else {
-            json[field] = field == "schemaVersion" ? 3 : "unsupported"
+            json[field] = field == "schemaVersion" ? Int.max : "unsupported"
         }
         let altered = try JSONDecoder().decode(PublishedCollectionPolicy.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(throws: ServerError.self) {
@@ -87,5 +102,42 @@ struct PublishedCollectionPolicyTests {
         #expect(throws: ServerError.self) {
             try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 1, requirements: requirements)
         }
+    }
+}
+
+
+extension PublishedCollectionPolicyTests {
+    @Test(arguments: [(-60.0, 60.0, true), (-60, 0, false), (60, 120, true), (120, 180, false), (-60, 180, true)])
+    func sleepPolicyIncludesWholeOverlappingIntervals(start: Double, end: Double, included: Bool) throws {
+        let sleep = CollectionRequirement(profile: CollectionObservationProfile.sleepStage.rawValue, sourceKind: .participantApp)
+        let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement, sleep])
+        #expect(policy.permits(
+            studyID: Self.studyID,
+            revision: 2,
+            profile: sleep.profile,
+            sourceKind: .participantApp,
+            effectiveAt: Self.acceptedAt.addingTimeInterval(start),
+            consentAcceptedAt: Self.acceptedAt,
+            effectiveEnd: Self.acceptedAt.addingTimeInterval(end),
+            adoptionEnd: Self.acceptedAt.addingTimeInterval(120)
+        ) == included)
+        #expect(!policy.permits(
+            studyID: Self.studyID,
+            revision: 2,
+            profile: sleep.profile,
+            sourceKind: .participantApp,
+            effectiveAt: Self.acceptedAt,
+            consentAcceptedAt: Self.acceptedAt
+        ))
+    }
+
+    @Test
+    func consentDescribesCompleteSleepIntervalsInBothSupportedLanguages() throws {
+        let sleep = CollectionRequirement(profile: CollectionObservationProfile.sleepStage.rawValue, sourceKind: .participantApp)
+        let english = try CollectionScopePresentation.markdown(requirements: [Self.requirement, sleep], locale: "en-US")
+        let german = try CollectionScopePresentation.markdown(requirements: [sleep], locale: "de-DE")
+        #expect(english.contains("Heart rate") && english.contains("Sleep stages"))
+        #expect(english.contains("collected in full") && english.contains("start before it or end after it"))
+        #expect(german.contains("Schlafphasen") && german.contains("vollständig") && german.contains("überlappen"))
     }
 }

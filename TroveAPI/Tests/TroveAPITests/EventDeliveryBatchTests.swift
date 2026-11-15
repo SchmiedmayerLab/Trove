@@ -16,6 +16,29 @@ struct EventDeliveryBatchTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     @Test
+    func configuredRecordCountSplitsBundlesWithoutDroppingRecords() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let ids = try await Self.stage(journal, count: 5)
+            let transport = DeliveryTransport()
+            let limits = try EventSubmissionLimits.Configuration(
+                recordBytes: 4 * 1024 * 1024,
+                bundleBytes: 4 * 1024 * 1024 + 1024,
+                envelopeBytes: 6 * 1024 * 1024,
+                batchRecords: 2
+            )
+            let drainer = try EventDeliveryDrainer(
+                journal: journal,
+                scope: DeliveryFixture.scope,
+                client: Client(serverURL: #require(URL(string: DeliveryFixture.scope.backend)), configuration: .trove, transport: transport),
+                limits: limits,
+                validateSession: {}
+            )
+            #expect(try await drainer.drain().map(\.deliveryID) == ids)
+            #expect(await transport.submittedBatches.map { $0.events.count } == [2, 2, 1])
+        }
+    }
+
+    @Test
     func countBoundCreatesThreeBatchesWithoutReordering() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let ids = try await Self.stage(journal, count: 34)

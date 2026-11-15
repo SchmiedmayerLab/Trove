@@ -39,7 +39,10 @@ public enum ParticipantCollectionRefresh {
             let plan = try await plan(id, client: client)
             try await checkSession(validateSession)
             _ = try ParticipantCollectionSnapshot(plans: [plan], enrollmentIDs: [id])
-            guard plan.stateVersion >= enrollment.stateVersion else { throw DeliveryJournalError.staleCollectionState }
+            guard plan.stateVersion >= enrollment.stateVersion,
+                  UUID(uuidString: plan.studyId) == UUID(uuidString: enrollment.studyId), plan.endsAt == enrollment.endsAt else {
+                throw DeliveryJournalError.staleCollectionState
+            }
             if let previous = expected.snapshot?.plans.first(where: { UUID(uuidString: $0.enrollmentId) == id }),
                !previous.windows.isEmpty, plan.windows.isEmpty {
                 guard plan.stateVersion > previous.stateVersion, plan.asOf >= previous.asOf else {

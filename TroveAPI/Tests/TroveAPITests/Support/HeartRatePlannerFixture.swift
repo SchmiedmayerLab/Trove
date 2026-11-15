@@ -16,7 +16,7 @@ enum HeartRatePlannerFixture {
 
     static func date(_ offset: Double) -> Date { origin.addingTimeInterval(offset) }
 
-    static func definition() throws -> Data { try HeartRateQueryDefinition(kind: .live, start: liveStart).encoded() }
+    static func definition() throws -> Data { try HealthKitQueryDefinition(profile: .heartRate, kind: .live, start: liveStart).encoded() }
 
     static func plan(start: Double = -600, end: Double? = nil) -> Components.Schemas.ParticipantCollectionPlan {
         let requirement = Components.Schemas.CollectionPlanRequirement(
@@ -25,7 +25,14 @@ enum HeartRatePlannerFixture {
         let window = Components.Schemas.ConsentCollectionWindow(
             consentId: UUID().uuidString, publicationId: UUID().uuidString, revision: 1, start: origin, requirements: [requirement]
         )
-        return .init(enrollmentId: UUID().uuidString, stateVersion: 1, asOf: liveStart, windows: [window])
+        return .init(
+            enrollmentId: UUID().uuidString,
+            studyId: UUID().uuidString,
+            title: .init([.enUS: "Saved Study"]),
+            stateVersion: 1,
+            asOf: liveStart,
+            windows: [window]
+        )
     }
 
     static func adopt(
@@ -59,7 +66,7 @@ enum HeartRatePlannerFixture {
         return try await journal.retainCollectionSnapshot(snapshot, replacing: journal.collectionState())
     }
 
-    static func ranges(_ plan: HeartRateQueryPlan) -> [Range<Date>] {
+    static func ranges(_ plan: HealthKitQueryPlan) -> [Range<Date>] {
         plan.queries.compactMap { query in query.definition.end.map { query.definition.start..<$0 } }.sorted { $0.lowerBound < $1.lowerBound }
     }
 }

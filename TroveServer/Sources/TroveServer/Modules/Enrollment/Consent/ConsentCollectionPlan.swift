@@ -32,7 +32,16 @@ extension ConsentService {
                     let timeline = try await ConsentCollectionTimeline.load(enrollment: enrollment, on: transaction, asOf: asOf)
                     windows = try await Self.collectionWindows(timeline, studyID: enrollment.$study.id, on: transaction)
                 }
-                return .init(enrollmentId: enrollmentID.uuidString.lowercased(), stateVersion: enrollment.stateVersion, asOf: asOf, windows: windows)
+                let title = try await Self.collectionTitle(enrollment: enrollment, on: transaction)
+                return .init(
+                    enrollmentId: enrollmentID.uuidString.lowercased(),
+                    studyId: enrollment.$study.id.uuidString.lowercased(),
+                    title: title,
+                    endsAt: enrollment.endsAt,
+                    stateVersion: enrollment.stateVersion,
+                    asOf: asOf,
+                    windows: windows
+                )
             }
         }
     }
@@ -40,6 +49,15 @@ extension ConsentService {
 
 
 extension ConsentService {
+    private static func collectionTitle(enrollment: Enrollment, on database: any Database) async throws -> Components.Schemas.LocalizedString {
+        guard let publication = try await PublishedStudy.query(on: database)
+            .filter(\.$study.$id == enrollment.$study.id)
+            .filter(\.$revision == enrollment.currentRevision)
+            .field(\.$metadata)
+            .first() else { throw ServerError.internalServerError("Adopted study details are unavailable") }
+        return publication.metadata.title
+    }
+
     private static func collectionWindows(
         _ timeline: [ConsentCollectionTimeline.Window], studyID: UUID, on database: any Database
     ) async throws -> [Components.Schemas.ConsentCollectionWindow] {
@@ -74,7 +92,15 @@ extension ConsentService {
                 revision: consent.revision,
                 start: consent.acceptedAt,
                 end: window.end,
-                requirements: requirements.map { .init(profile: $0.profile, sourceKind: .participantApp, start: $0.start, end: $0.end) }
+                requirements: requirements.map {
+                    .init(
+                        includeWorkoutRoutes: $0.includeWorkoutRoutes,
+                        profile: $0.profile,
+                        sourceKind: .participantApp,
+                        start: $0.start,
+                        end: $0.end
+                    )
+                }
             )
         }
     }

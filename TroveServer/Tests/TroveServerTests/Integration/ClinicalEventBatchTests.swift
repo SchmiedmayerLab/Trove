@@ -29,7 +29,7 @@ struct ClinicalEventBatchTests {
             let first = try Self.submission(bytes, fixture: fixture)
             let submissions = [first, .init(eventBase64: "not-base64", targets: []), conflict, missingConsent, second]
             let outcomes = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = ClinicalEventService(database: app.db, validator: Self.validator())
+                let service = TestApp.clinicalService(database: app.db, validator: Self.validator())
                 return try await service.acceptBatch(submissions, sourceID: fixture.source.id, installation: fixture.installation)
             }
             #expect(outcomes.count == 5)
@@ -44,7 +44,7 @@ struct ClinicalEventBatchTests {
             try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 2 * receipt.nodeCount, facts: 2, grants: 4, on: app.db)
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                    let service = ClinicalEventService(database: reopened.db, validator: Self.validator())
+                    let service = TestApp.clinicalService(database: reopened.db, validator: Self.validator())
                     let replay = try await service.acceptBatch(submissions, sourceID: fixture.source.id, installation: fixture.installation)
                     #expect(replay[0] == outcomes[0])
                     #expect(replay[4] == outcomes[4])
@@ -64,7 +64,7 @@ struct ClinicalEventBatchTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let submission = try Self.submission(LocalPointEventFixture.bytes(source: fixture.source), fixture: fixture)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let results = try await ClinicalEventService(database: app.db, validator: Self.validator())
+                let results = try await TestApp.clinicalService(database: app.db, validator: Self.validator())
                     .acceptBatch(Array(repeating: submission, count: 16), sourceID: fixture.source.id, installation: fixture.installation)
                 #expect(results.count == 16)
                 guard case .EventReceipt(let receipt) = results[0] else {
@@ -90,12 +90,12 @@ struct ClinicalEventBatchTests {
                 return try Self.reply(bytes)
             }
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = ClinicalEventService(database: app.db, validator: validator)
+                let service = TestApp.clinicalService(database: app.db, validator: validator)
                 await #expect(throws: CancellationError.self) {
                     try await service.acceptBatch(submissions, sourceID: fixture.source.id, installation: fixture.installation)
                 }
                 #expect(await calls.invocations == 2)
-                let recovered = try await ClinicalEventService(database: app.db, validator: Self.validator())
+                let recovered = try await TestApp.clinicalService(database: app.db, validator: Self.validator())
                     .accept(submission: submissions[0], sourceID: fixture.source.id, installation: fixture.installation)
                 try await ClinicalEventStoreTests.expectRows(events: 1, nodes: recovered.nodeCount, facts: 1, grants: 2, on: app.db)
             }
@@ -106,7 +106,7 @@ struct ClinicalEventBatchTests {
     func invalidMemberCountFailsBeforeSourceLookup(count: Int) async throws {
         try await TestApp.withApp { app, _ in
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = ClinicalEventService(database: app.db, validator: Self.validator())
+                let service = TestApp.clinicalService(database: app.db, validator: Self.validator())
                 await #expect {
                     try await service.acceptBatch(
                         Array(repeating: .init(eventBase64: "e30=", targets: []), count: count),
@@ -125,7 +125,7 @@ struct ClinicalEventBatchTests {
             let member = Components.Schemas.EventSubmission(eventBase64: encoded, targets: [])
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect {
-                    try await ClinicalEventService(database: app.db, validator: Self.validator()).acceptBatch(
+                    try await TestApp.clinicalService(database: app.db, validator: Self.validator()).acceptBatch(
                         [member, member], sourceID: UUID(), installation: SourceBindingFixture.proof(UUID())
                     )
                 } throws: { ($0 as? ServerError)?.status.code == 413 }
@@ -153,7 +153,7 @@ struct ClinicalEventBatchTests {
             }
             await AuthContext.$current.withValue(foreign) {
                 await #expect {
-                    try await ClinicalEventService(database: app.db, validator: validator)
+                    try await TestApp.clinicalService(database: app.db, validator: validator)
                         .acceptBatch([.init(eventBase64: "e30=", targets: [])], sourceID: fixture.source.id, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 404 }
             }
@@ -172,7 +172,7 @@ struct ClinicalEventBatchTests {
                 return try Self.reply(bytes)
             }
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let outcomes = try await ClinicalEventService(database: app.db, validator: validator)
+                let outcomes = try await TestApp.clinicalService(database: app.db, validator: validator)
                     .acceptBatch([submission, submission], sourceID: fixture.source.id, installation: fixture.installation)
                 #expect(outcomes[0].problemStatus == 503)
                 guard case .EventReceipt = outcomes[1] else {

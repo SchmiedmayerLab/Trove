@@ -112,7 +112,8 @@ struct FHIRValidationClient: Sendable {
     }
 
     private func validate(_ bytes: Data, purpose: Purpose) async throws -> String {
-        guard bytes.count <= Self.maximumBytes else { throw purpose.tooLarge }
+        let limit = purpose == .event ? Self.maximumBytes : EventSubmissionLimits.Configuration.standard.recordBytes
+        guard bytes.count <= limit else { throw purpose.tooLarge }
         guard !bytes.isEmpty else { throw purpose.invalid }
         let expectedIdentity = try requireIdentity()
         let status: Int

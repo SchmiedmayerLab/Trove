@@ -37,7 +37,8 @@ enum PublishedStudyFixtures {
             title: study.details[.enUS]?.title ?? "Synthetic Study",
             consentSnapshot: consent,
             participationCriterion: study.participationCriterion,
-            collectionRequirements: study.collectionRequirements
+            collectionRequirements: study.collectionRequirements,
+            enrollmentPeriod: study.enrollmentPeriod
         )
     }
 
@@ -54,6 +55,7 @@ enum PublishedStudyFixtures {
         participationCriterion: StudyDefinition.ParticipationCriterion = .all([]),
         artifact: ArtifactReference? = nil,
         collectionRequirements: [CollectionRequirement] = [],
+        enrollmentPeriod: EnrollmentPeriod = .ongoing,
         save: Bool = true
     ) async throws -> PublishedStudy {
         let metadata = StudyDefinition.Metadata(
@@ -80,7 +82,9 @@ enum PublishedStudyFixtures {
             bundleDigest: retainedArtifact.digest,
             artifactID: retainedArtifact.id,
             consentSnapshot: consentSnapshot,
-            collectionPolicy: try .compile(studyID: studyId, revision: revision, requirements: collectionRequirements)
+            collectionPolicy: try .compile(
+                studyID: studyId, revision: revision, requirements: collectionRequirements, enrollmentPeriod: enrollmentPeriod
+            )
         )
         if save {
             try await published.save(on: database)

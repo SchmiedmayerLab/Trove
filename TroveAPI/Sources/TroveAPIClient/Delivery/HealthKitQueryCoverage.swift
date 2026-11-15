@@ -10,30 +10,37 @@ import Foundation
 import TroveAPITypes
 
 
-/// Range arithmetic uses sample start dates, exactly as consent filtering does. Query predicates alone
-/// cannot establish coverage: an old cursor may have advanced past points that were not yet authorized.
-struct HeartRateQueryCoverage {
+/// Coverage is independent for each anchored stream, including workout routes. Query predicates alone cannot establish
+/// coverage: an old cursor may have advanced past records that were not yet authorized.
+struct HealthKitQueryCoverage {
+    let stream: HealthKitQueryDefinition.Stream
     let consentIDs: Set<UUID>
     let ranges: [Range<Date>]
     let previousRanges: [Range<Date>]
 
-    init(snapshot: ParticipantCollectionSnapshot, reconciled: Set<UUID>) {
+    init(stream: HealthKitQueryDefinition.Stream, snapshot: ParticipantCollectionSnapshot, reconciled: Set<UUID>) {
+        self.stream = stream
         let windows = snapshot.plans.flatMap(\.windows)
         consentIDs = Set(windows.compactMap { UUID(uuidString: $0.consentId) })
-        ranges = Self.union(windows.flatMap(\.requirements).compactMap(Self.range))
+        ranges = Self.union(windows.flatMap(\.requirements).compactMap { Self.range($0, stream: stream) })
         let previous = windows.filter {
             UUID(uuidString: $0.consentId).map(reconciled.contains) == true
         }
-        previousRanges = Self.union(previous.flatMap(\.requirements).compactMap(Self.range))
+        previousRanges = Self.union(previous.flatMap(\.requirements).compactMap { Self.range($0, stream: stream) })
     }
 
-    func includes(_ definition: HeartRateQueryDefinition) -> Bool {
-        ranges.contains { $0.lowerBound < (definition.end ?? Date(timeIntervalSince1970: .infinity)) && $0.upperBound > definition.start }
+    func includes(_ definition: HealthKitQueryDefinition) -> Bool {
+        definition.stream == stream && ranges.contains {
+            $0.lowerBound < (definition.end ?? Date(timeIntervalSince1970: .infinity)) && $0.upperBound > definition.start
+        }
     }
 
-    func missing(before cutoff: Date, queries: [HeartRateQueryDefinition]) -> [Range<Date>] {
+    func missing(before cutoff: Date, queries: [HealthKitQueryDefinition]) -> [Range<Date>] {
         let desired = ranges.compactMap { Self.intersection($0, Date(timeIntervalSince1970: -.infinity)..<cutoff) }
         let predicates = Self.union(queries.compactMap { query -> Range<Date>? in
+            guard query.stream == stream else {
+                return nil
+            }
             let upper = min(query.end ?? cutoff, cutoff)
             return query.start < upper ? query.start..<upper : nil
         })
@@ -45,10 +52,10 @@ struct HeartRateQueryCoverage {
 }
 
 
-extension HeartRateQueryCoverage {
-    private static func range(_ requirement: Components.Schemas.CollectionPlanRequirement) -> Range<Date>? {
+extension HealthKitQueryCoverage {
+    private static func range(_ requirement: Components.Schemas.CollectionPlanRequirement, stream: HealthKitQueryDefinition.Stream) -> Range<Date>? {
         let upper = requirement.end ?? Date(timeIntervalSince1970: .infinity)
-        guard requirement.profile == ParticipantCollectionSnapshot.heartRateProfile, requirement.start < upper else {
+        guard stream.includes(requirement), requirement.start < upper else {
             return nil
         }
         return requirement.start..<upper

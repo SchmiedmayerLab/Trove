@@ -66,7 +66,10 @@ class TroveAppDelegate: GroveAppDelegate {
         }
         let store = healthKit.healthStore
         let runtime = HealthDataRuntime(model: healthData) { update in
-            store.startBackgroundObservation(for: [HKQuantityType(.heartRate)], updateHandler: { _ in await update() }) {
+            let types: Set<HKSampleType> = [
+                HKQuantityType(.heartRate), HKCategoryType(.sleepAnalysis), HKSampleType.workoutType(), HKSeriesType.workoutRoute()
+            ]
+            return store.startBackgroundObservation(for: types, updateHandler: { _ in await update() }) {
                 let lifetime = AsyncStream<Void>.makeStream()
                 defer { lifetime.continuation.finish() }
                 for await _ in lifetime.stream { }

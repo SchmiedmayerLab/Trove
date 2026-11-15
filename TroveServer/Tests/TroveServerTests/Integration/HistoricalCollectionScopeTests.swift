@@ -26,10 +26,12 @@ struct HistoricalCollectionScopeTests {
                 let (presentation, _) = try await service.getPresentation(enrollmentId: fixture.enrollmentIDs[0], locale: "en-US", revision: 2)
                 #expect(presentation.markdown.contains("6 months"))
                 #expect(presentation.markdown.contains("America/Los_Angeles"))
+                #expect(presentation.markdown.contains("Duration from enrollment: 6 months"))
                 let consent = try await ClinicalEventStoreTests.acceptConsent(enrollmentID: fixture.enrollmentIDs[0], on: app, revision: 2)
                 let stored = try #require(try await EnrollmentConsent.find(consent.requireID(), on: app.db))
                 let retained = try #require(stored.collectionScope?.requirements.first?.window.start)
                 let plan = try await service.collectionPlan(enrollmentID: fixture.enrollmentIDs[0])
+                #expect(plan.endsAt == nil, "Publishing and adopting a new period cannot change an existing enrollment end.")
                 let scope = try #require(plan.windows.first?.requirements.first)
                 #expect(scope.start == retained)
                 #expect(scope.start < (try #require(stored.createdAt)))
@@ -84,7 +86,8 @@ extension HistoricalCollectionScopeTests {
             timeZone: "America/Los_Angeles",
             start: .last(.init(_type: .last, components: .init(month: 6)))
         )
-        let patch = Components.Schemas.StudyPatchInput(collectionRequirements: [
+        let period = EnrollmentPeriod(calendar: .gregorian, timeZone: "America/Los_Angeles", duration: .init(month: 6))
+        let patch = Components.Schemas.StudyPatchInput(enrollmentPeriod: period, collectionRequirements: [
             .init(measurementWindow: window, profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)
         ])
         try await app.test(.PATCH, "\(apiBasePath)/studies/\(studyID)", beforeRequest: { request in
@@ -95,6 +98,7 @@ extension HistoricalCollectionScopeTests {
             try #require(response.status == .ok)
             let returned = try response.content.decode(Components.Schemas.StudyResponse.self)
             #expect(returned.collectionRequirements[0].measurementWindow == window)
+            #expect(returned.enrollmentPeriod == period)
         }
         let published = try await PublicationWorkflowFixtures.publish(studyID, app: app, token: token)
         try #require(published.status == .created)

@@ -39,11 +39,30 @@ private struct RetainedCollectionContent: Codable, Sendable {
 /// An account-bound local observation. Only the journal can create its revision token.
 /// Nil snapshot means that no complete server discovery has been retained yet.
 public struct ParticipantCollectionState: Sendable {
+    /// Display-only retained settings, including locally stopped plans. Collection must use `snapshot`.
+    public struct Collection: Sendable, Identifiable {
+        public let plan: Components.Schemas.ParticipantCollectionPlan
+        public let isStopped: Bool
+        public var id: String { plan.enrollmentId }
+
+        public init(plan: Components.Schemas.ParticipantCollectionPlan, isStopped: Bool) {
+            self.plan = plan
+            self.isStopped = isStopped
+        }
+    }
+
     public let snapshot: ParticipantCollectionSnapshot?
     public let stoppedEnrollmentIDs: Set<UUID>
     let scope: DeliveryScope
     let revision: UUID?
     fileprivate let content: RetainedCollectionContent
+
+    /// Restores the study names from accepted publications without a profile or network request.
+    public var collections: [Collection] {
+        content.plans.map { plan in
+            Collection(plan: plan, isStopped: UUID(uuidString: plan.enrollmentId).map(stoppedEnrollmentIDs.contains) == true)
+        }
+    }
 }
 
 
@@ -135,15 +154,20 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
 
     /// Bind a query to the retained authority used for filtering its outputs. `stage` compares this
     /// checkpoint inside its transaction, so another connection's withdrawal also invalidates the pass.
+    /// Historical requirements authorize deletion processing, not collection of new samples.
     public func collectionCheckpoint(
         for sourceID: UUID,
         state: ParticipantCollectionState,
-        queryID: UUID? = nil
+        queryID: UUID? = nil,
+        at now: Date = .now
     ) throws -> Checkpoint {
         guard state.scope == scope else { throw JournalError.wrongScope }
-        guard state.snapshot != nil else { throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized }
-        let checkpoint = try queryID.map { try self.checkpoint(for: sourceID, queryID: $0) } ?? self.checkpoint(for: sourceID)
+        guard let active = try state.snapshot?.active(at: now), !active.retainedStreams.isEmpty else {
+            throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized
+        }
+        var checkpoint = try queryID.map { try self.checkpoint(for: sourceID, queryID: $0) } ?? self.checkpoint(for: sourceID)
         guard checkpoint.collectionRevision == state.revision else { throw JournalError.staleCollectionState }
+        checkpoint.acquisitionDeadline = active.acquisitionDeadline
         return checkpoint
     }
 
@@ -165,7 +189,8 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
     ) throws {
         for old in previous {
             guard let next = incoming.first(where: { UUID(uuidString: $0.enrollmentId) == UUID(uuidString: old.enrollmentId) }) else { continue }
-            guard next.stateVersion >= old.stateVersion, next.asOf >= old.asOf,
+            guard UUID(uuidString: next.studyId) == UUID(uuidString: old.studyId), next.endsAt == old.endsAt,
+                  next.stateVersion >= old.stateVersion, next.asOf >= old.asOf,
                   next.stateVersion != old.stateVersion || next.windows == old.windows else { throw JournalError.staleCollectionState }
         }
     }

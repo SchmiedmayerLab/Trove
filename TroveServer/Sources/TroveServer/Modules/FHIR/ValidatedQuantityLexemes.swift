@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import TroveAPITypes
 
 
 /// A token walker with only the paths needed for extraction; no JSON object graph is built.
@@ -202,7 +203,7 @@ enum ValidatedQuantityLexemes {
         case nestingLimit
     }
 
-    static let maximumBytes = 4 * 1024 * 1024
+    static let maximumBytes = EventSubmissionLimits.maximumEventBytes
     static let maximumDepth = 64
 
     static func extract(from data: Data) throws -> [Int: String] {

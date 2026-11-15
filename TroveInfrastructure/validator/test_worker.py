@@ -117,6 +117,14 @@ class StrictJSONTests(unittest.TestCase):
             with self.subTest(raw_prefix=raw[:20]), self.assertRaises((ValueError, UnicodeError)):
                 worker.strict_json(raw)
 
+    def test_larger_complete_json_and_exact_hard_boundary(self):
+        for size in (5 * 1024 * 1024, worker.MAX_BODY):
+            raw = b'{"x":"' + b'a' * (size - 8) + b'"}'
+            self.assertEqual(len(raw), size)
+            self.assertEqual(len(worker.strict_json(raw)["x"]), size - 8)
+        with self.assertRaises(worker.InvalidJSON):
+            worker.strict_json(raw + b' ')
+
     def test_accepts_valid_escaping_and_finite_numbers(self):
         value = worker.strict_json(b'{"x":"[\\\"{", "y":1.234, "z":"\\ud83d\\ude00"}')
         self.assertEqual(str(value["y"]), "1.234")

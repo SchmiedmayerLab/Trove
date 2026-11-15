@@ -22,6 +22,7 @@ struct AcceptedCollectionScope: Codable, Sendable, Hashable {
         let profile: String
         let sourceKind: SourceKind
         let window: ResolvedCollectionWindow
+        let includeWorkoutRoutes: Bool
     }
 
     let requirements: [Requirement]
@@ -31,7 +32,8 @@ struct AcceptedCollectionScope: Codable, Sendable, Hashable {
             .init(
                 profile: $0.profile,
                 sourceKind: $0.sourceKind,
-                window: try $0.measurementWindow?.resolve(at: acceptedAt) ?? .init(start: nil, end: nil)
+                window: try $0.measurementWindow?.resolve(at: acceptedAt) ?? .init(start: nil, end: nil),
+                includeWorkoutRoutes: $0.includeWorkoutRoutes
             )
         }
     }

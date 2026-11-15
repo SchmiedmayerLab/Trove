@@ -13,6 +13,7 @@ import { KeyValueCard } from "@/components/interfaces/KeyValueCard";
 import { EditButtonLink } from "@/components/ui/EditButton";
 import type { StudyResponse } from "@/lib/api/generated/types.gen";
 import { invitationCodeListQueryOptions } from "@/lib/queries/invitationCode";
+import { enrollmentPeriodSummary } from "../lib/enrollmentPeriod";
 
 const enrollmentModeLabel: Record<
   StudyResponse["enrollmentConditions"],
@@ -67,6 +68,10 @@ export const EnrollmentCard = ({ study, isLoading }: EnrollmentCardProps) => {
               isLoading={isLoading}
             />
           ),
+        },
+        {
+          key: "Enrollment period",
+          value: study ? enrollmentPeriodSummary(study.enrollmentPeriod) : null,
         },
         {
           key: "Mode",

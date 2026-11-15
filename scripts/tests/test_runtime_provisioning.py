@@ -90,3 +90,12 @@ esac
         clinical_grants = source.split("GRANT SELECT, INSERT ON public.clinical_events,", 1)[1].split("TO", 1)[0]
         actual = {"clinical_events", *re.findall(r"public\.([a-z_]+)", clinical_grants)}
         self.assertEqual(actual, expected)
+
+    def test_recording_transfer_grants_match_append_only_evidence(self):
+        migration = (ROOT / "TroveServer/Sources/TroveServer/Migrations/Postgres/CreateRecordingTransfers.swift").read_text()
+        inventory = migration.split("static let tables = [", 1)[1].split("]", 1)[0]
+        expected = set(re.findall(r'"([a-z_]+)"', inventory))
+        source = (SCRIPT.parent / "grant-runtime.sql").read_text()
+        grants = source.split("GRANT SELECT, INSERT ON public.recording_transfers,", 1)[1].split("TO", 1)[0]
+        actual = {"recording_transfers", *re.findall(r"public\.([a-z_]+)", grants)}
+        self.assertEqual(actual, expected)

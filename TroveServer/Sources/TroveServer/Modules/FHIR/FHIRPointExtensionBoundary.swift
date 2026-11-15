@@ -10,19 +10,20 @@ import Foundation
 
 
 private enum PointExtensionLocation {
-    case bundle, entries, entry, resource, targets, target, other
+    case bundle, entries, entry, resource, targets, target, entities, entity, documentContext, period, temporalPrimitive, codedValue, other
 
     var element: Self {
         switch self {
         case .entries: .entry
         case .targets: .target
+        case .entities: .entity
         default: .other
         }
     }
 
     var allowsExtensions: Bool {
         switch self {
-        case .entry, .resource, .target: true
+        case .entry, .resource, .target, .entity, .temporalPrimitive, .codedValue: true
         default: false
         }
     }
@@ -32,6 +33,13 @@ private enum PointExtensionLocation {
         case (.bundle, "entry"): .entries
         case (.entry, "resource"): .resource
         case (.resource, "target"): .targets
+        case (.resource, "entity"): .entities
+        case (.resource, "valueCodeableConcept"): .codedValue
+        case (.resource, "context"): .documentContext
+        case (.documentContext, "period"): .period
+        case (.resource, "effectivePeriod"), (.resource, "occurredPeriod"): .period
+        case (.resource, "_effectiveDateTime"), (.resource, "_issued"), (.resource, "_authored"),
+             (.resource, "_occurredDateTime"), (.period, "_start"), (.period, "_end"): .temporalPrimitive
         default: .other
         }
     }
@@ -41,8 +49,9 @@ private enum PointExtensionLocation {
 extension FHIRPointSupportBoundary {
     /// Runs only after complete validation. JSONSerialization is used exclusively to inspect
     /// member locations; its number representations are never projected or re-encoded.
-    /// This initial receiver accepts no nested or modifier extensions. Entry identity and the
-    /// supported resource-level extension meanings are checked by the IG and typed boundary.
+    /// Temporal primitives may retain the standard timezone code. Other nested extensions and
+    /// modifier extensions remain outside this receiver capability. Entry identity and supported
+    /// resource-level extension meanings are checked by the IG and typed boundary.
     static func validateExtensionLocations(in bytes: Data) throws {
         guard !bytes.isEmpty, bytes.count <= ValidatedQuantityLexemes.maximumBytes else { throw FHIRValidationClient.invalid }
         do {
@@ -63,6 +72,11 @@ extension FHIRPointSupportBoundary {
                 guard key != "modifierExtension" else { throw FHIRValidationClient.invalid }
                 if key == "extension" {
                     guard location.allowsExtensions, child is [Any] else { throw FHIRValidationClient.invalid }
+                    if location == .entity {
+                        try sourceRevision(child)
+                        continue
+                    }
+                    try validateNestedExtensions(child, at: location)
                 }
                 try inspectExtensionLocations(child, at: location.member(key), depth: depth + 1)
             }
@@ -71,6 +85,50 @@ extension FHIRPointSupportBoundary {
             for child in array {
                 try inspectExtensionLocations(child, at: location.element, depth: depth + 1)
             }
+        }
+    }
+
+    private static func validateNestedExtensions(_ value: Any, at location: PointExtensionLocation) throws {
+        switch location {
+        case .temporalPrimitive: try timezoneExtensions(value)
+        case .codedValue: try unmappedSourceValues(value)
+        default: break
+        }
+    }
+
+    private static func sourceRevision(_ value: Any) throws {
+        guard let extensions = value as? [[String: Any]], extensions.count <= 1 else { throw FHIRValidationClient.invalid }
+        let allowed: Set<String> = ["sourceName", "sourceBundleIdentifier", "version", "productType", "operatingSystemVersion"]
+        for item in extensions {
+            guard Set(item.keys) == ["url", "extension"],
+                  item["url"] as? String == "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-source-revision",
+                  let facts = item["extension"] as? [[String: Any]], !facts.isEmpty, facts.count <= allowed.count else {
+                throw FHIRValidationClient.invalid
+            }
+            var keys: Set<String> = []
+            for fact in facts {
+                guard Set(fact.keys) == ["url", "valueString"], let key = fact["url"] as? String,
+                      allowed.contains(key), keys.insert(key).inserted,
+                      let text = fact["valueString"] as? String, !text.isEmpty else { throw FHIRValidationClient.invalid }
+            }
+        }
+    }
+
+    private static func timezoneExtensions(_ value: Any) throws {
+        guard let extensions = value as? [[String: Any]], extensions.count <= 1 else { throw FHIRValidationClient.invalid }
+        for item in extensions {
+            guard Set(item.keys) == ["url", "valueCode"],
+                  item["url"] as? String == "http://hl7.org/fhir/StructureDefinition/timezone",
+                  let code = item["valueCode"] as? String, !code.isEmpty else { throw FHIRValidationClient.invalid }
+        }
+    }
+
+    private static func unmappedSourceValues(_ value: Any) throws {
+        guard let extensions = value as? [[String: Any]], extensions.count <= 1 else { throw FHIRValidationClient.invalid }
+        for item in extensions {
+            guard Set(item.keys) == ["url", "valueString"],
+                  item["url"] as? String == "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-unmapped-source-value",
+                  let raw = item["valueString"] as? String, !raw.isEmpty else { throw FHIRValidationClient.invalid }
         }
     }
 }

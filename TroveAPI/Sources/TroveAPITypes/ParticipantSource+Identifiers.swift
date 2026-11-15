@@ -11,6 +11,13 @@ import GroveFHIRContract
 
 
 extension Components.Schemas.ParticipantSource {
+    /// Clear native IDs remain separate from keyed Grove identities and installation credentials.
+    /// The store-scoped namespace survives key rotation and reinstall; it conveys no authority.
+    public func nativeRecordIdentifierSystem() throws -> IdentifierSystem {
+        _ = try identifierSystems()
+        return try IdentifierSystem(identifierRoot + "/NamingSystem/" + repositoryKind.rawValue + "-native-record")
+    }
+
     /// Derives Grove's complete namespace set from the immutable server assignment.
     /// Installations recover this context without changing the participant source identity.
     public func identifierSystems() throws -> DeploymentIdentifierSystems {

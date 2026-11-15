@@ -7,20 +7,38 @@ import {
   zAbsoluteStartDate,
   zCollectionMeasurementWindow,
   zCollectionRequirement,
-  zDateComponents,
   zOldestSampleStartDate,
   zRelativeStartDate,
 } from "@/lib/api/generated/zod.gen";
+import {
+  calendarInstant,
+  calendarTimeZone,
+  positiveCalendarPeriod,
+} from "./calendarFields";
 
 export const heartRateProfile =
   "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate";
 
-const date = zAbsoluteStartDate.shape.date.refine(
-  (value) =>
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(value) &&
-    !value.startsWith("0000"),
-  "Enter a complete UTC date and time, with at most six fractional second digits.",
-);
+export const sleepStageProfile =
+  "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-sleep-stage";
+
+export const workoutProfile =
+  "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-workout";
+
+export const collectionMeasurements = [
+  { profile: heartRateProfile, label: "Heart rate" },
+  { profile: sleepStageProfile, label: "Sleep stages" },
+  { profile: workoutProfile, label: "Workouts" },
+] as const;
+
+export const setCollectionRequirement = (
+  requirements: CollectionRequirement[],
+  profile: string,
+  requirement?: CollectionRequirement,
+): CollectionRequirement[] => {
+  const remaining = requirements.filter((item) => item.profile !== profile);
+  return requirement ? [...remaining, requirement] : remaining;
+};
 
 // Compare at the API's microsecond precision without rounding through JavaScript Date.
 const dateKey = (value: string) => {
@@ -28,38 +46,19 @@ const dateKey = (value: string) => {
   return `${seconds}.${fraction.padEnd(6, "0")}`;
 };
 
-const components = zDateComponents
-  .extend({
-    year: z.number().int().min(0).max(9998).optional(),
-    month: z.number().int().min(0).max(119988).optional(),
-    day: z.number().int().min(0).max(3652058).optional(),
-  })
-  .strict()
-  .refine(
-    (value) =>
-      [value.year, value.month, value.day].some((part) => (part ?? 0) > 0),
-    "Enter a lookback greater than zero.",
-  );
-
 const measurementWindow = zCollectionMeasurementWindow
   .extend({
-    timeZone: zCollectionMeasurementWindow.shape.timeZone.refine((value) => {
-      if (!/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/.test(value)) return false;
-      try {
-        new Intl.DateTimeFormat("en", { timeZone: value });
-        return true;
-      } catch {
-        return false;
-      }
-    }, "Enter an IANA time zone, such as America/Los_Angeles, or UTC."),
+    timeZone: calendarTimeZone,
     start: z
       .discriminatedUnion("type", [
         zOldestSampleStartDate.strict(),
-        zRelativeStartDate.extend({ components }).strict(),
-        zAbsoluteStartDate.extend({ date }).strict(),
+        zRelativeStartDate
+          .extend({ components: positiveCalendarPeriod })
+          .strict(),
+        zAbsoluteStartDate.extend({ date: calendarInstant }).strict(),
       ])
       .optional(),
-    end: date.optional(),
+    end: calendarInstant.optional(),
   })
   .strict()
   .refine(
@@ -74,12 +73,20 @@ const requirementsSchema = z
   .array(
     zCollectionRequirement
       .extend({
-        profile: z.literal(heartRateProfile),
+        profile: z.enum([heartRateProfile, sleepStageProfile, workoutProfile]),
         measurementWindow: measurementWindow.optional(),
       })
-      .strict(),
+      .strict()
+      .refine(
+        (item) => !item.includeWorkoutRoutes || item.profile === workoutProfile,
+        "Workout routes require workout collection.",
+      ),
   )
-  .max(1);
+  .max(3)
+  .refine(
+    (items) => new Set(items.map((item) => item.profile)).size === items.length,
+    "Each measurement may appear only once.",
+  );
 
 export const canEditCollection = (requirements: unknown) =>
   requirementsSchema.safeParse(requirements).success;
@@ -108,7 +115,11 @@ export const collectionSummary = (requirements: CollectionRequirement[]) => {
   if (!requirements.length) return "No health measurements requested.";
   if (!canEditCollection(requirements))
     return "Review the collection settings before saving.";
-  const window = requirements[0].measurementWindow;
+  return requirements.map(requirementSummary).join(" ");
+};
+
+const requirementSummary = (requirement: CollectionRequirement) => {
+  const window = requirement.measurementWindow;
   const start = window?.start;
   let range: string;
   switch (start?.type) {
@@ -140,5 +151,21 @@ export const collectionSummary = (requirements: CollectionRequirement[]) => {
     window?.end ?
       `Before ${window.end} (exclusive).`
     : "Collection continues while enrollment and permission remain active.";
-  return `Heart rate. ${range} ${end}`;
+  const label =
+    collectionMeasurements.find(
+      ({ profile }) => profile === requirement.profile,
+    )?.label ?? "Measurements";
+  let overlap = "";
+  if (requirement.profile === workoutProfile) {
+    overlap =
+      " Complete workouts include all segments and statistics when the session overlaps this window, even if it starts before it or ends after it.";
+    overlap +=
+      requirement.includeWorkoutRoutes ?
+        " Precise workout location routes are collected for this study."
+      : " Workout location routes are not collected for this study.";
+  } else if (requirement.profile === sleepStageProfile) {
+    overlap =
+      " Complete sleep records are included when they overlap this window, even if they start before it or end after it.";
+  }
+  return `${label}. ${range} ${end}${overlap}`;
 };
