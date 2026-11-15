@@ -55,7 +55,7 @@ private enum PointExtensionLocation {
         case (.resource, _): Self.resourceMember(name)
         case (.documentContext, "period"): .period
         case (.component, "extension"): .componentExtensions
-        case (.component, "valuePeriod"): .period
+        case (.component, "valuePeriod"), (.resourceExtension, "valuePeriod"): .period
         case (.period, "_start"), (.period, "_end"): .temporalPrimitive
         default: .other
         }

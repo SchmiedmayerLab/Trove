@@ -184,7 +184,10 @@ enum FHIRPointSupportBoundary {
     }
 
     private static func extensions(_ values: [Extension], resourceType: String, resources: [String: ResourceProxy]) throws {
-        let ordinary = try values.filter { try !FHIRHealthKitMetadataBoundary.accepts($0, resourceType: resourceType) }
+        let ordinary = try values.filter {
+            try !FHIRHealthKitMetadataBoundary.accepts($0, resourceType: resourceType)
+                && !FHIRHealthKitECGBoundary.accepts($0, resourceType: resourceType)
+        }
         for value in ordinary {
             guard value.extension?.isEmpty != false else { throw FHIRValidationClient.invalid }
             switch (resourceType, value.url.value?.url.absoluteString, value.value) {

@@ -16,6 +16,11 @@ enum FHIRFoodProjection {
         guard observation.value == nil, observation.component?.isEmpty != false,
               observation.dataAbsentReason == nil, let members = observation.hasMember,
               !members.isEmpty else { throw FHIRValidationClient.invalid }
+        try independentMembers(members)
+    }
+
+    /// Members that are independent source records, named only by their output identity, each once.
+    static func independentMembers(_ members: [Reference]) throws {
         var identities: Set<BusinessIdentifier> = []
         for member in members {
             guard member.reference == nil, member.extension?.isEmpty != false,

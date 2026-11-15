@@ -177,10 +177,16 @@ admission; a stale client state cannot authorize a revoked installation.
 ## HealthKit Acquisition
 
 The optional Apple-platform `TroveHealthKit` product connects Grove's anchored
-quantity and category queries, blood pressure, audiograms, state of mind, GAD-7 and PHQ-9 assessments,
-workouts, food correlations, clinical documents, heartbeat series and optional workout routes to the delivery journal.
-The enabled collection capabilities expose only implemented producer and receiver paths.
-ECG acquisition requires its companion adapter. Heartbeat series stream
+quantity and category queries, blood pressure, audiograms, electrocardiograms, state of mind, GAD-7 and PHQ-9
+assessments, workouts, food correlations, clinical documents, heartbeat series and optional workout routes to the
+delivery journal. The enabled collection capabilities expose only implemented producer and receiver paths.
+
+An ECG is queried one per page. Only after its interval has an accepted consent are its voltages and correlated
+symptoms read; Grove converts it into one record with the lead's voltages as SampledData in the waveform Observation
+and the average heart rate as a second Observation derived from it. Both outputs are selected together under the
+ECG requirement. The waveform names each symptom by output identity only: a symptom stays its own record and is
+collected only through its own consented symptom stream. The permission request for the ECG stream includes the
+correlated symptom types, because an ECG that reports symptoms cannot be converted without reading them. Heartbeat series stream
 into the registered beat-interval CSV format with original gap markers and a separate
 source-bound recording scope. Their complete files use the same bounded compression and
 resumable delivery path as workout routes. The server and cross-platform

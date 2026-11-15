@@ -552,7 +552,10 @@ a refusal; there is no structural-only fallback. See the [validator setup](../Tr
 
 The receiver supports immutable, single-owner Mobile heart-rate point quantities
 sleep-stage intervals, and complete workout sessions with their segments and statistics, including supported HealthKit and questionnaire-derived
-source graphs, and whole-source-record retractions. Revision selection first removes versions
+source graphs, and whole-source-record retractions. A HealthKit ECG is one source record: a waveform Observation with
+one lead of millivolt SampledData, one classification, an optional algorithm version and its symptoms status and source
+period, plus at most one average heart rate derived from it over exactly its period. The waveform names correlated
+symptoms only by output identity; each symptom is its own record with its own requirement. Revision selection first removes versions
 dominated by a higher writer version under the same complete writer-record identity.
 It then selects the latest exact `Provenance.recorded`; equal instants use the
 bytewise-greater record-version identifier value, then system. Selection preserves
@@ -596,7 +599,9 @@ end define a fixed measurement range. Heart-rate points must lie inside the half
 window. A sleep interval or workout session is included whole when it overlaps the window; an interval
 that only touches a boundary is excluded. The receiver preserves the original
 start and end without clipping or changing the source identity. Workout selection includes every segment,
-including segments outside the selected window. Partial workout grants and exports are rejected.
+including segments outside the selected window. Partial workout grants and exports are rejected. An ECG's
+average heart rate is collected under the ECG requirement and its waveform's interval; partial ECG grants and
+exports are rejected in the same way.
 
 Acceptance resolves relative bounds once and stores them atomically in the
 append-only consent record. Later uploads and plan reads use those literal bounds,

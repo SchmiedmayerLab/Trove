@@ -131,7 +131,8 @@ extension HealthKitAcquisition {
             nextAnchor: delta.nextAnchor,
             readHeartbeatSeries: delta.readHeartbeatSeries,
             readDocument: delta.readDocument,
-            readRoute: delta.readRoute
+            readRoute: delta.readRoute,
+            readElectrocardiogram: delta.readElectrocardiogram
         )
     }
 
@@ -161,6 +162,7 @@ extension HealthKitAcquisition {
         case .gad7: SampleType.gad7.hkSampleType
         case .phq9: SampleType.phq9.hkSampleType
         case .audiogram: SampleType.audiogram.hkSampleType
+        case .electrocardiogram: SampleType.electrocardiogram.hkSampleType
         case .healthKitRecording: SampleType.heartbeatSeries.hkSampleType
         default:
             if stream.profile.categorySource != nil {
@@ -181,6 +183,7 @@ extension HealthKitAcquisition {
         case .gad7: try await querySamples(.gad7, healthKit: healthKit, anchor: &anchor, predicate: predicate)
         case .phq9: try await querySamples(.phq9, healthKit: healthKit, anchor: &anchor, predicate: predicate)
         case .audiogram: try await querySamples(.audiogram, healthKit: healthKit, anchor: &anchor, predicate: predicate)
+        case .electrocardiogram: try await queryElectrocardiograms(healthKit, anchor: &anchor, predicate: predicate)
         default:
             if stream.profile.categorySource != nil {
                 try await querySamples(categoryType(for: stream), healthKit: healthKit, anchor: &anchor, predicate: predicate)

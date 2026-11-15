@@ -22,6 +22,12 @@ extension HealthKitAcquisition {
         let recordingDeclarations: [[Components.Schemas.RecordingTransferDeclaration]]
     }
 
+    struct InputRecords {
+        var records: [HealthKitFHIRExporter.Record] = []
+        var recordings: [UUID: HealthKitRecordingFile] = [:]
+        var companions: Set<UUID> = []
+    }
+
     struct ConversionTiming {
         let batchInstant: Date
         let records: [UUID: Date]
@@ -117,18 +123,15 @@ extension HealthKitAcquisition {
             return instant
         }
         for time in groups.keys.sorted() {
-            var records: [HealthKitFHIRExporter.Record] = []
-            var recordings: [UUID: HealthKitRecordingFile] = [:]
-            for sample in groups[time] ?? [] {
-                let record = try await inputRecord(sample, stream: stream, delta: delta)
-                if case .fileRecording(let recording) = record { recordings[sample.uuid] = recording }
-                records.append(record)
-            }
-            try await exporter.export(records: records, at: time) { result in
+            let input = try await inputRecords(groups[time] ?? [], stream: stream, delta: delta)
+            try await exporter.export(records: input.records, at: time) { result in
+                guard !input.companions.contains(result.source.uuid) else {
+                    return
+                }
                 guard case .record(let record) = result.outcome,
                       let consents = nativeConsents[result.source.uuid] else { throw AcquisitionError.unsupportedDelta }
                 if let prepared = try Self.payload(
-                    for: record, stream: stream, snapshot: snapshot, nativeConsents: consents, recording: recordings[result.source.uuid]
+                    for: record, stream: stream, snapshot: snapshot, nativeConsents: consents, recording: input.recordings[result.source.uuid]
                 ) {
                     payloads.append(prepared.payload)
                     declarations.append(prepared.declarations)
@@ -144,6 +147,22 @@ extension HealthKitAcquisition {
         return PreparedPage(payloads: payloads, recordingDeclarations: declarations)
     }
 
+    /// The exporter records of consented samples, their recording files, and the independent companions an ECG names:
+    /// its symptoms are separate records that only their own consented streams collect.
+    private static func inputRecords(_ samples: [HKSample], stream: HealthKitQueryDefinition.Stream, delta: Delta) async throws -> InputRecords {
+        var input = InputRecords()
+        for sample in samples {
+            let record = try await inputRecord(sample, stream: stream, delta: delta)
+            switch record {
+            case .fileRecording(let recording): input.recordings[sample.uuid] = recording
+            case .electrocardiogram(_, _, let symptoms): input.companions.formUnion(symptoms.map(\.uuid))
+            default: break
+            }
+            input.records.append(record)
+        }
+        return input
+    }
+
     private static func inputRecord(
         _ sample: HKSample, stream: HealthKitQueryDefinition.Stream, delta: Delta
     ) async throws -> HealthKitFHIRExporter.Record {
@@ -153,6 +172,12 @@ extension HealthKitAcquisition {
         if stream.profile == .healthKitRecording {
             guard let series = sample as? HKHeartbeatSeriesSample else { throw AcquisitionError.unsupportedDelta }
             return .fileRecording(try await delta.readHeartbeatSeries(series))
+        }
+        if stream.profile == .electrocardiogram {
+            guard let ecg = sample as? HKElectrocardiogram else { throw AcquisitionError.unsupportedDelta }
+            let record = try await delta.readElectrocardiogram(ecg)
+            guard case .electrocardiogram(let read, _, _) = record, read.uuid == ecg.uuid else { throw AcquisitionError.unsupportedDelta }
+            return record
         }
         guard stream == .workoutRoute else {
             return .sample(sample)
@@ -206,6 +231,10 @@ extension HealthKitAcquisition {
                   Set(members) == Set(segments.compactMap { $0.0.fullUrl?.value?.url.absoluteString }) else {
                 throw AcquisitionError.unsupportedDelta
             }
+        } else if profile == .electrocardiogram {
+            // The average heart rate is derived from the waveform and is selected with it.
+            let derived = observations.filter { $0.1.meta?.profile?.contains(Profile.healthkitEcgAverageHeartRateObservation) == true }
+            guard derived.count <= 1, derived.count + 1 == observations.count else { throw AcquisitionError.unsupportedDelta }
         } else {
             guard observations.count == 1 else { throw AcquisitionError.unsupportedDelta }
         }

@@ -44,6 +44,7 @@ public struct HealthKitAcquisition: Sendable {
         let readHeartbeatSeries: @Sendable (HKHeartbeatSeriesSample) async throws -> HealthKitRecordingFile
         let readDocument: @Sendable (HKSample) async throws -> HealthKitRecordingFile
         let readRoute: @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile
+        let readElectrocardiogram: @Sendable (HKElectrocardiogram) async throws -> HealthKitFHIRExporter.Record
 
         init(
             added: [HKSample],
@@ -53,7 +54,10 @@ public struct HealthKitAcquisition: Sendable {
                 throw AcquisitionError.unsupportedDelta
             },
             readDocument: @escaping @Sendable (HKSample) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta },
-            readRoute: @escaping @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta }
+            readRoute: @escaping @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta },
+            readElectrocardiogram: @escaping @Sendable (HKElectrocardiogram) async throws -> HealthKitFHIRExporter.Record = { _ in
+                throw AcquisitionError.unsupportedDelta
+            }
         ) {
             self.added = added
             self.deletedIDs = deletedIDs
@@ -61,6 +65,7 @@ public struct HealthKitAcquisition: Sendable {
             self.readHeartbeatSeries = readHeartbeatSeries
             self.readDocument = readDocument
             self.readRoute = readRoute
+            self.readElectrocardiogram = readElectrocardiogram
         }
     }
 

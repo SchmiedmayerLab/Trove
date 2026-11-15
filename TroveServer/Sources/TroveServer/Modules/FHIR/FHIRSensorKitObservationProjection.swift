@@ -97,7 +97,8 @@ struct FHIRSensorKitObservationProjection {
         return (system, code)
     }
 
-    private static func waveform(_ data: SampledData) throws {
+    /// Shared by every sampled waveform: finite values or SampledData markers in whole dimensions over a positive period.
+    static func waveform(_ data: SampledData) throws {
         guard let dimensions = data.dimensions.value?.integer, dimensions > 0,
               let period = data.period.value?.decimal, !period.isNaN, period > 0,
               let origin = data.origin.value?.value?.decimal, !origin.isNaN,
