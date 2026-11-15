@@ -38,7 +38,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.14.1"),
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "4f75b24273a260bb35cb54b0bd23a804f371d1f3")
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "cc42583ff63e44b5507829db4aadbd42076b4dcb")
     ] + swiftLintPackage(),
     targets: [
         .systemLibrary(name: "CTroveDeliverySQLite", pkgConfig: "sqlite3", providers: [.apt(["libsqlite3-dev"])]),
