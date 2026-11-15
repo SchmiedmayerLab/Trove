@@ -54,22 +54,33 @@ struct FHIRSyncRecordIdentifierTests {
     }
 
     @Test
-    func documentSyncIdentifierTravelsOnlyBesideTheWriterRecordVersion() throws {
-        let bundle = try JSONDecoder().decode(
-            ModelsR4.Bundle.self, from: SyncIdentifierFixture.bytes("heartbeat-series-sync-identifier-disclosure")
-        )
-        let documents = (bundle.entry ?? []).compactMap { entry -> DocumentReference? in
-            guard case .documentReference(let document)? = entry.resource else {
-                return nil
-            }
-            return document
+    func documentPrimaryAdmitsTheSyncIdentifierExactlyAsAnObservation() throws {
+        let name = "heartbeat-series-sync-identifier-disclosure"
+        let bytes = try SyncIdentifierFixture.bytes(name)
+        let without = try SyncIdentifierFixture.changing(bytes, resourceType: "DocumentReference") { resource in
+            resource["identifier"] = (resource["identifier"] as? [[String: Any]])?.filter { !SyncIdentifierFixture.isSyncIdentifier($0) }
         }
-        let document = try #require(documents.first)
-        let identifiers = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [], extensions: document.extension ?? [])
-        #expect(identifiers.sync == [.init(system: SyncIdentifierFixture.system, value: SyncIdentifierFixture.value)])
-        #expect(identifiers.native.count == 1)
-        #expect(throws: (any Error).self) {
-            try FHIRNativeRecordIdentifiers.output(document.identifier ?? [], extensions: [])
+        let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
+        let base = try FHIRPointProjection.project(validatedBytes: without, validatorIdentity: "test-only")
+        #expect(event.syncRecordIdentifiers == [.init(system: SyncIdentifierFixture.system, value: SyncIdentifierFixture.value)])
+        #expect(event.nativeRecordIdentifiers == base.nativeRecordIdentifiers && event.nativeRecordIdentifiers.count == 1)
+        #expect(event.deploymentIdentifiers.systems == base.deploymentIdentifiers.systems)
+        #expect(event.outputs.map(\.sourceRecordIdentifier) == base.outputs.map(\.sourceRecordIdentifier))
+        #expect(event.outputs.map(\.writerIdentifier) == base.outputs.map(\.writerIdentifier))
+        #expect(event.outputs.map(\.writerVersion) == base.outputs.map(\.writerVersion))
+        let unversioned = try SyncIdentifierFixture.changing(bytes, resourceType: "DocumentReference") { resource in
+            resource["extension"] = (resource["extension"] as? [[String: Any]])?.filter {
+                $0["url"] as? String != Canonicals.writerRecordVersion.value?.url.absoluteString
+            }
+        }
+        let duplicated = try SyncIdentifierFixture.changing(bytes, resourceType: "DocumentReference") { resource in
+            let identifiers = resource["identifier"] as? [[String: Any]] ?? []
+            resource["identifier"] = identifiers + identifiers.filter(SyncIdentifierFixture.isSyncIdentifier)
+        }
+        for refused in [unversioned, duplicated] {
+            #expect {
+                try FHIRPointProjection.project(validatedBytes: refused, validatorIdentity: "test-only")
+            } throws: { ($0 as? ServerError)?.status.code == 422 }
         }
     }
 
