@@ -90,18 +90,24 @@ private func configureObjectStorage(
     app.logger.info("Connecting to S3 object storage...")
     let validator = try FHIRValidationClient(application: app)
     let storageProvider = try S3ObjectStorageProvider(application: app, config: S3ObjectStorageConfiguration())
-    try await configureServices(
-        for: app,
-        storageProvider: storageProvider,
-        validator: validator,
-        sourceKeyring: sourceKeyring,
-        grantorAuthority: keycloak.authorityProvider,
-        clientPolicy: keycloak.config.clientPolicy,
-        recordingLimits: recordingLimits,
-        recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
-        collectionCapacity: collectionCapacity,
-        providerConfiguration: providerConfiguration
-    )
+    do {
+        try await configureServices(
+            for: app,
+            storageProvider: storageProvider,
+            validator: validator,
+            sourceKeyring: sourceKeyring,
+            grantorAuthority: keycloak.authorityProvider,
+            clientPolicy: keycloak.config.clientPolicy,
+            recordingLimits: recordingLimits,
+            recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
+            collectionCapacity: collectionCapacity,
+            providerConfiguration: providerConfiguration
+        )
+    } catch {
+        // The storage lifecycle is not registered yet; release the provider's own HTTP client.
+        try? await storageProvider.shutdown()
+        throw error
+    }
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
     try await storageService.ensureBucketExists()
