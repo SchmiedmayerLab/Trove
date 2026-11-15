@@ -365,7 +365,7 @@ extension HeartRateAcquisitionTests {
         }
 
         func interruptCatchUp(_ interruption: Interruption) async {
-            let task = Task {
+            let task = _Concurrency.Task {
                 try await HeartRateAcquisition.catchUp {
                     try await collectPage { _, anchor in
                         if anchor == QueryAnchor() {
