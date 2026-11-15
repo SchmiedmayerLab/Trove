@@ -466,7 +466,10 @@ extension HeartRateAcquisitionTests {
         }
 
         func setConsentStart(_ start: Date) {
-            for index in plans.indices { plans[index].windows[0].start = start }
+            for index in plans.indices {
+                plans[index].windows[0].start = start
+                plans[index].windows[0].requirements[0].start = start
+            }
         }
 
         func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String) async throws -> (HTTPResponse, HTTPBody?) {
