@@ -130,11 +130,11 @@ final class TroveUITests: XCTestCase {
             XCTAssertTrue(setup.wait(for: \.isEnabled, toEqual: true, timeout: 10))
             setup.tap()
         }
-        // Foreground collection may advance a restored source to its Health access gate.
+        // Foreground collection may advance a restored source to its data access gate.
         // Both states require an existing registration; error and revoked states do not qualify.
         let ready = app.staticTexts.matching(NSPredicate(format: "label IN %@", [
-            "This device is set up. You can review Health access and sync available data.",
-            "Review Health access before syncing data from this device."
+            "This device is set up. You can review data access and sync available data.",
+            "Review data access before syncing data from this device."
         ])).firstMatch
         XCTAssertTrue(ready.waitForExistence(timeout: 20), "The real participant source did not register or restore.")
         XCTAssertFalse(setup.isEnabled, "Restoration must not offer replacement registration.")
