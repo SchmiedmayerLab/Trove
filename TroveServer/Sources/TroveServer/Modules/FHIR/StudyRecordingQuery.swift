@@ -32,13 +32,13 @@ extension StudyDataQuery {
 
 
 extension StudyDataQuery {
-    /// Proves again, before any recording byte is read, that the grant's exact consent window selects
-    /// every row of a query-created batch. A grant without this proof discloses nothing.
+    /// Proves again, before a study view or any recording byte is prepared, that the grant's exact consent
+    /// window selects every row of a query-created batch. This covers the recording and the summary derived
+    /// from it. A grant without this proof discloses nothing; page export and recording download share this rule.
     func requireEveryRowSelected(
-        _ event: ValidatedExchangeEvent, output: Output, grant: StudyDataFence.Grant, studyID: UUID
+        _ event: ValidatedExchangeEvent, output: Output, grant: StudyDataFence.Grant, studyID: UUID, otherwise unavailable: ServerError
     ) async throws {
         guard database.inTransaction else { throw AuditError.transactionRequired }
-        let unavailable = ServerError.notFound("Study recording not found")
         guard let facts = event.collectionOutputs.first(where: { $0.fullURL == output.fullURL }), !facts.lacksRowEvidence else {
             throw unavailable
         }

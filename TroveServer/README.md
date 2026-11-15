@@ -310,6 +310,9 @@ documents and their attachment paths remain unchanged.
 A recording download checks study eligibility before reading storage. For a query
 batch it also proves again that the grant's exact consent window selects every
 verified row; a grant without that proof returns HTTP 404 and releases no bytes.
+Study data pages apply the same rule to the recording document and its derived
+summary and fail with HTTP 500, without a disclosure audit, instead of releasing or
+silently omitting such an output.
 The server then stages and verifies the complete stored and decoded bytes in private, unnamed temporary
 files. Zstandard decoding uses an 8 MiB window and file reads use 64 KiB chunks.
 Compressed preparation can hold both a stored and a decoded temporary file; neither

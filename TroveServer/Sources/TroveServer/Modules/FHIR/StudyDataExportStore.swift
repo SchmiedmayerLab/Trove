@@ -80,6 +80,13 @@ struct StudyDataExportStore {
             )
         }
         let event = try await retainedEvent(id: first.eventID)
+        for grant in evidence.grants {
+            guard let output = nodes[grant.nodeID] else { continue }
+            // A grant that lacks row proof fails the page; it is never silently narrowed or released.
+            try await StudyDataQuery(database: database).requireEveryRowSelected(
+                event, output: output, grant: grant, studyID: studyID, otherwise: .internalServerError("Study data is unavailable")
+            )
+        }
         var recordingURLs: [String: String] = [:]
         for attachment in event.recordings {
             let address = attachment.declaration.output.fullURL

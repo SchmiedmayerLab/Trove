@@ -85,28 +85,81 @@ struct SensorRecordingRowWindowTests {
             let whole = try await scenario.submit(rowCount: 4, studies: [0])
             let slice = try await scenario.submit(rowCount: 2, studies: [1])
             _ = try (whole.eventID, slice.eventID)
-            let sql = try #require(app.db as? any SQLDatabase)
-            // A grant that bypassed admission still cannot release rows outside its consent window.
-            let forged = UUID()
-            try await sql.raw("""
-                INSERT INTO study_data_grants (id, node_id, source_id, participant_id, study_id, enrollment_id,
-                    consent_id, publication_id, revision, accepted_at)
-                SELECT \(bind: forged), w.node_id, s.source_id, s.participant_id, s.study_id, s.enrollment_id,
-                    s.consent_id, s.publication_id, s.revision, s.accepted_at
-                FROM study_data_grants s, study_data_grants w
-                JOIN clinical_event_nodes n ON n.id = w.node_id
-                WHERE s.study_id = \(bind: source.studyIDs[1]) AND n.full_url = \(bind: whole.payload.recordingURL)
-                LIMIT 1
-                """)
-                .run()
             let reader = try await StudyRecordingFixture.readerToken()
+            let pages = "\(apiBasePath)/studies/\(source.studyIDs[1])/data"
+            try await app.test(.GET, pages, beforeRequest: { $0.bearerAuth(reader) }) { #expect($0.status == .ok) }
+            // A grant that bypassed admission still cannot release rows outside its consent window.
+            let forged = try await Self.forgeGrant(study: source.studyIDs[1], fullURL: whole.payload.recordingURL, on: app)
             let path = StudyRecordingLocation.path(studyID: source.studyIDs[1], grantID: forged, versions: .current)
             try await app.test(.GET, path, beforeRequest: { $0.bearerAuth(reader) }) { #expect($0.status == .notFound) }
             #expect(try await StudyRecordingFixture.disclosureCount(on: app) == 0)
+            let disclosedPages = try await Self.auditCount("study.data.disclosure", on: app)
+            try await app.test(.GET, pages, beforeRequest: { $0.bearerAuth(reader) }) {
+                #expect($0.status == .internalServerError && !$0.body.string.contains("bundleBase64"))
+            }
+            #expect(try await Self.auditCount("study.data.disclosure", on: app) == disclosedPages)
             let legitimate = try #require(try await Self.grants(on: app).first {
                 $0.studyID == source.studyIDs[1] && $0.fullURL == slice.payload.recordingURL
             })
             #expect(try await Self.download(legitimate, on: app, token: reader) == slice.payload.original)
+        }
+    }
+
+    @Test
+    func forgedSummaryGrantFailsTheStudyPageWithoutDisclosure() async throws {
+        try await TestApp.withApp(token: .participant(subject: "test-participant"), validator: ClinicalEventBatchTests.validator()) { app, token in
+            let scenario = try await Scenario(app: app, token: token), source = scenario.source
+            let whole = try await scenario.submit(rowCount: 4, studies: [0])
+            let slice = try await scenario.submit(rowCount: 2, studies: [1])
+            _ = try (whole.eventID, slice.eventID)
+            // The summary of the four-row batch describes rows outside the second study's window.
+            _ = try await Self.forgeGrant(study: source.studyIDs[1], fullURL: whole.payload.summaryURL, on: app)
+            let reader = try await StudyRecordingFixture.readerToken()
+            try await app.test(.GET, "\(apiBasePath)/studies/\(source.studyIDs[1])/data", beforeRequest: { $0.bearerAuth(reader) }) {
+                #expect($0.status == .internalServerError)
+            }
+            #expect(try await Self.auditCount("study.data.disclosure", on: app) == 0)
+            // The first study's complete grants are unaffected.
+            try await app.test(.GET, "\(apiBasePath)/studies/\(source.studyIDs[0])/data", beforeRequest: { $0.bearerAuth(reader) }) {
+                #expect($0.status == .ok)
+            }
+        }
+    }
+
+    @Test(arguments: ["verification", "download"])
+    func withdrawalWhileRecordingBytesAreReadGrantsAndDisclosesNothing(phase: String) async throws {
+        let storage = RecordingDownloadStorage()
+        try await TestApp.withApp(
+            token: .participant(subject: "test-participant"), storageProvider: storage, validator: ClinicalEventBatchTests.validator()
+        ) { app, token in
+            let scenario = try await Scenario(app: app, token: token), source = scenario.source
+            let withdraw: @Sendable () async throws -> Void = {
+                try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                    _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: source.enrollmentIDs[1])
+                }
+            }
+            if phase == "verification" {
+                let refused = try await scenario.submit(rowCount: 2, studies: [0, 1]) { await storage.reset(afterRead: withdraw) }
+                guard case .ProblemDetails(let problem) = refused.result else { throw ServerError.unexpectedError }
+                #expect(problem.status == 403)
+                #expect(await storage.reads == 1)
+                #expect(try await Self.grants(on: app).isEmpty)
+                try await ClinicalRecordingAttachmentTests.expectAttachment(refused.receipt, count: 0, state: .ready, on: app)
+            } else {
+                let slice = try await scenario.submit(rowCount: 2, studies: [0, 1])
+                let grants = try await Self.grants(on: app)
+                let withdrawn = try #require(grants.first { $0.studyID == source.studyIDs[1] && $0.fullURL == slice.payload.recordingURL })
+                let retained = try #require(grants.first { $0.studyID == source.studyIDs[0] && $0.fullURL == slice.payload.recordingURL })
+                let reader = try await StudyRecordingFixture.readerToken()
+                await storage.reset(afterRead: withdraw)
+                let path = StudyRecordingLocation.path(studyID: withdrawn.studyID, grantID: withdrawn.id, versions: .current)
+                try await app.test(.GET, path, beforeRequest: { $0.bearerAuth(reader) }) {
+                    #expect($0.status == .conflict && !$0.body.string.contains("timestamp,identifier"))
+                }
+                #expect(await storage.reads == 1)
+                #expect(try await StudyRecordingFixture.disclosureCount(on: app) == 0)
+                #expect(try await Self.download(retained, on: app, token: reader) == slice.payload.original)
+            }
         }
     }
 }
@@ -117,6 +170,28 @@ extension SensorRecordingRowWindowTests {
         let id: UUID
         let studyID: UUID
         let fullURL: String
+    }
+
+    /// Copies the study's own authority onto a node it was never granted.
+    private static func forgeGrant(study: UUID, fullURL: String, on app: Application) async throws -> UUID {
+        let sql = try #require(app.db as? any SQLDatabase), forged = UUID()
+        try await sql.raw("""
+            INSERT INTO study_data_grants (id, node_id, source_id, participant_id, study_id, enrollment_id,
+                consent_id, publication_id, revision, accepted_at)
+            SELECT \(bind: forged), n.id, s.source_id, s.participant_id, s.study_id, s.enrollment_id,
+                s.consent_id, s.publication_id, s.revision, s.accepted_at
+            FROM study_data_grants s, clinical_event_nodes n
+            WHERE s.study_id = \(bind: study) AND n.full_url = \(bind: fullURL)
+            LIMIT 1
+            """)
+            .run()
+        return forged
+    }
+
+    private static func auditCount(_ action: String, on app: Application) async throws -> Int {
+        let sql = try #require(app.db as? any SQLDatabase)
+        let row = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM audit_events WHERE action = \(bind: action)").first())
+        return try row.decode(column: "count", as: Int.self)
     }
 
     private static func grants(on app: Application) async throws -> [Grant] {
@@ -168,7 +243,9 @@ extension SensorRecordingRowWindowTests.Scenario {
         )
     }
 
-    fileprivate func submit(rowCount: Int, studies: [Int]) async throws -> SensorRecordingRowWindowTests.Submitted {
+    fileprivate func submit(
+        rowCount: Int, studies: [Int], afterUpload: () async throws -> Void = {}
+    ) async throws -> SensorRecordingRowWindowTests.Submitted {
         var payload = try await SensorRecordingAttachmentFixture.make(
             source: source.source, consentID: source.consentIDs[studies[0]], compressed: false, firstRow: firstRow, rowCount: rowCount
         )
@@ -176,6 +253,7 @@ extension SensorRecordingRowWindowTests.Scenario {
             .init(consentId: source.consentIDs[$0].uuidString, outputFullUrls: [payload.recordingURL])
         }
         let receipt = try await ClinicalRecordingAttachmentTests.upload(payload.recording, source: source, on: app, token: token)
+        try await afterUpload()
         var submission = payload.recording
         submission.declaration.targets = studies.map { .init(consentId: source.consentIDs[$0].uuidString, outputFullUrls: payload.outputURLs) }
         let results = try await ClinicalRecordingAttachmentTests.submit(
