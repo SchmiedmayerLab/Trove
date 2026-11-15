@@ -127,8 +127,8 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 17 rejects earlier or unknown formats without
-migration or deletion.
+later response. Journal format 19 upgrades formats 17 and 18 in place and rejects earlier or
+unknown formats without migration or deletion.
 
 Recording files are staged beside the journal in an owner-only directory. The
 journal commits empty-file reservations before consuming recording chunks, then
@@ -615,8 +615,8 @@ storing the response's sibling receipts. Accepted receipts can still be recovere
 later using a newly authenticated, correctly scoped drainer.
 
 The caller schedules passes. There is no internal timer, independent token manager
-or separate collector checkpoint authority. Journal format changes currently require a
-fresh development journal; no migration or automatic replacement is provided.
+or separate collector checkpoint authority. Formats 17 and 18 upgrade in place; any earlier
+journal format requires a fresh development journal.
 
 ## Grove Development Dependency
 

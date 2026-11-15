@@ -1,6 +1,221 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Review Health Documents": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Health Documents"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesundheitsdokumente prüfen"
+          }
+        }
+      }
+    },
+    "Reviewing Health Documents…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewing Health Documents…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesundheitsdokumente werden geprüft…"
+          }
+        }
+      }
+    },
+    "Cancel Document Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel Document Review"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dokumentenprüfung abbrechen"
+          }
+        }
+      }
+    },
+    "Health may ask you to approve individual documents requested by your studies.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health may ask you to approve individual documents requested by your studies."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health kann dich bitten, einzelne von deinen Studien angeforderte Dokumente freizugeben."
+          }
+        }
+      }
+    },
+    "Document review was canceled. Saved data has been preserved. You can review documents again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Document review was canceled. Saved data has been preserved. You can review documents again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Dokumentenprüfung wurde abgebrochen. Gespeicherte Daten bleiben erhalten. Du kannst die Dokumente erneut prüfen."
+          }
+        }
+      }
+    },
+    "The service could not be reached. Collection will retry.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Der Dienst konnte nicht erreicht werden. Die Datenerfassung wird erneut versucht."
+            }
+          }
+        }
+      },
+      "Collection permissions changed. Refresh to review the connection.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Die Berechtigungen zur Datenerfassung haben sich geändert. Aktualisieren Sie die Ansicht, um die Verbindung zu prüfen."
+            }
+          }
+        }
+      },
+      "Collection is waiting for its next opportunity.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Die Datenerfassung wartet auf die nächste Gelegenheit."
+            }
+          }
+        }
+      },
+      "Collection is paused because a capacity limit was reached. Contact the study team.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Die Datenerfassung ist wegen einer Kapazitätsgrenze pausiert. Wenden Sie sich an das Studienteam."
+            }
+          }
+        }
+      },
+      "Next check": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Nächste Prüfung"
+            }
+          }
+        }
+      },
+      "This source could not be collected. Contact the study team.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Diese Quelle konnte nicht erfasst werden. Wenden Sie sich an das Studienteam."
+            }
+          }
+        }
+      },
+      "No current study collection is requested for this source.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Für diese Quelle ist derzeit keine Datenerfassung für eine Studie vorgesehen."
+            }
+          }
+        }
+      },
+      "Data source": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Datenquelle"
+            }
+          }
+        }
+      },
+      "Latest collection attempt": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Letzter Erfassungsversuch"
+            }
+          }
+        }
+      },
+      "Previously selected data": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Zuvor ausgewählte Daten"
+            }
+          }
+        }
+      },
+      "Data from this attempt was accepted.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Die Daten aus diesem Versuch wurden angenommen."
+            }
+          }
+        }
+      },
+      "This status applies to the named source, not every source on your account.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dieser Status gilt für die genannte Quelle und nicht für alle Quellen Ihres Kontos."
+            }
+          }
+        }
+      },
+      "Collection is scheduled.": {
+        "localizations": {
+          "de": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Die Datenerfassung ist geplant."
+            }
+          }
+        }
+      },
     "Your enrollment has ended." : {},
     "Enrollment ends" : {},
     "Ended" : {},

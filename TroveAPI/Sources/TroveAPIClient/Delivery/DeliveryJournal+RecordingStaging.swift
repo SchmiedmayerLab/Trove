@@ -14,6 +14,7 @@ extension DeliveryJournal {
     /// The queue's per-file budget, used by acquisition before constructing a recording.
     public var recordingByteLimit: Int { limits.maximumRecordingBytes }
 
+
     static func validRecordingPath(_ path: String) -> Bool {
         (1...512).contains(path.utf8.count)
             && path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }

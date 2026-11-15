@@ -16,6 +16,39 @@ import TroveAPIClient
 @Suite(.timeLimit(.minutes(1)))
 struct HealthDataModelTests {
     @Test
+    func explicitDocumentReviewCanBeCanceledAndRetriedWithoutPublishingStaleStatus() async throws {
+        let fixture = try Fixture()
+        let model = fixture.model()
+        let review = Task { await model.run(.reviewDocuments) }
+        await fixture.waitForStart()
+        #expect(model.isReviewingDocuments)
+        model.cancelDocumentReview()
+        fixture.finish(.ready, at: 0)
+        await review.value
+        #expect(fixture.cancellations == [true])
+        #expect(!model.isBusy && model.status == .documentReviewCancelled)
+        let retry = Task { await model.run(.reviewDocuments) }
+        await fixture.waitForStart()
+        fixture.finish(.waiting, at: 1)
+        await retry.value
+        #expect(fixture.actions == [.reviewDocuments, .reviewDocuments])
+        #expect(!model.isReviewingDocuments && model.status == .waiting)
+    }
+
+    @Test
+    func backgroundWakeUsesCaptureWithoutDocumentReview() async throws {
+        let fixture = try Fixture()
+        let model = fixture.model()
+        let session = try #require(fixture.session)
+        let wake = Task { await model.receiveHealthUpdate(for: session, context: .background) }
+        await fixture.waitForStart()
+        #expect(fixture.actions == [.capture])
+        #expect(!model.isReviewingDocuments)
+        fixture.finish(.ready, at: 0)
+        await wake.value
+    }
+
+    @Test
     func repeatedActionsCannotStartConcurrentCollection() async throws {
         let fixture = try Fixture()
         let model = fixture.model()

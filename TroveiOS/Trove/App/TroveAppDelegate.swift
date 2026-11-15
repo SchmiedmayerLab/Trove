@@ -10,7 +10,12 @@ import Grove
 import GroveAccount
 @_spi(Experimental) import GroveHealthKit
 import GroveKeychainStorage
+import GroveLocalStorage
+import GroveSensorKit
 import HealthKit
+import TroveAPIClient
+import TroveHealthKit
+import TroveSensorKit
 import UIKit
 
 
@@ -20,7 +25,9 @@ actor TroveStandard: Standard {}
 class TroveAppDelegate: GroveAppDelegate {
     private let healthKit = GroveHealthKit.HealthKit()
     private let healthData = HealthDataModel()
+    private let sensorKit = GroveSensorKit.SensorKit()
     private var healthDataRuntime: HealthDataRuntime?
+    private var sensorDataRuntime: SensorDataRuntime?
 
     override var configuration: Configuration {
         let keycloak = KeycloakAccountService(
@@ -32,8 +39,10 @@ class TroveAppDelegate: GroveAppDelegate {
         )
         return Configuration(standard: TroveStandard()) {
             KeychainStorage()
+            LocalStorage()
             TroveAPIModule()
             healthKit
+            sensorKit
             healthData
             AccountConfiguration(
                 service: keycloak,
@@ -61,14 +70,23 @@ class TroveAppDelegate: GroveAppDelegate {
         // swiftlint:disable:next discouraged_optional_collection
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        startHealthKitRuntime()
+        let sensors = SensorDataRuntime(model: healthData) {
+            GroveSensorKit.SensorKit.isAvailable
+                && SensorDataConfiguration.sources.contains { $0.sensor?.authorizationStatus == .authorized }
+        }
+        sensorDataRuntime = sensors
+        sensors.start()
+        return true
+    }
+
+    private func startHealthKitRuntime() {
         guard HKHealthStore.isHealthDataAvailable() else {
-            return true
+            return
         }
         let store = healthKit.healthStore
         let runtime = HealthDataRuntime(model: healthData) { update in
-            let types: Set<HKSampleType> = [
-                HKQuantityType(.heartRate), HKCategoryType(.sleepAnalysis), HKSampleType.workoutType(), HKSeriesType.workoutRoute()
-            ]
+            let types = Set(HealthKitQueryDefinition.Stream.allCases.compactMap { try? HealthKitAcquisition.sampleType(for: $0) })
             return store.startBackgroundObservation(for: types, updateHandler: { _ in await update() }) {
                 let lifetime = AsyncStream<Void>.makeStream()
                 defer { lifetime.continuation.finish() }
@@ -77,6 +95,5 @@ class TroveAppDelegate: GroveAppDelegate {
         }
         healthDataRuntime = runtime
         runtime.start()
-        return true
     }
 }

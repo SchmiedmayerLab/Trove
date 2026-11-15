@@ -25,6 +25,7 @@ let package = Package(
         .library(name: "TroveAPITypes", targets: ["TroveAPITypes"]),
         .library(name: "TroveAPIClient", targets: ["TroveAPIClient"]),
         .library(name: "TroveHealthKit", targets: ["TroveHealthKit"]),
+        .library(name: "TroveSensorKit", targets: ["TroveSensorKit"]),
         .library(name: "TroveAPIServer", targets: ["TroveAPIServer"]),
         .executable(name: "trove", targets: ["TroveCLI"])
     ],
@@ -82,6 +83,22 @@ let package = Package(
                     name: "GroveHealthKitFHIR", package: "Grove", condition: .when(platforms: [.iOS, .macOS, .watchOS, .visionOS, .macCatalyst])
                 )
             ],
+            plugins: [] + swiftLintPlugin()
+        ),
+        .target(
+            name: "TroveSensorKit",
+            dependencies: [
+                .target(name: "TroveAPIClient"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
+                .product(name: "GroveSensorKit", package: "Grove", condition: .when(platforms: [.iOS]))
+            ],
+            plugins: [] + swiftLintPlugin()
+        ),
+        .testTarget(
+            name: "TroveSensorKitTests",
+            dependencies: [.target(name: "TroveSensorKit")],
             plugins: [] + swiftLintPlugin()
         ),
         .target(

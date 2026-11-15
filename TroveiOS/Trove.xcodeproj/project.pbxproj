@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DFAA0001000000000000A00F /* GroveLocalStorage in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A00E /* GroveLocalStorage */; };
+		DFAA0001000000000000A00D /* GroveSensorKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A00C /* GroveSensorKit */; };
+		DFAA0001000000000000A00B /* TroveSensorKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A00A /* TroveSensorKit */; };
 		DFAA0001000000000000A009 /* XCTHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A008 /* XCTHealthKit */; };
 		DFAA0001000000000000A005 /* TroveHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A004 /* TroveHealthKit */; };
 		DFAA0001000000000000A007 /* GroveHealthKit in Frameworks */ = {isa = PBXBuildFile; productRef = DFAA0001000000000000A006 /* GroveHealthKit */; };
@@ -74,6 +77,9 @@
 				DFBAF4592FA5206F00CCAEAA /* TroveAPIClient in Frameworks */,
 				DFAA0001000000000000A005 /* TroveHealthKit in Frameworks */,
 				DFAA0001000000000000A007 /* GroveHealthKit in Frameworks */,
+				DFAA0001000000000000A00F /* GroveLocalStorage in Frameworks */,
+				DFAA0001000000000000A00D /* GroveSensorKit in Frameworks */,
+				DFAA0001000000000000A00B /* TroveSensorKit in Frameworks */,
 				DFBAF45F2FA5208700CCAEAA /* GroveStudy in Frameworks */,
 				DFBAF4902FA5300000CCAEAA /* Grove in Frameworks */,
 				DFBAF4912FA5300000CCAEAA /* GroveKeychainStorage in Frameworks */,
@@ -148,6 +154,9 @@
 				DFBAF4582FA5206F00CCAEAA /* TroveAPIClient */,
 				DFAA0001000000000000A004 /* TroveHealthKit */,
 				DFAA0001000000000000A006 /* GroveHealthKit */,
+				DFAA0001000000000000A00E /* GroveLocalStorage */,
+				DFAA0001000000000000A00C /* GroveSensorKit */,
+				DFAA0001000000000000A00A /* TroveSensorKit */,
 				DFBAF45B2FA5207900CCAEAA /* GroveAccount */,
 				DFBAF45E2FA5208700CCAEAA /* GroveStudy */,
 				DFBAF4802FA5300000CCAEAA /* Grove */,
@@ -458,6 +467,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				CODE_SIGN_ENTITLEMENTS = Trove.entitlements;
 				INFOPLIST_FILE = TroveInfo.plist;
+				TROVE_SENSORKIT_ENABLED = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -490,6 +500,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				CODE_SIGN_ENTITLEMENTS = Trove.entitlements;
 				INFOPLIST_FILE = TroveInfo.plist;
+				TROVE_SENSORKIT_ENABLED = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -682,6 +693,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		DFAA0001000000000000A00E /* GroveLocalStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
+			productName = GroveLocalStorage;
+		};
+		DFAA0001000000000000A00C /* GroveSensorKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;
+			productName = GroveSensorKit;
+		};
+		DFAA0001000000000000A00A /* TroveSensorKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TroveSensorKit;
+		};
 		DFAA0001000000000000A008 /* XCTHealthKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DFBAF4702FA5300000CCAEAA /* XCRemoteSwiftPackageReference "Grove" */;

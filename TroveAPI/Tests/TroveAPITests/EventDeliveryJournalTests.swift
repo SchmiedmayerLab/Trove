@@ -245,7 +245,7 @@ extension EventDeliveryJournalTests {
 
     @Test
     func sqliteFullPreservesPreviouslyStagedEventsAndRollsBackTheNewSequence() async throws {
-        try await DeliveryFixture.withJournal(limits: .init(maximumDatabaseBytes: 128 * 1024)) { journal, url in
+        try await DeliveryFixture.withJournal(limits: .init(maximumDatabaseBytes: 160 * 1024)) { journal, url in
             let existing = try await DeliveryFixture.stage(journal, changes: ["add:a"])
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             do {

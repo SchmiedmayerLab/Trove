@@ -19,3 +19,9 @@ extension DeliveryJournal.Limits {
         }
     }
 }
+
+
+extension DeliveryJournal {
+    /// Read-only acquisition preflight budgets; the staging transaction still enforces current durable capacity.
+    public var configuredLimits: Limits { limits }
+}
