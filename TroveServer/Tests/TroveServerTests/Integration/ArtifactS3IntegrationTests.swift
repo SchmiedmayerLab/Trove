@@ -15,15 +15,41 @@ import Vapor
 
 
 struct ArtifactS3IntegrationTests {
-    private static func peakResidentBytes() throws -> Int? {
+    /// The process's current resident memory, or `nil` where `/proc` does not report it.
+    ///
+    /// Unlike the peak resident memory (`VmHWM`), the current value does not carry the high-water mark that earlier tests
+    /// in the same process left behind.
+    private static func residentBytes() -> Int? {
         #if os(Linux)
-        let status = try String(contentsOfFile: "/proc/self/status", encoding: .utf8)
-        let line = try #require(status.split(separator: "\n").first { $0.hasPrefix("VmHWM:") })
-        let kibibytes = try #require(Int(line.split(whereSeparator: \.isWhitespace)[1]))
-        return kibibytes * 1024
+        guard let statm = try? String(contentsOfFile: "/proc/self/statm", encoding: .utf8) else {
+            return nil
+        }
+        let fields = statm.split(separator: " ")
+        guard fields.count > 1, let pages = Int(fields[1]) else {
+            return nil
+        }
+        return pages * Int(getpagesize())
         #else
         return nil
         #endif
+    }
+
+    /// Runs `operation` while sampling the resident memory, and returns its result with the highest observed value.
+    private static func peakResidentBytes<Result: Sendable>(
+        during operation: () async throws -> Result
+    ) async throws -> (result: Result, peakBytes: Int?) {
+        let sampler = Task.detached { () -> Int? in
+            var peak = residentBytes()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(2))
+                peak = max(peak ?? 0, residentBytes() ?? 0)
+            }
+            return peak
+        }
+        defer { sampler.cancel() }
+        let result = try await operation()
+        sampler.cancel()
+        return (result, await sampler.value)
     }
 
     @Test(.enabled(if: Environment.get("TROVE_TEST_S3_PORT") != nil, "Requires a disposable loopback S3 test service"))
@@ -53,23 +79,42 @@ struct ArtifactS3IntegrationTests {
                     storage: app.grove[ObjectStorageService.self],
                     limits: try .init(storedBytes: input.byteCount, sourceBytes: input.byteCount)
                 )
-                let baseline = try Self.peakResidentBytes()
-                let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                    try await service.upload(
-                        input.body, sourceID: fixture.source.id, transferID: UUID(), declaration: declaration, installation: fixture.installation
-                    )
+                func upload(_ input: GeneratedObjectStorageBody, declaration: RecordingTransferDeclaration) async throws -> RecordingTransferReceipt {
+                    try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                        try await service.upload(
+                            input.body, sourceID: fixture.source.id, transferID: UUID(), declaration: declaration, installation: fixture.installation
+                        )
+                    }
+                }
+                // The bound covers what the transfer itself adds, not what the process accumulated before it. A warm-up
+                // through the same path first creates the storage client, connection and lazily initialized state that
+                // stay resident afterwards, and leaves the allocator's pools sized for a transfer. The measured upload is
+                // then compared with the resident memory after the warm-up, sampled throughout the transfer: a transfer
+                // that buffered the payload instead of streaming it would hold at least its 96 MiB at once.
+                let warmUpInput = GeneratedObjectStorageBody(byteCount: 1024 * 1024 + 1)
+                let warmUpDeclaration = try Self.declaration(
+                    byteCount: warmUpInput.byteCount,
+                    digest: try await warmUpInput.digest(),
+                    consentID: fixture.consentIDs[0],
+                    output: "urn:uuid:5d0c4f43-6f1e-4c2b-9a51-0f4d4c8f7a21"
+                )
+                _ = try await upload(warmUpInput, declaration: warmUpDeclaration)
+                let baseline = Self.residentBytes()
+                let (receipt, peak) = try await Self.peakResidentBytes {
+                    try await upload(input, declaration: declaration)
                 }
                 let stored = try #require(try await StoredArtifact.find(receipt.artifactID, on: app.db))
                 let reference = try stored.reference()
                 #expect(receipt.declarationSHA256 == declaration.sha256 && receipt.storedSHA256 == digest)
-                if let baseline, let peak = try Self.peakResidentBytes() {
-                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) baselineBytes=\(baseline) peakBytes=\(peak)")
+                if let baseline, let peak {
+                    print("S3_TRANSFER_MEMORY payloadBytes=\(input.byteCount) baselineResidentBytes=\(baseline) peakResidentBytes=\(peak)")
                     #expect(peak - baseline < 64 * 1024 * 1024)
                 }
                 #expect(stored.state == .ready)
                 #expect(stored.byteCount == input.byteCount && stored.digest == digest)
                 #expect(try stored.reference().scope == .participantSource(scope))
-                #expect(try await store.cleanup(now: Date().addingTimeInterval(7200)).deleted == 1)
+                // The warm-up and the measured artifact.
+                #expect(try await store.cleanup(now: Date().addingTimeInterval(7200)).deleted == 2)
                 await #expect(throws: (any Error).self) { try await provider.downloadBody(key: reference.key) }
             }
         }
@@ -113,8 +158,12 @@ struct ArtifactS3IntegrationTests {
 
 
 extension ArtifactS3IntegrationTests {
-    private static func declaration(byteCount: Int, digest: String, consentID: UUID) throws -> RecordingTransferDeclaration {
-        let output = "urn:uuid:997260f5-8c97-4cc7-bbe0-46c230c2bf4f"
+    private static func declaration(
+        byteCount: Int,
+        digest: String,
+        consentID: UUID,
+        output: String = "urn:uuid:997260f5-8c97-4cc7-bbe0-46c230c2bf4f"
+    ) throws -> RecordingTransferDeclaration {
         let date = Date()
         // Transport verification only; the generated bytes are not a clinically admitted route.
         return try .init(
