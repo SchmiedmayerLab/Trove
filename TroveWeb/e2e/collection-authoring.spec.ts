@@ -91,12 +91,15 @@ test("authors, reloads and preserves exact historical collection windows", async
   await expect(
     page.getByLabel("Calendar time zone", { exact: true }),
   ).toHaveValue("America/Los_Angeles");
-  await expect(
-    page.getByRole("status").filter({ hasText: "Collection scope" }),
-  ).toContainText("6 months from each participant's acceptance");
-  await page.screenshot({
+  const scope = page
+    .getByRole("status")
+    .filter({ hasText: "Collection scope" });
+  await expect(scope).toContainText(
+    "6 months from each participant's acceptance",
+  );
+  // The complete measurement catalog makes the page taller than a browser can capture in one image.
+  await scope.screenshot({
     path: testInfo.outputPath("collection-lookback.png"),
-    fullPage: true,
   });
 
   let patchCount = 0;

@@ -13,6 +13,9 @@ import SQLKit
 
 /// A deployment's global provider key space is retained independently of registrations and accounts.
 enum ProviderGlobalScopeSchema {
+    /// Provider identity scopes, query coverage and conversion instants are append-only evidence for the runtime login.
+    static let appendOnlyTables = ["provider_global_scopes", "provider_query_coverage", "provider_conversion_instants"]
+
     static func prepare(on database: any Database) async throws {
         try await database.schema("provider_global_scopes")
             .field("provider", .string, .identifier(auto: false), .required, .sql(unsafeRaw: "CHECK (provider = 'oura')"))
