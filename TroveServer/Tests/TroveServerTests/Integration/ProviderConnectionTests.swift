@@ -10,7 +10,9 @@ import Fluent
 import Foundation
 import SQLKit
 import Testing
+import TroveAPIServer
 @testable import TroveServer
+import VaporTesting
 
 
 struct ProviderConnectionTests {
@@ -20,6 +22,31 @@ struct ProviderConnectionTests {
         #expect(try sources.decode(column: "count", as: Int.self) == 1)
         let installations = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM source_installations").first())
         #expect(try installations.decode(column: "count", as: Int.self) == 0)
+    }
+
+    @Test
+    func unconfiguredDeploymentOffersNoConnectionsWithoutFailing() async throws {
+        try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
+            try await ParticipantFixtures.createParticipant(on: app.db)
+            try await app.test(.GET, "\(apiBasePath)/participant/provider-connections", beforeRequest: { request in
+                request.bearerAuth(token)
+            }) { response in
+                #expect(response.status == .ok)
+                #expect(response.headers.first(name: .cacheControl) == "no-store")
+                let connections = try response.content.decode([Components.Schemas.ProviderConnection].self)
+                #expect(connections.isEmpty)
+            }
+            try await app.test(.GET, "\(apiBasePath)/participant/provider-registrations", beforeRequest: { request in
+                request.bearerAuth(token)
+            }) { response in
+                #expect(response.status == .ok)
+                let registrations = try response.content.decode([Components.Schemas.ProviderRegistration].self)
+                #expect(registrations.isEmpty)
+            }
+            try await app.test(.GET, "\(apiBasePath)/participant/provider-connections") { response in
+                #expect(response.status == .unauthorized)
+            }
+        }
     }
 
     @Test
