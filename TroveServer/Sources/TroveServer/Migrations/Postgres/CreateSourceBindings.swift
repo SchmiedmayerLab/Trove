@@ -12,6 +12,26 @@ import SQLKit
 
 
 struct CreateSourceBindings: AsyncMigration {
+    private static func protect(on transaction: any Database) async throws {
+        guard let sql = transaction as? any SQLDatabase else {
+            throw AuditError.unsupportedDatabase
+        }
+        try await sql.raw("""
+            CREATE UNIQUE INDEX source_bindings_native_repository
+            ON source_bindings (participant_id, repository_kind) WHERE kind = 'participant-app'
+            """)
+            .run()
+        try await RevocableSourceSchema.protect(
+            table: "source_bindings",
+            immutableColumns: [
+                "id", "participant_id", "key_id", "key_epoch", "repository_kind", "kind", "provider_registration_id",
+                "identifier_root", "event_identifier_system",
+                "participant_identifier_system", "participant_identifier_value", "created_at"
+            ],
+            on: transaction
+        )
+    }
+
     func prepare(on database: any Database) async throws {
         try await database.transaction { transaction in
             try await transaction.schema("source_bindings")
@@ -41,21 +61,7 @@ struct CreateSourceBindings: AsyncMigration {
                     AND (revoked_at IS NULL OR revoked_at >= created_at)
                     """)))))
                 .create()
-            guard let sql = transaction as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
-            try await sql.raw("""
-                CREATE UNIQUE INDEX source_bindings_native_repository
-                ON source_bindings (participant_id, repository_kind) WHERE kind = 'participant-app'
-                """)
-                .run()
-            try await RevocableSourceSchema.protect(
-                table: "source_bindings",
-                immutableColumns: [
-                    "id", "participant_id", "key_id", "key_epoch", "repository_kind", "kind", "provider_registration_id",
-                    "identifier_root", "event_identifier_system",
-                    "participant_identifier_system", "participant_identifier_value", "created_at"
-                ],
-                on: transaction
-            )
+            try await Self.protect(on: transaction)
         }
     }
 

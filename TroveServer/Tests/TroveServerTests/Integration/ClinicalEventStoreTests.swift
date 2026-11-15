@@ -137,7 +137,8 @@ struct ClinicalEventStoreTests {
                 if failure == "withdrawal" {
                     _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: fixture.enrollmentIDs[1])
                 }
-                let event = try Self.event(source: fixture.source, effectiveAt: failure == "collection-time" ? Date(timeIntervalSince1970: 0) : Date())
+                let effectiveAt = failure == "collection-time" ? Date(timeIntervalSince1970: 0) : Date()
+                let event = try Self.event(source: fixture.source, effectiveAt: effectiveAt)
                 await #expect {
                     try await ClinicalEventStore(database: app.db).accept(
                         event, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
@@ -314,8 +315,8 @@ extension ClinicalEventStoreTests {
             for (profile, quantity) in cases {
                 await #expect {
                     try await sql.raw("""
-                        INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at, effective_seconds, effective_fraction,
-                            value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
+                        INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
+                            effective_seconds, effective_fraction, value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
                         SELECT n.id, n.source_id, f.event_id, f.record_id, f.output_binding_id, \(bind: profile), f.effective_at,
                             f.effective_seconds, f.effective_fraction, 'quantity', \(bind: quantity), 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4'
                         FROM clinical_event_nodes n JOIN clinical_point_facts f ON f.event_id = n.event_id WHERE n.ordinal = 0
