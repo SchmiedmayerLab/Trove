@@ -54,21 +54,20 @@ the same delivery journal. `SensorKitCollectionCapabilities` lists the sources w
 implemented acquisition and receiver path; guide inventory alone enables nothing.
 The app links it but keeps SensorKit disabled unless the `TROVE_SENSORKIT_ENABLED`
 build setting (default `NO`) and a privacy policy URL are set; see [SensorKit deployment](../TroveiOS/README.md#sensorkit-deployment).
-Structured sources and native sessions (on-wrist state, visits, usage reports, sleep
+It collects 16 sources: on-wrist state, visits, messages usage, phone usage, sleep
 sessions, electrocardiograms, device usage, wrist temperature, photoplethysmogram
-samples) select whole overlapping records. Each native photoplethysmogram sample is
+samples, acceleration, ambient light, ambient pressure, heart rate, pedometer, device
+motion and headphone settings. Structured sources and native sessions select whole
+overlapping records. Each native photoplethysmogram sample is
 retained in Grove's registered binary format beside a coverage summary; the two
 outputs are consented separately.
 
 Keyboard metrics, face metrics, media events, odometer, rotation rate and the Siri
-and telephony speech metrics are not collected. Grove's FHIR converter accepts
-caller-built records for them, but it has no bridge from the SensorKit values to a
-registered payload for keyboard, face, media and speech metrics or to the odometer
-rows, and its rotation-rate series requires exactly uniform sample timing. Acoustic
-settings are deferred in the guide.
+and telephony speech metrics are not collected; [issue #158](https://github.com/SchmiedmayerLab/Trove/issues/158)
+tracks them. Acoustic settings are deferred in the guide.
 
-Acceleration, ambient light, ambient pressure, heart rate, pedometer and headphone
-recordings arrive as query batches of independent rows. The client divides a retained
+Acceleration, ambient light, ambient pressure, heart rate, pedometer, device motion and
+headphone recordings arrive as query batches of independent rows. The client divides a retained
 batch into immutable row slices: each uncovered run of rows with one exact set of
 authorizing consents becomes a slice, so a boundary between two study windows always
 starts a new one. A slice's source identifier derives from the retained batch
@@ -715,9 +714,9 @@ or separate collector checkpoint authority.
 ## Grove Development Dependency
 
 API, server and iOS pin Grove commit
-`833850907283712ea4dcf987fb8edf6d721fc4fc`, the top of Grove's unreleased collection stack
-(branch `provider-converters`), which builds on
-[Grove #144](https://github.com/SchmiedmayerLab/Grove/pull/144). It
+`833850907283712ea4dcf987fb8edf6d721fc4fc` on the
+[`provider-converters`](https://github.com/SchmiedmayerLab/Grove/tree/provider-converters)
+branch of Grove. It
 provides typed source metadata, recording-device mappings, complete recording periods,
 file-backed recordings, the collection catalog and the provider and SensorKit converters
 for the stateless Bundle exchange. Trove sets the HealthKit exporter's metadata policy
@@ -727,6 +726,12 @@ document format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple com
 and simulator checks are separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
+
+The profiles Grove emits follow the Grove FHIR implementation-guide branches
+[`metadata-preservation`](https://github.com/SchmiedmayerLab/grove-fhir/pull/72), then
+`sdk-27-2-baseline`, `healthkit-audiogram-details`, `provider-source-time-precision`,
+`healthkit-clinical-source-time` and `healthkit-ecg-symptoms-unavailable`. The server's
+validator manifest separately pins the published Grove FHIR 0.8.0 guides.
 
 This remains a development revision. Grove's producer conformance source and
 Trove's validator source/package closure have separate identities. The validator

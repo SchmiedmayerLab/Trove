@@ -181,6 +181,14 @@ implemented by the Trove receiver and remains optional future work in
 [issue #134](https://github.com/SchmiedmayerLab/Trove/issues/134). HMAC identity
 recovery is independent of signing. Do not describe unsigned data as signature-verified.
 
+Tracked next steps outside this acceptance scope: reporting omitted source records
+to researchers ([#147](https://github.com/SchmiedmayerLab/Trove/issues/147)),
+HealthKit characteristics as participant account attributes
+([#148](https://github.com/SchmiedmayerLab/Trove/issues/148)), withholding device
+unit identifiers from studies that do not need them
+([#157](https://github.com/SchmiedmayerLab/Trove/issues/157)) and the remaining
+SensorKit sources ([#158](https://github.com/SchmiedmayerLab/Trove/issues/158)).
+
 Close engineering work only against its executed evidence. Closing #137 additionally
 requires its targeted physical-device evidence. The complete collection scope requires
 implemented and tested coverage of all admitted adapters in
