@@ -56,7 +56,10 @@ versions. Recreate an identified disposable database when the schema changes;
 
 ## Artifact storage
 
-The S3 provider uploads and reads asynchronous byte chunks with backpressure. Artifact
+The S3 provider uploads and reads asynchronous byte chunks with backpressure. Its
+connections share one event loop, and an upload pulls a chunk only while at most 16
+earlier chunks (about 1 MiB) wait for that loop, so a busy loop slows the transfer
+instead of queueing the object in memory. Artifact
 staging requires a known byte count and SHA-256 digest within the purpose's limit:
 10 MiB for consent PDFs and 50 MiB for publication archives. A recovery row is saved
 before upload. The stored object is read back and checked incrementally for exact
@@ -154,13 +157,15 @@ object, and deletes it. A 1 MiB warm-up upload through the same path runs first.
 test then samples the process's resident memory throughout the large upload on Linux
 and requires its peak to stay less than 64 MiB above the value after the warm-up.
 Earlier tests' peak memory does not count; concurrent tests in the same process
-would, so measure with `--no-parallel` or alone. This is
+would, so measure with `--no-parallel` or alone. `EventLoopPacedBodyTests` checks the
+pacing bound itself against a blocked event loop. This is
 storage-transport evidence, not a measurement of the complete mobile collection and
 durable-queue pipeline.
 
 `RecordingTransferStreamingTests.largeHTTPUploadStreamsToStorageAndRecoversItsReceipt`
 adds a real HTTP listener and streamed client request to the same 96 MiB workload.
-Run it alone in a fresh process for its memory measurement. It covers authentication,
+It applies the same resident-growth bound, measured from just before the upload, and
+paces its own client body like the storage upload. It covers authentication,
 declaration recovery, HTTP upload, S3 readback and receipt persistence. Its generated
 bytes are transport fixtures, not clinically valid route data; source decoding,
 compression and mobile queue storage are outside that measurement.
