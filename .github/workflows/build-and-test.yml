@@ -125,7 +125,7 @@ jobs:
       path: TroveiOS
       runsonlabels: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]' }}
       # Bind the runtime: OS:latest can select an installed runtime without this device.
-      destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0'
+      destination: 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2'
       # The real-stack job owns UI testing and its service/simulator prerequisites.
       scheme: Trove-UnitTests
       resultBundle: Trove-iOS-Tests.xcresult
@@ -192,7 +192,7 @@ jobs:
           set -euo pipefail
           udid="$(xcrun simctl create "Trove-UI-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
             com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
-            com.apple.CoreSimulator.SimRuntime.iOS-27-0)"
+            com.apple.CoreSimulator.SimRuntime.iOS-27-2)"
           # Record ownership before boot so cleanup also runs after preparation failure.
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
