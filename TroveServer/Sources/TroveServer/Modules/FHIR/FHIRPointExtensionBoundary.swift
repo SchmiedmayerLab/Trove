@@ -12,7 +12,7 @@ import GroveFHIRContract
 
 private enum PointExtensionLocation {
     case bundle, entries, entry, resource, resourceExtensions, resourceExtension, targets, target, entities, entity
-    case components, component, componentExtensions, componentExtension
+    case components, component, componentExtensions, componentExtension, members, member
     case documentContext, period, temporalPrimitive, codedValue, other
 
     var element: Self {
@@ -23,13 +23,14 @@ private enum PointExtensionLocation {
         case .resourceExtensions: .resourceExtension
         case .components: .component
         case .componentExtensions: .componentExtension
+        case .members: .member
         default: .other
         }
     }
 
     var allowsExtensions: Bool {
         switch self {
-        case .entry, .resource, .target, .entity, .temporalPrimitive, .codedValue, .component: true
+        case .entry, .resource, .target, .entity, .temporalPrimitive, .codedValue, .component, .member: true
         default: false
         }
     }
@@ -42,6 +43,7 @@ private enum PointExtensionLocation {
         case "valueCodeableConcept": .codedValue
         case "context": .documentContext
         case "component": .components
+        case "hasMember": .members
         case "effectivePeriod", "occurredPeriod": .period
         case "_effectiveDateTime", "_issued", "_authored", "_occurredDateTime": .temporalPrimitive
         default: .other
@@ -66,7 +68,8 @@ private enum PointExtensionLocation {
 extension FHIRPointSupportBoundary {
     /// Runs only after complete validation. JSONSerialization is used exclusively to inspect
     /// member locations; its number representations are never projected or re-encoded.
-    /// Temporal primitives may retain the standard timezone code. Other nested extensions and
+    /// Temporal primitives may retain the standard timezone code, and an Observation member the data-absent reason the
+    /// HealthKit ECG boundary admits for unreadable symptoms. Other nested extensions and
     /// modifier extensions remain outside this receiver capability. Entry identity and supported
     /// resource-level extension meanings are checked by the IG and typed boundary.
     static func validateExtensionLocations(in bytes: Data) throws {
@@ -125,6 +128,7 @@ extension FHIRPointSupportBoundary {
         switch location {
         case .temporalPrimitive: try timezoneExtensions(value)
         case .codedValue: try unmappedSourceValues(value)
+        case .member: try dataAbsentMemberReasons(value)
         default: break
         }
     }
@@ -178,6 +182,13 @@ extension FHIRPointSupportBoundary {
                   item["url"] as? String == "http://hl7.org/fhir/StructureDefinition/timezone",
                   let code = item["valueCode"] as? String, !code.isEmpty else { throw FHIRValidationClient.invalid }
         }
+    }
+
+    /// The single data-absent reason of a member that names no target; the ECG boundary decides where one may occur.
+    private static func dataAbsentMemberReasons(_ value: Any) throws {
+        guard let extensions = value as? [[String: Any]], extensions.count == 1, let item = extensions.first,
+              Set(item.keys) == ["url", "valueCode"], item["url"] as? String == FHIRHealthKitECGBoundary.dataAbsentReasonURL,
+              item["valueCode"] as? String == FHIRHealthKitECGBoundary.unreadableSymptomsCode else { throw FHIRValidationClient.invalid }
     }
 
     private static func unmappedSourceValues(_ value: Any) throws {

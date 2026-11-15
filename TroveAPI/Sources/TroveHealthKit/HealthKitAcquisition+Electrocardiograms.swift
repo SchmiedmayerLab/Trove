@@ -30,7 +30,8 @@ extension HealthKitAcquisition {
 
     /// The symptoms HealthKit associates with `ecg`. The waveform names each one by identity; each remains its own
     /// record, collected only through its own consented stream. Reading never prompts for permission.
-    private static func symptoms(of ecg: HKElectrocardiogram, healthKit: GroveHealthKit.HealthKit) async throws -> [HKCategorySample] {
+    private static func symptoms(of ecg: HKElectrocardiogram, healthKit: GroveHealthKit.HealthKit) async throws -> [HKCategorySample]? {
+        // swiftlint:disable:previous discouraged_optional_collection
         guard ecg.symptomsStatus == .present else {
             return []
         }
@@ -40,10 +41,19 @@ extension HealthKitAcquisition {
         for type in HKElectrocardiogram.correlatedSymptomTypes {
             symptoms += try await healthKit.query(type, timeRange: .ever, predicate: predicate)
         }
-        return symptoms
+        return readableSymptoms(symptoms, status: ecg.symptomsStatus)
     }
 
-    /// HealthKit read types a stream needs. An ECG with reported symptoms cannot be converted without reading them.
+    /// The symptoms Grove names for an ECG with `status`, or `nil` when it reports symptoms that none of the reads
+    /// returned. Symptom types need their own read authorization and HealthKit does not reveal a denied read, so no
+    /// sample for a present status means they could not be read: the ECG still uploads, stating its symptoms unknown.
+    static func readableSymptoms(_ samples: [HKCategorySample], status: HKElectrocardiogram.SymptomsStatus) -> [HKCategorySample]? {
+        // swiftlint:disable:previous discouraged_optional_collection
+        status == .present && samples.isEmpty ? nil : samples
+    }
+
+    /// HealthKit read types a stream needs. The ECG's correlated symptom types are requested so its waveform can name
+    /// them; when they cannot be read, the ECG uploads with its symptoms stated unknown.
     public static func readTypes(for stream: HealthKitQueryDefinition.Stream) throws -> [HKObjectType] {
         let primary = try sampleType(for: stream)
         guard stream.profile == .electrocardiogram else {

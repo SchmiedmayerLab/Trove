@@ -41,7 +41,7 @@ struct ElectrocardiogramAcquisitionTests {
         voltages: [HKElectrocardiogram.VoltageMeasurement],
         reads: Reads,
         in journal: EventDeliveryJournal,
-        symptoms: [HKCategorySample] = [],
+        symptoms: [HKCategorySample]? = [], // swiftlint:disable:this discouraged_optional_collection
         deleted: [UUID] = []
     ) async throws -> HealthKitAcquisition.Page {
         let acquisition = try HealthKitAcquisition(journal: journal, scope: DeliveryFixture.scope) {}
@@ -112,6 +112,47 @@ struct ElectrocardiogramAcquisitionTests {
             #expect(observations.count == 2 && members.count == 1 && members.first?.reference == nil && members.first?.identifier != nil)
             #expect(!String(decoding: attempt.bytes, as: UTF8.self).contains(symptom.uuid.uuidString.lowercased()))
         }
+    }
+
+    /// Symptom types need their own read authorization, and HealthKit does not reveal a denied read.
+    @Test
+    func anECGWhoseSymptomsCannotBeReadUploadsWithThemUnknown() async throws {
+        let definition = try HealthKitQueryDefinition(stream: Self.stream, kind: .live, start: Fixture.liveStart)
+        try await DeliveryFixture.withJournal(query: definition.encoded()) { journal, _ in
+            _ = try await Fixture.retain([Self.plan()], in: journal)
+            let recording = try ElectrocardiogramFixture.make(start: Fixture.date(110), end: Fixture.date(140), symptoms: true)
+            let page = try await Self.collect(recording.ecg, voltages: recording.voltages, reads: Reads(), in: journal, symptoms: nil)
+            #expect(page.eventIDs.count == 1)
+            let eventID = try #require(page.eventIDs.first)
+            let attempt = try #require(try await journal.prepareAttempt(eventID))
+            let observations = try Self.observations(attempt.bytes)
+            let members = observations.compactMap(\.hasMember).flatMap(\.self)
+            #expect(observations.count == 2 && members.count == 1)
+            let member = try #require(members.first)
+            #expect(member.reference == nil && member.identifier == nil && member.type == nil)
+            let reason = try #require(member.extension?.first)
+            #expect(member.extension?.count == 1 && reason.url == Canonicals.dataAbsentReason)
+            guard case .code(let code)? = reason.value else {
+                Issue.record("The member states its data-absent reason as a code")
+                return
+            }
+            #expect(code.value?.string == "unknown")
+            #expect(attempt.commitment.targetIntent.targets.first?.outputFullURLs.count == 2)
+        }
+    }
+
+    @Test
+    func noSymptomForAPresentStatusMeansTheyCouldNotBeRead() {
+        let symptom = HKCategorySample(
+            type: HKCategoryType(.dizziness),
+            value: HKCategoryValueSeverity.mild.rawValue,
+            start: Fixture.date(110),
+            end: Fixture.date(140)
+        )
+        #expect(HealthKitAcquisition.readableSymptoms([], status: .present) == nil)
+        #expect(HealthKitAcquisition.readableSymptoms([symptom], status: .present) == [symptom])
+        #expect(HealthKitAcquisition.readableSymptoms([], status: .none)?.isEmpty == true)
+        #expect(HealthKitAcquisition.readableSymptoms([], status: .notSet)?.isEmpty == true)
     }
 
     @Test

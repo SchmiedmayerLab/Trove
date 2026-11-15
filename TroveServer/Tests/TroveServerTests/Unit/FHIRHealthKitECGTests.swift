@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import GroveFHIRContract
 import Testing
 import TroveAPITypes
 @testable import TroveServer
@@ -10,7 +11,29 @@ import TroveAPITypes
 struct FHIRHealthKitECGTests {
     private typealias Mutation = @Sendable (_ waveform: inout [String: Any], _ average: inout [String: Any], _ averageURL: String) -> Void
 
+    private static var unreadableMember: [String: Any] {
+        ["extension": [["url": FHIRHealthKitECGBoundary.dataAbsentReasonURL, "valueCode": "unknown"]]]
+    }
+
     private static let waveformMutations: [String: Mutation] = [
+        "unreadable-symptoms-without-present-status": { waveform, _, _ in
+            waveform["hasMember"] = [unreadableMember]
+            symptomsStatus(&waveform, "none")
+        },
+        "unreadable-symptoms-beside-a-symptom": { waveform, _, _ in
+            waveform["hasMember"] = (waveform["hasMember"] as? [[String: Any]] ?? []) + [unreadableMember]
+        },
+        "unreadable-symptoms-twice": { waveform, _, _ in waveform["hasMember"] = [unreadableMember, unreadableMember] },
+        "unreadable-symptoms-other-reason": { waveform, _, _ in
+            waveform["hasMember"] = [["extension": [["url": FHIRHealthKitECGBoundary.dataAbsentReasonURL, "valueCode": "asked-declined"]]]]
+        },
+        "unreadable-symptoms-naming-a-symptom": { waveform, _, _ in
+            let symptom = (waveform["hasMember"] as? [[String: Any]])?.first ?? [:]
+            waveform["hasMember"] = [symptom.merging(unreadableMember) { current, _ in current }]
+        },
+        "unreadable-symptoms-with-display": { waveform, _, _ in
+            waveform["hasMember"] = [unreadableMember.merging(["display": "Symptoms"]) { current, _ in current }]
+        },
         "lead": { waveform, _, _ in
             var components = waveform["component"] as? [[String: Any]] ?? []
             components[0]["code"] = ["coding": [["system": FHIRHealthKitECGBoundary.leadSystem, "code": "131330"]]]
@@ -41,6 +64,13 @@ struct FHIRHealthKitECGTests {
         "average-origin": { _, average, _ in average.removeValue(forKey: "derivedFrom") },
         "control": { _, _, _ in }
     ]
+
+    private static func symptomsStatus(_ waveform: inout [String: Any], _ code: String) {
+        let url = Canonicals.healthKitECGSymptomsStatusExtension.value?.url.absoluteString
+        waveform["extension"] = (waveform["extension"] as? [[String: Any]] ?? []).map { item in
+            item["url"] as? String == url ? ["url": item["url"] ?? "", "valueCode": code] : item
+        }
+    }
 
     static func bytes(_ name: String) throws -> Data {
         try Data(contentsOf: #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "HealthKitComponentEvents")))
@@ -87,6 +117,28 @@ struct FHIRHealthKitECGTests {
         #expect(throws: ServerError.self) {
             try FHIRHealthKitECGBoundary.requireCompleteSelection([waveform.fullURL], outputs: event.collectionOutputs)
         }
+    }
+
+    /// Symptom samples need their own read authorization, which HealthKit does not reveal: a present ECG whose symptoms
+    /// could not be read still arrives, with one member that states them unknown. That member grants nothing.
+    @Test
+    func unreadableSymptomsAreAdmittedAndGrantNothing() throws {
+        var bundle = try #require(JSONSerialization.jsonObject(with: Self.bytes("electrocardiogram-with-symptom")) as? [String: Any])
+        var entries = try #require(bundle["entry"] as? [[String: Any]])
+        let index = try #require(entries.firstIndex { Self.profiles($0).contains(CollectionObservationProfile.electrocardiogram.rawValue) })
+        var waveform = try #require(entries[index]["resource"] as? [String: Any])
+        waveform["hasMember"] = [Self.unreadableMember]
+        entries[index]["resource"] = waveform
+        bundle["entry"] = entries
+        let unreadable = try Self.project(JSONSerialization.data(withJSONObject: bundle, options: [.sortedKeys]))
+        let readable = try Self.project(Self.bytes("electrocardiogram-with-symptom"))
+        #expect(unreadable.outputs.count == 2)
+        #expect(Set(unreadable.outputs.map(\.sourceTypeIdentifier)) == ["HKDataTypeIdentifierElectrocardiogram"])
+        #expect(unreadable.outputs.map(\.profile) == readable.outputs.map(\.profile))
+        #expect(unreadable.outputDependencies.map(\.targetFullURL) == readable.outputDependencies.map(\.targetFullURL))
+        let collected = try FHIRHealthKitECGBoundary.collectionOutputs(unreadable.collectionOutputs)
+        let expected = try FHIRHealthKitECGBoundary.collectionOutputs(readable.collectionOutputs)
+        #expect(collected.map(\.fullURL) == expected.map(\.fullURL) && collected.map(\.profile) == expected.map(\.profile))
     }
 
     @Test
