@@ -22,6 +22,14 @@ rocketsim="${ROCKETSIM_CLI:-/Applications/RocketSim.app/Contents/Resources/CLI/r
 [ -x "$rocketsim" ] || { echo "Install RocketSim with its CLI first." >&2; exit 1; }
 output="$root/docs/images/mobile"
 mkdir -p "$output"
+# Every image uses the same device and runtime, so all captures share one frame and size.
+device="$(xcrun simctl list devices --json | jq --raw-output --arg udid "$udid" '
+    .devices | to_entries[] | .key as $runtime | .value[]
+    | select(.udid == $udid) | "\($runtime) \(.deviceTypeIdentifier) \(.state)"')"
+if [ "$device" != 'com.apple.CoreSimulator.SimRuntime.iOS-27-2 com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro Booted' ]; then
+    echo "Use a booted iPhone 18 Pro Simulator with iOS 27.2 (found: ${device:-none})." >&2
+    exit 1
+fi
 temporary="$(mktemp -d)"
 trap 'rm -f "$temporary/light.png" "$temporary/dark.png"; rmdir "$temporary"' EXIT
 
@@ -34,9 +42,16 @@ for appearance in light dark; do
     xcrun simctl ui "$udid" appearance "$appearance"
     "$rocketsim" wait time --ms 800
     "$rocketsim" wait element --udid "$udid" --label "$expected" --timeout 2
-    "$rocketsim" screenshot --udid "$udid" --bezel device --background transparent > "$temporary/$appearance.png"
+    # Pin the layout options instead of relying on saved RocketSim preferences.
+    "$rocketsim" screenshot --udid "$udid" --bezel device --background transparent \
+        --ratio auto --orientation portrait > "$temporary/$appearance.png"
     # Decode before replacing a reviewed image; an error envelope is not a PNG.
-    sips --getProperty pixelWidth --getProperty pixelHeight "$temporary/$appearance.png"
+    size="$(sips --getProperty pixelWidth --getProperty pixelHeight "$temporary/$appearance.png" \
+        | awk '/pixel(Width|Height)/ { printf "%s ", $2 }')"
+    if [ "$size" != '1350 2760 ' ]; then
+        echo "Expected a 1350 x 2760 framed $appearance capture (found: ${size:-no image})." >&2
+        exit 1
+    fi
 done
 mv "$temporary/light.png" "$output/$name.png"
 mv "$temporary/dark.png" "$output/$name~dark.png"
