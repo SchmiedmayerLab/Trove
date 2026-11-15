@@ -21,7 +21,6 @@ enum ProviderCollectionPresentation {
         "sleep-duration": ("Sleep duration", "Schlafdauer"),
         "sleep-heart-rate": ("Average heart rate during sleep", "Mittlere Herzfrequenz während des Schlafs"),
         "resting-heart-rate-daily-average": ("Daily average resting heart rate (Google Health)", "Tagesmittel der Ruheherzfrequenz (Google Health)"),
-        "oura-equivalent-walking-distance": ("Equivalent walking distance (Oura)", "Äquivalente Gehstrecke (Oura)"),
         "oura-cardiovascular-age": ("Estimated cardiovascular age (Oura)", "Geschätztes Herz-Kreislauf-Alter (Oura)"),
         "oura-readiness-score": ("Readiness score (Oura)", "Tagesformwert (Oura)"),
         "body-fat-mass": ("Body fat mass (Withings)", "Körperfettmasse (Withings)"),
