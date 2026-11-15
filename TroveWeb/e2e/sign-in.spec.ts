@@ -44,12 +44,13 @@ test.describe("sign in", () => {
     await expect(page.locator("#username")).toBeVisible();
   });
 
-  test("keeps the dashboard closed if logout does not navigate", async ({
+  test("keeps the dashboard closed if logout navigation is canceled", async ({
     researcherPage: page,
   }) => {
     await expect(page.getByRole("button", { name: "User menu" })).toBeVisible();
+    // Cancel the navigation itself so the existing document remains active.
     await page.route("**/protocol/openid-connect/logout*", (route) =>
-      route.fulfill({ status: 204 }),
+      route.abort("aborted"),
     );
     await page.getByRole("button", { name: "User menu" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();

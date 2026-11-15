@@ -31,12 +31,14 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone
 
+from rekey_fixture import recovered_arguments
+
 ROOT = Path(__file__).resolve().parents[2]
-KEYCLOAK_SHA = "f3ce596dcf772ae145581ef338f9c3937ee37c74d7c1793e563c61519baaaafc"
+KEYCLOAK_SHA = "9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 PDF = b"%PDF-1.4 Synthetic process-restart consent evidence"
-POSTGRES_IMAGE = "timescale/timescaledb:latest-pg18@sha256:9508616d5b941ed931198504c5db3fb47e8f53f790732ea1e889591f1062057c"
-STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6"
+POSTGRES_IMAGE = "timescale/timescaledb:latest-pg18@sha256:e72689191e1c977892c53d6f2c344dbc4a9657a867dc8cc1899229f9d3672b2e"
+STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
 
 # The relay can reach only its fixed worker destination in this implementation.
 # The worker itself has only the internal network, without Internet egress.
@@ -48,7 +50,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path not in ('/health','/validate'):
             self.send_error(404); return
         size=int(self.headers.get('Content-Length','0'))
-        if not 0 <= size <= 4194304:
+        if not 0 <= size <= 16777216:
             self.send_error(413); return
         self.connection.settimeout(10)
         body=self.rfile.read(size)
@@ -84,7 +86,7 @@ def response_uuid(response: object, field: str) -> str:
     return value
 
 
-def request(url, method="GET", data=None, token=None, headers=None, expected=200):
+def request(url, method="GET", data=None, token=None, headers=None, expected=200, *, response_headers=None):
     headers = dict(headers or {})
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -94,17 +96,37 @@ def request(url, method="GET", data=None, token=None, headers=None, expected=200
     try:
         with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=150) as response:
             status, body = response.status, response.read(10_000_001)
+            for name, value in (response_headers or {}).items():
+                require(response.headers.get(name) == value, f"Unexpected response header: {name}")
     except urllib.error.HTTPError as error:
         status, body = error.code, error.read(2048)
     require(status == expected, f"{method} {urllib.parse.urlsplit(url).path}: expected {expected}, received {status}")
     return body
 
 
+def installation_headers(registration_request):
+    return {"Trove-Source-Installation-ID": registration_request["registrationID"],
+            "Trove-Source-Credential": registration_request["credentialBase64"]}
+
+
+def record_version_identifier(event):
+    """The conversion Provenance entry identifies the record version, not the Bundle."""
+    identifiers = [extension["valueIdentifier"] for entry in json.loads(event)["entry"]
+                   if entry["resource"]["resourceType"] == "Provenance"
+                   for extension in entry.get("extension", [])
+                   if extension.get("url") == "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-key"]
+    require(len(identifiers) == 1, "Expected one record-version entry identity")
+    return {key: identifiers[0][key] for key in ("system", "value")}
+
+
 class Checkpoint:
     def __init__(self, args):
         self.args = args
         self.evidence = Path(tempfile.mkdtemp(prefix="trove-process-restart-", dir="/private/tmp"))
+        # Never retain encryption keys with the evidence bundle or database backup.
+        self.private_directory = tempfile.TemporaryDirectory(prefix="trove-restart-secrets-")
         self.name = "trove_restart_" + uuid.uuid4().hex[:12]
+        self.validator_container = args.validator_container or self.name + "-worker"
         self.bucket = self.name.replace("_", "-")
         self.runtime_password = "synthetic-" + uuid.uuid4().hex
         self.processes, self.containers = [], []
@@ -155,10 +177,17 @@ class Checkpoint:
                 process.wait(timeout=10)
         require(process.poll() is not None, "Owned process did not terminate")
 
-    def ready(self, url, process=None):
+    def ready(self, url, process=None, *, container=None):
+        require(container is None or container in self.containers, "Readiness may inspect only an owned container")
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
             require(process is None or process.poll() is None, "Owned service exited before readiness")
+            if container is not None:
+                state = json.loads(self.run(["docker", "inspect", "--format", "{{json .State}}", container]))
+                if not state.get("Running"):
+                    self.summary["failedService"] = {"container": container, "exitCode": state.get("ExitCode"),
+                                                     "outOfMemory": state.get("OOMKilled")}
+                    raise RuntimeError("Owned container exited before readiness; inspect failedService in summary.json")
             try:
                 with urllib.request.urlopen(url, timeout=2) as response:
                     if response.status == 200:
@@ -186,18 +215,53 @@ class Checkpoint:
         images = json.loads(self.run(["docker", "image", "inspect", self.args.image, POSTGRES_IMAGE, STORAGE_IMAGE]))
         self.validator_image = images[0]["Id"]
         self.summary["validatorImageID"] = self.validator_image
+        self.prepare_identity_keyring(binary)
         self.prepare_stores()
         self.sql(f"CREATE DATABASE {self.name};", database="postgres")
         self.sql("CREATE EXTENSION IF NOT EXISTS timescaledb;")
         self.run([str(binary), "migrate", "--yes"], env=self.env, log="migrate.log")
         self.provision_runtime()
-        self.prepare_keycloak()
+        # Observe the validator's startup peak, and let it finish loading the offline
+        # package cache before starting the authentication JVM on a shared test host.
+        self.monitor = threading.Thread(target=self.sample_memory, daemon=True)
+        self.monitor.start()
         self.prepare_validator()
+        self.prepare_keycloak()
         self.env.update(S3_ENDPOINT=f"http://127.0.0.1:{self.args.s3_port}", S3_ACCESS_KEY="trove_test",
                         S3_SECRET_KEY="trove_test", S3_BUCKET=self.bucket, S3_REGION="us-east-1",
                         FHIR_VALIDATOR_URL=f"http://127.0.0.1:{self.args.validator_port}/validate", FHIR_VALIDATOR_IDENTITY=self.identity)
-        self.monitor = threading.Thread(target=self.sample_memory, daemon=True)
-        self.monitor.start()
+
+    def prepare_identity_keyring(self, binary):
+        keyring = Path(self.private_directory.name) / "keyring.secret"
+        self.run([str(binary), "create-source-keyring", "--output", str(keyring)], env=self.env)
+        require(keyring.is_file() and keyring.stat().st_mode & 0o777 == 0o600, "Identity keyring is not private")
+        self.env["SOURCE_IDENTITY_KEYRING_FILE"] = str(keyring)
+
+    def register_installation(self, participant, repository_kind="healthkit"):
+        body = {"registrationID": str(uuid.uuid4()), "repositoryKind": repository_kind,
+                "credentialBase64": base64.b64encode(os.urandom(32)).decode()}
+        registration = self.api_json("/participant/sources", participant, "POST", body)
+        require(registration["installation"]["registrationID"] == body["registrationID"]
+                and registration["installation"]["sourceID"] == registration["source"]["id"]
+                and registration["source"]["repositoryKind"] == repository_kind,
+                "Registration did not retain the requested installation and repository")
+        return registration, body
+
+    def recover_identity(self, participant, registration, registration_request):
+        recovery = json.loads(request(
+            self.api + f'/participant/source-installations/{registration_request["registrationID"]}/identity',
+            "POST", {"credentialBase64": registration_request["credentialBase64"]}, participant,
+            response_headers={"Cache-Control": "no-store"}))
+        require(recovery["registration"] == registration, "Identity recovery changed the retained registration")
+        recovered_arguments(recovery)  # Validate complete context; never use synthetic fallback material.
+        return recovery
+
+    def fixture(self, recovery, effective_at, native_record_id):
+        return self.run([
+            sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
+            "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
+            "--recovered-identity-stdin", "--native-record-id", native_record_id, "--effective-at", effective_at,
+        ], data=json.dumps(recovery).encode())
 
     def provision_runtime(self):
         self.run(["docker", "exec", self.pg_container, "mkdir", self.container_scripts])
@@ -251,7 +315,7 @@ class Checkpoint:
                         self.memory["backendSampledMaxRSSBytes"] = max(self.memory["backendSampledMaxRSSBytes"], int(result.stdout) * 1024)
                         self.memory["backendSamples"] += 1
             try:
-                result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self.name + "-worker"],
+                result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self.validator_container],
                                         capture_output=True, timeout=10, check=False)
                 value = result.stdout.decode().split("/")[0].strip()
                 for unit in ("GiB", "MiB", "KiB", "B"):
@@ -267,7 +331,7 @@ class Checkpoint:
     def prepare_keycloak(self, *, participant_usernames=()):
         with tarfile.open(self.args.keycloak_archive) as archive:
             archive.extractall(self.evidence, filter="data")
-        home = self.evidence / "keycloak-26.6.1"
+        home = self.evidence / "keycloak-26.8.0"
         realm = json.loads((ROOT / "TroveInfrastructure/docker/keycloak/realm.json").read_bytes())
         existing = {user["username"] for user in realm["users"]}
         require(len(set(participant_usernames)) == len(participant_usernames)
@@ -312,21 +376,39 @@ class Checkpoint:
                         KEYCLOAK_RESEARCHER_ROLE="trove-researcher", KEYCLOAK_PARTICIPANT_ROLE="trove-participant")
 
     def prepare_validator(self):
-        self.run(["docker", "network", "create", "--internal", self.name])
-        self.network_created = True
-        worker, relay = self.name + "-worker", self.name + "-relay"
-        limits = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "128",
-                  "--memory", "4g", "--cpus", "2", "--tmpfs", "/tmp:size=2g,mode=1777,noexec,nosuid,nodev"]
-        self.run(["docker", "create", "--name", worker, "--network", self.name, *limits, self.validator_image])
-        self.containers.append(worker)
-        self.run(["docker", "start", worker])
+        worker, relay = self.validator_container, self.name + "-relay"
+        if self.args.validator_container:
+            network = self.reusable_validator_network()
+        else:
+            network = self.name
+            self.run(["docker", "network", "create", "--internal", network])
+            self.network_created = True
+            limits = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "128",
+                      "--memory", "4g", "--cpus", "2", "--tmpfs", "/tmp:size=2g,mode=1777,noexec,nosuid,nodev"]
+            self.run(["docker", "create", "--name", worker, "--network", network, *limits, self.validator_image])
+            self.containers.append(worker)
+            self.run(["docker", "start", worker])
         self.run(["docker", "create", "--name", relay, "--network", "bridge", "-p", f"127.0.0.1:{self.args.validator_port}:8080",
                   "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--memory", "128m", "--pids-limit", "32",
                   "--entrypoint", "python3", self.validator_image, "-c", RELAY, worker])
         self.containers.append(relay)
-        self.run(["docker", "network", "connect", self.name, relay])
+        self.run(["docker", "network", "connect", network, relay])
         self.run(["docker", "start", relay])
-        self.ready(f"http://127.0.0.1:{self.args.validator_port}/health")
+        self.ready(f"http://127.0.0.1:{self.args.validator_port}/health", container=worker if worker in self.containers else None)
+
+    def reusable_validator_network(self):
+        """Inspect an explicitly selected stateless worker; never restart or remove it."""
+        container = json.loads(self.run(["docker", "inspect", "--type", "container", self.validator_container]))[0]
+        networks = container["NetworkSettings"]["Networks"]
+        require(container["Image"] == self.validator_image and container["State"]["Running"]
+                and container["HostConfig"]["ReadonlyRootfs"] and not container["HostConfig"].get("PortBindings")
+                and len(networks) == 1, "Reused validator must be running the selected image privately and read-only")
+        network = next(iter(networks))
+        configuration = json.loads(self.run(["docker", "network", "inspect", network]))[0]
+        require(configuration["Internal"], "Reused validator network must have no external egress")
+        self.summary["reusedValidator"] = {"containerID": container["Id"], "imageID": container["Image"],
+                                           "networkID": configuration["Id"], "startedAt": container["State"]["StartedAt"]}
+        return network
 
     def backend(self, number):
         process = self.start([str(self.evidence / "TroveServer"), "serve", "--hostname", "127.0.0.1",
@@ -405,22 +487,30 @@ class Checkpoint:
     def exercise(self):
         first = self.backend(1)
         researcher, participant, studies, enrollments, consents = self.prepare_studies()
-        source = self.api_json("/participant/sources", participant, "POST", {"registrationID": str(uuid.uuid4())})
-        event = self.run([sys.executable, str(ROOT / "TroveInfrastructure/validator/rekey_fixture.py"), "--assets", str(self.args.assets),
-                          "--fixture", str(ROOT / "TroveServer/Tests/TroveServerTests/Resources/ImmutablePointEvent.json"),
-                          "--event-system", source["eventIdentifierSystem"], "--producer-instance", source["id"],
-                          "--identifier-root", source["identifierRoot"], "--registration-id", source["registrationID"],
-                          "--participant-system", source["participantIdentifier"]["system"], "--participant-value", source["participantIdentifier"]["value"],
-                          "--effective-at", datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")])
+        registration, registration_request = self.register_installation(participant)
+        recovery = self.recover_identity(participant, registration, registration_request)
+        source = registration["source"]
+        headers = installation_headers(registration_request)
+        effective_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        native_record_id = str(uuid.uuid4())
+        event = self.fixture(recovery, effective_at, native_record_id)
+        replacement, replacement_request = self.register_installation(participant)
+        replacement_recovery = self.recover_identity(participant, replacement, replacement_request)
+        require(replacement["source"] == source and replacement["installation"] != registration["installation"],
+                "Second installation did not retain independent authority over the same source")
+        require(recovered_arguments(replacement_recovery) == recovered_arguments(recovery),
+                "Second installation recovered different identity material")
+        require(self.fixture(replacement_recovery, effective_at, native_record_id) == event,
+                "Recovered identity changed the same synthetic conversion")
         (self.evidence / "event.json").write_bytes(event)
         path = f'/participant/sources/{source["id"]}/events'
         outputs = [entry["fullUrl"] for entry in json.loads(event)["entry"] if entry["resource"]["resourceType"] == "Observation"]
         targets = [{"consentId": consent["id"], "outputFullUrls": outputs} for consent in consents]
         submission = {"eventBase64": base64.b64encode(event).decode(), "targets": targets[:1]}
-        receipt = request(self.api + path, "POST", submission, participant)
+        receipt = request(self.api + path, "POST", submission, participant, headers=headers)
         accepted = json.loads(receipt)
         require(accepted["sourceId"] == source["id"], "Receipt does not identify the accepted source")
-        producer_identifier = json.loads(event)["identifier"]
+        producer_identifier = record_version_identifier(event)
         require(accepted["producerEventIdentifier"] == {
             key: producer_identifier[key] for key in ("system", "value")
         }, "Receipt does not identify the accepted producer event")
@@ -432,49 +522,77 @@ class Checkpoint:
         )
         intent_digest = hashlib.sha256(json.dumps(canonical_targets, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         require(accepted["targetIntentSHA256"] == intent_digest, "Receipt does not identify the original target intent")
-        require(request(self.api + path, "POST", submission, participant) == receipt, "Initial retry changed receipt bytes")
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt, "Initial retry changed receipt bytes")
         attribution_path = path + f'/{accepted["eventId"]}/attributions'
         attribution = {"commandId": str(uuid.uuid4()), "targets": targets[1:]}
-        attribution_receipt = self.api_json(attribution_path, participant, "POST", attribution)
+        attribution_receipt = self.api_json(attribution_path, participant, "POST", attribution, headers=headers)
         require(attribution_receipt["authorizedOutputCount"] == 1, "Late attribution did not grant exactly the second study output")
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Attribution retry changed its original receipt")
-        self.api_json(attribution_path, participant, "POST", {**attribution, "targets": targets[:1]}, 409)
+        self.api_json(attribution_path, participant, "POST", {**attribution, "targets": targets[:1]}, 409, headers=headers)
         self.check_state(studies, event, withdrawn=False)
-        request(self.api + path, "POST", {**submission, "eventBase64": base64.b64encode(event + b" ").decode()}, participant, expected=409)
-        request(self.api + path, "POST", {**submission, "targets": targets}, participant, expected=409)
+        variant = event + b" "
+        variant_submission = {**submission, "eventBase64": base64.b64encode(variant).decode()}
+        variant_receipt = self.api_json(path, participant, "POST", variant_submission, headers=headers)
+        require(variant_receipt["eventId"] == accepted["eventId"]
+                and variant_receipt["payloadSHA256"] == hashlib.sha256(variant).hexdigest(),
+                "A byte representation duplicated the record or lost its own receipt")
+        request(self.api + path, "POST", {**submission, "targets": targets}, participant, headers=headers, expected=409)
         self.api_json(f"/participant/enrollments/{enrollments[0]}/withdraw", participant, "POST")
-        self.check_state(studies, event, withdrawn=True)
+        self.check_state(studies, event, withdrawn=True, representations=1)
         lookup_path = f'/participant/sources/{source["id"]}/event-receipts/lookup'
         lookup = {"producerEventIdentifier": accepted["producerEventIdentifier"],
                   "payloadSHA256": accepted["payloadSHA256"], "targets": submission["targets"]}
         require(self.api_json(lookup_path, participant, "POST", lookup) == accepted,
                 "Receipt recovery after withdrawal changed the immutable acknowledgement")
-        # A second stream is already revoked in the snapshot. The primary stream
-        # remains active so the original retry/revocation checks still run after restore.
-        retired = self.api_json("/participant/sources", participant, "POST", {"registrationID": str(uuid.uuid4())})
-        retired = self.api_json(f'/participant/sources/{retired["id"]}/revoke', participant, "POST")
-        self.check_revoked_source(retired, participant, submission)
+        # A different repository is an independent logical source; another HealthKit
+        # installation must never be used as a stand-in for a different source.
+        retired, retired_request = self.register_installation(participant, "sensorkit")
+        retired["source"] = self.api_json(f'/participant/sources/{retired["source"]["id"]}/revoke', participant, "POST")
+        self.check_revoked_source(retired, retired_request, participant, submission)
+        retired_installation = self.api_json(
+            f'/participant/source-installations/{registration_request["registrationID"]}/revoke', participant, "POST")
+        require(retired_installation["source"] == source and retired_installation["installation"].get("revokedAt"),
+                "Installation revocation changed the logical source or failed to revoke its authority")
+        request(self.api + path, "POST", submission, participant, headers=headers, expected=409)
+        self.api_json(f'/participant/source-installations/{registration_request["registrationID"]}/identity', participant,
+                      "POST", {"credentialBase64": registration_request["credentialBase64"]}, 409)
+        headers = installation_headers(replacement_request)
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt,
+                "Revoking one installation revoked its independent replacement")
         prior_audit = self.check_study_audit(studies, researcher, participant)
         second = self.replace_backend(first)
         require(first.pid != second.pid and first.poll() is not None, "Backend was not replaced by a new OS process")
         participant = self.token("alice@example.com")
-        self.check_revoked_source(retired, participant, submission)
-        require(request(self.api + path, "POST", submission, participant) == receipt, "Restart retry changed receipt bytes")
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        self.check_revoked_source(retired, retired_request, participant, submission)
+        restored_recovery = self.recover_identity(participant, replacement, replacement_request)
+        require(recovered_arguments(restored_recovery) == recovered_arguments(recovery),
+                "Backend replacement changed the retained identity key or scope")
+        require(self.fixture(restored_recovery, effective_at, native_record_id) == event,
+                "Backend replacement changed synthetic record identities")
+        require(self.api_json(f'/participant/source-installations/{registration_request["registrationID"]}', participant)
+                == retired_installation, "Backend replacement lost installation revocation")
+        request(self.api + path, "POST", submission, participant,
+                headers=installation_headers(registration_request), expected=409)
+        require(self.api_json(path, participant, "POST", variant_submission, headers=headers) == variant_receipt,
+                "Backend replacement lost the additional byte representation receipt")
+        require(self.sql("SELECT encode(raw_bytes,'hex') FROM clinical_event_representations;") == variant.hex(),
+                "Backend replacement lost or changed the additional representation")
+        require(request(self.api + path, "POST", submission, participant, headers=headers) == receipt, "Restart retry changed receipt bytes")
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Late attribution receipt did not survive backend process replacement")
         self.api_json(f'/participant/sources/{source["id"]}/revoke', participant, "POST")
         require(self.api_json(lookup_path, participant, "POST", lookup) == accepted,
                 "Receipt recovery after process restart and source revocation failed")
-        request(self.api + path, "POST", submission, participant, expected=409)
-        require(self.api_json(attribution_path, participant, "POST", attribution) == attribution_receipt,
+        request(self.api + path, "POST", submission, participant, headers=headers, expected=409)
+        require(self.api_json(attribution_path, participant, "POST", attribution, headers=headers) == attribution_receipt,
                 "Source revocation lost the original attribution receipt")
-        self.api_json(attribution_path, participant, "POST", {**attribution, "commandId": str(uuid.uuid4())}, 409)
-        self.api_json(lookup_path, participant, "POST", {**lookup, "payloadSHA256": "0" * 64}, 409)
+        self.api_json(attribution_path, participant, "POST", {**attribution, "commandId": str(uuid.uuid4())}, 409, headers=headers)
+        self.api_json(lookup_path, participant, "POST", {**lookup, "payloadSHA256": "0" * 64}, 404)
         self.api_json(lookup_path, researcher, "POST", lookup, 403)
         require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.receipt.disclosure' AND outcome='disclosure_intent';") == "2",
                 "Receipt disclosures lack committed intent or denied lookups disclosed data")
-        self.check_state(studies, event, withdrawn=True)
+        self.check_state(studies, event, withdrawn=True, representations=1)
         for enrollment, consent in zip(enrollments, consents):
             actual = request(self.api + f'/participant/enrollments/{enrollment}/consents/{consent["id"]}/pdf', token=participant)
             require(actual == PDF, "Retained consent PDF changed across process restart")
@@ -483,32 +601,38 @@ class Checkpoint:
         self.summary["studyAuditReader"] = {"explicitCapabilityRequired": True, "administratorDenied": True,
             "participantDenied": True, "foreignCursorDenied": True, "retainedAcrossRestart": len(prior_audit),
             "scopedDisclosureIntents": 2}
+        self.summary["participantIdentityRecovery"] = {
+            "sameSyntheticRecordAcrossInstallationsAndRestart": True, "independentInstallationRevocation": True,
+            "recoveryResponsesNotCacheable": True, "keyringRetainedOutsideEvidence": True,
+            "physicalHealthKitAcquisitionVerified": False}
         self.summary["retainedSourceRevocation"] = {"revokedBeforeReplacement": True,
             "registrationRetryRemainsRevoked": True, "revocationRetryRemainsUnchanged": True,
             "admissionDeniedBeforeAndAfter": True, "revocationAudits": 1}
         require(self.memory["backendSamples"] > 0 and self.memory["validatorSamples"] > 0, "Missing observed memory samples")
         self.summary.update(passed=True, backendPIDs=[first.pid, second.pid], eventSHA256=hashlib.sha256(event).hexdigest(),
                             receipt=json.loads(receipt), events=1, facts=1, grants=2, effectiveGrantsAfterWithdrawal=[0, 1],
-                            nodeCount=len(json.loads(event)["entry"]), receiverAuditEvents=4,
+                            nodeCount=len(json.loads(event)["entry"]), representations=1, receiverAuditEvents=5,
                             lateAttributionReceipt=attribution_receipt,
                             receiptRecoveryAfterRevocation=True, receiptDisclosureIntents=2,
                             retainedConsentPDFs=2, runtimeRole=self.name)
 
-    def check_revoked_source(self, source: dict[str, object], participant: str, submission: dict[str, object]) -> None:
-        identifier, registration, revoked_at = source.get("id"), source.get("registrationID"), source.get("revokedAt")
-        if not isinstance(identifier, str) or not isinstance(registration, str) or not isinstance(revoked_at, str):
-            raise RuntimeError("Revoked source fixture lacks its identity or revocation time")
-        identifier, registration = uuid.UUID(identifier), uuid.UUID(registration)
+    def check_revoked_source(self, registration, registration_request, participant, submission):
+        source = registration["source"]
+        identifier = uuid.UUID(response_uuid(source, "id"))
+        uuid.UUID(response_uuid(registration_request, "registrationID"))
+        revoked_at = source.get("revokedAt")
+        require(isinstance(revoked_at, str), "Revoked source fixture lacks its revocation time")
         require(datetime.fromisoformat(revoked_at.replace("Z", "+00:00")).tzinfo is not None,
                 "Revoked source fixture lacks a timezone")
         path = f"/participant/sources/{identifier}"
         require(self.api_json(path, participant) == source, "Restored source identity or revocation changed")
-        require(self.api_json("/participant/sources", participant, "POST", {"registrationID": str(registration)}) == source,
+        require(self.api_json("/participant/sources", participant, "POST", registration_request) == registration,
                 "Registration retry reopened or replaced a revoked source")
         require(self.api_json(path + "/revoke", participant, "POST") == source,
                 "Revocation retry changed its retained timestamp or identity")
-        denied = self.api_json(path + "/events", participant, "POST", submission, 409)
-        require(denied.get("detail") == "Source binding is not active",
+        denied = self.api_json(path + "/events", participant, "POST", submission, 409,
+                               headers=installation_headers(registration_request))
+        require(denied.get("detail") == "Source installation is not active",
                 "Retained source was not rejected at the revocation boundary")
         require(self.sql(f"SELECT count(*) FROM audit_events WHERE action='source.revoked' "
                          f"AND source_binding_id='{identifier}' AND outcome='succeeded';") == "1",
@@ -535,13 +659,15 @@ class Checkpoint:
                 "Denied reads produced audit grants or successful page lacked a committed intent")
         return set(identifiers)
 
-    def check_state(self, studies, event, withdrawn):
+    def check_state(self, studies, event, withdrawn, representations=0):
         counts = self.sql("SELECT (SELECT count(*) FROM clinical_events), (SELECT count(*) FROM clinical_point_facts), (SELECT count(*) FROM study_data_grants);")
         require(counts == "1|1|2", "Unexpected retained event/fact/grant counts")
         require(self.sql("SELECT count(*) FROM clinical_event_nodes;") == str(len(json.loads(event)["entry"])),
                 "Retained node index is incomplete or duplicated")
-        require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.accepted';") == "1",
-                "Event acceptance audit was missing or duplicated")
+        require(self.sql("SELECT count(*) FROM clinical_event_representations;") == str(representations),
+                "Additional custody representations were lost or duplicated")
+        require(self.sql("SELECT count(*) FROM audit_events WHERE action='clinical.event.accepted';") == str(1 + representations),
+                "Each original or additional custody representation requires one acceptance audit")
         require(self.sql("SELECT count(*) FROM audit_events WHERE action='study.data.granted';") == "2",
                 "Independent grant audits were missing or duplicated")
         require(self.sql("SELECT count(*) FROM clinical_attribution_commands;") == "1",
@@ -579,6 +705,7 @@ class Checkpoint:
             attempt(lambda: self.run(["docker", "network", "rm", self.name]))
         # Database, runtime role, script copies and bucket existed only inside these owned
         # disposable containers/tmpfs. Removing the containers removes those records too.
+        attempt(self.private_directory.cleanup)
         self.summary["cleanupComplete"] = not errors
         self.summary["passed"] = self.summary.get("passed", False) and not errors
         self.summary["elapsedSeconds"] = round(time.monotonic() - self.started, 3)
@@ -593,6 +720,7 @@ def add_stack_arguments(parser):
     parser.add_argument("--keycloak-archive", type=Path, required=True)
     parser.add_argument("--java-home", type=Path, required=True)
     parser.add_argument("--image", default="trove-fhir-validator:local-final")
+    parser.add_argument("--validator-container", help="Reuse a running stateless worker of exactly the selected image on one internal network")
     for name, port in (("pg", 58032), ("s3", 58033), ("server", 58080), ("keycloak", 58180), ("management", 59000), ("validator", 58081)):
         parser.add_argument("--" + name + "-port", type=int, default=port)
 

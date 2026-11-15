@@ -22,6 +22,108 @@ screens, and the [capture guide](../docs/images/README.md) to reproduce them.
 3. Start the API server and Keycloak from [`TroveInfrastructure/docker`](../TroveInfrastructure/docker)
 4. Start the development server: `npm run dev`
 
+Use Node.js 26, matching the container, workflows, and shared verification command.
+TypeScript 7 supplies `tsc`; the `typescript` dependency aliases the official
+TypeScript 6 compatibility package because OpenAPI generation and typed ESLint
+still require its compiler API. See the [upstream migration guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/).
+
+Keep TanStack Table on version 8 until Grove's published `DataTable` accepts the
+version 9 column definitions. The Grove design-system Zod override shares the
+app's schema implementation with its form helpers; installing two incompatible
+schema type graphs breaks form inference and can exhaust the lint heap. Check
+generation, typed lint, build, and tests together when changing these dependencies.
+
+The version-scoped `glob` and `minimatch` overrides select patched releases while
+the lint and coverage tools still request vulnerable major versions. Keep
+`eslint-plugin-import-x` at 4.18.1 or later for minimatch 11 compatibility. Remove
+the overrides when the upstream dependency ranges select patched versions, and
+rerun the shared web and dependency vulnerability checks.
+
+## Health collection authoring
+
+Study configuration → Health collection edits the draft's collection requirements
+through the shared API with the revision that populated the form. Concurrent edits
+are rejected without replacing unsaved values. Saving a draft does not change an
+accepted participant scope; publish and obtain acceptance of the new version.
+
+The editor offers the HealthKit and SensorKit outputs listed by the server's
+`/collection-capabilities` endpoint, plus the measurements of each approved wearable
+service registration returned for the study. Each selected source stream has an
+independent window from participant acceptance, a Gregorian calendar lookback (six
+months initially), a fixed start, or all available history. Interval records such as
+sleep sessions and complete workouts are included whole when they overlap their
+window; the form and scope summary disclose that they may extend outside it.
+Choose an explicit IANA time zone for lookbacks and an optional exclusive end.
+Fixed times use UTC strings, preserving the API's six fractional-second digits
+through unrelated edits. Relative dates resolve once at acceptance on the server.
+Unsupported settings remain unchanged and cannot be saved through this editor.
+
+Workout location routes are a separate opt-in. Outputs carrying an original source
+recording are selected separately from structured summaries. Clinical records are
+selected by when HealthKit downloaded them; CDA documents by the dates their creator
+assigned, and participants review each document in HealthKit. Where an output needs
+companion outputs from the same source, the form names them; each must be selected
+explicitly and is not granted implicitly. Native health-data components remain
+separate app configuration; adding a component does not authorize server collection.
+
+The browser regressions in `e2e/collection-authoring.spec.ts` use the real authenticated
+API to verify save/reload, exact date retention, invalid input, and stale revisions.
+They exercise draft authoring, not publication or native data acquisition.
+
+## Study results
+
+Results loads one authorized page on request, with current measurement versions
+selected by default. Researchers need membership in the study's group and its
+explicit `data-reader` capability; administrator or audit access alone is
+insufficient. The server independently authorizes and audits each disclosure.
+
+Choose history to include superseded versions without treating them as additional
+measurements. Next page follows the server's opaque cursor. Start from the first
+page after eligibility changes or to include newly attributed historical records.
+These pages are a live view, not a frozen final dataset or a clinical chart.
+
+Each download decodes the returned derived FHIR Bundle directly to bytes, retaining
+exact numeric values, source facts and study-specific derivation Provenance. Pages
+are held only in the mounted view, outside the shared query cache. Changing study,
+version mode or page size clears the results; starting another request clears the
+previous page, and cancellation cannot restore it. Session termination unmounts
+the view through the existing authentication boundary. Downloads already saved by
+the researcher remain governed study data.
+
+External original recordings have a separate **Save recording** action. It requests the
+generated, authenticated study-recording endpoint for the selected grant and
+version view; attachment URLs cannot redirect credentials to other endpoints.
+The server verifies the original recording before disclosure. The browser checks
+the `application/octet-stream` transport, the original media type declared in
+`X-Recording-Content-Type` and the exact attachment byte count without parsing or
+rewriting the payload. The closed recording-format/media registry permits CSV,
+native and provider JSON, binary PPG, FHIR JSON (preserving its declared FHIR
+version parameter), and CDA XML; unknown or mismatched representations fail. Files
+receive a safe media-derived suffix and are downloaded without inline previews.
+FHIR downloads retain the original numeric tokens even when the page inspects
+attachment metadata.
+
+Where the browser exposes the File System Access save picker, source bytes stream
+to a temporary destination with backpressure; the destination is committed only
+after the complete expected payload arrives. This requires a secure context and
+a user-initiated save. Other browsers use an explicitly bounded 64 MiB payload
+fallback. This is a browser implementation capacity limit, independent of study
+collection and server download limits; fallback buffering and Blob creation can
+use more memory than the payload itself. For larger recordings, use the
+[Trove CLI](../TroveAPI/CLI.md) or a browser exposing the streaming save picker.
+The page reports this limit before downloading and never offers a truncated file.
+
+Changing the page, study, version mode or session cancels pending recording work;
+the user can also cancel explicitly. A session change while the save picker is
+open cannot transfer the request to the replacement account. Cancellation aborts
+an unfinished destination, but cannot retract a file already committed or
+handed to the browser's download manager. Unit tests cover stream backpressure,
+size mismatches, cancellation, session replacement and fallback capacity; native
+save-picker and operating-system disk behavior require browser verification.
+
+Pages count records and do not split workout segments. A page capacity refusal
+offers smaller page sizes; it never offers a partial download.
+
 ## Container transport
 
 The image defaults to `APP_ENVIRONMENT=production` and serves HTTPS on port 8080.
@@ -44,7 +146,7 @@ or participant identifiers. Startup diagnostics remain available; deployed ingre
 logs retain only the configured allowlisted operational fields.
 
 CI builds the image and runs `TroveInfrastructure/tools/verify_web_image.py` against
-it. The same local check requires Docker, Node.js 24, and the pinned Python tooling
+it. The same local check requires Docker, Node.js 26, and the pinned Python tooling
 dependencies:
 
 ```bash

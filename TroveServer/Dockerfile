@@ -9,7 +9,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9 AS build
+FROM swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca AS build
 ARG TARGETARCH
 
 # Install OS updates
@@ -68,7 +68,7 @@ RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources
 # ================================
 # Run image
 # ================================
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:ae9575b121f5776e2f04e192064bc2c5665af9d1c425d620dc773aca31698712
 
 # Keep the Swift toolchain in the build stage. The serving image needs only the
 # binary's dynamic libraries, certificate roots and time-zone data.
@@ -76,7 +76,10 @@ FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be
 RUN apk upgrade --no-cache \
     && apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
     && addgroup -S -g 999 vapor \
-    && adduser -S -D -H -u 999 -G vapor -h /app vapor
+    && adduser -S -D -H -u 999 -G vapor -h /app vapor \
+    && mkdir -p /var/lib/trove/source-identity \
+    && chown vapor:vapor /var/lib/trove/source-identity \
+    && chmod 0700 /var/lib/trove/source-identity
 
 # Switch to the new home directory
 WORKDIR /app

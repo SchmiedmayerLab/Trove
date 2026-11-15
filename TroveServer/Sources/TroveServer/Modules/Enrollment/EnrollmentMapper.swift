@@ -19,6 +19,7 @@ extension Components.Schemas.EnrollmentResponse {
             currentRevision: model.currentRevision,
             stateVersion: model.stateVersion,
             enrolledAt: model.createdAt!,  // swiftlint:disable:this force_unwrapping
+            endsAt: model.endsAt,
             withdrawnAt: model.withdrawnAt
         )
     }

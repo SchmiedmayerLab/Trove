@@ -18,7 +18,7 @@ bash scripts/check tooling
 bash scripts/check validator-pin
 ```
 
-Swift checks require Swift 6.4.x and its matching `llvm-cov` (via `xcrun` on macOS). Linux CI uses the digest-pinned Swift 6.4.0 image in `.github/workflows/swift-package.yml`; a macOS result does not replace Linux evidence. Web checks require Node.js 24 and npm. Tooling checks require actionlint, ShellCheck, Python 3, awk and kubectl. Install `TroveInfrastructure/tools/requirements.txt` in the Python environment for the rendered deployment checks; CI installs the same pinned dependency. Missing tools or mismatched compiler/runtime versions fail before builds start.
+Swift checks require Swift 6.4.x and its matching `llvm-cov` (via `xcrun` on macOS). Linux CI uses the digest-pinned Swift 6.4.0 image in `.github/workflows/swift-package.yml`; a macOS result does not replace Linux evidence. On Linux, Swift checks also require `pkg-config` and the SQLite development files (`libsqlite3-dev`). The Linux job cannot build the HealthKit and SensorKit acquisition targets, so the `API (macOS)` job in `.github/workflows/build-and-test.yml` additionally builds and tests `TroveAPI` with Xcode 27.2, using `swift build --build-tests --force-resolved-versions` and `swift test --skip-build --force-resolved-versions`; it collects no coverage. Web checks require Node.js 26 and npm. Tooling checks require actionlint, ShellCheck, Python 3, awk and kubectl. Install `TroveInfrastructure/tools/requirements.txt` in the Python environment for the rendered deployment checks; CI installs the same pinned dependency. Missing tools or mismatched compiler/runtime versions fail before builds start.
 
 Swift checks also reject compiler-plugin `Internal Error` and `LLVM Profile Error` diagnostics when SwiftPM exits zero. Raw build/test logs remain in `.build/verification`; ordinary warnings remain visible. Fix the dependency/toolchain problem rather than filtering its output or disabling coverage.
 
@@ -70,7 +70,7 @@ Real-stack simulator tests use ad-hoc signing: `CODE_SIGNING_ALLOWED=YES CODE_SI
 
 ## Artifact Recovery Verification
 
-The artifact storage lane additionally requires a disposable S3-compatible service on loopback. It uses synthetic credentials and a fresh test bucket, never deployment storage configuration:
+The artifact storage lane additionally requires a disposable S3-compatible service on loopback. It uses synthetic credentials and fresh test buckets, never deployment storage configuration. Configure the service with `AWS_ACCESS_KEY_ID=trove_test` and `AWS_SECRET_ACCESS_KEY=trove_test`; signed streaming uploads require authentication. The workflow also checks that unsigned requests are rejected. The tests include a generated 96 MiB recording and verify its exact byte count and SHA-256 without collecting the object in memory:
 
 ```sh
 TROVE_TEST_POSTGRES_PORT=15432 TROVE_TEST_S3_PORT=18333 bash scripts/check swift TroveServer

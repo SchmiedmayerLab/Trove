@@ -32,7 +32,16 @@ extension ConsentService {
                     let timeline = try await ConsentCollectionTimeline.load(enrollment: enrollment, on: transaction, asOf: asOf)
                     windows = try await Self.collectionWindows(timeline, studyID: enrollment.$study.id, on: transaction)
                 }
-                return .init(enrollmentId: enrollmentID.uuidString.lowercased(), stateVersion: enrollment.stateVersion, asOf: asOf, windows: windows)
+                let title = try await Self.collectionTitle(enrollment: enrollment, on: transaction)
+                return .init(
+                    enrollmentId: enrollmentID.uuidString.lowercased(),
+                    studyId: enrollment.$study.id.uuidString.lowercased(),
+                    title: title,
+                    endsAt: enrollment.endsAt,
+                    stateVersion: enrollment.stateVersion,
+                    asOf: asOf,
+                    windows: windows
+                )
             }
         }
     }
@@ -40,7 +49,16 @@ extension ConsentService {
 
 
 extension ConsentService {
-    private static func collectionWindows(
+    private static func collectionTitle(enrollment: Enrollment, on database: any Database) async throws -> Components.Schemas.LocalizedString {
+        guard let publication = try await PublishedStudy.query(on: database)
+            .filter(\.$study.$id == enrollment.$study.id)
+            .filter(\.$revision == enrollment.currentRevision)
+            .field(\.$metadata)
+            .first() else { throw ServerError.internalServerError("Adopted study details are unavailable") }
+        return publication.metadata.title
+    }
+
+    static func collectionWindows(
         _ timeline: [ConsentCollectionTimeline.Window], studyID: UUID, on database: any Database
     ) async throws -> [Components.Schemas.ConsentCollectionWindow] {
         guard !timeline.isEmpty else {
@@ -61,14 +79,31 @@ extension ConsentService {
                   publication.$study.id == studyID, publication.revision == consent.revision else {
                 throw ServerError.internalServerError("Exact collection policy is unavailable")
             }
-            let requirements = try publication.collectionPolicy.validatedRequirements(studyID: studyID, revision: consent.revision)
+            let requirements = try publication.collectionPolicy.resolvedRequirements(
+                studyID: studyID,
+                revision: consent.revision,
+                acceptedAt: consent.acceptedAt,
+                scope: consent.collectionScope,
+                adoptionEnd: window.end
+            )
             return .init(
                 consentId: consent.consentID.uuidString.lowercased(),
                 publicationId: consent.publicationID.uuidString.lowercased(),
                 revision: consent.revision,
                 start: consent.acceptedAt,
                 end: window.end,
-                requirements: requirements.map(Components.Schemas.CollectionRequirement.init)
+                requirements: requirements.map {
+                    .init(
+                        includeWorkoutRoutes: $0.includeWorkoutRoutes,
+                        profile: $0.profile,
+                        sourceTypeIdentifier: $0.sourceTypeIdentifier,
+                        providerRegistrationId: $0.providerRegistrationID?.uuidString.lowercased(),
+                        sourceKind: $0.sourceKind == .participantApp ? .participantApp : .serverWorker,
+                        start: $0.start,
+                        end: $0.end,
+                        timeBasis: $0.timeBasis
+                    )
+                }
             )
         }
     }

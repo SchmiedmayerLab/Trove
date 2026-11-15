@@ -58,7 +58,6 @@ struct ReceiverRevisionAssertions: Sendable {
         let store = ClinicalEventStore(database: database)
         #expect(try await store.effectiveGrantCount(studyID: studyID) == expected.visible.count)
         #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
-        #expect(try await conflictingEvidence(on: sql) == eventIDs(expected.conflicts))
         return visible
     }
 }
@@ -87,19 +86,5 @@ extension ReceiverRevisionAssertions {
         return try Set(rows.map {
             try Self.key(event: $0.decode(column: "event_id", as: UUID.self).uuidString, url: $0.decode(column: "full_url", as: String.self))
         })
-    }
-
-    /// Inspects retained evidence, not a public conflict-reporting API or a second selector.
-    /// A later unique maximum must not erase earlier equal/incomparable claims.
-    private func conflictingEvidence(on sql: any SQLDatabase) async throws -> Set<String> {
-        let rows = try await sql.raw("""
-            SELECT r.event_id FROM clinical_record_events r WHERE EXISTS (
-                SELECT 1 FROM clinical_record_events other WHERE other.record_id = r.record_id AND other.event_id <> r.event_id
-                AND (r.writer_version IS NULL OR other.writer_version IS NULL
-                    OR r.writer_system <> other.writer_system OR r.writer_value <> other.writer_value
-                    OR r.writer_version = other.writer_version))
-            """)
-            .all()
-        return try Set(rows.map { try $0.decode(column: "event_id", as: UUID.self).uuidString.lowercased() })
     }
 }

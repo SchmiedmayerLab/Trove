@@ -18,6 +18,7 @@ final class StudyValidationService: Module, @unchecked Sendable {
     @Dependency(AuthorizationService.self) var authorizationService
     @Dependency(StudyBundleService.self) var bundleService
     @Dependency(ObjectStorageService.self) var storageService
+    @Dependency(ProviderRuntime.self) var providerRuntime
 
     let validator: FHIRValidationClient
 
@@ -78,6 +79,7 @@ final class StudyValidationService: Module, @unchecked Sendable {
             guard let snapshot = try await self.repository.loadWithComponentsAndSchedules(id: studyID, on: transaction) else {
                 throw ServerError.notFound("Study draft not found")
             }
+            try await self.providerRuntime.registrations.validate(requirements: snapshot.collectionRequirements, on: transaction)
             try await AuditRepository.recordDisclosureIntent(AuditEvent(
                 context: context,
                 action: .studyDraftDisclosure,

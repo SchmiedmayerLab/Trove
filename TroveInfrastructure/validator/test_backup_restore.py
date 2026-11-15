@@ -131,39 +131,43 @@ class BackupRestoreTests(unittest.TestCase):
 
     def test_retained_source_checks_cannot_pass_reopened_identity_or_missing_audit(self):
         source = {"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-                  "registrationID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                   "revokedAt": "2026-09-07T00:00:00Z"}
+        registration = {"source": source, "installation": {"registrationID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}}
+        registration_request = {**registration["installation"], "credentialBase64": "synthetic-fixture", "repositoryKind": "sensorkit"}
         for failure in (None, "identity", "lookup", "registration", "revocation", "admission", "audit"):
             with self.subTest(failure=failure):
                 checkpoint = object.__new__(Checkpoint)
-                replies = [dict(source), dict(source), dict(source), {"detail": "Source binding is not active"}]
+                replies = [dict(source), {**registration, "source": dict(source)}, dict(source), {"detail": "Source installation is not active"}]
                 if failure == "identity":
                     replies[0]["id"] = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
                 if failure in ("lookup", "registration", "revocation"):
-                    replies[("lookup", "registration", "revocation").index(failure)]["revokedAt"] = None
+                    index = ("lookup", "registration", "revocation").index(failure)
+                    (replies[index]["source"] if index == 1 else replies[index])["revokedAt"] = None
                 if failure == "admission":
                     replies[3] = {"detail": "An unrelated conflict"}
                 checkpoint.api_json = Mock(side_effect=replies)
                 checkpoint.sql = Mock(return_value="2" if failure == "audit" else "1")
                 if failure:
                     with self.assertRaises(RuntimeError):
-                        checkpoint.check_revoked_source(source, "synthetic-token", {})
+                        checkpoint.check_revoked_source(registration, registration_request, "synthetic-token", {})
                 else:
-                    checkpoint.check_revoked_source(source, "synthetic-token", {})
+                    checkpoint.check_revoked_source(registration, registration_request, "synthetic-token", {})
                     self.assertEqual(checkpoint.api_json.call_count, 4)
                     self.assertEqual(checkpoint.api_json.call_args.args[-1], 409)
 
     def test_revocation_fixture_requires_valid_identifiers_and_explicit_time(self):
         source = {"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-                  "registrationID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                   "revokedAt": "2026-09-07T00:00:00Z"}
+        registration_request = {"registrationID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "credentialBase64": "synthetic-fixture"}
         for key, value in (("id", "invalid"), ("registrationID", None), ("revokedAt", None),
                            ("revokedAt", "invalid"), ("revokedAt", "2026-09-07T00:00:00")):
             with self.subTest(key=key, value=value):
                 checkpoint = object.__new__(Checkpoint)
                 checkpoint.api_json = Mock()
+                changed_source, changed_request = dict(source), dict(registration_request)
+                (changed_request if key == "registrationID" else changed_source)[key] = value
                 with self.assertRaises((RuntimeError, ValueError)):
-                    checkpoint.check_revoked_source({**source, key: value}, "synthetic-token", {})
+                    checkpoint.check_revoked_source({"source": changed_source}, changed_request, "synthetic-token", {})
                 checkpoint.api_json.assert_not_called()
 
     def test_interrupted_fixture_keys_are_owned_and_stable(self):
@@ -277,6 +281,7 @@ class BackupRestoreTests(unittest.TestCase):
             checkpoint = object.__new__(Checkpoint)
             checkpoint.evidence = Path(directory)
             checkpoint.monitor_stop = Mock()
+            checkpoint.private_directory = Mock()
             checkpoint.monitor = None
             checkpoint.processes = []
             checkpoint.containers = []

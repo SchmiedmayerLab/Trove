@@ -24,7 +24,9 @@ struct ClinicalAttributionReceipt: Sendable, Equatable {
 struct ClinicalAttributionStore: Sendable {
     let database: any Database
 
-    func attribute(eventID: UUID, sourceID: UUID, commandID: UUID, targets: [ClinicalEventTarget]) async throws -> ClinicalAttributionReceipt {
+    func attribute(
+        eventID: UUID, sourceID: UUID, commandID: UUID, targets: [ClinicalEventTarget], installation: SourceInstallationProof
+    ) async throws -> ClinicalAttributionReceipt {
         let context = try AuthContext.checkIsParticipant()
         guard !targets.isEmpty else { throw ServerError.badRequest("Attribution requires explicit consent targets") }
         let intent = try ClinicalEventIntent(targets: targets)
@@ -32,16 +34,51 @@ struct ClinicalAttributionStore: Sendable {
             let source = try await ClinicalEventStore(database: transaction).lockSourceOwner(
                 sourceID: sourceID, context: context, on: transaction, requireActive: false
             )
+            let retainedInstallation = try await installation.validate(source: source, on: transaction, requireActive: false)
             guard let sql = transaction as? any SQLDatabase else { throw ServerError.unexpectedError }
             if let receipt = try await self.replay(commandID: commandID, sourceID: sourceID, eventID: eventID, intent: intent, on: sql) {
                 return receipt
             }
-            guard source.revokedAt == nil, source.kind == .participantApp else {
-                throw ServerError.conflict("Source binding is not active")
+            guard source.revokedAt == nil, retainedInstallation.revokedAt == nil, source.kind == .participantApp else {
+                throw ServerError.conflict("Source installation is not active")
             }
             let grants = ClinicalGrantStore(database: transaction, source: source, context: context, acceptedAt: Date())
             return try await self.insert(commandID: commandID, eventID: eventID, intent: intent, grants: grants)
         }
+    }
+
+    /// Reuses retained provider custody after an exact current-demand check in the worker transaction.
+    func attribute(
+        eventID: UUID,
+        commandID: UUID,
+        targets: [ClinicalEventTarget],
+        authorization: ProviderWorkerAuthority.Authorized,
+        sourceToken: String
+    ) async throws -> ClinicalAttributionReceipt {
+        guard database.inTransaction, authorization.source.kind == .serverWorker, !targets.isEmpty else {
+            throw ProviderFailure.fenced
+        }
+        let intent = try ClinicalEventIntent(targets: targets)
+        let sql = try ProviderSQL.sql(database)
+        let rows = try await sql.raw("""
+            SELECT source_type_identifier FROM clinical_point_facts
+            WHERE event_id = \(bind: eventID) AND source_id = \(bind: authorization.source.id)
+            """)
+            .all()
+        guard !rows.isEmpty, try rows.allSatisfy({ try $0.decode(column: "source_type_identifier", as: String?.self) == sourceToken }) else {
+            throw ProviderFailure.scopeLost
+        }
+        if let receipt = try await replay(
+            commandID: commandID, sourceID: authorization.source.id, eventID: eventID, intent: intent, on: sql
+        ) { return receipt }
+        let grants = ClinicalGrantStore(
+            database: database,
+            source: authorization.source,
+            auditContext: authorization.audit,
+            acceptedAt: Date(),
+            providerRegistrationID: authorization.registrationID
+        )
+        return try await insert(commandID: commandID, eventID: eventID, intent: intent, grants: grants)
     }
 
     private func insert(
@@ -55,17 +92,30 @@ struct ClinicalAttributionStore: Sendable {
             throw ServerError.notFound("Clinical event not found")
         }
         let rows = try await sql.raw("""
-            SELECT f.node_id, n.full_url, f.profile, f.effective_at
+            SELECT f.node_id, n.full_url, f.profile, f.effective_seconds, f.effective_fraction,
+                f.effective_end_seconds, f.effective_end_fraction, f.code_system, f.code, f.source_type_identifier
             FROM clinical_point_facts f JOIN clinical_event_nodes n ON n.id = f.node_id
             WHERE f.event_id = \(bind: eventID) AND f.source_id = \(bind: sourceID)
             """)
             .all()
-        let outputs = try rows.map {
+        var outputs = try rows.map {
             try ClinicalGrantStore.Output(
                 fullURL: $0.decode(column: "full_url", as: String.self),
                 profile: $0.decode(column: "profile", as: String.self),
-                effectiveAt: $0.decode(column: "effective_at", as: Date.self)
+                measurementBounds: ClinicalMeasurementBounds(row: $0),
+                codeSystem: $0.decode(column: "code_system", as: String.self),
+                code: $0.decode(column: "code", as: String.self),
+                sourceTypeIdentifier: $0.decode(column: "source_type_identifier", as: String?.self)
             )
+        }
+        if outputs.contains(where: \.lacksRowEvidence) {
+            // Row evidence comes from retained custody, never from the attribution command or the recording envelope.
+            let retained = try await StudyDataExportStore(database: transaction).retainedEvent(id: eventID).collectionOutputs
+            outputs = outputs.map { output in
+                var output = output
+                output.rowExtent = retained.first { $0.fullURL == output.fullURL }?.rowExtent
+                return output
+            }
         }
         let authorities = try await grants.authorities(outputs: outputs, intent: intent, requireCustodyCoverage: false)
         for row in rows {
@@ -90,7 +140,7 @@ struct ClinicalAttributionStore: Sendable {
             """)
             .run()
         try await AuditRepository.recordMutation(.init(
-            context: grants.context.auditContext,
+            context: grants.auditContext,
             action: .clinicalEventAttributed,
             scope: .participantSource(participantID: grants.source.participantID, sourceBindingID: sourceID),
             target: .init(id: commandID)

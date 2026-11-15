@@ -62,7 +62,7 @@ struct FHIRValidationClientTests {
         } throws: { ($0 as? ServerError)?.status.code == 503 }
     }
 
-    @Test(arguments: [0, 4 * 1024 * 1024 + 1])
+    @Test(arguments: [0, FHIRValidationClient.maximumBytes + 1])
     func inputBoundsAreCheckedBeforeWorker(size: Int) async throws {
         let validator = FHIRValidationClient(expectedIdentity: Self.identity) { _ in
             Issue.record("Invalid input length must not reach worker")

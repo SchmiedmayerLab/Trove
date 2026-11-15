@@ -43,16 +43,32 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
     public.participants, public.invitation_codes, public.enrollments, public.stored_artifacts
 TO :"runtime_name";
 GRANT SELECT, INSERT ON public.published_studies, public.enrollment_consents TO :"runtime_name";
+GRANT SELECT, INSERT ON public.native_collection_reconciliations TO :"runtime_name";
+GRANT UPDATE (instruction, completed_at) ON public.native_collection_reconciliations TO :"runtime_name";
 GRANT SELECT, INSERT ON public.study_delegations, public.study_publication_candidates TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.study_delegations TO :"runtime_name";
 GRANT SELECT, INSERT ON public.source_bindings TO :"runtime_name";
+GRANT SELECT, INSERT ON public.source_installations TO :"runtime_name";
+GRANT UPDATE (revoked_at) ON public.source_installations TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.source_bindings TO :"runtime_name";
+GRANT SELECT, INSERT ON public.source_identity_keys, public.source_identity_key_envelopes TO :"runtime_name";
 GRANT SELECT, INSERT ON public.audit_events TO :"runtime_name";
-GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_nodes,
+GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representations, public.clinical_event_nodes,
     public.clinical_point_facts, public.study_data_grants, public.clinical_source_records,
-    public.clinical_record_events, public.clinical_output_bindings, public.clinical_output_retractions,
-    public.clinical_questionnaire_contexts, public.clinical_point_derivations,
+    public.clinical_record_events, public.clinical_output_bindings, public.clinical_record_retractions,
+    public.clinical_retraction_reversals, public.clinical_questionnaire_contexts, public.clinical_point_derivations,
+    public.clinical_output_dependencies,
     public.clinical_attribution_commands TO :"runtime_name";
+GRANT SELECT, INSERT ON public.recording_transfers, public.recording_transfer_attempts, public.recording_transfer_receipts,
+    public.clinical_recording_attachments TO :"runtime_name";
+-- Provider collection state is updated in place; its identity scopes, coverage and conversion instants are append-only.
+-- Nothing provider-related is deleted at runtime, and dispatch budgets are seeded by the migration.
+GRANT SELECT, INSERT, UPDATE ON public.provider_registrations, public.provider_connections, public.provider_link_intents,
+    public.provider_checkpoints, public.provider_worker_states TO :"runtime_name";
+GRANT SELECT, INSERT ON public.provider_staged_records, public.provider_query_coverage, public.provider_conversion_instants,
+    public.provider_global_scopes TO :"runtime_name";
+GRANT UPDATE (event_id) ON public.provider_staged_records TO :"runtime_name";
+GRANT SELECT, UPDATE ON public.provider_dispatch_budgets TO :"runtime_name";
 
 -- The only definer bridge reveals a Boolean, never settings, paths or privileged operations.
 CREATE OR REPLACE FUNCTION public.trove_timescale_preloaded() RETURNS boolean

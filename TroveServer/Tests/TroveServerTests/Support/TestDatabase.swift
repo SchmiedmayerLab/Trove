@@ -39,12 +39,18 @@ enum TestDatabase {
             CreatePublishedStudies().name,
             CreateStudyPublicationCandidates().name,
             CreateParticipants().name,
+            CreateProviderRegistrations().name,
             CreateSourceBindings().name,
+            CreateSourceIdentityKeys().name,
+            CreateSourceInstallations().name,
             CreateInvitationCodes().name,
             CreateEnrollments().name,
             CreateEnrollmentConsents().name,
+            CreateNativeReconciliations().name,
             CreateAuditEvents().name,
-            CreateClinicalEvents().name
+            CreateClinicalEvents().name,
+            CreateRecordingTransfers().name,
+            CreateProviderConnections().name
         ].sorted()
     }
 
@@ -170,9 +176,17 @@ enum TestDatabase {
         guard let admin = app.db(adminID) as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "PostgreSQL test cleanup unavailable")
         }
-        // Tests have completed. FORCE closes this application's idle pools before removal.
-        // Targets are only the exact names successfully created by this invocation.
+        // Tests have completed. Prevent idle pools or Timescale workers from reconnecting
+        // while FORCE closes their sessions. Only this invocation's exact owned names are affected.
         for name in names {
+            try await admin.raw("ALTER DATABASE \(ident: name) ALLOW_CONNECTIONS false").run()
+            // Wait for backend termination before DROP's shorter internal wait. Timescale
+            // workers can otherwise still be exiting after FORCE sends its signals.
+            try await admin.raw("""
+                SELECT pg_terminate_backend(pid, 10000)
+                FROM pg_stat_activity WHERE datname = \(bind: name)
+                """)
+                .run()
             try await admin.raw("DROP DATABASE IF EXISTS \(ident: name) WITH (FORCE)").run()
         }
         app.storage[CreatedDatabases.self] = nil

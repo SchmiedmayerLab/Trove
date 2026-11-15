@@ -12,18 +12,9 @@ import GroveFHIRContract
 import Testing
 
 
-/// Test-only implementation of the IG's frozen identity framing, independent of Grove's
-/// private producer helpers. Production code consumes exporter graphs without rekeying them.
+/// Synthetic shape-valid keys for local storage/boundary tests, not producer conformance.
+/// Full-validator fixtures derive content keys with the independently pinned IG implementation.
 enum FixtureIdentity {
-    static func node(system: IdentifierSystem, event: ExchangeEventIdentifier, role: String, ordinal: String) throws -> RoledIdentifier {
-        let fields = [
-            "org.grovealliance.fhir.entry-node.v0", event.identifier.identifier.system.rawValue,
-            event.identifier.identifier.value, role, ordinal
-        ]
-        let digest = encoded(Data(SHA256.hash(data: try frame(fields))))
-        return .init(identifier: try BusinessIdentifier(system: system, value: "n0:\(role):\(ordinal):\(digest)"), role: .entryNode)
-    }
-
     static func opaque(system: IdentifierSystem, role: GroveIdentifierRole, components: [String]) throws -> RoledIdentifier {
         let key = SymmetricKey(data: Data(repeating: 0xA5, count: 32))
         let fields = ["org.grovealliance.fhir.identity.v0", role.rawValue] + components

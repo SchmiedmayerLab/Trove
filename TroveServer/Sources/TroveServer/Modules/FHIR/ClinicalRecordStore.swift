@@ -17,13 +17,12 @@ struct ClinicalRecordRevision: Sendable {
     let writer: ValidatedExchangeEvent.Identifier?
     let version: String?
     let kind: String
+    let recorded: RecordedInstant
 
     init(_ event: ValidatedExchangeEvent) throws {
+        recorded = event.recorded
         if let retraction = event.retraction {
-            guard event.outputs.isEmpty, Self.bounded(retraction.sourceRecordIdentifier),
-                  (1...512).contains(retraction.outputIdentifiers.count),
-                  Set(retraction.outputIdentifiers).count == retraction.outputIdentifiers.count,
-                  retraction.outputIdentifiers.allSatisfy(Self.bounded) else {
+            guard event.outputs.isEmpty, Self.bounded(retraction.sourceRecordIdentifier) else {
                 throw ServerError.badRequest("Unsupported retraction targets")
             }
             identifier = retraction.sourceRecordIdentifier
@@ -75,19 +74,25 @@ struct ClinicalRecordRevision: Sendable {
 struct ClinicalRecordStore: Sendable {
     let sql: any SQLDatabase
 
-    func insertPoint(
-        _ output: ValidatedExchangeEvent.PointOutput,
+    func insertOutput(
+        _ output: ValidatedExchangeEvent.Output,
         nodeID: UUID,
         recordID: UUID,
         bindingID: UUID,
         receipt: ClinicalEventReceipt
     ) async throws {
         try await sql.raw("""
-            INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                quantity_value, quantity_system, quantity_code, code_system, code)
+            INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at, effective_end,
+                effective_seconds, effective_fraction, effective_end_seconds, effective_end_fraction,
+                value_kind, quantity_value, quantity_system, quantity_code, value_code_system, value_code, code_system, code,
+                source_type_identifier, source_repository_kind)
             VALUES (\(bind: nodeID), \(bind: receipt.sourceID), \(bind: receipt.eventID), \(bind: recordID), \(bind: bindingID),
-                \(bind: output.profile), \(bind: output.effectiveAt),
-                \(bind: output.quantityValue), \(bind: output.quantitySystem), \(bind: output.quantityCode), \(bind: output.codeSystem), \(bind: output.code))
+                \(bind: output.profile), \(bind: output.effectiveAt), \(bind: output.effectiveEnd),
+                \(bind: output.measurementBounds.start.seconds), \(bind: output.measurementBounds.start.fraction),
+                \(bind: output.measurementBounds.end?.seconds), \(bind: output.measurementBounds.end?.fraction),
+                \(bind: output.value.kind), \(bind: output.value.quantityValue), \(bind: output.value.quantitySystem), \(bind: output.value.quantityCode),
+                \(bind: output.value.codingSystem), \(bind: output.value.codingCode), \(bind: output.codeSystem), \(bind: output.code),
+                \(bind: output.sourceTypeIdentifier), \(bind: output.sourceRepositoryKind?.rawValue))
             """)
             .run()
     }
@@ -110,9 +115,11 @@ struct ClinicalRecordStore: Sendable {
                 .run()
         }
         try await sql.raw("""
-            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind, writer_system, writer_value, writer_version)
+            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind, writer_system, writer_value, writer_version,
+                recorded_seconds, recorded_fraction)
             VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), \(bind: revision.kind),
-                \(bind: revision.writer?.system), \(bind: revision.writer?.value), \(bind: revision.version))
+                \(bind: revision.writer?.system), \(bind: revision.writer?.value), \(bind: revision.version),
+                \(bind: revision.recorded.seconds), \(bind: revision.recorded.fraction))
             """)
             .run()
         return recordID
@@ -140,11 +147,10 @@ struct ClinicalRecordStore: Sendable {
         return bindingID
     }
 
-    func retract(_ output: ValidatedExchangeEvent.Identifier, recordID: UUID, sourceID: UUID, eventID: UUID) async throws {
-        let bindingID = try await bind(output, recordID: recordID, sourceID: sourceID, eventID: eventID)
+    func retract(recordID: UUID, sourceID: UUID, eventID: UUID) async throws {
         try await sql.raw("""
-            INSERT INTO clinical_output_retractions (event_id, source_id, record_id, output_binding_id, kind)
-            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), \(bind: bindingID), 'retraction')
+            INSERT INTO clinical_record_retractions (event_id, source_id, record_id, kind)
+            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), 'retraction')
             """)
             .run()
     }
@@ -153,19 +159,26 @@ struct ClinicalRecordStore: Sendable {
 
 extension ClinicalRecordStore {
     /// Predicate for an active record-event aliased `r`. Selection conveys no read authority.
-    /// A missing/different writer or an equal/higher competing version prevents selection.
-    /// Equal older versions do not prevent a uniquely higher complete revision from being selected.
+    /// Discard dominated versions only within the same writer-record identity, then use
+    /// exact recorded time and bytewise record-version identity to select one whole revision.
     static func currentPredicate(on sql: any SQLDatabase) -> SQLQueryString {
         let collation = sql.dialect.name == "sqlite" ? "BINARY" : "C"
         return """
-            r.kind = 'active' AND NOT EXISTS (
-                SELECT 1 FROM clinical_record_events other
-                WHERE other.record_id = r.record_id AND other.kind = 'active' AND other.event_id <> r.event_id
-                    AND (r.writer_version IS NULL OR other.writer_version IS NULL
-                        OR r.writer_system <> other.writer_system OR r.writer_value <> other.writer_value
-                        OR length(other.writer_version) > length(r.writer_version)
-                        OR (length(other.writer_version) = length(r.writer_version)
-                            AND other.writer_version COLLATE \(ident: collation) >= r.writer_version COLLATE \(ident: collation)))
+            r.kind = 'active' AND r.event_id = (
+                SELECT candidate.event_id FROM clinical_record_events candidate
+                JOIN clinical_events identity ON identity.id = candidate.event_id
+                WHERE candidate.record_id = r.record_id AND candidate.kind = 'active'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM clinical_record_events other
+                        WHERE other.record_id = candidate.record_id AND other.kind = 'active'
+                            AND other.writer_system = candidate.writer_system AND other.writer_value = candidate.writer_value
+                            AND (length(other.writer_version) > length(candidate.writer_version)
+                                OR (length(other.writer_version) = length(candidate.writer_version)
+                                    AND other.writer_version COLLATE \(ident: collation) > candidate.writer_version COLLATE \(ident: collation)))
+                    )
+                ORDER BY candidate.recorded_seconds DESC, candidate.recorded_fraction COLLATE \(ident: collation) DESC,
+                    identity.identifier_value COLLATE \(ident: collation) DESC, identity.identifier_system COLLATE \(ident: collation) DESC
+                LIMIT 1
             )
             """
     }

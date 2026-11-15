@@ -19,39 +19,61 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
     public typealias JournalError = DeliveryJournalError
 
     public struct Limits: Sendable {
+        public var maximumPayloadBytes: Int
         public var maximumBytes: Int
         public var maximumEvents: Int
+        public var maximumQueries: Int
         public var maximumDatabaseBytes: Int
+        public var maximumRecordingBytes: Int
+        public var maximumPendingRecordingBytes: Int
+        public var maximumRecordingFiles: Int
 
         public init(
+            maximumPayloadBytes: Int = 4 * 1024 * 1024,
             maximumBytes: Int = 64 * 1024 * 1024,
             maximumEvents: Int = 2048,
-            maximumDatabaseBytes: Int = 128 * 1024 * 1024
+            maximumQueries: Int = 2048,
+            maximumDatabaseBytes: Int = 128 * 1024 * 1024,
+            maximumRecordingBytes: Int = 128 * 1024 * 1024,
+            maximumPendingRecordingBytes: Int = 1024 * 1024 * 1024,
+            maximumRecordingFiles: Int = 4096
         ) {
+            self.maximumPayloadBytes = maximumPayloadBytes
             self.maximumBytes = maximumBytes
             self.maximumEvents = maximumEvents
+            self.maximumQueries = maximumQueries
             self.maximumDatabaseBytes = maximumDatabaseBytes
+            self.maximumRecordingBytes = maximumRecordingBytes
+            self.maximumPendingRecordingBytes = maximumPendingRecordingBytes
+            self.maximumRecordingFiles = maximumRecordingFiles
         }
     }
 
     public struct Payload: Sendable {
         public let bytes: Data
         public let targets: [Contract.Target]
+        public let recordings: [DeliveryRecording]
 
-        public init(bytes: Data, targets: [Contract.Target]) {
+        public init(bytes: Data, targets: [Contract.Target], recordings: [DeliveryRecording] = []) {
             self.bytes = bytes
             self.targets = targets
+            self.recordings = recordings
         }
     }
 
     /// A snapshot for exactly one registered query. Only the journal constructs checkpoints.
     public struct Checkpoint: Sendable, Equatable {
         public let sourceID: UUID
+        public let queryID: UUID
         public let epoch: UUID
         public let queryDefinition: Data
         public let cursor: Data?
+        public let lastServedSequence: Int64
+        public let queryExhausted: Bool
         let scope: Scope
         let revision: UUID
+        let collectionRevision: UUID?
+        var acquisitionDeadline: Date?
     }
 
     public struct Attempt: Sendable {
@@ -60,6 +82,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         public let commitment: Contract.Commitment
         public let custodyWasUncertain: Bool
         public let attemptCount: Int
+        public let recordings: [DeliveryRecordingReference]
     }
 
     public enum BlockReason: Codable, Sendable, Equatable {
@@ -80,21 +103,19 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
     }
 
     let database: DeliverySQLite
+    let recordingFiles: DeliveryFileStore
     let limits: Limits
     let url: URL
     /// Immutable principal/backend binding used when constructing the authenticated drain.
     nonisolated public let scope: Scope
 
-    /// The caller supplies an owner-only (0700) application directory. Existing files must be owner-only (0600).
-    /// Missing established journals are never recreated; unsafe permissions are never silently repaired.
+    /// Requires a private (0700) directory and owner-only (0600) files; never recreates missing journals or repairs unsafe permissions.
     public init(url: URL, scope: Scope, mode: OpenMode, limits: Limits = .init()) throws {
         guard url.isFileURL, !url.path.utf8.contains(0),
-              [Contract.identifier, scope.backend, scope.issuer, scope.subject].allSatisfy({ (1...2048).contains($0.utf8.count) }),
-              (1...512 * 1024 * 1024).contains(limits.maximumBytes),
-              (1...65_536).contains(limits.maximumEvents),
-              (65_536...1024 * 1024 * 1024).contains(limits.maximumDatabaseBytes) else {
+              [Contract.identifier, scope.backend, scope.issuer, scope.subject].allSatisfy({ (1...2048).contains($0.utf8.count) }) else {
             throw JournalError.invalidConfiguration
         }
+        try limits.validate()
         let url = try DeliverySQLite.databaseURL(url)
         try DeliveryJournalSchema.checkProtection(of: url.deletingLastPathComponent())
         if mode == .createNew {
@@ -109,10 +130,13 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         }
         try DeliveryJournalSchema.checkProtection(of: url)
         let database = try DeliverySQLite(url: url)
+        let budget = (limits.maximumDatabaseBytes, limits.maximumBytes)
         try DeliveryJournalSchema.configure(
-            database, scope: scope, contract: Contract.identifier, create: mode == .createNew, maximumBytes: limits.maximumDatabaseBytes
+            database, scope: scope, contract: Contract.identifier, create: mode == .createNew, limits: budget
         )
+        let recordingFiles = try DeliveryFileStore(directory: url.appendingPathExtension("recordings"), create: mode == .createNew)
         self.database = database
+        self.recordingFiles = recordingFiles
         self.url = url
         self.limits = limits
         self.scope = scope
@@ -123,71 +147,45 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         database.close()
     }
 
-    /// Read this checkpoint before a bounded query; query semantics must match its immutable definition.
-    public func checkpoint(for sourceID: UUID) throws -> Checkpoint {
-        let rows = try database.query(
-            "SELECT local_id, query_definition, cursor, checkpoint_revision FROM source_state WHERE source_id = ?", [.text(sourceID.lowercase)]
-        ) { statement in
-            Checkpoint(
-                sourceID: sourceID,
-                epoch: try Self.identifier(statement, 0),
-                queryDefinition: try DeliverySQLite.blob(statement, 1),
-                cursor: sqlite3_column_type(statement, 2) == SQLITE_NULL ? nil : try DeliverySQLite.blob(statement, 2),
-                scope: scope,
-                revision: try Self.identifier(statement, 3)
-            )
-        }
-        guard let checkpoint = rows.first else { throw JournalError.unknownSource }
-        return checkpoint
-    }
-
-    /// Commit prepared payloads and their next cursor together. Grove owns wire identities;
-    /// the queue sequence only orders local deliveries. Conversion must visit every change:
-    /// omit explicit policy exclusions, but never advance past a malformed or refused record.
-    /// A stale checkpoint requires reloading and querying again, never transforming the old result under a newer cursor.
-    public func stage(
+    /// Backend-specific evidence joins payload custody before the checkpoint advances.
+    func stage(
         from expected: Checkpoint,
         nextCursor: Data,
         payloads: [Payload],
-        observedDeletions: [UUID] = []
+        observedDeletions: [UUID] = [],
+        queryExhausted: Bool = false,
+        finalizingDeliveries: ([UUID]) throws -> Void
     ) throws -> [UUID] {
         try Task.checkCancellation()
         guard expected.scope == scope else { throw JournalError.wrongScope }
         guard (1...65_536).contains(nextCursor.count), payloads.count <= 128,
               observedDeletions.count <= 128 else { throw JournalError.invalidConfiguration }
+        guard payloads.allSatisfy({ $0.bytes.count <= limits.maximumPayloadBytes }) else { throw JournalError.capacityExceeded }
+        let reservations = try reserveRecordings(payloads, from: expected)
         return try database.transaction {
-            _ = try activeSource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
+            let registered = try activeDeliverySource(expected.sourceID)
+            try validateCheckpoint(expected)
             let source = try database.query(
                 "SELECT next_sequence, producer_system FROM source_state WHERE source_id = ?", [.text(expected.sourceID.lowercase)]
             ) {
                 (sqlite3_column_int64($0, 0), try DeliverySQLite.text($0, 1))
             }
             guard let (sequence, system) = source.first else { throw JournalError.unknownSource }
-            var deliveryIDs: [UUID] = []
-            for payload in payloads {
-                try Task.checkCancellation()
-                guard sequence <= Int64.max - Int64(deliveryIDs.count) else { throw JournalError.sequenceExhausted }
-                let sequence = sequence + Int64(deliveryIDs.count)
-                guard sequence < Int64.max else { throw JournalError.sequenceExhausted }
-                let commitment = try Contract.commitment(sourceID: expected.sourceID, originalBytes: payload.bytes, targets: payload.targets)
-                let metadata = Contract.metadata(for: commitment)
-                guard metadata.sourceID == expected.sourceID, metadata.eventSystem.utf8.elementsEqual(system.utf8) else {
-                    throw JournalError.eventIdentityMismatch
-                }
-                let id = UUID()
-                try insert(id: id, sequence: sequence, payload: payload, commitment: commitment)
-                try checkByteLimit()
-                deliveryIDs.append(id)
-            }
-            try retireDeletionDetections(observedDeletions, sourceID: expected.sourceID)
-            // Retire this checkpoint's opaque ledger only after all payloads are durable.
-            // A crash after COMMIT cannot strand reservations behind the advanced cursor.
-            // The new checkpoint mints a fresh producer instance, never reusing its counter.
-            try database.execute("DELETE FROM producer_ledger WHERE source_id = ?", [.text(expected.sourceID.lowercase)])
+            let deliveryIDs = try stagePayloads(payloads, reservations: reservations, source: registered, sequence: sequence, system: system)
+            try finalizingDeliveries(deliveryIDs)
+            try retireDeletionDetections(observedDeletions, queryID: expected.queryID)
+            let lastServed = try lastQuerySequence(for: expected.sourceID)
+            guard lastServed < Int64.max else { throw JournalError.capacityExceeded }
+            // Retire the conversion instant only after record bytes and the cursor are durable.
             try database.execute(
-                "UPDATE source_state SET cursor = ?, checkpoint_revision = ? WHERE source_id = ?",
-                [.blob(nextCursor), .text(UUID().lowercase), .text(expected.sourceID.lowercase)]
+                """
+                UPDATE acquisition_query SET cursor = ?, checkpoint_revision = ?, conversion_instant = NULL,
+                    last_served = ?, query_exhausted = ? WHERE id = ?
+                """,
+                [
+                    .blob(nextCursor), .text(UUID().lowercase), .integer(lastServed + 1),
+                    .integer(queryExhausted ? 1 : 0), .text(expected.queryID.lowercase)
+                ]
             )
             try checkByteLimit()
             try Task.checkCancellation()
@@ -195,10 +193,10 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         }
     }
 
-    private func retireDeletionDetections(_ recordIDs: [UUID], sourceID: UUID) throws {
+    private func retireDeletionDetections(_ recordIDs: [UUID], queryID: UUID) throws {
         for id in recordIDs {
             try database.execute(
-                "DELETE FROM deletion_detection WHERE source_id = ? AND record_id = ?", [.text(sourceID.lowercase), .text(id.lowercase)]
+                "DELETE FROM deletion_detection WHERE query_id = ? AND record_id = ?", [.text(queryID.lowercase), .text(id.lowercase)]
             )
         }
     }
@@ -234,6 +232,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
             try database.execute(
                 "UPDATE delivery SET receipt = ?, payload = NULL, blocked = NULL, retry_after = 0 WHERE id = ?", [.blob(bytes), .text(id.lowercase)]
             )
+            try database.execute("UPDATE recording_file SET state = 'retired' WHERE delivery_id = ? AND state = 'attached'", [.text(id.lowercase)])
         }
     }
 
@@ -259,11 +258,16 @@ extension DeliveryJournal {
     public func pruneDelivered(limit: Int = 128) throws -> Int {
         guard (1...128).contains(limit) else { throw JournalError.invalidConfiguration }
         return try database.transaction {
-            let ids = try database.query("SELECT id FROM delivery WHERE receipt IS NOT NULL ORDER BY rowid LIMIT ?", [.integer(Int64(limit))]) {
+            let ids = try database.query("""
+                SELECT id FROM delivery WHERE receipt IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM recording_file WHERE delivery_id = delivery.id AND state != 'deleted')
+                    ORDER BY rowid LIMIT ?
+                """, [.integer(Int64(limit))]) {
                 try Self.identifier($0, 0)
             }
             for id in ids {
                 guard try storedReceipt(id) != nil else { throw JournalError.corruptJournal }
+                try database.execute("DELETE FROM recording_file WHERE delivery_id = ? AND state = 'deleted'", [.text(id.lowercase)])
                 try database.execute("DELETE FROM delivery WHERE id = ?", [.text(id.lowercase)])
             }
             return ids.count
@@ -324,6 +328,64 @@ extension DeliveryJournal {
 
 
 extension DeliveryJournal {
+    private func stagePayloads(
+        _ payloads: [Payload], reservations: [[DeliveryFileStore.Reservation]], source: DeliverySource, sequence: Int64, system: String
+    ) throws -> [UUID] {
+        var deliveryIDs: [UUID] = []
+        var nextSequence = sequence
+        for (payloadIndex, payload) in payloads.enumerated() {
+            try Task.checkCancellation()
+            let commitment = try Contract.commitment(sourceID: source.id, originalBytes: payload.bytes, targets: payload.targets)
+            let metadata = Contract.metadata(for: commitment)
+            guard metadata.sourceID == source.id,
+                  metadata.eventSystem.utf8.elementsEqual(system.utf8)
+                    || metadata.eventSystem.utf8.elementsEqual(source.systems.recordRetraction.rawValue.utf8) else {
+                throw JournalError.eventIdentityMismatch
+            }
+            let recordings = try writeRecordings(payload.recordings, reservations: reservations[payloadIndex], sourceID: source.id)
+            if let existing = try existingDelivery(payload: payload, commitment: commitment) {
+                try matchRecordings(recordings, to: existing)
+                deliveryIDs.append(existing)
+                continue
+            }
+            guard nextSequence < Int64.max else { throw JournalError.sequenceExhausted }
+            let id = UUID()
+            try insert(id: id, sequence: nextSequence, payload: payload, commitment: commitment)
+            try attachRecordings(recordings, to: id)
+            nextSequence += 1
+            try checkByteLimit()
+            deliveryIDs.append(id)
+        }
+        return deliveryIDs
+    }
+
+    /// Exact commitments reuse their pending or delivered row; distinct representations retain separate custody.
+    private func existingDelivery(payload: Payload, commitment: Contract.Commitment) throws -> UUID? {
+        let metadata = Contract.metadata(for: commitment)
+        let rows = try database.query(
+            """
+            SELECT id, payload, targets, node_count FROM delivery
+            WHERE source_id = ? AND event_system = ? AND event_value = ? AND payload_digest = ? AND target_digest = ?
+            """,
+            [
+                .text(metadata.sourceID.lowercase), .text(metadata.eventSystem), .text(metadata.eventValue),
+                .text(metadata.payloadSHA256), .text(metadata.targetSHA256)
+            ]
+        ) { statement in
+            guard try DeliverySQLite.blob(statement, 2) == Contract.serializedTargets(for: commitment),
+                  sqlite3_column_int64(statement, 3) == Int64(metadata.nodeCount) else { throw JournalError.corruptJournal }
+            if sqlite3_column_type(statement, 1) != SQLITE_NULL {
+                guard try DeliverySQLite.blob(statement, 1) == payload.bytes else { throw JournalError.eventIdentityMismatch }
+            }
+            return try Self.identifier(statement, 0)
+        }
+        guard let id = rows.first else {
+            return nil
+        }
+        _ = try storedReceipt(id)
+        return id
+    }
+
     private func insert(
         id: UUID, sequence: Int64, payload: Payload, commitment: Contract.Commitment
     ) throws {
@@ -334,11 +396,12 @@ extension DeliveryJournal {
         guard let count = count.first, count < limits.maximumEvents else { throw JournalError.capacityExceeded }
         try database.execute(
             """
-            INSERT INTO delivery(id, source_id, sequence, event_value, payload, targets, payload_digest, target_digest, node_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO delivery(id, source_id, sequence, event_system, event_value, payload, targets, payload_digest, target_digest, node_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                .text(id.lowercase), .text(sourceID.lowercase), .integer(sequence), .text(metadata.eventValue), .blob(payload.bytes), .blob(intent),
+                .text(id.lowercase), .text(sourceID.lowercase), .integer(sequence), .text(metadata.eventSystem), .text(metadata.eventValue),
+                .blob(payload.bytes), .blob(intent),
                 .text(metadata.payloadSHA256), .text(metadata.targetSHA256), .integer(Int64(metadata.nodeCount))
             ]
         )
@@ -352,7 +415,7 @@ extension DeliveryJournal {
     private func storedReceipt(_ id: UUID) throws -> Contract.Receipt? {
         let rows = try database.query(
             """
-            SELECT d.receipt, d.source_id, s.producer_system, d.event_value, d.payload_digest, d.target_digest, d.node_count
+            SELECT d.receipt, d.source_id, d.event_system, d.event_value, d.payload_digest, d.target_digest, d.node_count
             FROM delivery d JOIN source_state s ON s.source_id = d.source_id WHERE d.id = ?
             """, [.text(id.lowercase)]
         ) { statement in
@@ -381,15 +444,19 @@ extension DeliveryJournal {
         return row
     }
 
-    private func loadAttempt(_ id: UUID) throws -> Attempt {
+    func loadAttempt(_ id: UUID) throws -> Attempt {
+        let recordings = try recordingReferences(for: id)
         let rows = try database.query(
             """
             SELECT d.source_id, d.payload, d.targets, d.payload_digest, d.target_digest,
-                d.node_count, d.attempt_count, d.event_value, s.producer_system
+                d.node_count, d.attempt_count, d.event_value, d.event_system
             FROM delivery d JOIN source_state s ON s.source_id = d.source_id WHERE d.id = ?
             """,
             [.text(id.lowercase)]
         ) { statement in
+            guard (1...DeliveryJournalSchema.maximumPayloadBytes).contains(Int(sqlite3_column_bytes(statement, 1))) else {
+                throw JournalError.corruptJournal
+            }
             let bytes = try DeliverySQLite.blob(statement, 1)
             let targets = try JSONDecoder().decode([Contract.Target].self, from: DeliverySQLite.blob(statement, 2))
             let sourceID = try Self.identifier(statement, 0)
@@ -410,7 +477,8 @@ extension DeliveryJournal {
                 bytes: bytes,
                 commitment: commitment,
                 custodyWasUncertain: previousAttempts > 0,
-                attemptCount: min(previousAttempts + 1, 1_000_000)
+                attemptCount: min(previousAttempts + 1, 1_000_000),
+                recordings: recordings
             )
         }
         guard let row = rows.first else { throw JournalError.unknownDelivery }
@@ -420,7 +488,7 @@ extension DeliveryJournal {
 
 
 extension DeliveryJournal {
-    private static func identifier(_ statement: OpaquePointer, _ column: Int32) throws -> UUID {
+    static func identifier(_ statement: OpaquePointer, _ column: Int32) throws -> UUID {
         guard let value = UUID(uuidString: try DeliverySQLite.text(statement, column)) else { throw JournalError.corruptJournal }
         return value
     }

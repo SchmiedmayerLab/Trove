@@ -23,7 +23,8 @@ struct ClinicalRecordSchemaTests {
                     try await ClinicalEventStore(database: app.db).accept(
                         ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: version),
                         sourceID: fixture.source.id,
-                        targets: fixture.targets
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
             }
@@ -54,7 +55,8 @@ struct ClinicalRecordSchemaTests {
                 _ = try await ClinicalEventStore(database: app.db).accept(
                     ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "0"),
                     sourceID: fixture.source.id,
-                    targets: fixture.targets
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
             }
             await #expect {
@@ -106,15 +108,14 @@ struct ClinicalRecordSchemaTests {
                 let first = try await store.accept(
                     ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1"),
                     sourceID: fixture.source.id,
-                    targets: fixture.targets
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
-                let secondEvent = ClinicalRecordStoreTests.event(
+                let secondEvent = try ClinicalRecordStoreTests.event(
                     source: fixture.source, sequence: 2, version: "1", record: "another", outputs: ["other"]
                 )
                 let second = try await store.accept(
-                    secondEvent,
-                    sourceID: fixture.source.id,
-                    targets: fixture.targets(for: secondEvent)
+                    secondEvent, sourceID: fixture.source.id, targets: fixture.targets(for: secondEvent), installation: fixture.installation
                 )
                 return (first, second)
             }
@@ -124,9 +125,9 @@ struct ClinicalRecordSchemaTests {
             await #expect {
                 try await sql.raw("""
                     INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                        quantity_value, quantity_system, quantity_code, code_system, code)
+                        value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
                     SELECT n.id, n.source_id, n.event_id, f.record_id, f.output_binding_id, f.profile, f.effective_at,
-                        f.quantity_value, f.quantity_system, f.quantity_code, f.code_system, f.code
+                        f.value_kind, f.quantity_value, f.quantity_system, f.quantity_code, f.code_system, f.code
                     FROM clinical_point_facts f CROSS JOIN clinical_event_nodes n
                     WHERE f.event_id = \(bind: receipts.0.eventID) AND n.event_id = \(bind: receipts.1.eventID) AND n.ordinal = 0
                     """)

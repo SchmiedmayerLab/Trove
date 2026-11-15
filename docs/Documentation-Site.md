@@ -45,11 +45,9 @@ it does not bypass the independent candidate-image approval boundary.
 
 ## Maintaining Content
 
-- Document working interfaces in the [tour](Platform-Tour.md), design decisions
-  in the design pages, and delivery scope and status in
-  [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and issues.
-  Do not copy milestone checklists or progress reports into the site.
-- Describe supported behavior and identify planned capabilities explicitly.
+- Document working interfaces in the [tour](Platform-Tour.md) and design decisions
+  in the design pages. Describe what exists; do not record project status, plans,
+  history or issue tracking in the documentation.
   Keep API instructions aligned with the documented revision.
 - Keep the component diagrams in the root README and architecture page identical.
 - Use only synthetic study and participant data. Follow the

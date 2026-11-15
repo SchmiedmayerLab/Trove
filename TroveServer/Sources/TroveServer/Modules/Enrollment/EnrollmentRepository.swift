@@ -42,9 +42,20 @@ final class EnrollmentRepository: Module, Sendable {
             .first()
     }
 
-    func create(_ enrollment: Enrollment) async throws -> Enrollment {
-        try await enrollment.save(on: database)
-        return enrollment
+    func create(_ enrollment: Enrollment, period: EnrollmentPeriod = .ongoing) async throws -> Enrollment {
+        try period.validate()
+        return try await database.transaction { transaction in
+            try await enrollment.save(on: transaction)
+            guard let stored = try await Enrollment.find(enrollment.requireID(), on: transaction), let start = stored.createdAt else {
+                throw ServerError.unexpectedError
+            }
+            if let end = try period.resolve(at: start) {
+                stored.endsAt = end
+                try await stored.save(on: transaction)
+            }
+            guard let result = try await Enrollment.find(stored.requireID(), on: transaction) else { throw ServerError.unexpectedError }
+            return result
+        }
     }
 
     func update(_ enrollment: Enrollment) async throws -> Enrollment {

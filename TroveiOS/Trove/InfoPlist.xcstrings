@@ -1,18 +1,42 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "NSHealthShareUsageDescription" : {
-      "comment" : "System permission prompt explaining why the participant app requests read access to heart rate samples.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trove reads heart rate data to share measurements covered by your study consents."
+  "sourceLanguage": "en",
+  "strings": {
+    "NSHealthShareUsageDescription": {
+      "comment": "System permission prompt explaining the study-scoped read access requested by the participant app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trove reads the health data you authorize for your enrolled studies, including any requested history and workout routes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trove liest die von dir freigegebenen Gesundheitsdaten für deine Studien, einschließlich angeforderter früherer Daten und Trainingsrouten."
+          }
+        }
+      }
+    },
+    "NSHealthClinicalHealthRecordsShareUsageDescription": {
+      "comment": "System permission prompt explaining the study-scoped read access requested by the participant app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trove reads the clinical records you authorize to share with your enrolled research studies."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trove liest die klinischen Dokumente, die du für deine Forschungsstudien freigibst."
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

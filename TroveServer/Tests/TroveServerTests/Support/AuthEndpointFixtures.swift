@@ -135,6 +135,9 @@ extension AuthIntegrationTests {
         let base = apiBasePath
 
         return [
+            AuthEndpoint(
+                method: .GET, path: "\(base)/collection-capabilities", body: nil, contentType: nil, role: .authenticated, successStatus: .ok
+            ),
             // Groups
             researcher(.GET, "\(base)/groups", successStatus: .ok, requiresGroupAccess: false),
             researcher(.GET, "\(base)/groups/\(groupId)", successStatus: .ok),
@@ -143,6 +146,7 @@ extension AuthIntegrationTests {
             researcher(.GET, "\(base)/groups/\(groupId)/studies", successStatus: .ok),
             researcher(.PATCH, "\(base)/studies/\(studyId)", body: jsonData(patchBody()), draftRevision: ids.draftRevision, successStatus: .ok),
             researcher(.POST, "\(base)/groups/\(groupId)/studies", body: jsonData(studyBody()), minRole: .admin, successStatus: .created),
+            researcher(.GET, "\(base)/studies/\(studyId)/collection-provider-capabilities", successStatus: .ok),
             // Invitation Codes
             researcher(.GET, "\(base)/studies/\(studyId)/invitation-codes", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/invitation-codes", body: jsonData(["count": 1] as [String: Any]), successStatus: .created),
@@ -177,6 +181,22 @@ extension AuthIntegrationTests {
                 successStatus: .ok
             ),
             researcher(.GET, "\(base)/studies/\(studyId)/enrollments", successStatus: .ok),
+            AuthEndpoint(
+                method: .GET,
+                path: "\(base)/studies/\(studyId)/data",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .ok
+            ),
+            AuthEndpoint(
+                method: .GET,
+                path: "\(base)/studies/\(studyId)/data/recordings/\(dummyId)",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .notFound
+            ),
 
             // The positive administrator fixture has an accepted publication.
             researcher(.DELETE, "\(base)/studies/\(studyId)", draftRevision: ids.draftRevision, minRole: .admin, successStatus: .conflict),
@@ -205,9 +225,31 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/profile", successStatus: .conflict, body: jsonData(profileBody())),
             participant(.GET, "\(base)/participant/profile", successStatus: .ok),
             participant(.PUT, "\(base)/participant/profile", successStatus: .ok, body: jsonData(profileBody(firstName: "Updated"))),
-            participant(.POST, "\(base)/participant/sources", successStatus: .ok, body: jsonData(["registrationID": dummyId.uuidString])),
+            participant(.POST, "\(base)/participant/sources", successStatus: .ok, body: jsonData([
+                "registrationID": dummyId.uuidString, "repositoryKind": "healthkit",
+                "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+            ])),
+            participant(.GET, "\(base)/participant/source-installations/\(dummyId)", successStatus: .ok),
+            participant(.POST, "\(base)/participant/source-installations/\(dummyId)/identity", successStatus: .ok, body: jsonData([
+                "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+            ])),
+            participant(.POST, "\(base)/participant/source-installations/\(dummyId)/revoke", successStatus: .ok),
             participant(.GET, "\(base)/participant/sources/\(dummyId)", successStatus: .notFound),
             participant(.POST, "\(base)/participant/sources/\(dummyId)/revoke", successStatus: .notFound),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/declaration",
+                successStatus: .notFound,
+                body: jsonData(recordingDeclarationBody())
+            ),
+            participant(
+                .PUT,
+                "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/content",
+                successStatus: .notFound,
+                body: Data([0]),
+                contentType: .binary
+            ),
+            participant(.GET, "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/receipt", successStatus: .notFound),
             participant(
                 .POST,
                 "\(base)/participant/sources/\(dummyId)/event-receipts/lookup",
@@ -238,6 +280,21 @@ extension AuthIntegrationTests {
             ),
             participant(
                 .POST,
+                "\(base)/participant/sources/\(dummyId)/record-bundles",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.RecordBundleSubmission(bundleBase64: "e30=", records: [
+                    .init(
+                    commitment: .init(
+                        producerEventIdentifier: .init(system: "urn:test", value: "record"),
+                        payloadSHA256: String(repeating: "0", count: 64),
+                        targets: []
+                    ),
+                    entryFullUrls: ["urn:test:entry"]
+                    )
+                ]))
+            ),
+            participant(
+                .POST,
                 "\(base)/participant/sources/\(dummyId)/events/\(dummyId)/attributions",
                 successStatus: .notFound,
                 body: jsonData(Components.Schemas.EventAttribution(
@@ -245,11 +302,38 @@ extension AuthIntegrationTests {
                     targets: [.init(consentId: dummyId.uuidString, outputFullUrls: ["urn:uuid:point"])]
                 ))
             ),
+            participant(.GET, "\(base)/participant/provider-registrations", successStatus: .ok),
+            participant(.GET, "\(base)/participant/provider-connections", successStatus: .ok),
+            participant(
+                .POST,
+                "\(base)/participant/provider-registrations/\(dummyId)/link-intents",
+                successStatus: .serviceUnavailable,
+                body: jsonData(Components.Schemas.ProviderLinkRequest(redirectId: "native"))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/provider-link-intents/\(dummyId)/complete",
+                successStatus: .serviceUnavailable,
+                body: jsonData(Components.Schemas.ProviderLinkCompletion(state: String(repeating: "a", count: 43), code: "synthetic-code"))
+            ),
+            participant(.POST, "\(base)/participant/provider-connections/\(dummyId)/disconnect", successStatus: .serviceUnavailable),
             participant(.GET, "\(base)/participant/studies", successStatus: .ok),
             participant(.GET, "\(base)/participant/studies/\(studyId)/\(dummyRevision)/bundle", successStatus: .notFound),
             participant(.POST, "\(base)/participant/studies/\(studyId)/enrollments", successStatus: .notFound, body: jsonData([String: String]())),
             participant(.GET, "\(base)/participant/enrollments", successStatus: .ok),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/collection-plan", successStatus: .notFound),
+            participant(
+                .POST,
+                "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.NativeCollectionReconciliationRequest(sourceId: dummyId.uuidString))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations/\(dummyId)/complete",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.NativeCollectionReconciliationRequest(sourceId: dummyId.uuidString))
+            ),
             participant(.POST, "\(base)/participant/enrollments/\(dummyId)/withdraw", successStatus: .notFound),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consent-presentation?locale=en-US", successStatus: .notFound),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consents", successStatus: .notFound),
@@ -329,4 +413,23 @@ private func scheduleBody() -> [String: Any] {
         "completionPolicy": "anytime",
         "notification": false
     ] as [String: Any]
+}
+
+
+private func recordingDeclarationBody() -> [String: Any] {
+    let output = "urn:uuid:24622144-883b-4f1a-99a6-054f532482b5"
+    let digest = ArtifactStore.digest(Data([0]))
+    return [
+        "attachmentPath": "recordings/route.csv",
+        "outputFullUrl": output,
+        "profile": FHIRRecordingProjection.profile,
+        "format": FHIRRecordingProjection.routeFormat,
+        "effectiveAt": "2026-01-01T00:00:00.000000Z",
+        "effectiveEnd": "2026-01-01T00:00:00.000000Z",
+        "content": [
+            "encoding": "identity", "storedByteCount": 1, "storedSHA256": digest,
+            "sourceByteCount": 1, "sourceSHA256": digest
+        ] as [String: Any],
+        "targets": [["consentId": dummyUUID.uuidString, "outputFullUrls": [output]] as [String: Any]]
+    ]
 }

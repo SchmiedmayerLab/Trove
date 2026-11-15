@@ -44,7 +44,10 @@ const OnboardingRoute = () => {
 
 export const Route = createFileRoute("/(dashboard)/onboarding")({
   beforeLoad: async ({ context: { queryClient } }) => {
-    const groups = await queryClient.ensureQueryData(groupListQueryOptions());
+    const groups = await queryClient.query({
+      ...groupListQueryOptions(),
+      staleTime: "static",
+    });
     const firstGroup = groups.at(0);
     if (firstGroup) {
       throw redirect({

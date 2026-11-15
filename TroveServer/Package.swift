@@ -37,8 +37,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.4"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        // Match the API's immutable Grove revision until the shared products have a tagged release.
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "8f3a68562b237c402a0a66df92f7fa805c169d8e"),
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "833850907283712ea4dcf987fb8edf6d721fc4fc"),
         .package(url: "https://github.com/soto-project/soto.git", from: "7.0.0"),
         .package(url: "https://github.com/SchmiedmayerLab/FHIRModels.git", .upToNextMinor(from: "0.9.3"))
     ] + swiftLintPackage(),
@@ -61,7 +60,10 @@ let package = Package(
                 .product(name: "GroveHealthKitBulkExport", package: "Grove"),
                 .product(name: "Grove", package: "Grove"),
                 .product(name: "GroveFoundation", package: "Grove"),
+                .product(name: "GroveConsent", package: "Grove"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveProviderFHIR", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
                 .product(name: "GroveQuestionnaireFHIR", package: "Grove"),
                 .target(name: "GroveVapor"),
                 .product(name: "JWTKit", package: "jwt-kit"),
@@ -90,14 +92,27 @@ let package = Package(
                 .product(name: "TroveAPIClient", package: "TroveAPI"),
                 .product(name: "VaporTesting", package: "vapor"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveProviderFHIR", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
                 .product(name: "CryptoExtras", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "JWTKit", package: "jwt-kit")
             ],
-            exclude: ["Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license"],
-            resources: [.copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json")],
+            exclude: [
+                "Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license",
+                "Resources/HealthKitSleepEvent.json.license", "Resources/HealthKitWorkoutEvent.json.license",
+                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license",
+                "Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json.license"
+            ],
+            resources: [
+                .copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json"),
+                .copy("Resources/HealthKitSleepEvent.json"), .copy("Resources/HealthKitWorkoutEvent.json"),
+                .copy("Resources/HealthKitWorkoutRouteEvent.json"), .copy("Resources/HealthKitBodyWeightEvent.json"),
+                .copy("Resources/HealthKitComponentEvents"), .copy("Resources/HealthKitClinicalDocuments"),
+                .copy("Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json")
+            ],
             swiftSettings: swiftSettings,
             plugins: [] + swiftLintPlugin()
         )

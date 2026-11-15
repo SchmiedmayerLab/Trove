@@ -45,7 +45,8 @@ struct FHIRValidationClient: Sendable {
         let purpose: Purpose?
     }
 
-    static let contractRevision = "444e06fb25680c3af29e5d3ccbebeb0249be7318"
+    static let contractVersion = "0.8.0"
+    static let contractRevision = "cde0cdb92e4f63e96b463085f2a5765a77f5211f"
     static let maximumBytes = EventSubmissionLimits.maximumEventBytes
     static let unavailable = ServerError(status: .serviceUnavailable, title: "Validation Unavailable", detail: "Try again later")
     static let invalid = ServerError(status: .unprocessableContent, title: "Invalid Event", detail: "Invalid or unsupported Grove FHIR event")
@@ -111,7 +112,8 @@ struct FHIRValidationClient: Sendable {
     }
 
     private func validate(_ bytes: Data, purpose: Purpose) async throws -> String {
-        guard bytes.count <= Self.maximumBytes else { throw purpose.tooLarge }
+        let limit = purpose == .event ? Self.maximumBytes : EventSubmissionLimits.Configuration.standard.recordBytes
+        guard bytes.count <= limit else { throw purpose.tooLarge }
         guard !bytes.isEmpty else { throw purpose.invalid }
         let expectedIdentity = try requireIdentity()
         let status: Int

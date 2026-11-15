@@ -37,10 +37,18 @@ struct SourceSetupRecoveryTests {
             #expect(try await journal.sourceSetup(for: pending.localID) == pending)
             let request = try #require(await transport.registrationBodies.first)
             let object = try #require(JSONSerialization.jsonObject(with: request) as? [String: String])
-            #expect(object == ["registrationID": pending.registrationID.uuidString.lowercased()])
+            #expect(object == [
+                "registrationID": pending.registrationID.uuidString.lowercased(), "repositoryKind": "healthkit",
+                "credentialBase64": try await journal.installationCredential(for: pending.localID).base64EncodedString()
+            ])
             await journal.close()
             try await TestDatabase.withRestartedApplication(app) { reopened in
-                try await configureServices(for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: .init(application: reopened))
+                try await configureServices(
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: .init(application: reopened),
+                    sourceKeyring: TestApp.sourceKeyring()
+                )
                 _ = try await TestApp.configureTransport(for: reopened)
                 try await Self.restore(url: url, scope: scope, pending: pending, request: request, receiver: (reopened, token))
             }
@@ -64,10 +72,11 @@ extension SourceSetupRecoveryTests {
         )
         let binding = try #require(confirmed.binding)
         #expect(await transport.registrationBodies == [request])
-        let sourceID = try #require(UUID(uuidString: binding.id))
+        let sourceID = try #require(UUID(uuidString: binding.source.id))
         let identity = try await journal.identityScope(for: sourceID)
-        #expect(identity.keyID == setup.localID.uuidString.lowercased())
-        #expect(identity.systems == (try binding.identifierSystems()))
+        #expect(identity.keyID == binding.source.keyID)
+        #expect(identity.keyID != setup.localID.uuidString.lowercased())
+        #expect(identity.systems == (try binding.source.identifierSystems()))
         let checkpoint = try await journal.checkpoint(for: sourceID)
         #expect(checkpoint.cursor == nil)
         let sql = try #require(app.db as? any SQLDatabase)

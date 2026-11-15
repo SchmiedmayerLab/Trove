@@ -20,15 +20,24 @@ actor ReceiverClientTransport: ClientTransport {
     private let token: String?
     private var loseBatchResponse: Bool
     private var loseRegistrationResponse: Bool
+    private var loseRecordingResponse: Bool
     private(set) var paths: [String] = []
     private(set) var batchBodies: [Data] = []
     private(set) var registrationBodies: [Data] = []
+    private(set) var recordingBodies: [Data] = []
 
-    init(application: Application, token: String?, loseBatchResponse: Bool = false, loseRegistrationResponse: Bool = false) {
+    init(
+        application: Application,
+        token: String?,
+        loseBatchResponse: Bool = false,
+        loseRegistrationResponse: Bool = false,
+        loseRecordingResponse: Bool = false
+    ) {
         self.application = application
         self.token = token
         self.loseBatchResponse = loseBatchResponse
         self.loseRegistrationResponse = loseRegistrationResponse
+        self.loseRecordingResponse = loseRecordingResponse
     }
 
     func send(
@@ -46,19 +55,25 @@ actor ReceiverClientTransport: ClientTransport {
         for field in request.headerFields { headers.add(name: field.name.rawName, value: field.value) }
         if let token { headers.bearerAuthorization = .init(token: token) }
         paths.append(path)
-        if path.hasSuffix("/events/batch") { batchBodies.append(bytes) }
+        if path.hasSuffix("/record-bundles") { batchBodies.append(bytes) }
         let isRegistration = request.method == .post && path.hasSuffix("/participant/sources")
         if isRegistration { registrationBodies.append(bytes) }
+        let isRecording = request.method == .put && path.contains("/recording-transfers/") && path.hasSuffix("/content")
+        if isRecording { recordingBodies.append(bytes) }
         let response = try await application.performTest(request: .init(
             method: .init(rawValue: request.method.rawValue), url: .init(string: path), headers: headers, body: .init(data: bytes)
         ))
-        if path.hasSuffix("/events/batch"), loseBatchResponse {
+        if path.hasSuffix("/record-bundles"), loseBatchResponse {
             loseBatchResponse = false
             // The router finished; committed transactions survive even though the client sees no response.
             throw URLError(.networkConnectionLost)
         }
         if isRegistration, loseRegistrationResponse {
             loseRegistrationResponse = false
+            throw URLError(.networkConnectionLost)
+        }
+        if isRecording, loseRecordingResponse {
+            loseRecordingResponse = false
             throw URLError(.networkConnectionLost)
         }
         var fields = HTTPFields()

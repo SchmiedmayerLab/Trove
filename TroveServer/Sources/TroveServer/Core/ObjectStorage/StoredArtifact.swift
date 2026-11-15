@@ -11,7 +11,7 @@ import Foundation
 
 
 /// Consent and publication artifacts always belong to one study, even before acceptance.
-struct StudyArtifactScope: Sendable {
+struct StudyArtifactScope: Sendable, Equatable {
     let studyID: UUID
     var groupID: UUID?
 }
@@ -19,11 +19,29 @@ struct StudyArtifactScope: Sendable {
 
 struct ArtifactReference: Sendable {
     enum Purpose: String, Codable, Sendable {
-        case consent, publication
+        case consent, publication, recording
 
-        var contentType: String { self == .consent ? "application/pdf" : "application/zip" }
-        var maximumBytes: Int { (self == .consent ? 10 : 50) * 1024 * 1024 }
-        var directory: String { self == .consent ? "consents" : "publications" }
+        var contentType: String {
+            switch self {
+            case .consent: "application/pdf"
+            case .publication: "application/zip"
+            case .recording: "application/octet-stream"
+            }
+        }
+        var maximumBytes: Int {
+            switch self {
+            case .consent: 10 * 1024 * 1024
+            case .publication: 50 * 1024 * 1024
+            case .recording: Int(Int32.max)
+            }
+        }
+        var directory: String {
+            switch self {
+            case .consent: "consents"
+            case .publication: "publications"
+            case .recording: "recordings"
+            }
+        }
     }
 
     let id: UUID
@@ -31,6 +49,7 @@ struct ArtifactReference: Sendable {
     let purpose: Purpose
     let digest: String
     let byteCount: Int
+    let scope: ArtifactScope
 
     var key: String { "artifacts/\(purpose.directory)/\(ownerID)/\(id)" }
 }
@@ -49,8 +68,10 @@ final class StoredArtifact: Model, @unchecked Sendable {
     @Field(key: "purpose") var purpose: ArtifactReference.Purpose
     @Field(key: "digest") var digest: String
     @Field(key: "byte_count") var byteCount: Int
-    @Field(key: "study_id") var studyID: UUID
+    @OptionalField(key: "study_id") var studyID: UUID?
     @OptionalField(key: "group_id") var groupID: UUID?
+    @OptionalField(key: "participant_id") var participantID: UUID?
+    @OptionalField(key: "source_binding_id") var sourceBindingID: UUID?
     @Field(key: "state") var state: State
     @Field(key: "expires_at") var expiresAt: Date
     @OptionalField(key: "cleanup_after") var cleanupAfter: Date?
@@ -58,20 +79,35 @@ final class StoredArtifact: Model, @unchecked Sendable {
 
     init() {}
 
-    init(reference: ArtifactReference, scope: StudyArtifactScope, expiresAt: Date) {
+    init(reference: ArtifactReference, expiresAt: Date) {
         id = reference.id
         ownerID = reference.ownerID
         purpose = reference.purpose
         digest = reference.digest
         byteCount = reference.byteCount
-        studyID = scope.studyID
-        groupID = scope.groupID
+        switch reference.scope {
+        case .study(let scope):
+            studyID = scope.studyID
+            groupID = scope.groupID
+        case .participantSource(let scope):
+            participantID = scope.participantID
+            sourceBindingID = scope.sourceBindingID
+        }
         state = .staging
         self.expiresAt = expiresAt
         cleanupAfter = expiresAt
     }
 
     func reference() throws -> ArtifactReference {
-        .init(id: try requireID(), ownerID: ownerID, purpose: purpose, digest: digest, byteCount: byteCount)
+        let scope: ArtifactScope
+        switch (purpose, studyID, groupID, participantID, sourceBindingID) {
+        case let (.consent, study?, group, nil, nil), let (.publication, study?, group, nil, nil):
+            scope = .study(.init(studyID: study, groupID: group))
+        case let (.recording, nil, nil, participant?, source?) where ownerID == participant:
+            scope = .participantSource(.init(participantID: participant, sourceBindingID: source))
+        default:
+            throw ServerError.internalServerError("Invalid artifact ownership")
+        }
+        return .init(id: try requireID(), ownerID: ownerID, purpose: purpose, digest: digest, byteCount: byteCount, scope: scope)
     }
 }

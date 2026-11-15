@@ -18,9 +18,12 @@ public enum DeliveryJournalError: Error, Equatable {
     case unsupportedFormat
     case sourceConflict
     case unknownSource
+    case queryConflict
+    case unknownQuery
     case sourceRevoked
     case invalidSourceBinding
     case staleCheckpoint
+    case staleCollectionState
     case capacityExceeded
     case sequenceExhausted
     case eventIdentityMismatch
@@ -81,12 +84,16 @@ public struct DeliverySource: Sendable {
     public let eventSystem: String
     public let revokedAt: Date?
     public let systems: DeploymentIdentifierSystems
+    public let identity: (keyID: String, epoch: KeyEpoch)
 
-    public init(id: UUID, eventSystem: String, revokedAt: Date?, systems: DeploymentIdentifierSystems) {
+    public init(
+        id: UUID, eventSystem: String, revokedAt: Date?, systems: DeploymentIdentifierSystems, identity: (keyID: String, epoch: KeyEpoch)
+    ) {
         self.id = id
         self.eventSystem = eventSystem
         self.revokedAt = revokedAt
         self.systems = systems
+        self.identity = identity
     }
 }
 

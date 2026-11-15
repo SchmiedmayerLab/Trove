@@ -18,6 +18,9 @@ enum CLIError: Error, CustomStringConvertible, Equatable {
     case invalidCredential
     case invalidInput
     case outputFailed
+    case recordingOutputFailed
+    case recordingOutputExists
+    case recordingTooLarge
     case requestFailed
     case httpStatus(Int)
 
@@ -35,6 +38,12 @@ enum CLIError: Error, CustomStringConvertible, Equatable {
             "Cannot read the JSON input, or it does not match the operation's API schema."
         case .outputFailed:
             "Cannot write the JSON result. The operation may have succeeded; verify its state before trying again."
+        case .recordingOutputFailed:
+            "Cannot save the recording. No partial output was published."
+        case .recordingOutputExists:
+            "The output already exists. Choose a new path; existing files are never replaced."
+        case .recordingTooLarge:
+            "The recording exceeds the configured byte limit. No output was published."
         case .requestFailed:
             "The request failed or the reply could not be decoded. No automatic retry was attempted; verify state before retrying a write."
         case .httpStatus(412):

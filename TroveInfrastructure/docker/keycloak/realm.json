@@ -29,6 +29,10 @@
         {
           "name": "audit-reader",
           "subGroups": []
+        },
+        {
+          "name": "data-reader",
+          "subGroups": []
         }
       ]
     }

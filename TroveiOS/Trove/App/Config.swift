@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import TroveAPIClient
+import TroveAPITypes
 
 
 enum Config {
@@ -30,6 +32,15 @@ enum Config {
         environment.keycloakIssuer
         #endif
     }
+    /// An operator-approved HTTPS callback requires the matching Associated Domains entitlement.
+    static var providerRedirectURI: URL? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "TroveProviderRedirectURI") as? String,
+              let url = URL(string: value), (try? ProviderAuthorizationCallback.redirectComponents(url)) != nil else {
+            return nil
+        }
+        return url
+    }
+
     static var keycloakClientID: String { environment.keycloakClientID }
     static var keycloakRedirectScheme: String { environment.keycloakRedirectScheme }
     static var keycloakRedirectURI: URL {
@@ -85,5 +96,24 @@ extension Config {
             }
             return url
         }
+    }
+}
+
+
+extension Config {
+    /// Signed application configuration; debug launch overrides exercise bounded-capacity behavior.
+    static func collectionCapacity() throws -> EventDeliveryCapacityConfiguration {
+        let key = "TroveCollectionCapacity"
+        var values: [String: String] = [:]
+        if let configured = Bundle.main.object(forInfoDictionaryKey: key) {
+            guard let settings = configured as? [String: String] else { throw DeliveryJournalError.invalidConfiguration }
+            values = settings
+        }
+        #if DEBUG
+        for setting in CollectionCapacitySetting.allCases {
+            if let value = ProcessInfo.processInfo.environment[setting.rawValue] { values[setting.rawValue] = value }
+        }
+        #endif
+        return try EventDeliveryCapacityConfiguration(settings: values)
     }
 }

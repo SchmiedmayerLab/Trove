@@ -11,6 +11,7 @@ import TroveAPIClient
 
 
 enum DeliveryFixture {
+    static let identityKey = Data(repeating: 0x42, count: 32)
     static let sourceID = UUID()
     static let consentID = UUID()
     static let epoch = UUID()
@@ -19,6 +20,7 @@ enum DeliveryFixture {
 
     static func withJournal(
         limits: EventDeliveryJournal.Limits = .init(),
+        query: Data = queryDefinition,
         _ operation: (EventDeliveryJournal, URL) async throws -> Void
     ) async throws {
         let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
@@ -35,7 +37,7 @@ enum DeliveryFixture {
         let url = directory.appendingPathComponent("delivery.sqlite")
         let journal = try EventDeliveryJournal(url: url, scope: scope, mode: .createNew, limits: limits)
         do {
-            try await register(journal, sourceID: sourceID, query: queryDefinition, localID: epoch)
+            try await register(journal, sourceID: sourceID, query: query, localID: epoch)
             try await operation(journal, url)
         } catch {
             await journal.close()
@@ -49,24 +51,33 @@ enum DeliveryFixture {
         return try await journal.stage(
             from: checkpoint,
             nextCursor: Data(UUID().uuidString.utf8),
-            payloads: [payload(sequence: 1, changes: changes, producerID: UUID())]
+            payloads: [try payload(sequence: 1, changes: changes, producerID: UUID())]
         )
     }
 
     static func register(_ journal: EventDeliveryJournal, sourceID: UUID, query: Data, localID: UUID = UUID()) async throws {
         let setup = try await journal.createSource(localID: localID, queryDefinition: query)
-        try await journal.confirmSource(binding(sourceID: sourceID, registrationID: localID), for: setup)
+        try await journal.confirmSource(binding(sourceID: sourceID, registrationID: localID), for: setup, identityKey: identityKey)
     }
 
-    static func binding(sourceID: UUID, registrationID: UUID) -> Components.Schemas.ParticipantSource {
-        .init(
-            id: sourceID.uuidString.lowercased(),
-            registrationID: registrationID.uuidString.lowercased(),
-            kind: .participantApp,
-            eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-event-v0",
-            identifierRoot: identifierRoot(sourceID),
-            participantIdentifier: .init(system: scope.issuer + "/trove/participants", value: consentID.uuidString.lowercased()),
-            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+    static func binding(sourceID: UUID, registrationID: UUID) -> Components.Schemas.ParticipantSourceRegistration {
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        return .init(
+            source: .init(
+                id: sourceID.uuidString.lowercased(),
+                keyID: registrationID.uuidString.lowercased(),
+                keyEpoch: "1",
+                repositoryKind: .healthkit,
+                repositoryScope: .init(system: identifierRoot(sourceID) + "/repository", value: "healthkit"),
+                kind: .participantApp,
+                eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-record-version-v0/\(registrationID.uuidString.lowercased())/1",
+                identifierRoot: identifierRoot(sourceID),
+                participantIdentifier: .init(system: scope.issuer + "/trove/participants", value: consentID.uuidString.lowercased()),
+                createdAt: createdAt
+            ),
+            installation: .init(
+                registrationID: registrationID.uuidString.lowercased(), sourceID: sourceID.uuidString.lowercased(), createdAt: createdAt
+            )
         )
     }
 
@@ -75,14 +86,19 @@ enum DeliveryFixture {
     }
 
     static func payload(
-        sequence: Int64, changes: [String], sourceID: UUID = DeliveryFixture.sourceID, producerID: UUID? = nil
-    ) -> EventDeliveryJournal.Payload {
-        // These are commitment envelopes, not claimed FHIR-conformant clinical fixtures.
-        let entries = Array(repeating: "{}", count: changes.count).joined(separator: ",")
-        let bytes = Data("""
-            {"identifier":{"system":"\(identifierRoot(sourceID))/NamingSystem/grove-event-v0","value":"e0:\((producerID ?? sourceID).uuidString.lowercased()):\(sequence)"},"entry":[\(entries)]}
-            """.utf8)
-        return .init(bytes: bytes, targets: [.init(consentID: consentID, outputFullURLs: ["urn:output:a"])])
+        sequence: Int64,
+        changes: [String],
+        sourceID: UUID = DeliveryFixture.sourceID,
+        producerID: UUID? = nil,
+        registrationID: UUID = epoch
+    ) throws -> EventDeliveryJournal.Payload {
+        let record = try RecordFixture.make(
+            sourceID: sourceID,
+            registrationID: registrationID,
+            seed: "\(sequence):\((producerID ?? sourceID).uuidString):\(changes.joined(separator: ","))",
+            sourceSeed: changes.joined(separator: ",")
+        )
+        return .init(bytes: record.json, targets: [.init(consentID: consentID, outputFullURLs: record.outputFullURLs)])
     }
 
     static func identifierRoot(_ sourceID: UUID) -> String {

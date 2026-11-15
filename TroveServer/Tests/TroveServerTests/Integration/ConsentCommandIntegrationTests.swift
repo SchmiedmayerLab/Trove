@@ -15,7 +15,7 @@ import TroveAPIServer
 import VaporTesting
 
 
-private actor ConsentCommandStorage: ObjectStorageProvider {
+private actor ConsentCommandStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private(set) var uploads = 0
     private let pauseFirstUpload: Bool
@@ -26,7 +26,7 @@ private actor ConsentCommandStorage: ObjectStorageProvider {
         self.pauseFirstUpload = pauseFirstUpload
     }
 
-    func upload(data: Data, key: String, contentType: String) async throws {
+    func uploadBuffered(data: Data, key: String, contentType: String) async throws {
         uploads += 1
         objects[key] = data
         if pauseFirstUpload, uploads == 1 {
@@ -47,7 +47,7 @@ private actor ConsentCommandStorage: ObjectStorageProvider {
         released.continuation.finish()
     }
 
-    func download(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
+    func downloadBuffered(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
         guard let data = objects[key] else {
             throw ServerError.notFound("Synthetic consent evidence not found")
         }

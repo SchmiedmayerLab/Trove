@@ -2,21 +2,573 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 @_spi(Generated) public import OpenAPIRuntime
-#if os(Linux)
-@preconcurrency public import struct Foundation.URL
-@preconcurrency public import struct Foundation.Data
-@preconcurrency public import struct Foundation.Date
-#else
 public import struct Foundation.URL
 public import struct Foundation.Data
 public import struct Foundation.Date
-#endif
 public import GroveLocalization
 public import GroveHealthKit
 public import GroveStudyDefinition
 extension Components {
     /// Types generated from the `#/components/schemas` section of the OpenAPI document.
     public enum Schemas {
+        /// - Remark: Generated from `#/components/schemas/ProviderRedirect`.
+        public struct ProviderRedirect: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderRedirect/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRedirect/uri`.
+            public var uri: Swift.String
+            /// Creates a new `ProviderRedirect`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - uri:
+            public init(
+                id: Swift.String,
+                uri: Swift.String
+            ) {
+                self.id = id
+                self.uri = uri
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case uri
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.uri = try container.decode(
+                    Swift.String.self,
+                    forKey: .uri
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "uri"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement`.
+        public struct ProviderCollectionMeasurement: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/displayNameEnglish`.
+            public var displayNameEnglish: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/displayNameGerman`.
+            public var displayNameGerman: Swift.String
+            /// Creates a new `ProviderCollectionMeasurement`.
+            ///
+            /// - Parameters:
+            ///   - profile:
+            ///   - displayNameEnglish:
+            ///   - displayNameGerman:
+            public init(
+                profile: Swift.String,
+                displayNameEnglish: Swift.String,
+                displayNameGerman: Swift.String
+            ) {
+                self.profile = profile
+                self.displayNameEnglish = displayNameEnglish
+                self.displayNameGerman = displayNameGerman
+            }
+            public enum CodingKeys: String, CodingKey {
+                case profile
+                case displayNameEnglish
+                case displayNameGerman
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.displayNameEnglish = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameEnglish
+                )
+                self.displayNameGerman = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameGerman
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "profile",
+                    "displayNameEnglish",
+                    "displayNameGerman"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability`.
+        public struct ProviderCollectionCapability: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/measurements`.
+            public var measurements: [Components.Schemas.ProviderCollectionMeasurement]
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/effectiveTime`.
+            @frozen public enum EffectiveTimePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case point = "point"
+                case interval = "interval"
+                case pointOrInterval = "point-or-interval"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/effectiveTime`.
+            public var effectiveTime: Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload
+            /// Creates a new `ProviderCollectionCapability`.
+            ///
+            /// - Parameters:
+            ///   - sourceTypeIdentifier:
+            ///   - measurements:
+            ///   - effectiveTime:
+            public init(
+                sourceTypeIdentifier: Swift.String,
+                measurements: [Components.Schemas.ProviderCollectionMeasurement],
+                effectiveTime: Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload
+            ) {
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.measurements = measurements
+                self.effectiveTime = effectiveTime
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceTypeIdentifier
+                case measurements
+                case effectiveTime
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.measurements = try container.decode(
+                    [Components.Schemas.ProviderCollectionMeasurement].self,
+                    forKey: .measurements
+                )
+                self.effectiveTime = try container.decode(
+                    Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload.self,
+                    forKey: .effectiveTime
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceTypeIdentifier",
+                    "measurements",
+                    "effectiveTime"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderRegistration`.
+        public struct ProviderRegistration: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/provider`.
+            @frozen public enum ProviderPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case withings = "withings"
+                case oura = "oura"
+                case googleHealthApi = "google-health-api"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/provider`.
+            public var provider: Components.Schemas.ProviderRegistration.ProviderPayload
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/displayName`.
+            public var displayName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/controller`.
+            public var controller: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/region`.
+            public var region: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/redirects`.
+            public var redirects: [Components.Schemas.ProviderRedirect]
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/capabilities`.
+            public var capabilities: [Components.Schemas.ProviderCollectionCapability]
+            /// Creates a new `ProviderRegistration`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - provider:
+            ///   - displayName:
+            ///   - controller:
+            ///   - region:
+            ///   - redirects:
+            ///   - capabilities:
+            public init(
+                id: Swift.String,
+                provider: Components.Schemas.ProviderRegistration.ProviderPayload,
+                displayName: Swift.String,
+                controller: Swift.String,
+                region: Swift.String,
+                redirects: [Components.Schemas.ProviderRedirect],
+                capabilities: [Components.Schemas.ProviderCollectionCapability]
+            ) {
+                self.id = id
+                self.provider = provider
+                self.displayName = displayName
+                self.controller = controller
+                self.region = region
+                self.redirects = redirects
+                self.capabilities = capabilities
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case provider
+                case displayName
+                case controller
+                case region
+                case redirects
+                case capabilities
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.provider = try container.decode(
+                    Components.Schemas.ProviderRegistration.ProviderPayload.self,
+                    forKey: .provider
+                )
+                self.displayName = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayName
+                )
+                self.controller = try container.decode(
+                    Swift.String.self,
+                    forKey: .controller
+                )
+                self.region = try container.decode(
+                    Swift.String.self,
+                    forKey: .region
+                )
+                self.redirects = try container.decode(
+                    [Components.Schemas.ProviderRedirect].self,
+                    forKey: .redirects
+                )
+                self.capabilities = try container.decode(
+                    [Components.Schemas.ProviderCollectionCapability].self,
+                    forKey: .capabilities
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "provider",
+                    "displayName",
+                    "controller",
+                    "region",
+                    "redirects",
+                    "capabilities"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkRequest`.
+        public struct ProviderLinkRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkRequest/redirectId`.
+            public var redirectId: Swift.String
+            /// Creates a new `ProviderLinkRequest`.
+            ///
+            /// - Parameters:
+            ///   - redirectId:
+            public init(redirectId: Swift.String) {
+                self.redirectId = redirectId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case redirectId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.redirectId = try container.decode(
+                    Swift.String.self,
+                    forKey: .redirectId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "redirectId"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent`.
+        public struct ProviderLinkIntent: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/authorizationUrl`.
+            public var authorizationUrl: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/redirectUri`.
+            public var redirectUri: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `ProviderLinkIntent`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - authorizationUrl:
+            ///   - redirectUri:
+            ///   - expiresAt:
+            public init(
+                id: Swift.String,
+                authorizationUrl: Swift.String,
+                redirectUri: Swift.String,
+                expiresAt: Foundation.Date
+            ) {
+                self.id = id
+                self.authorizationUrl = authorizationUrl
+                self.redirectUri = redirectUri
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case authorizationUrl
+                case redirectUri
+                case expiresAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.authorizationUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .authorizationUrl
+                )
+                self.redirectUri = try container.decode(
+                    Swift.String.self,
+                    forKey: .redirectUri
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "authorizationUrl",
+                    "redirectUri",
+                    "expiresAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion`.
+        public struct ProviderLinkCompletion: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion/state`.
+            public var state: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion/code`.
+            public var code: Swift.String
+            /// Creates a new `ProviderLinkCompletion`.
+            ///
+            /// - Parameters:
+            ///   - state:
+            ///   - code:
+            public init(
+                state: Swift.String,
+                code: Swift.String
+            ) {
+                self.state = state
+                self.code = code
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case code
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.state = try container.decode(
+                    Swift.String.self,
+                    forKey: .state
+                )
+                self.code = try container.decode(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "state",
+                    "code"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderConnection`.
+        public struct ProviderConnection: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/registrationId`.
+            public var registrationId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case active = "active"
+                case disconnected = "disconnected"
+                case reauthorizationRequired = "reauthorization-required"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/state`.
+            public var state: Components.Schemas.ProviderConnection.StatePayload
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/generation`.
+            public var generation: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/lastAttempt`.
+            public var lastAttempt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/lastSuccessfulFetch`.
+            public var lastSuccessfulFetch: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/acceptedThrough`.
+            public var acceptedThrough: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/requiresReauthorization`.
+            public var requiresReauthorization: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/collectionAttempt`.
+            public var collectionAttempt: Components.Schemas.ProviderCollectionAttempt?
+            /// Creates a new `ProviderConnection`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - registrationId:
+            ///   - sourceId:
+            ///   - state:
+            ///   - generation:
+            ///   - lastAttempt:
+            ///   - lastSuccessfulFetch:
+            ///   - acceptedThrough:
+            ///   - requiresReauthorization:
+            ///   - collectionAttempt:
+            public init(
+                id: Swift.String,
+                registrationId: Swift.String,
+                sourceId: Swift.String,
+                state: Components.Schemas.ProviderConnection.StatePayload,
+                generation: Swift.Int64,
+                lastAttempt: Foundation.Date? = nil,
+                lastSuccessfulFetch: Foundation.Date? = nil,
+                acceptedThrough: Foundation.Date? = nil,
+                requiresReauthorization: Swift.Bool,
+                collectionAttempt: Components.Schemas.ProviderCollectionAttempt? = nil
+            ) {
+                self.id = id
+                self.registrationId = registrationId
+                self.sourceId = sourceId
+                self.state = state
+                self.generation = generation
+                self.lastAttempt = lastAttempt
+                self.lastSuccessfulFetch = lastSuccessfulFetch
+                self.acceptedThrough = acceptedThrough
+                self.requiresReauthorization = requiresReauthorization
+                self.collectionAttempt = collectionAttempt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case registrationId
+                case sourceId
+                case state
+                case generation
+                case lastAttempt
+                case lastSuccessfulFetch
+                case acceptedThrough
+                case requiresReauthorization
+                case collectionAttempt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.registrationId = try container.decode(
+                    Swift.String.self,
+                    forKey: .registrationId
+                )
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.state = try container.decode(
+                    Components.Schemas.ProviderConnection.StatePayload.self,
+                    forKey: .state
+                )
+                self.generation = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .generation
+                )
+                self.lastAttempt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .lastAttempt
+                )
+                self.lastSuccessfulFetch = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .lastSuccessfulFetch
+                )
+                self.acceptedThrough = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .acceptedThrough
+                )
+                self.requiresReauthorization = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .requiresReauthorization
+                )
+                self.collectionAttempt = try container.decodeIfPresent(
+                    Components.Schemas.ProviderCollectionAttempt.self,
+                    forKey: .collectionAttempt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "registrationId",
+                    "sourceId",
+                    "state",
+                    "generation",
+                    "lastAttempt",
+                    "lastSuccessfulFetch",
+                    "acceptedThrough",
+                    "requiresReauthorization",
+                    "collectionAttempt"
+                ])
+            }
+        }
+        /// Most recent collection attempt for one exact source. This is not a completeness claim for every source on the connected account.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt`.
+        public struct ProviderCollectionAttempt: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case scheduled = "scheduled"
+                case deferred = "deferred"
+                case accepted = "accepted"
+                case noCurrentDemand = "no-current-demand"
+                case transientFailure = "transient-failure"
+                case capacityBlocked = "capacity-blocked"
+                case sourceBlocked = "source-blocked"
+                case authorizationChanged = "authorization-changed"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/outcome`.
+            public var outcome: Components.Schemas.ProviderCollectionAttempt.OutcomePayload
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/nextAttempt`.
+            public var nextAttempt: Foundation.Date
+            /// Creates a new `ProviderCollectionAttempt`.
+            ///
+            /// - Parameters:
+            ///   - sourceTypeIdentifier:
+            ///   - outcome:
+            ///   - nextAttempt:
+            public init(
+                sourceTypeIdentifier: Swift.String,
+                outcome: Components.Schemas.ProviderCollectionAttempt.OutcomePayload,
+                nextAttempt: Foundation.Date
+            ) {
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.outcome = outcome
+                self.nextAttempt = nextAttempt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceTypeIdentifier
+                case outcome
+                case nextAttempt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.outcome = try container.decode(
+                    Components.Schemas.ProviderCollectionAttempt.OutcomePayload.self,
+                    forKey: .outcome
+                )
+                self.nextAttempt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .nextAttempt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceTypeIdentifier",
+                    "outcome",
+                    "nextAttempt"
+                ])
+            }
+        }
         /// RFC 7807 Problem Details for HTTP APIs
         ///
         /// - Remark: Generated from `#/components/schemas/ProblemDetails`.
@@ -54,12 +606,215 @@ extension Components {
                 case detail
             }
         }
+        /// - Remark: Generated from `#/components/schemas/StudyDataVersions`.
+        @frozen public enum StudyDataVersions: String, Codable, Hashable, Sendable, CaseIterable {
+            case current = "current"
+            case history = "history"
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyDataOutput`.
+        public struct StudyDataOutput: Codable, Hashable, Sendable {
+            /// Address of the derived Observation inside this response record's Bundle.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataOutput/fullUrl`.
+            public var fullUrl: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyDataOutput/isCurrent`.
+            public var isCurrent: Swift.Bool
+            /// Original profile names retained as lineage, not derived-resource conformance claims.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataOutput/sourceProfiles`.
+            public var sourceProfiles: [Swift.String]
+            /// Creates a new `StudyDataOutput`.
+            ///
+            /// - Parameters:
+            ///   - fullUrl: Address of the derived Observation inside this response record's Bundle.
+            ///   - isCurrent:
+            ///   - sourceProfiles: Original profile names retained as lineage, not derived-resource conformance claims.
+            public init(
+                fullUrl: Swift.String,
+                isCurrent: Swift.Bool,
+                sourceProfiles: [Swift.String]
+            ) {
+                self.fullUrl = fullUrl
+                self.isCurrent = isCurrent
+                self.sourceProfiles = sourceProfiles
+            }
+            public enum CodingKeys: String, CodingKey {
+                case fullUrl
+                case isCurrent
+                case sourceProfiles
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.fullUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .fullUrl
+                )
+                self.isCurrent = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .isCurrent
+                )
+                self.sourceProfiles = try container.decode(
+                    [Swift.String].self,
+                    forKey: .sourceProfiles
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "fullUrl",
+                    "isCurrent",
+                    "sourceProfiles"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyDataRecord`.
+        public struct StudyDataRecord: Codable, Hashable, Sendable {
+            /// Newly assigned derived Bundle identity, not the retained source record identity.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataRecord/id`.
+            public var id: Swift.String
+            /// Base64 encoded FHIR R4 collection Bundle. The configured decoded budget defaults to 16 MiB and cannot exceed 64 MiB.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataRecord/bundleBase64`.
+            public var bundleBase64: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyDataRecord/outputs`.
+            public var outputs: [Components.Schemas.StudyDataOutput]
+            /// Creates a new `StudyDataRecord`.
+            ///
+            /// - Parameters:
+            ///   - id: Newly assigned derived Bundle identity, not the retained source record identity.
+            ///   - bundleBase64: Base64 encoded FHIR R4 collection Bundle. The configured decoded budget defaults to 16 MiB and cannot exceed 64 MiB.
+            ///   - outputs:
+            public init(
+                id: Swift.String,
+                bundleBase64: Swift.String,
+                outputs: [Components.Schemas.StudyDataOutput]
+            ) {
+                self.id = id
+                self.bundleBase64 = bundleBase64
+                self.outputs = outputs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case bundleBase64
+                case outputs
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.bundleBase64 = try container.decode(
+                    Swift.String.self,
+                    forKey: .bundleBase64
+                )
+                self.outputs = try container.decode(
+                    [Components.Schemas.StudyDataOutput].self,
+                    forKey: .outputs
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "bundleBase64",
+                    "outputs"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyDataPage`.
+        public struct StudyDataPage: Codable, Hashable, Sendable {
+            /// Page identity recorded in the committed disclosure-intent audit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/studyId`.
+            public var studyId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/versions`.
+            public var versions: Components.Schemas.StudyDataVersions
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/policy`.
+            @frozen public enum PolicyPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case studyPointViewV1 = "study-point-view-v1"
+            }
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/policy`.
+            public var policy: Components.Schemas.StudyDataPage.PolicyPayload
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/records`.
+            public var records: [Components.Schemas.StudyDataRecord]
+            /// Opaque continuation cursor. Omitted when the captured page has no continuation.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDataPage/nextBefore`.
+            public var nextBefore: Swift.String?
+            /// Creates a new `StudyDataPage`.
+            ///
+            /// - Parameters:
+            ///   - id: Page identity recorded in the committed disclosure-intent audit.
+            ///   - studyId:
+            ///   - versions:
+            ///   - policy:
+            ///   - records:
+            ///   - nextBefore: Opaque continuation cursor. Omitted when the captured page has no continuation.
+            public init(
+                id: Swift.String,
+                studyId: Swift.String,
+                versions: Components.Schemas.StudyDataVersions,
+                policy: Components.Schemas.StudyDataPage.PolicyPayload,
+                records: [Components.Schemas.StudyDataRecord],
+                nextBefore: Swift.String? = nil
+            ) {
+                self.id = id
+                self.studyId = studyId
+                self.versions = versions
+                self.policy = policy
+                self.records = records
+                self.nextBefore = nextBefore
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case studyId
+                case versions
+                case policy
+                case records
+                case nextBefore
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.versions = try container.decode(
+                    Components.Schemas.StudyDataVersions.self,
+                    forKey: .versions
+                )
+                self.policy = try container.decode(
+                    Components.Schemas.StudyDataPage.PolicyPayload.self,
+                    forKey: .policy
+                )
+                self.records = try container.decode(
+                    [Components.Schemas.StudyDataRecord].self,
+                    forKey: .records
+                )
+                self.nextBefore = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextBefore
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "studyId",
+                    "versions",
+                    "policy",
+                    "records",
+                    "nextBefore"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/StudyAuditAction`.
         @frozen public enum StudyAuditAction: String, Codable, Hashable, Sendable, CaseIterable {
             case consent_recorded = "consent.recorded"
             case consent_pdf_disclosure = "consent.pdf.disclosure"
             case consent_records_disclosure = "consent.records.disclosure"
             case collection_plan_disclosure = "collection.plan.disclosure"
+            case collection_reconciliation_issued = "collection.reconciliation.issued"
+            case collection_reconciliation_completed = "collection.reconciliation.completed"
             case enrollment_withdrawn = "enrollment.withdrawn"
             case study_published = "study.published"
             case study_publication_disclosure = "study.publication.disclosure"
@@ -75,6 +830,8 @@ extension Components {
             case artifact_discard_scheduled = "artifact.discard.scheduled"
             case study_data_granted = "study.data.granted"
             case study_audit_disclosure = "study.audit.disclosure"
+            case study_data_disclosure = "study.data.disclosure"
+            case study_recording_disclosure = "study.recording.disclosure"
         }
         /// - Remark: Generated from `#/components/schemas/StudyPublicationInput`.
         public struct StudyPublicationInput: Codable, Hashable, Sendable {
@@ -758,7 +1515,7 @@ extension Components {
         public typealias EventTargets = [Components.Schemas.EventTarget]
         /// - Remark: Generated from `#/components/schemas/EventSubmission`.
         public struct EventSubmission: Codable, Hashable, Sendable {
-            /// RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+            /// RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. The configured decoded budget defaults to 4 MiB and cannot exceed 16 MiB.
             ///
             /// - Remark: Generated from `#/components/schemas/EventSubmission/eventBase64`.
             public var eventBase64: Swift.String
@@ -767,7 +1524,7 @@ extension Components {
             /// Creates a new `EventSubmission`.
             ///
             /// - Parameters:
-            ///   - eventBase64: RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+            ///   - eventBase64: RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. The configured decoded budget defaults to 4 MiB and cannot exceed 16 MiB.
             ///   - targets:
             public init(
                 eventBase64: Swift.String,
@@ -818,6 +1575,547 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "events"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration`.
+        public struct RecordingTransferDeclaration: Codable, Hashable, Sendable {
+            /// Stable relative attachment path; no empty, dot or parent segments, escapes, query or fragment.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/attachmentPath`.
+            public var attachmentPath: Swift.String
+            /// Exact recording DocumentReference address in its immutable clinical record.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/outputFullUrl`.
+            public var outputFullUrl: Swift.String
+            /// Supported recording-document profile, independently checked against collection authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/profile`.
+            public var profile: Swift.String
+            /// Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Registered Grove recording-format code, checked with the exact source token and output profile.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/format`.
+            public var format: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/effectiveAt`.
+            public var effectiveAt: Foundation.Date
+            /// Inclusive measurement end, at or after effectiveAt; actual recording bounds are checked at clinical admission.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/effectiveEnd`.
+            public var effectiveEnd: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/content`.
+            public var content: Components.Schemas.RecordingTransferContent
+            /// Distinct consent targets, each selecting only outputFullUrl.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/targets`.
+            public var targets: [Components.Schemas.EventTarget]
+            /// Creates a new `RecordingTransferDeclaration`.
+            ///
+            /// - Parameters:
+            ///   - attachmentPath: Stable relative attachment path; no empty, dot or parent segments, escapes, query or fragment.
+            ///   - outputFullUrl: Exact recording DocumentReference address in its immutable clinical record.
+            ///   - profile: Supported recording-document profile, independently checked against collection authority.
+            ///   - sourceTypeIdentifier: Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
+            ///   - format: Registered Grove recording-format code, checked with the exact source token and output profile.
+            ///   - effectiveAt:
+            ///   - effectiveEnd: Inclusive measurement end, at or after effectiveAt; actual recording bounds are checked at clinical admission.
+            ///   - content:
+            ///   - targets: Distinct consent targets, each selecting only outputFullUrl.
+            public init(
+                attachmentPath: Swift.String,
+                outputFullUrl: Swift.String,
+                profile: Swift.String,
+                sourceTypeIdentifier: Swift.String? = nil,
+                format: Swift.String,
+                effectiveAt: Foundation.Date,
+                effectiveEnd: Foundation.Date,
+                content: Components.Schemas.RecordingTransferContent,
+                targets: [Components.Schemas.EventTarget]
+            ) {
+                self.attachmentPath = attachmentPath
+                self.outputFullUrl = outputFullUrl
+                self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.format = format
+                self.effectiveAt = effectiveAt
+                self.effectiveEnd = effectiveEnd
+                self.content = content
+                self.targets = targets
+            }
+            public enum CodingKeys: String, CodingKey {
+                case attachmentPath
+                case outputFullUrl
+                case profile
+                case sourceTypeIdentifier
+                case format
+                case effectiveAt
+                case effectiveEnd
+                case content
+                case targets
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.attachmentPath = try container.decode(
+                    Swift.String.self,
+                    forKey: .attachmentPath
+                )
+                self.outputFullUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .outputFullUrl
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.format = try container.decode(
+                    Swift.String.self,
+                    forKey: .format
+                )
+                self.effectiveAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .effectiveAt
+                )
+                self.effectiveEnd = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .effectiveEnd
+                )
+                self.content = try container.decode(
+                    Components.Schemas.RecordingTransferContent.self,
+                    forKey: .content
+                )
+                self.targets = try container.decode(
+                    [Components.Schemas.EventTarget].self,
+                    forKey: .targets
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "attachmentPath",
+                    "outputFullUrl",
+                    "profile",
+                    "sourceTypeIdentifier",
+                    "format",
+                    "effectiveAt",
+                    "effectiveEnd",
+                    "content",
+                    "targets"
+                ])
+            }
+        }
+        /// Exact stored and decoded-source commitments, bounded separately by deployment configuration. Identity encoding requires identical counts and digests. Source commitments and format validity are checked when admitting the clinical attachment.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RecordingTransferContent`.
+        public struct RecordingTransferContent: Codable, Hashable, Sendable {
+            /// Encoding inside the octet-stream body, not HTTP Content-Encoding.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/encoding`.
+            @frozen public enum EncodingPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case identity = "identity"
+                case zstd = "zstd"
+            }
+            /// Encoding inside the octet-stream body, not HTTP Content-Encoding.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/encoding`.
+            public var encoding: Components.Schemas.RecordingTransferContent.EncodingPayload
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/storedByteCount`.
+            public var storedByteCount: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/storedSHA256`.
+            public var storedSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/sourceByteCount`.
+            public var sourceByteCount: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferContent/sourceSHA256`.
+            public var sourceSHA256: Swift.String
+            /// Creates a new `RecordingTransferContent`.
+            ///
+            /// - Parameters:
+            ///   - encoding: Encoding inside the octet-stream body, not HTTP Content-Encoding.
+            ///   - storedByteCount:
+            ///   - storedSHA256:
+            ///   - sourceByteCount:
+            ///   - sourceSHA256:
+            public init(
+                encoding: Components.Schemas.RecordingTransferContent.EncodingPayload,
+                storedByteCount: Swift.Int64,
+                storedSHA256: Swift.String,
+                sourceByteCount: Swift.Int64,
+                sourceSHA256: Swift.String
+            ) {
+                self.encoding = encoding
+                self.storedByteCount = storedByteCount
+                self.storedSHA256 = storedSHA256
+                self.sourceByteCount = sourceByteCount
+                self.sourceSHA256 = sourceSHA256
+            }
+            public enum CodingKeys: String, CodingKey {
+                case encoding
+                case storedByteCount
+                case storedSHA256
+                case sourceByteCount
+                case sourceSHA256
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.encoding = try container.decode(
+                    Components.Schemas.RecordingTransferContent.EncodingPayload.self,
+                    forKey: .encoding
+                )
+                self.storedByteCount = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .storedByteCount
+                )
+                self.storedSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .storedSHA256
+                )
+                self.sourceByteCount = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .sourceByteCount
+                )
+                self.sourceSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceSHA256
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "encoding",
+                    "storedByteCount",
+                    "storedSHA256",
+                    "sourceByteCount",
+                    "sourceSHA256"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration`.
+        public struct RecordingTransferRegistration: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration/transferId`.
+            public var transferId: Swift.String
+            /// Server commitment to the entire declaration; retain it to match subsequent receipts.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration/declarationSHA256`.
+            public var declarationSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration/storedByteCount`.
+            public var storedByteCount: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferRegistration/storedSHA256`.
+            public var storedSHA256: Swift.String
+            /// Creates a new `RecordingTransferRegistration`.
+            ///
+            /// - Parameters:
+            ///   - sourceId:
+            ///   - transferId:
+            ///   - declarationSHA256: Server commitment to the entire declaration; retain it to match subsequent receipts.
+            ///   - storedByteCount:
+            ///   - storedSHA256:
+            public init(
+                sourceId: Swift.String,
+                transferId: Swift.String,
+                declarationSHA256: Swift.String,
+                storedByteCount: Swift.Int64,
+                storedSHA256: Swift.String
+            ) {
+                self.sourceId = sourceId
+                self.transferId = transferId
+                self.declarationSHA256 = declarationSHA256
+                self.storedByteCount = storedByteCount
+                self.storedSHA256 = storedSHA256
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceId
+                case transferId
+                case declarationSHA256
+                case storedByteCount
+                case storedSHA256
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.transferId = try container.decode(
+                    Swift.String.self,
+                    forKey: .transferId
+                )
+                self.declarationSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .declarationSHA256
+                )
+                self.storedByteCount = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .storedByteCount
+                )
+                self.storedSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .storedSHA256
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceId",
+                    "transferId",
+                    "declarationSHA256",
+                    "storedByteCount",
+                    "storedSHA256"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt`.
+        public struct RecordingTransferReceipt: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/transferId`.
+            public var transferId: Swift.String
+            /// Opaque identifier for binding these exact owned bytes to a clinical attachment.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/artifactId`.
+            public var artifactId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/declarationSHA256`.
+            public var declarationSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/storedByteCount`.
+            public var storedByteCount: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/storedSHA256`.
+            public var storedSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/verifiedAt`.
+            public var verifiedAt: Foundation.Date
+            /// Latest time to accept the unretained attachment; not a permanent storage promise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferReceipt/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `RecordingTransferReceipt`.
+            ///
+            /// - Parameters:
+            ///   - sourceId:
+            ///   - transferId:
+            ///   - artifactId: Opaque identifier for binding these exact owned bytes to a clinical attachment.
+            ///   - declarationSHA256:
+            ///   - storedByteCount:
+            ///   - storedSHA256:
+            ///   - verifiedAt:
+            ///   - expiresAt: Latest time to accept the unretained attachment; not a permanent storage promise.
+            public init(
+                sourceId: Swift.String,
+                transferId: Swift.String,
+                artifactId: Swift.String,
+                declarationSHA256: Swift.String,
+                storedByteCount: Swift.Int64,
+                storedSHA256: Swift.String,
+                verifiedAt: Foundation.Date,
+                expiresAt: Foundation.Date
+            ) {
+                self.sourceId = sourceId
+                self.transferId = transferId
+                self.artifactId = artifactId
+                self.declarationSHA256 = declarationSHA256
+                self.storedByteCount = storedByteCount
+                self.storedSHA256 = storedSHA256
+                self.verifiedAt = verifiedAt
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceId
+                case transferId
+                case artifactId
+                case declarationSHA256
+                case storedByteCount
+                case storedSHA256
+                case verifiedAt
+                case expiresAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.transferId = try container.decode(
+                    Swift.String.self,
+                    forKey: .transferId
+                )
+                self.artifactId = try container.decode(
+                    Swift.String.self,
+                    forKey: .artifactId
+                )
+                self.declarationSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .declarationSHA256
+                )
+                self.storedByteCount = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .storedByteCount
+                )
+                self.storedSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .storedSHA256
+                )
+                self.verifiedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .verifiedAt
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceId",
+                    "transferId",
+                    "artifactId",
+                    "declarationSHA256",
+                    "storedByteCount",
+                    "storedSHA256",
+                    "verifiedAt",
+                    "expiresAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission`.
+        public struct RecordBundleSubmission: Codable, Hashable, Sendable {
+            /// Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle. The configured decoded budget defaults to 4 MiB plus 1 KiB and cannot exceed 16 MiB plus 1 KiB.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission/bundleBase64`.
+            public var bundleBase64: Swift.String
+            /// Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleSubmission/records`.
+            public var records: [Components.Schemas.RecordBundleMember]
+            /// Creates a new `RecordBundleSubmission`.
+            ///
+            /// - Parameters:
+            ///   - bundleBase64: Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle. The configured decoded budget defaults to 4 MiB plus 1 KiB and cannot exceed 16 MiB plus 1 KiB.
+            ///   - records: Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+            public init(
+                bundleBase64: Swift.String,
+                records: [Components.Schemas.RecordBundleMember]
+            ) {
+                self.bundleBase64 = bundleBase64
+                self.records = records
+            }
+            public enum CodingKeys: String, CodingKey {
+                case bundleBase64
+                case records
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.bundleBase64 = try container.decode(
+                    Swift.String.self,
+                    forKey: .bundleBase64
+                )
+                self.records = try container.decode(
+                    [Components.Schemas.RecordBundleMember].self,
+                    forKey: .records
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "bundleBase64",
+                    "records"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordBundleMember`.
+        public struct RecordBundleMember: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecordBundleMember/commitment`.
+            public var commitment: Components.Schemas.EventReceiptLookup
+            /// Exact uploaded artifacts for this record's relative recording attachments. Paths, transfer IDs and artifact IDs must be distinct. The receiver verifies ownership, the retained declaration, decoded content and current consent before retaining artifacts with clinical custody. Omit for records without external recordings.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleMember/recordings`.
+            public var recordings: [Components.Schemas.RecordingAttachmentBinding]?
+            /// Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordBundleMember/entryFullUrls`.
+            public var entryFullUrls: [Swift.String]
+            /// Creates a new `RecordBundleMember`.
+            ///
+            /// - Parameters:
+            ///   - commitment:
+            ///   - recordings: Exact uploaded artifacts for this record's relative recording attachments. Paths, transfer IDs and artifact IDs must be distinct. The receiver verifies ownership, the retained declaration, decoded content and current consent before retaining artifacts with clinical custody. Omit for records without external recordings.
+            ///   - entryFullUrls: Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+            public init(
+                commitment: Components.Schemas.EventReceiptLookup,
+                recordings: [Components.Schemas.RecordingAttachmentBinding]? = nil,
+                entryFullUrls: [Swift.String]
+            ) {
+                self.commitment = commitment
+                self.recordings = recordings
+                self.entryFullUrls = entryFullUrls
+            }
+            public enum CodingKeys: String, CodingKey {
+                case commitment
+                case recordings
+                case entryFullUrls
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.commitment = try container.decode(
+                    Components.Schemas.EventReceiptLookup.self,
+                    forKey: .commitment
+                )
+                self.recordings = try container.decodeIfPresent(
+                    [Components.Schemas.RecordingAttachmentBinding].self,
+                    forKey: .recordings
+                )
+                self.entryFullUrls = try container.decode(
+                    [Swift.String].self,
+                    forKey: .entryFullUrls
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "commitment",
+                    "recordings",
+                    "entryFullUrls"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordingAttachmentBinding`.
+        public struct RecordingAttachmentBinding: Codable, Hashable, Sendable {
+            /// Exact relative Attachment.url in the original record and retained transfer declaration.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingAttachmentBinding/attachmentPath`.
+            public var attachmentPath: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RecordingAttachmentBinding/transferId`.
+            public var transferId: Swift.String
+            /// The artifact from the completed transfer receipt; an identifier alone confers no authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingAttachmentBinding/artifactId`.
+            public var artifactId: Swift.String
+            /// Creates a new `RecordingAttachmentBinding`.
+            ///
+            /// - Parameters:
+            ///   - attachmentPath: Exact relative Attachment.url in the original record and retained transfer declaration.
+            ///   - transferId:
+            ///   - artifactId: The artifact from the completed transfer receipt; an identifier alone confers no authority.
+            public init(
+                attachmentPath: Swift.String,
+                transferId: Swift.String,
+                artifactId: Swift.String
+            ) {
+                self.attachmentPath = attachmentPath
+                self.transferId = transferId
+                self.artifactId = artifactId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case attachmentPath
+                case transferId
+                case artifactId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.attachmentPath = try container.decode(
+                    Swift.String.self,
+                    forKey: .attachmentPath
+                )
+                self.transferId = try container.decode(
+                    Swift.String.self,
+                    forKey: .transferId
+                )
+                self.artifactId = try container.decode(
+                    Swift.String.self,
+                    forKey: .artifactId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "attachmentPath",
+                    "transferId",
+                    "artifactId"
                 ])
             }
         }
@@ -1059,18 +2357,18 @@ extension Components {
                 ])
             }
         }
-        /// Durable custody acknowledgement for one original producer event, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt.
+        /// Durable custody acknowledgement for one source-record version or retraction, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt. Accepted byte representations of the same clinical version share eventId; payloadSHA256, receivedAt and nodeCount describe the specific retained representation. Additional representations do not create new clinical facts, versions or study grants.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/EventReceipt`.
         public struct EventReceipt: Codable, Hashable, Sendable {
-            /// Server-assigned immutable custody record ID, not the producer's event identifier.
+            /// Server-assigned clinical version or retraction ID, shared by its accepted byte representations.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/eventId`.
             public var eventId: Swift.String
             /// - Remark: Generated from `#/components/schemas/EventReceipt/sourceId`.
             public var sourceId: Swift.String
-            /// Complete identifier from the accepted original Bundle.
+            /// Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/producerEventIdentifier`.
             public struct ProducerEventIdentifierPayload: Codable, Hashable, Sendable {
@@ -1110,7 +2408,7 @@ extension Components {
                     ])
                 }
             }
-            /// Complete identifier from the accepted original Bundle.
+            /// Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/producerEventIdentifier`.
             public var producerEventIdentifier: Components.Schemas.EventReceipt.ProducerEventIdentifierPayload
@@ -1130,9 +2428,9 @@ extension Components {
             /// Creates a new `EventReceipt`.
             ///
             /// - Parameters:
-            ///   - eventId: Server-assigned immutable custody record ID, not the producer's event identifier.
+            ///   - eventId: Server-assigned clinical version or retraction ID, shared by its accepted byte representations.
             ///   - sourceId:
-            ///   - producerEventIdentifier: Complete identifier from the accepted original Bundle.
+            ///   - producerEventIdentifier: Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///   - payloadSHA256: Lowercase SHA-256 of the accepted event bytes, before any JSON normalization.
             ///   - targetIntentSHA256: SHA-256 of UTF-8 canonical target JSON: array sorted by consent ID, lowercase UUIDs, lexically sorted distinct ASCII output addresses, object keys consentId then outputFullUrls, compact JSON without escaped slashes. Bind this to the original staged intent, not later attribution.
             ///   - receivedAt:
@@ -1208,6 +2506,18 @@ extension Components {
         public struct ParticipantCollectionPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ParticipantCollectionPlan/enrollmentId`.
             public var enrollmentId: Swift.String
+            /// Stable study identity for this enrollment; checked against complete enrollment discovery.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantCollectionPlan/studyId`.
+            public var studyId: Swift.String
+            /// Study title from the enrollment's adopted publication, retained for offline collection settings and withdrawal.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantCollectionPlan/title`.
+            public var title: Components.Schemas.LocalizedString
+            /// Exclusive enrollment end resolved once by the server; omitted means ongoing. Stops acquisition, not receipt recovery.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantCollectionPlan/endsAt`.
+            public var endsAt: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/ParticipantCollectionPlan/stateVersion`.
             public var stateVersion: Swift.Int64
             /// Server observation time; not an expiration or promise of future eligibility.
@@ -1222,22 +2532,34 @@ extension Components {
             ///
             /// - Parameters:
             ///   - enrollmentId:
+            ///   - studyId: Stable study identity for this enrollment; checked against complete enrollment discovery.
+            ///   - title: Study title from the enrollment's adopted publication, retained for offline collection settings and withdrawal.
+            ///   - endsAt: Exclusive enrollment end resolved once by the server; omitted means ongoing. Stops acquisition, not receipt recovery.
             ///   - stateVersion:
             ///   - asOf: Server observation time; not an expiration or promise of future eligibility.
             ///   - windows: Ordered by consent adoption, never by latest publication. Empty means no collection.
             public init(
                 enrollmentId: Swift.String,
+                studyId: Swift.String,
+                title: Components.Schemas.LocalizedString,
+                endsAt: Foundation.Date? = nil,
                 stateVersion: Swift.Int64,
                 asOf: Foundation.Date,
                 windows: [Components.Schemas.ConsentCollectionWindow]
             ) {
                 self.enrollmentId = enrollmentId
+                self.studyId = studyId
+                self.title = title
+                self.endsAt = endsAt
                 self.stateVersion = stateVersion
                 self.asOf = asOf
                 self.windows = windows
             }
             public enum CodingKeys: String, CodingKey {
                 case enrollmentId
+                case studyId
+                case title
+                case endsAt
                 case stateVersion
                 case asOf
                 case windows
@@ -1247,6 +2569,18 @@ extension Components {
                 self.enrollmentId = try container.decode(
                     Swift.String.self,
                     forKey: .enrollmentId
+                )
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.title = try container.decode(
+                    Components.Schemas.LocalizedString.self,
+                    forKey: .title
+                )
+                self.endsAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .endsAt
                 )
                 self.stateVersion = try container.decode(
                     Swift.Int64.self,
@@ -1262,9 +2596,262 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "enrollmentId",
+                    "studyId",
+                    "title",
+                    "endsAt",
                     "stateVersion",
                     "asOf",
                     "windows"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationRequest`.
+        public struct NativeCollectionReconciliationRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationRequest/sourceId`.
+            public var sourceId: Swift.String
+            /// Creates a new `NativeCollectionReconciliationRequest`.
+            ///
+            /// - Parameters:
+            ///   - sourceId:
+            public init(sourceId: Swift.String) {
+                self.sourceId = sourceId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceId"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationResponse`.
+        public struct NativeCollectionReconciliationResponse: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationResponse/instructions`.
+            public var instructions: [Components.Schemas.NativeCollectionReconciliationInstruction]
+            /// Creates a new `NativeCollectionReconciliationResponse`.
+            ///
+            /// - Parameters:
+            ///   - instructions:
+            public init(instructions: [Components.Schemas.NativeCollectionReconciliationInstruction]) {
+                self.instructions = instructions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case instructions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.instructions = try container.decode(
+                    [Components.Schemas.NativeCollectionReconciliationInstruction].self,
+                    forKey: .instructions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "instructions"
+                ])
+            }
+        }
+        /// Current online authority for one finite sweep of an ended, originally accepted window. It does not extend the enrollment's cached collection plan. Renewal keeps the identity, source, accepted scope and window, and only moves the lease.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction`.
+        public struct NativeCollectionReconciliationInstruction: Codable, Hashable, Sendable {
+            /// Stable sweep identity for this source and window, unchanged by renewal.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/enrollmentId`.
+            public var enrollmentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/studyId`.
+            public var studyId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/stateVersion`.
+            public var stateVersion: Swift.Int64
+            /// Server time of this issuance or renewal; not a clinical or source insertion time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/issuedAt`.
+            public var issuedAt: Foundation.Date
+            /// End of the lease. Unfinished work pauses and keeps its position until renewed online.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/consentId`.
+            public var consentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/publicationId`.
+            public var publicationId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/revision`.
+            public var revision: Swift.Int
+            /// Exact output profile, including the recording profile for an opted-in workout route.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/profile`.
+            public var profile: Swift.String
+            /// Exact native source token. Profile membership alone does not authorize a stream.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// Original accepted window start; whole overlapping sessions remain eligible.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/start`.
+            public var start: Foundation.Date
+            /// Original closed window end, no later than issuedAt.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/end`.
+            public var end: Foundation.Date
+            /// The accepted workout-route option of the window; an instruction cannot add it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/includeWorkoutRoutes`.
+            public var includeWorkoutRoutes: Swift.Bool
+            /// Creates a new `NativeCollectionReconciliationInstruction`.
+            ///
+            /// - Parameters:
+            ///   - id: Stable sweep identity for this source and window, unchanged by renewal.
+            ///   - sourceId:
+            ///   - enrollmentId:
+            ///   - studyId:
+            ///   - stateVersion:
+            ///   - issuedAt: Server time of this issuance or renewal; not a clinical or source insertion time.
+            ///   - expiresAt: End of the lease. Unfinished work pauses and keeps its position until renewed online.
+            ///   - consentId:
+            ///   - publicationId:
+            ///   - revision:
+            ///   - profile: Exact output profile, including the recording profile for an opted-in workout route.
+            ///   - sourceTypeIdentifier: Exact native source token. Profile membership alone does not authorize a stream.
+            ///   - start: Original accepted window start; whole overlapping sessions remain eligible.
+            ///   - end: Original closed window end, no later than issuedAt.
+            ///   - includeWorkoutRoutes: The accepted workout-route option of the window; an instruction cannot add it.
+            public init(
+                id: Swift.String,
+                sourceId: Swift.String,
+                enrollmentId: Swift.String,
+                studyId: Swift.String,
+                stateVersion: Swift.Int64,
+                issuedAt: Foundation.Date,
+                expiresAt: Foundation.Date,
+                consentId: Swift.String,
+                publicationId: Swift.String,
+                revision: Swift.Int,
+                profile: Swift.String,
+                sourceTypeIdentifier: Swift.String,
+                start: Foundation.Date,
+                end: Foundation.Date,
+                includeWorkoutRoutes: Swift.Bool
+            ) {
+                self.id = id
+                self.sourceId = sourceId
+                self.enrollmentId = enrollmentId
+                self.studyId = studyId
+                self.stateVersion = stateVersion
+                self.issuedAt = issuedAt
+                self.expiresAt = expiresAt
+                self.consentId = consentId
+                self.publicationId = publicationId
+                self.revision = revision
+                self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.start = start
+                self.end = end
+                self.includeWorkoutRoutes = includeWorkoutRoutes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case sourceId
+                case enrollmentId
+                case studyId
+                case stateVersion
+                case issuedAt
+                case expiresAt
+                case consentId
+                case publicationId
+                case revision
+                case profile
+                case sourceTypeIdentifier
+                case start
+                case end
+                case includeWorkoutRoutes
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.enrollmentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .enrollmentId
+                )
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.stateVersion = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .stateVersion
+                )
+                self.issuedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .issuedAt
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                self.consentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .consentId
+                )
+                self.publicationId = try container.decode(
+                    Swift.String.self,
+                    forKey: .publicationId
+                )
+                self.revision = try container.decode(
+                    Swift.Int.self,
+                    forKey: .revision
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.start = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .start
+                )
+                self.end = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                self.includeWorkoutRoutes = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .includeWorkoutRoutes
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "sourceId",
+                    "enrollmentId",
+                    "studyId",
+                    "stateVersion",
+                    "issuedAt",
+                    "expiresAt",
+                    "consentId",
+                    "publicationId",
+                    "revision",
+                    "profile",
+                    "sourceTypeIdentifier",
+                    "start",
+                    "end",
+                    "includeWorkoutRoutes"
                 ])
             }
         }
@@ -1276,24 +2863,24 @@ extension Components {
             public var publicationId: Swift.String
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/revision`.
             public var revision: Swift.Int
-            /// Inclusive measurement-time boundary at exact consent acceptance.
+            /// Consent adoption time; measurement boundaries are carried by each resolved requirement.
             ///
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/start`.
             public var start: Foundation.Date
-            /// Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+            /// Next consent adoption time, if any. This does not change the retained historical measurement starts.
             ///
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/end`.
             public var end: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/requirements`.
-            public var requirements: [Components.Schemas.CollectionRequirement]
+            public var requirements: [Components.Schemas.CollectionPlanRequirement]
             /// Creates a new `ConsentCollectionWindow`.
             ///
             /// - Parameters:
             ///   - consentId:
             ///   - publicationId:
             ///   - revision:
-            ///   - start: Inclusive measurement-time boundary at exact consent acceptance.
-            ///   - end: Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+            ///   - start: Consent adoption time; measurement boundaries are carried by each resolved requirement.
+            ///   - end: Next consent adoption time, if any. This does not change the retained historical measurement starts.
             ///   - requirements:
             public init(
                 consentId: Swift.String,
@@ -1301,7 +2888,7 @@ extension Components {
                 revision: Swift.Int,
                 start: Foundation.Date,
                 end: Foundation.Date? = nil,
-                requirements: [Components.Schemas.CollectionRequirement]
+                requirements: [Components.Schemas.CollectionPlanRequirement]
             ) {
                 self.consentId = consentId
                 self.publicationId = publicationId
@@ -1341,7 +2928,7 @@ extension Components {
                     forKey: .end
                 )
                 self.requirements = try container.decode(
-                    [Components.Schemas.CollectionRequirement].self,
+                    [Components.Schemas.CollectionPlanRequirement].self,
                     forKey: .requirements
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -1354,34 +2941,367 @@ extension Components {
                 ])
             }
         }
-        /// Explicit backend collection permission, independent of native HealthKit components. The current receiver supports the Grove Mobile heart-rate profile as immutable point quantities from participant-app streams, measured at or after the exact consent acceptance. This does not attest the source device or authorize historical data.
+        /// Published enrollment end rule. Resolve once from the stored enrollment instant using the declared calendar and time zone. A duration and a fixed end may be combined; the earlier bound wins. Omitting both means ongoing enrollment. Later publication or revision adoption does not change an existing enrollment's end.
         ///
         ///
-        /// - Remark: Generated from `#/components/schemas/CollectionRequirement`.
-        public struct CollectionRequirement: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/profile`.
+        /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod`.
+        public struct EnrollmentPeriod: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod/calendar`.
+            @frozen public enum CalendarPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case gregorian = "gregorian"
+            }
+            /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod/calendar`.
+            public var calendar: Components.Schemas.EnrollmentPeriod.CalendarPayload
+            /// IANA time-zone identifier or UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod/timeZone`.
+            public var timeZone: Swift.String
+            /// Positive calendar duration from enrollment; all components must be nonnegative.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod/duration`.
+            public var duration: Components.Schemas.DateComponents?
+            /// Exclusive fixed closing instant; new enrollment at or beyond it is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EnrollmentPeriod/end`.
+            public var end: Foundation.Date?
+            /// Creates a new `EnrollmentPeriod`.
+            ///
+            /// - Parameters:
+            ///   - calendar:
+            ///   - timeZone: IANA time-zone identifier or UTC.
+            ///   - duration: Positive calendar duration from enrollment; all components must be nonnegative.
+            ///   - end: Exclusive fixed closing instant; new enrollment at or beyond it is refused.
+            public init(
+                calendar: Components.Schemas.EnrollmentPeriod.CalendarPayload,
+                timeZone: Swift.String,
+                duration: Components.Schemas.DateComponents? = nil,
+                end: Foundation.Date? = nil
+            ) {
+                self.calendar = calendar
+                self.timeZone = timeZone
+                self.duration = duration
+                self.end = end
+            }
+            public enum CodingKeys: String, CodingKey {
+                case calendar
+                case timeZone
+                case duration
+                case end
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.calendar = try container.decode(
+                    Components.Schemas.EnrollmentPeriod.CalendarPayload.self,
+                    forKey: .calendar
+                )
+                self.timeZone = try container.decode(
+                    Swift.String.self,
+                    forKey: .timeZone
+                )
+                self.duration = try container.decodeIfPresent(
+                    Components.Schemas.DateComponents.self,
+                    forKey: .duration
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "calendar",
+                    "timeZone",
+                    "duration",
+                    "end"
+                ])
+            }
+        }
+        /// Measurement scope resolved once when this publication is accepted, not when a device starts a query. Omitted start means consent adoption; oldestSample authorizes all available history. Relative components must be nonnegative and at least one must be positive. An end is exclusive.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow`.
+        public struct CollectionMeasurementWindow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/calendar`.
+            @frozen public enum CalendarPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case gregorian = "gregorian"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/calendar`.
+            public var calendar: Components.Schemas.CollectionMeasurementWindow.CalendarPayload
+            /// IANA time-zone identifier, or UTC; never the device's implicit current zone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/timeZone`.
+            public var timeZone: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/start`.
+            public var start: Components.Schemas.ExportSessionStartDate?
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/end`.
+            public var end: Foundation.Date?
+            /// Creates a new `CollectionMeasurementWindow`.
+            ///
+            /// - Parameters:
+            ///   - calendar:
+            ///   - timeZone: IANA time-zone identifier, or UTC; never the device's implicit current zone.
+            ///   - start:
+            ///   - end:
+            public init(
+                calendar: Components.Schemas.CollectionMeasurementWindow.CalendarPayload,
+                timeZone: Swift.String,
+                start: Components.Schemas.ExportSessionStartDate? = nil,
+                end: Foundation.Date? = nil
+            ) {
+                self.calendar = calendar
+                self.timeZone = timeZone
+                self.start = start
+                self.end = end
+            }
+            public enum CodingKeys: String, CodingKey {
+                case calendar
+                case timeZone
+                case start
+                case end
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.calendar = try container.decode(
+                    Components.Schemas.CollectionMeasurementWindow.CalendarPayload.self,
+                    forKey: .calendar
+                )
+                self.timeZone = try container.decode(
+                    Swift.String.self,
+                    forKey: .timeZone
+                )
+                self.start = try container.decodeIfPresent(
+                    Components.Schemas.ExportSessionStartDate.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "calendar",
+                    "timeZone",
+                    "start",
+                    "end"
+                ])
+            }
+        }
+        /// Time basis used by the retained collection window. Omission means measurement-time for existing measurement scopes. Clinical and CDA document requirements must explicitly preserve their source-date basis; embedded care dates are not inferred or used for selection.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionTimeBasis`.
+        @frozen public enum CollectionTimeBasis: String, Codable, Hashable, Sendable, CaseIterable {
+            case measurementTime = "measurement-time"
+            case clinicalRecordDownload = "clinical-record-download"
+            case cdaSourceDocumentPeriod = "cda-source-document-period"
+        }
+        /// Exact measurement scope retained for an accepted publication.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement`.
+        public struct CollectionPlanRequirement: Codable, Hashable, Sendable {
+            /// Whether this accepted requirement includes precise workout routes. Only valid for the workout profile; omission means false.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/includeWorkoutRoutes`.
+            public var includeWorkoutRoutes: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/profile`.
             public var profile: Swift.String
-            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
+            /// Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/providerRegistrationId`.
+            public var providerRegistrationId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
             @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case participantApp = "participant-app"
+                case serverWorker = "server-worker"
             }
-            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
-            public var sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
-            /// Creates a new `CollectionRequirement`.
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
+            public var sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload
+            /// Inclusive window start; may precede consent adoption. Sleep records are included whole when they overlap the window.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/start`.
+            public var start: Foundation.Date
+            /// Exclusive window end, bounded by the next adoption when applicable. Overlapping sleep records may end after this boundary.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/end`.
+            public var end: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
+            /// Creates a new `CollectionPlanRequirement`.
+            ///
+            /// - Parameters:
+            ///   - includeWorkoutRoutes: Whether this accepted requirement includes precise workout routes. Only valid for the workout profile; omission means false.
+            ///   - profile:
+            ///   - sourceTypeIdentifier: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///   - providerRegistrationId: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///   - sourceKind:
+            ///   - start: Inclusive window start; may precede consent adoption. Sleep records are included whole when they overlap the window.
+            ///   - end: Exclusive window end, bounded by the next adoption when applicable. Overlapping sleep records may end after this boundary.
+            ///   - timeBasis:
+            public init(
+                includeWorkoutRoutes: Swift.Bool? = nil,
+                profile: Swift.String,
+                sourceTypeIdentifier: Swift.String? = nil,
+                providerRegistrationId: Swift.String? = nil,
+                sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload,
+                start: Foundation.Date,
+                end: Foundation.Date? = nil,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
+            ) {
+                self.includeWorkoutRoutes = includeWorkoutRoutes
+                self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.providerRegistrationId = providerRegistrationId
+                self.sourceKind = sourceKind
+                self.start = start
+                self.end = end
+                self.timeBasis = timeBasis
+            }
+            public enum CodingKeys: String, CodingKey {
+                case includeWorkoutRoutes
+                case profile
+                case sourceTypeIdentifier
+                case providerRegistrationId
+                case sourceKind
+                case start
+                case end
+                case timeBasis
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.includeWorkoutRoutes = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .includeWorkoutRoutes
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.providerRegistrationId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .providerRegistrationId
+                )
+                self.sourceKind = try container.decode(
+                    Components.Schemas.CollectionPlanRequirement.SourceKindPayload.self,
+                    forKey: .sourceKind
+                )
+                self.start = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "includeWorkoutRoutes",
+                    "profile",
+                    "sourceTypeIdentifier",
+                    "providerRegistrationId",
+                    "sourceKind",
+                    "start",
+                    "end",
+                    "timeBasis"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/CollectionCapability`.
+        public struct CollectionCapability: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/repositoryKind`.
+            @frozen public enum RepositoryKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case healthkit = "healthkit"
+                case sensorkit = "sensorkit"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/repositoryKind`.
+            public var repositoryKind: Components.Schemas.CollectionCapability.RepositoryKindPayload
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/displayNameEnglish`.
+            public var displayNameEnglish: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/displayNameGerman`.
+            public var displayNameGerman: Swift.String
+            /// Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/effectiveTime`.
+            @frozen public enum EffectiveTimePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case point = "point"
+                case interval = "interval"
+                case pointOrInterval = "point-or-interval"
+            }
+            /// Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/effectiveTime`.
+            public var effectiveTime: Components.Schemas.CollectionCapability.EffectiveTimePayload
+            /// Whether precise workout route collection can be opted into independently for this measurement.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/supportsWorkoutRoutes`.
+            public var supportsWorkoutRoutes: Swift.Bool
+            /// This output includes an original source recording, separately selected from structured summaries.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/isOriginalRecording`.
+            public var isOriginalRecording: Swift.Bool?
+            /// Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/requiredCompanionProfiles`.
+            public var requiredCompanionProfiles: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
+            /// Creates a new `CollectionCapability`.
             ///
             /// - Parameters:
             ///   - profile:
-            ///   - sourceKind:
+            ///   - repositoryKind:
+            ///   - sourceTypeIdentifier:
+            ///   - displayNameEnglish:
+            ///   - displayNameGerman:
+            ///   - effectiveTime: Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///   - supportsWorkoutRoutes: Whether precise workout route collection can be opted into independently for this measurement.
+            ///   - isOriginalRecording: This output includes an original source recording, separately selected from structured summaries.
+            ///   - requiredCompanionProfiles: Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+            ///   - timeBasis:
             public init(
                 profile: Swift.String,
-                sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
+                repositoryKind: Components.Schemas.CollectionCapability.RepositoryKindPayload,
+                sourceTypeIdentifier: Swift.String,
+                displayNameEnglish: Swift.String,
+                displayNameGerman: Swift.String,
+                effectiveTime: Components.Schemas.CollectionCapability.EffectiveTimePayload,
+                supportsWorkoutRoutes: Swift.Bool,
+                isOriginalRecording: Swift.Bool? = nil,
+                requiredCompanionProfiles: [Swift.String]? = nil,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
             ) {
                 self.profile = profile
-                self.sourceKind = sourceKind
+                self.repositoryKind = repositoryKind
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.displayNameEnglish = displayNameEnglish
+                self.displayNameGerman = displayNameGerman
+                self.effectiveTime = effectiveTime
+                self.supportsWorkoutRoutes = supportsWorkoutRoutes
+                self.isOriginalRecording = isOriginalRecording
+                self.requiredCompanionProfiles = requiredCompanionProfiles
+                self.timeBasis = timeBasis
             }
             public enum CodingKeys: String, CodingKey {
                 case profile
-                case sourceKind
+                case repositoryKind
+                case sourceTypeIdentifier
+                case displayNameEnglish
+                case displayNameGerman
+                case effectiveTime
+                case supportsWorkoutRoutes
+                case isOriginalRecording
+                case requiredCompanionProfiles
+                case timeBasis
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1389,41 +3309,245 @@ extension Components {
                     Swift.String.self,
                     forKey: .profile
                 )
+                self.repositoryKind = try container.decode(
+                    Components.Schemas.CollectionCapability.RepositoryKindPayload.self,
+                    forKey: .repositoryKind
+                )
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.displayNameEnglish = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameEnglish
+                )
+                self.displayNameGerman = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameGerman
+                )
+                self.effectiveTime = try container.decode(
+                    Components.Schemas.CollectionCapability.EffectiveTimePayload.self,
+                    forKey: .effectiveTime
+                )
+                self.supportsWorkoutRoutes = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .supportsWorkoutRoutes
+                )
+                self.isOriginalRecording = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .isOriginalRecording
+                )
+                self.requiredCompanionProfiles = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .requiredCompanionProfiles
+                )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "profile",
+                    "repositoryKind",
+                    "sourceTypeIdentifier",
+                    "displayNameEnglish",
+                    "displayNameGerman",
+                    "effectiveTime",
+                    "supportsWorkoutRoutes",
+                    "isOriginalRecording",
+                    "requiredCompanionProfiles",
+                    "timeBasis"
+                ])
+            }
+        }
+        /// Explicit backend collection permission, independent of native HealthKit components. The receiver supports Grove Mobile heart-rate and body-weight point quantities and sleep-stage intervals and workout sessions from participant-app streams. A point must be inside the accepted half-open measurement window. A sleep interval or workout session is collected in full if it overlaps that window, including all workout segments and statistics; touching a boundary alone is insufficient. Omitting the window starts collection at consent adoption. This does not attest the source device.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionRequirement`.
+        public struct CollectionRequirement: Codable, Hashable, Sendable {
+            /// Request precise workout routes in addition to workout sessions. Only valid for the workout profile; defaults to false and requires participant acceptance of the published revision.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/includeWorkoutRoutes`.
+            public var includeWorkoutRoutes: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/measurementWindow`.
+            public var measurementWindow: Components.Schemas.CollectionMeasurementWindow?
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/profile`.
+            public var profile: Swift.String
+            /// Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/providerRegistrationId`.
+            public var providerRegistrationId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
+            @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case participantApp = "participant-app"
+                case serverWorker = "server-worker"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
+            public var sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
+            /// Creates a new `CollectionRequirement`.
+            ///
+            /// - Parameters:
+            ///   - includeWorkoutRoutes: Request precise workout routes in addition to workout sessions. Only valid for the workout profile; defaults to false and requires participant acceptance of the published revision.
+            ///   - measurementWindow:
+            ///   - profile:
+            ///   - sourceTypeIdentifier: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///   - providerRegistrationId: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///   - sourceKind:
+            ///   - timeBasis:
+            public init(
+                includeWorkoutRoutes: Swift.Bool? = nil,
+                measurementWindow: Components.Schemas.CollectionMeasurementWindow? = nil,
+                profile: Swift.String,
+                sourceTypeIdentifier: Swift.String? = nil,
+                providerRegistrationId: Swift.String? = nil,
+                sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
+            ) {
+                self.includeWorkoutRoutes = includeWorkoutRoutes
+                self.measurementWindow = measurementWindow
+                self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.providerRegistrationId = providerRegistrationId
+                self.sourceKind = sourceKind
+                self.timeBasis = timeBasis
+            }
+            public enum CodingKeys: String, CodingKey {
+                case includeWorkoutRoutes
+                case measurementWindow
+                case profile
+                case sourceTypeIdentifier
+                case providerRegistrationId
+                case sourceKind
+                case timeBasis
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.includeWorkoutRoutes = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .includeWorkoutRoutes
+                )
+                self.measurementWindow = try container.decodeIfPresent(
+                    Components.Schemas.CollectionMeasurementWindow.self,
+                    forKey: .measurementWindow
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.providerRegistrationId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .providerRegistrationId
+                )
                 self.sourceKind = try container.decode(
                     Components.Schemas.CollectionRequirement.SourceKindPayload.self,
                     forKey: .sourceKind
                 )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "includeWorkoutRoutes",
+                    "measurementWindow",
                     "profile",
-                    "sourceKind"
+                    "sourceTypeIdentifier",
+                    "providerRegistrationId",
+                    "sourceKind",
+                    "timeBasis"
                 ])
             }
         }
-        /// Server-assigned identity for an unverified participant-app stream. Identifiers are not credentials. Every use requires participant authentication and ownership checks. This is not provider attestation.
+        /// Native repository identity; assignment alone does not imply receiver support for every data type.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NativeSourceRepository`.
+        @frozen public enum NativeSourceRepository: String, Codable, Hashable, Sendable, CaseIterable {
+            case healthkit = "healthkit"
+            case sensorkit = "sensorkit"
+        }
+        /// Canonical base64 of a random 256-bit installation secret, independent of identity and signing keys.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SourceInstallationCredential`.
+        public typealias SourceInstallationCredential = Swift.String
+        /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier`.
+        public struct SourceBusinessIdentifier: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier/system`.
+            public var system: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SourceBusinessIdentifier/value`.
+            public var value: Swift.String
+            /// Creates a new `SourceBusinessIdentifier`.
+            ///
+            /// - Parameters:
+            ///   - system:
+            ///   - value:
+            public init(
+                system: Swift.String,
+                value: Swift.String
+            ) {
+                self.system = system
+                self.value = value
+            }
+            public enum CodingKeys: String, CodingKey {
+                case system
+                case value
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.system = try container.decode(
+                    Swift.String.self,
+                    forKey: .system
+                )
+                self.value = try container.decode(
+                    Swift.String.self,
+                    forKey: .value
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "system",
+                    "value"
+                ])
+            }
+        }
+        /// Server-assigned logical source shared by a participant's authorized installations for one native repository. Identifiers are not credentials or provider attestation. Reinstalling does not change this identity.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/ParticipantSource`.
         public struct ParticipantSource: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/id`.
             public var id: Swift.String
-            /// - Remark: Generated from `#/components/schemas/ParticipantSource/registrationID`.
-            public var registrationID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/keyID`.
+            public var keyID: Swift.String
+            /// Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/keyEpoch`.
+            public var keyEpoch: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/repositoryKind`.
+            public var repositoryKind: Components.Schemas.NativeSourceRepository
+            /// - Remark: Generated from `#/components/schemas/ParticipantSource/repositoryScope`.
+            public var repositoryScope: Components.Schemas.SourceBusinessIdentifier
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case participantApp = "participant-app"
             }
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/kind`.
             public var kind: Components.Schemas.ParticipantSource.KindPayload
-            /// Immutable namespace for event identifiers only, not HMAC identifiers.
+            /// Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/eventIdentifierSystem`.
             public var eventIdentifierSystem: Swift.String
-            /// Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
+            /// Derive DeploymentIdentifierSystems from this server-assigned root, keyID and keyEpoch. The derived recordVersion system must equal eventIdentifierSystem. Use the supplied repositoryScope in all conversions and retain exact staged record bytes across retries.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/identifierRoot`.
             public var identifierRoot: Swift.String
-            /// Complete FHIR Patient business identifier assigned to this participant.
+            /// Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/participantIdentifier`.
             public struct ParticipantIdentifierPayload: Codable, Hashable, Sendable {
@@ -1463,13 +3587,13 @@ extension Components {
                     ])
                 }
             }
-            /// Complete FHIR Patient business identifier assigned to this participant.
+            /// Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/participantIdentifier`.
             public var participantIdentifier: Components.Schemas.ParticipantSource.ParticipantIdentifierPayload
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/createdAt`.
             public var createdAt: Foundation.Date
-            /// Present only after permanent revocation; never cleared.
+            /// Permanent logical-source revocation affects every installation; never cleared.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/revokedAt`.
             public var revokedAt: Foundation.Date?
@@ -1477,16 +3601,22 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id:
-            ///   - registrationID:
+            ///   - keyID:
+            ///   - keyEpoch: Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+            ///   - repositoryKind:
+            ///   - repositoryScope:
             ///   - kind:
-            ///   - eventIdentifierSystem: Immutable namespace for event identifiers only, not HMAC identifiers.
-            ///   - identifierRoot: Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
-            ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant.
+            ///   - eventIdentifierSystem: Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
+            ///   - identifierRoot: Derive DeploymentIdentifierSystems from this server-assigned root, keyID and keyEpoch. The derived recordVersion system must equal eventIdentifierSystem. Use the supplied repositoryScope in all conversions and retain exact staged record bytes across retries.
+            ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant within this deployment.
             ///   - createdAt:
-            ///   - revokedAt: Present only after permanent revocation; never cleared.
+            ///   - revokedAt: Permanent logical-source revocation affects every installation; never cleared.
             public init(
                 id: Swift.String,
-                registrationID: Swift.String,
+                keyID: Swift.String,
+                keyEpoch: Swift.String,
+                repositoryKind: Components.Schemas.NativeSourceRepository,
+                repositoryScope: Components.Schemas.SourceBusinessIdentifier,
                 kind: Components.Schemas.ParticipantSource.KindPayload,
                 eventIdentifierSystem: Swift.String,
                 identifierRoot: Swift.String,
@@ -1495,7 +3625,10 @@ extension Components {
                 revokedAt: Foundation.Date? = nil
             ) {
                 self.id = id
-                self.registrationID = registrationID
+                self.keyID = keyID
+                self.keyEpoch = keyEpoch
+                self.repositoryKind = repositoryKind
+                self.repositoryScope = repositoryScope
                 self.kind = kind
                 self.eventIdentifierSystem = eventIdentifierSystem
                 self.identifierRoot = identifierRoot
@@ -1505,7 +3638,10 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case id
-                case registrationID
+                case keyID
+                case keyEpoch
+                case repositoryKind
+                case repositoryScope
                 case kind
                 case eventIdentifierSystem
                 case identifierRoot
@@ -1519,9 +3655,21 @@ extension Components {
                     Swift.String.self,
                     forKey: .id
                 )
-                self.registrationID = try container.decode(
+                self.keyID = try container.decode(
                     Swift.String.self,
-                    forKey: .registrationID
+                    forKey: .keyID
+                )
+                self.keyEpoch = try container.decode(
+                    Swift.String.self,
+                    forKey: .keyEpoch
+                )
+                self.repositoryKind = try container.decode(
+                    Components.Schemas.NativeSourceRepository.self,
+                    forKey: .repositoryKind
+                )
+                self.repositoryScope = try container.decode(
+                    Components.Schemas.SourceBusinessIdentifier.self,
+                    forKey: .repositoryScope
                 )
                 self.kind = try container.decode(
                     Components.Schemas.ParticipantSource.KindPayload.self,
@@ -1549,13 +3697,156 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "id",
-                    "registrationID",
+                    "keyID",
+                    "keyEpoch",
+                    "repositoryKind",
+                    "repositoryScope",
                     "kind",
                     "eventIdentifierSystem",
                     "identifierRoot",
                     "participantIdentifier",
                     "createdAt",
                     "revokedAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation`.
+        public struct ParticipantSourceInstallation: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/registrationID`.
+            public var registrationID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/sourceID`.
+            public var sourceID: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/createdAt`.
+            public var createdAt: Foundation.Date
+            /// Permanent installation revocation; other installations retain independent authority.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceInstallation/revokedAt`.
+            public var revokedAt: Foundation.Date?
+            /// Creates a new `ParticipantSourceInstallation`.
+            ///
+            /// - Parameters:
+            ///   - registrationID:
+            ///   - sourceID:
+            ///   - createdAt:
+            ///   - revokedAt: Permanent installation revocation; other installations retain independent authority.
+            public init(
+                registrationID: Swift.String,
+                sourceID: Swift.String,
+                createdAt: Foundation.Date,
+                revokedAt: Foundation.Date? = nil
+            ) {
+                self.registrationID = registrationID
+                self.sourceID = sourceID
+                self.createdAt = createdAt
+                self.revokedAt = revokedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case registrationID
+                case sourceID
+                case createdAt
+                case revokedAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.registrationID = try container.decode(
+                    Swift.String.self,
+                    forKey: .registrationID
+                )
+                self.sourceID = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceID
+                )
+                self.createdAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .createdAt
+                )
+                self.revokedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .revokedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "registrationID",
+                    "sourceID",
+                    "createdAt",
+                    "revokedAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration`.
+        public struct ParticipantSourceRegistration: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration/source`.
+            public var source: Components.Schemas.ParticipantSource
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceRegistration/installation`.
+            public var installation: Components.Schemas.ParticipantSourceInstallation
+            /// Creates a new `ParticipantSourceRegistration`.
+            ///
+            /// - Parameters:
+            ///   - source:
+            ///   - installation:
+            public init(
+                source: Components.Schemas.ParticipantSource,
+                installation: Components.Schemas.ParticipantSourceInstallation
+            ) {
+                self.source = source
+                self.installation = installation
+            }
+            public enum CodingKeys: String, CodingKey {
+                case source
+                case installation
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.source = try container.decode(
+                    Components.Schemas.ParticipantSource.self,
+                    forKey: .source
+                )
+                self.installation = try container.decode(
+                    Components.Schemas.ParticipantSourceInstallation.self,
+                    forKey: .installation
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "source",
+                    "installation"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery`.
+        public struct ParticipantSourceIdentityRecovery: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery/registration`.
+            public var registration: Components.Schemas.ParticipantSourceRegistration
+            /// Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantSourceIdentityRecovery/identityKeyBase64`.
+            public var identityKeyBase64: Swift.String
+            /// Creates a new `ParticipantSourceIdentityRecovery`.
+            ///
+            /// - Parameters:
+            ///   - registration:
+            ///   - identityKeyBase64: Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
+            public init(
+                registration: Components.Schemas.ParticipantSourceRegistration,
+                identityKeyBase64: Swift.String
+            ) {
+                self.registration = registration
+                self.identityKeyBase64 = identityKeyBase64
+            }
+            public enum CodingKeys: String, CodingKey {
+                case registration
+                case identityKeyBase64
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.registration = try container.decode(
+                    Components.Schemas.ParticipantSourceRegistration.self,
+                    forKey: .registration
+                )
+                self.identityKeyBase64 = try container.decode(
+                    Swift.String.self,
+                    forKey: .identityKeyBase64
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "registration",
+                    "identityKeyBase64"
                 ])
             }
         }
@@ -1567,7 +3858,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/LocalizedString`.
         public typealias LocalizedString = GroveLocalization.LocalizationsDictionary<Swift.String>
-        /// Calendar-relative offset applied from the session creation time. At least one component must be provided. Uses Swift DateComponents naming (singular).
+        /// Calendar-relative offset from the anchor specified by the containing policy. At least one component must be provided. Uses Swift DateComponents naming (singular).
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/DateComponents`.
@@ -2060,6 +4351,8 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/StudyPatchInput`.
         public struct StudyPatchInput: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyPatchInput/enrollmentPeriod`.
+            public var enrollmentPeriod: Components.Schemas.EnrollmentPeriod?
             /// Empty disables backend collection in the next publication; existing publications are unchanged.
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/collectionRequirements`.
@@ -2085,6 +4378,7 @@ extension Components {
             /// Creates a new `StudyPatchInput`.
             ///
             /// - Parameters:
+            ///   - enrollmentPeriod:
             ///   - collectionRequirements: Empty disables backend collection in the next publication; existing publications are unchanged.
             ///   - locales: Supported locales for the study
             ///   - icon: Icon identifier (e.g. SF Symbol name)
@@ -2094,6 +4388,7 @@ extension Components {
             ///   - visibility:
             ///   - enrollmentConditions:
             public init(
+                enrollmentPeriod: Components.Schemas.EnrollmentPeriod? = nil,
                 collectionRequirements: [Components.Schemas.CollectionRequirement]? = nil,
                 locales: [Components.Schemas.LocalizationKey]? = nil,
                 icon: Swift.String? = nil,
@@ -2103,6 +4398,7 @@ extension Components {
                 visibility: Components.Schemas.StudyVisibility? = nil,
                 enrollmentConditions: Components.Schemas.EnrollmentConditions? = nil
             ) {
+                self.enrollmentPeriod = enrollmentPeriod
                 self.collectionRequirements = collectionRequirements
                 self.locales = locales
                 self.icon = icon
@@ -2113,6 +4409,7 @@ extension Components {
                 self.enrollmentConditions = enrollmentConditions
             }
             public enum CodingKeys: String, CodingKey {
+                case enrollmentPeriod
                 case collectionRequirements
                 case locales
                 case icon
@@ -2127,6 +4424,8 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/StudyResponse`.
         public struct StudyResponse: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyResponse/enrollmentPeriod`.
+            public var enrollmentPeriod: Components.Schemas.EnrollmentPeriod
             /// Opaque revision of the complete editable study draft.
             ///
             /// - Remark: Generated from `#/components/schemas/StudyResponse/draftRevision`.
@@ -2156,6 +4455,7 @@ extension Components {
             /// Creates a new `StudyResponse`.
             ///
             /// - Parameters:
+            ///   - enrollmentPeriod:
             ///   - draftRevision: Opaque revision of the complete editable study draft.
             ///   - collectionRequirements:
             ///   - id:
@@ -2167,6 +4467,7 @@ extension Components {
             ///   - visibility:
             ///   - enrollmentConditions:
             public init(
+                enrollmentPeriod: Components.Schemas.EnrollmentPeriod,
                 draftRevision: Swift.String,
                 collectionRequirements: [Components.Schemas.CollectionRequirement],
                 id: Swift.String,
@@ -2178,6 +4479,7 @@ extension Components {
                 visibility: Components.Schemas.StudyVisibility,
                 enrollmentConditions: Components.Schemas.EnrollmentConditions
             ) {
+                self.enrollmentPeriod = enrollmentPeriod
                 self.draftRevision = draftRevision
                 self.collectionRequirements = collectionRequirements
                 self.id = id
@@ -2190,6 +4492,7 @@ extension Components {
                 self.enrollmentConditions = enrollmentConditions
             }
             public enum CodingKeys: String, CodingKey {
+                case enrollmentPeriod
                 case draftRevision
                 case collectionRequirements
                 case id
@@ -3783,6 +6086,10 @@ extension Components {
             public var stateVersion: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/EnrollmentResponse/enrolledAt`.
             public var enrolledAt: Foundation.Date
+            /// Exclusive enrollment end retained when joining; independent of withdrawal and historical measurement ranges.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EnrollmentResponse/endsAt`.
+            public var endsAt: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/EnrollmentResponse/withdrawnAt`.
             public var withdrawnAt: Foundation.Date?
             /// Creates a new `EnrollmentResponse`.
@@ -3794,6 +6101,7 @@ extension Components {
             ///   - currentRevision:
             ///   - stateVersion: Monotonic enrollment concurrency version; independent of the adopted study revision.
             ///   - enrolledAt:
+            ///   - endsAt: Exclusive enrollment end retained when joining; independent of withdrawal and historical measurement ranges.
             ///   - withdrawnAt:
             public init(
                 id: Swift.String,
@@ -3802,6 +6110,7 @@ extension Components {
                 currentRevision: Swift.Int,
                 stateVersion: Swift.Int64,
                 enrolledAt: Foundation.Date,
+                endsAt: Foundation.Date? = nil,
                 withdrawnAt: Foundation.Date? = nil
             ) {
                 self.id = id
@@ -3810,6 +6119,7 @@ extension Components {
                 self.currentRevision = currentRevision
                 self.stateVersion = stateVersion
                 self.enrolledAt = enrolledAt
+                self.endsAt = endsAt
                 self.withdrawnAt = withdrawnAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -3819,6 +6129,7 @@ extension Components {
                 case currentRevision
                 case stateVersion
                 case enrolledAt
+                case endsAt
                 case withdrawnAt
             }
         }

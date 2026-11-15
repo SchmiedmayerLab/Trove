@@ -15,6 +15,12 @@ import Logging
 final class StudyService: Module, @unchecked Sendable {
     @Dependency(StudyRepository.self) var repository
     @Dependency(AuthorizationService.self) var authorizationService
+    @Dependency(RecordingDownloadService.self) var recordingDownloads
+    let exportLimits: StudyExportLimits
+
+    init(exportLimits: StudyExportLimits = .standard) {
+        self.exportLimits = exportLimits
+    }
 
     func getStudy(id: UUID) async throws -> Study {
         try await readDraft(id: id) { study, _ in study }

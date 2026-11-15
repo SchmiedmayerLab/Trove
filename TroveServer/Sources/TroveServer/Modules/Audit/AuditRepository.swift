@@ -64,24 +64,33 @@ enum AuditRepository {
         let groupID: UUID?
         let participantID: UUID?
         let sourceBindingID: UUID?
+        let providerRegistrationID: UUID?
         switch event.scope {
         case let .study(study, group):
             (studyID, groupID, participantID, sourceBindingID) = (study, group, nil, nil)
+            providerRegistrationID = nil
         case let .participantSource(participant, source):
             (studyID, groupID, participantID, sourceBindingID) = (nil, nil, participant, source)
+            providerRegistrationID = nil
+        case let .providerRegistration(registration):
+            (studyID, groupID, participantID, sourceBindingID) = (nil, nil, nil, nil)
+            providerRegistrationID = registration
+        case let .participantProvider(participant, registration):
+            (studyID, groupID, participantID, sourceBindingID) = (nil, nil, participant, nil)
+            providerRegistrationID = registration
         }
         try await sql.raw("""
             INSERT INTO audit_events (
                 id, occurred_at, actor_issuer, actor_subject, initiator_issuer, initiator_subject,
                 executing_client_id, delegation_id,
-                action, scope_kind, study_id, group_id, participant_id, source_binding_id,
+                action, scope_kind, study_id, group_id, participant_id, source_binding_id, provider_registration_id,
                 target_id, target_version, outcome, correlation_id, application_revision
             ) VALUES (
                 \(bind: event.id), \(bind: event.occurredAt), \(bind: event.context.actor.issuer), \(bind: event.context.actor.subject),
                 \(bind: event.context.initiator?.issuer), \(bind: event.context.initiator?.subject),
                 \(bind: event.context.executingClientID), \(bind: event.context.delegationID),
                 \(bind: event.action.rawValue), \(bind: event.scope.kind.rawValue), \(bind: studyID), \(bind: groupID),
-                \(bind: participantID), \(bind: sourceBindingID),
+                \(bind: participantID), \(bind: sourceBindingID), \(bind: providerRegistrationID),
                 \(bind: event.target.id), \(bind: event.target.version), \(bind: outcome),
                 \(bind: event.context.correlationID), \(bind: event.context.applicationRevision)
             )

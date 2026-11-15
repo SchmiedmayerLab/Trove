@@ -22,27 +22,28 @@ struct SourceBindingTests {
                 let nonce = UUID()
                 // Preserve the registration race without Swift 6.3's large-result async-let teardown failure.
                 let (binding, retry) = try await withThrowingTaskGroup(of: SourceBinding.self) { requests in
-                    requests.addTask { try await service.register(registrationID: nonce) }
-                    requests.addTask { try await service.register(registrationID: nonce) }
+                    requests.addTask { try await service.registerSource(registrationID: nonce) }
+                    requests.addTask { try await service.registerSource(registrationID: nonce) }
                     let first = try #require(try await requests.next())
                     let second = try #require(try await requests.next())
                     return (first, second)
                 }
                 #expect(binding == retry)
-                #expect(binding.registrationID == nonce)
+                #expect(binding.keyID != nonce)
                 #expect(binding.participantID == participantID)
                 #expect(binding.identifierRoot == TestApp.issuer + "/trove/sources/" + binding.id.uuidString.lowercased())
                 #expect(binding.kind == .participantApp)
-                #expect(binding.eventIdentifierSystem == binding.identifierRoot + "/NamingSystem/grove-event-v0")
+                let versionSystem = binding.identifierRoot + "/NamingSystem/grove-record-version-v0/" + binding.keyID.uuidString.lowercased() + "/1"
+                #expect(binding.eventIdentifierSystem == versionSystem)
                 #expect(binding.participantIdentifierSystem == TestApp.issuer + "/trove/participants")
                 #expect(binding.participantIdentifierValue == participantID.uuidString.lowercased())
                 #expect(binding.revokedAt == nil)
                 let loaded = try await service.find(id: binding.id)
                 #expect(loaded == binding)
                 try await Self.expectCount(1, table: "source_bindings", on: app.db)
-                try await Self.expectCount(1, table: "audit_events", on: app.db)
+                try await Self.expectCount(2, table: "audit_events", on: app.db)
                 let sql = try #require(app.db as? any SQLDatabase)
-                let row = try #require(try await sql.raw("SELECT * FROM audit_events").first())
+                let row = try #require(try await sql.raw("SELECT * FROM audit_events WHERE action = 'source.registered'").first())
                 #expect(try row.decode(column: "action", as: String.self) == "source.registered")
                 #expect(try row.decode(column: "participant_id", as: UUID.self) == participantID)
                 #expect(try row.decode(column: "source_binding_id", as: UUID.self) == binding.id)
@@ -55,11 +56,11 @@ struct SourceBindingTests {
     func unknownStoredSourceKindFailsDecoding(kind: String) async throws {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
-                let binding = try await service.register(registrationID: UUID())
+                let binding = try await service.registerSource(registrationID: UUID())
                 let sql = try #require(app.db as? any SQLDatabase)
                 // Project a corrupt value without disabling or changing schema constraints.
                 let row = try #require(try await sql.raw("""
-                    SELECT id, participant_id, registration_id, \(bind: kind) AS kind,
+                    SELECT id, participant_id, key_id, key_epoch, repository_kind, \(bind: kind) AS kind,
                         identifier_root, event_identifier_system, participant_identifier_system, participant_identifier_value,
                         created_at, revoked_at
                     FROM source_bindings WHERE id = \(bind: binding.id)
@@ -76,16 +77,16 @@ struct SourceBindingTests {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
                 let nonce = UUID()
-                let binding = try await service.register(registrationID: nonce)
+                let binding = try await service.registerSource(registrationID: nonce)
                 let revoked = try await service.revoke(id: binding.id)
                 let revokedAt = try #require(revoked.revokedAt)
                 #expect(revokedAt >= revoked.createdAt)
                 #expect(revoked.identifierRoot == binding.identifierRoot)
                 #expect(try await service.revoke(id: binding.id) == revoked)
-                #expect(try await service.register(registrationID: nonce) == revoked)
+                #expect(try await service.registerSource(registrationID: nonce) == revoked)
                 #expect(try await service.find(id: binding.id) == revoked)
                 try await Self.expectCount(1, table: "source_bindings", on: app.db)
-                try await Self.expectCount(2, table: "audit_events", on: app.db)
+                try await Self.expectCount(3, table: "audit_events", on: app.db)
                 let sql = try #require(app.db as? any SQLDatabase)
                 let row = try #require(try await sql.raw("SELECT * FROM audit_events WHERE action = 'source.revoked'").first())
                 #expect(try row.decode(column: "target_id", as: UUID.self) == binding.id)
@@ -98,13 +99,13 @@ struct SourceBindingTests {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
                 let nonce = UUID()
-                let binding = try await service.register(registrationID: nonce)
+                let binding = try await service.registerSource(registrationID: nonce)
                 let otherIssuer = "https://other.example.test/realms/trove"
                 let other = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderIssuer: otherIssuer)
                 try await AuthContext.$current.withValue(Self.context(issuer: otherIssuer)) {
                     await #expect { try await service.find(id: binding.id) } throws: { ($0 as? ServerError)?.status.code == 404 }
                     await #expect { try await service.revoke(id: binding.id) } throws: { ($0 as? ServerError)?.status.code == 404 }
-                    let separate = try await service.register(registrationID: nonce)
+                    let separate = try await service.registerSource(registrationID: nonce)
                     #expect(separate.id != binding.id)
                     #expect(separate.identifierRoot != binding.identifierRoot)
                     #expect(separate.eventIdentifierSystem != binding.eventIdentifierSystem)
@@ -122,11 +123,11 @@ struct SourceBindingTests {
             let service = SourceBindingService(database: app.db)
             let context = Self.context(roles: hasParticipantRole ? [TestApp.participantRole] : [TestApp.researcherRole])
             await AuthContext.$current.withValue(context) {
-                await #expect { try await service.register(registrationID: UUID()) } throws: {
+                await #expect { try await service.registerSource(registrationID: UUID()) } throws: {
                     ($0 as? ServerError)?.status.code == (hasParticipantRole ? 404 : 403)
                 }
             }
-            await #expect { try await service.register(registrationID: UUID()) } throws: { ($0 as? ServerError)?.status.code == 401 }
+            await #expect { try await service.registerSource(registrationID: UUID()) } throws: { ($0 as? ServerError)?.status.code == 401 }
             try await Self.expectCount(0, table: "source_bindings", on: app.db)
             try await Self.expectCount(0, table: "audit_events", on: app.db)
         }
@@ -136,14 +137,14 @@ struct SourceBindingTests {
     func auditFailureRollsBackRegistrationAndRevocation(registering: Bool) async throws {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
-                let existing: SourceBinding? = if registering { nil } else { try await service.register(registrationID: UUID()) }
+                let existing: SourceBinding? = if registering { nil } else { try await service.registerSource(registrationID: UUID()) }
                 let sql = try #require(app.db as? any SQLDatabase)
                 try await sql.raw("DROP TABLE audit_events").run()
                 await #expect(throws: (any Error).self) {
                     if let existing {
                         _ = try await service.revoke(id: existing.id)
                     } else {
-                        _ = try await service.register(registrationID: UUID())
+                        _ = try await service.registerSource(registrationID: UUID())
                     }
                 }
                 try await Self.expectCount(registering ? 0 : 1, table: "source_bindings", on: app.db)
@@ -155,7 +156,7 @@ struct SourceBindingTests {
     }
 
     @Test(arguments: [
-        "registration_id = '00000000-0000-4000-8000-000000000001'",
+        "key_id = '00000000-0000-4000-8000-000000000001'",
         "kind = 'provider'", "identifier_root = 'https://other.example.test/source'", "event_identifier_system = 'urn:uuid:other'",
         "participant_identifier_system = 'https://other.example.test/participants'",
         "participant_identifier_value = 'other'", "created_at = NULL"
@@ -163,7 +164,7 @@ struct SourceBindingTests {
     func persistedIdentityCannotBeChanged(assignment: String) async throws {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
-                let binding = try await service.register(registrationID: UUID())
+                let binding = try await service.registerSource(registrationID: UUID())
                 let sql = try #require(app.db as? any SQLDatabase)
                 await #expect {
                     try await sql.raw(SQLQueryString("UPDATE source_bindings SET " + assignment)).run()
@@ -177,7 +178,7 @@ struct SourceBindingTests {
     func ownerRetentionAndRevocationTimeAreDatabaseConstraints() async throws {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, participantID in
-                let binding = try await service.register(registrationID: UUID())
+                let binding = try await service.registerSource(registrationID: UUID())
                 let other = try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "other")
                 let sql = try #require(app.db as? any SQLDatabase)
                 await #expect {
@@ -202,7 +203,8 @@ struct SourceBindingTests {
     func revokedStreamCannotBeRemovedToReuseItsRegistrationNonce() async throws {
         try await TestApp.withApp { app, _ in
             try await Self.withOwner(on: app) { service, _ in
-                let binding = try await service.register(registrationID: UUID())
+                let nonce = UUID()
+                let binding = try await service.registerSource(registrationID: nonce)
                 let revoked = try await service.revoke(id: binding.id)
                 let sql = try #require(app.db as? any SQLDatabase)
                 await #expect {
@@ -215,7 +217,7 @@ struct SourceBindingTests {
                         try await sql.raw("TRUNCATE source_bindings CASCADE").run()
                     } throws: { ($0 as? any DatabaseError)?.isConstraintFailure == true }
                 }
-                #expect(try await service.register(registrationID: binding.registrationID) == revoked)
+                #expect(try await service.registerSource(registrationID: nonce) == revoked)
             }
         }
     }

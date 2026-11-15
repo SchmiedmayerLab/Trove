@@ -26,7 +26,9 @@ struct DatabaseRuntimePrivilegesTests {
             #expect(try row.decode(column: "effective", as: String.self) == fixture.role)
             #expect(try row.decode(column: "authenticated", as: String.self) == fixture.role)
             try await DatabaseRuntimePrivileges.validate(on: fixture.database)
-            for table in ["study_delegations", "study_publication_candidates"] {
+            for table in [
+                "study_delegations", "study_publication_candidates", "source_installations", "source_identity_keys", "source_identity_key_envelopes"
+            ] {
                 let permissions = try #require(try await sql.raw("""
                     SELECT has_table_privilege(current_user, \(bind: table), 'SELECT')
                         AND has_table_privilege(current_user, \(bind: table), 'INSERT') AS allowed
@@ -65,19 +67,24 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM enrollment_consents WHERE false", "TRUNCATE enrollment_consents",
         "UPDATE source_bindings SET participant_id = participant_id WHERE false",
         "DELETE FROM source_bindings WHERE false", "TRUNCATE source_bindings",
+        "UPDATE source_identity_keys SET key_id = key_id WHERE false", "DELETE FROM source_identity_keys WHERE false",
+        "TRUNCATE source_identity_keys", "UPDATE source_identity_key_envelopes SET sealed_key = sealed_key WHERE false",
+        "DELETE FROM source_identity_key_envelopes WHERE false", "TRUNCATE source_identity_key_envelopes",
         "UPDATE study_delegations SET client_id = client_id WHERE false",
         "DELETE FROM study_delegations WHERE false", "TRUNCATE study_delegations",
         "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
         "DELETE FROM study_publication_candidates WHERE false", "TRUNCATE study_publication_candidates",
         "UPDATE clinical_events SET raw_sha256 = raw_sha256 WHERE false", "DELETE FROM clinical_events WHERE false", "TRUNCATE clinical_events",
+        "UPDATE clinical_event_representations SET raw_sha256 = raw_sha256 WHERE false",
+        "DELETE FROM clinical_event_representations WHERE false", "TRUNCATE clinical_event_representations",
         "UPDATE clinical_event_nodes SET ordinal = ordinal WHERE false",
         "DELETE FROM clinical_event_nodes WHERE false", "TRUNCATE clinical_event_nodes",
         "UPDATE clinical_point_facts SET quantity_value = quantity_value WHERE false",
         "DELETE FROM clinical_point_facts WHERE false", "TRUNCATE clinical_point_facts",
         "UPDATE study_data_grants SET consent_id = consent_id WHERE false", "DELETE FROM study_data_grants WHERE false", "TRUNCATE study_data_grants",
         "UPDATE clinical_source_records SET identifier_value = identifier_value WHERE false",
-        "DELETE FROM clinical_record_events WHERE false", "TRUNCATE clinical_output_bindings",
-        "UPDATE clinical_output_retractions SET kind = kind WHERE false", "TRUNCATE clinical_output_retractions",
+        "DELETE FROM clinical_record_events WHERE false", "TRUNCATE clinical_output_bindings", "DELETE FROM clinical_retraction_reversals",
+        "UPDATE clinical_record_retractions SET kind = kind WHERE false", "TRUNCATE clinical_record_retractions",
         "DELETE FROM clinical_questionnaire_contexts WHERE false", "TRUNCATE clinical_point_derivations",
         "UPDATE clinical_attribution_commands SET target_intent = target_intent WHERE false",
         "DELETE FROM clinical_attribution_commands WHERE false", "TRUNCATE clinical_attribution_commands",
@@ -109,10 +116,10 @@ struct DatabaseRuntimePrivilegesTests {
             let sql = try #require(fixture.database as? any SQLDatabase)
             try await sql.raw("""
                 INSERT INTO source_bindings (
-                    id, participant_id, registration_id, kind, identifier_root, event_identifier_system,
+                    id, participant_id, key_id, key_epoch, repository_kind, kind, identifier_root, event_identifier_system,
                     participant_identifier_system, participant_identifier_value, created_at
                 ) VALUES (
-                    \(bind: id), \(bind: participant.requireId()), \(bind: UUID()), 'participant-app',
+                    \(bind: id), \(bind: participant.requireId()), \(bind: UUID()), '1', 'healthkit', 'participant-app',
                     'https://example.invalid', 'https://example.invalid/source',
                     'https://example.invalid/participant', 'synthetic', CURRENT_TIMESTAMP
                 )
@@ -166,17 +173,21 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (evidence_digest) ON public.enrollment_consents", "UPDATE ON public.source_bindings",
         "DELETE ON public.source_bindings", "TRUNCATE ON public.source_bindings", "MAINTAIN ON public.source_bindings",
         "UPDATE (participant_id) ON public.source_bindings",
+        "UPDATE (credential_verifier) ON public.source_installations", "UPDATE (key_id) ON public.source_identity_keys",
+        "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE ON public.study_delegations", "UPDATE (client_id) ON public.study_delegations",
         "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
         "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "DELETE ON public.study_publication_candidates", "TRUNCATE ON public.study_publication_candidates",
+        "UPDATE ON public.clinical_event_representations", "UPDATE (raw_bytes) ON public.clinical_event_representations",
+        "DELETE ON public.clinical_event_representations", "TRUNCATE ON public.clinical_event_representations",
         "UPDATE ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
         "TRUNCATE ON public.clinical_point_facts", "MAINTAIN ON public.study_data_grants",
         "UPDATE (raw_sha256) ON public.clinical_events", "UPDATE (ordinal) ON public.clinical_event_nodes",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "UPDATE (consent_id) ON public.study_data_grants",
         "UPDATE (identifier_value) ON public.clinical_source_records", "DELETE ON public.clinical_record_events",
-        "UPDATE ON public.clinical_attribution_commands",
-        "TRUNCATE ON public.clinical_output_bindings", "UPDATE ON public.clinical_output_retractions",
+        "UPDATE ON public.clinical_attribution_commands", "DELETE ON public.clinical_retraction_reversals",
+        "TRUNCATE ON public.clinical_output_bindings", "UPDATE ON public.clinical_record_retractions",
         "UPDATE ON public.clinical_questionnaire_contexts", "DELETE ON public.clinical_point_derivations"
     ])
     func excessiveDirectPrivilegesAreRejected(grant: String) async throws {
@@ -193,12 +204,15 @@ struct DatabaseRuntimePrivilegesTests {
         "INSERT ON public.enrollment_consents", "SELECT (bundle_digest) ON public.published_studies",
         "INSERT (evidence_digest) ON public.enrollment_consents", "UPDATE (revoked_at) ON public.source_bindings",
         "SELECT ON public.source_bindings", "INSERT (participant_id) ON public.source_bindings",
+        "SELECT ON public.source_installations", "UPDATE (revoked_at) ON public.source_installations",
+        "SELECT ON public.source_identity_keys", "INSERT ON public.source_identity_key_envelopes",
         "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
         "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
+        "SELECT ON public.clinical_event_representations", "INSERT ON public.clinical_event_representations",
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
         "SELECT (quantity_value) ON public.clinical_point_facts", "INSERT (consent_id) ON public.study_data_grants",
         "INSERT ON public.clinical_source_records", "SELECT ON public.clinical_record_events", "INSERT ON public.clinical_output_bindings",
-        "INSERT ON public.clinical_output_retractions",
+        "INSERT ON public.clinical_record_retractions", "INSERT ON public.clinical_retraction_reversals",
         "INSERT ON public.clinical_questionnaire_contexts", "INSERT ON public.clinical_point_derivations",
         "INSERT ON public.clinical_attribution_commands"
     ])
@@ -223,7 +237,10 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (bundle_digest) ON public.published_studies", "DELETE ON public.enrollment_consents",
         "UPDATE (client_id) ON public.study_delegations", "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "UPDATE (participant_id) ON public.source_bindings",
+        "UPDATE (credential_verifier) ON public.source_installations", "UPDATE (key_id) ON public.source_identity_keys",
+        "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE (raw_sha256) ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
+        "UPDATE (raw_bytes) ON public.clinical_event_representations",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "TRUNCATE ON public.study_data_grants"
     ])
     func excessivePublicGrantsAreRejected(grant: String) async throws {
@@ -248,7 +265,9 @@ struct DatabaseRuntimePrivilegesTests {
         }
     }
 
-    @Test(arguments: ["audit_events", "clinical_events", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"])
+    @Test(arguments: [
+        "audit_events", "clinical_events", "clinical_event_representations", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"
+    ])
     func indirectOwnershipThroughNonInheritedGroupIsRejected(table: String) async throws {
         try await Self.withRuntime { fixture in
             try await Self.withGroup(on: fixture) { group in
@@ -260,14 +279,19 @@ struct DatabaseRuntimePrivilegesTests {
             }
         }
     }
+}
 
+
+extension DatabaseRuntimePrivilegesTests {
     @Test(arguments: [
         "public.audit_events", "public._fluent_migrations", "public.published_studies",
-        "public.enrollment_consents", "public.source_bindings", "public.clinical_events",
+        "public.enrollment_consents", "public.source_bindings", "public.source_installations",
+        "public.source_identity_keys", "public.source_identity_key_envelopes",
+        "public.clinical_events", "public.clinical_event_representations",
         "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
-        "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_output_retractions",
-        "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
+        "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
+        "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
         "public.clinical_attribution_commands"
     ])
     func absentProtectedTablesFailClosed(table: String) async throws {
@@ -283,7 +307,7 @@ struct DatabaseRuntimePrivilegesTests {
 
 
 extension DatabaseRuntimePrivilegesTests {
-    private struct RuntimeFixture: Sendable {
+    struct RuntimeFixture: Sendable {
         let database: any Database
         let operatorDatabase: any Database
         let admin: any SQLDatabase
@@ -302,7 +326,7 @@ extension DatabaseRuntimePrivilegesTests {
         }
     }
 
-    private static func withRuntime(_ body: @escaping @Sendable (RuntimeFixture) async throws -> Void) async throws {
+    static func withRuntime(_ body: @escaping @Sendable (RuntimeFixture) async throws -> Void) async throws {
         try await TestApp.withApp { app, _ in
             let admin = try #require(app.db as? any SQLDatabase)
             let result = try await admin.raw("SELECT current_database() AS name").first()
@@ -343,18 +367,21 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
-            GRANT SELECT, INSERT ON public.audit_events, public.published_studies,
-                public.study_delegations, public.study_publication_candidates,
-                public.enrollment_consents, public.source_bindings, public.clinical_events,
+            GRANT SELECT, INSERT ON public.audit_events, public.published_studies, public.study_delegations, public.study_publication_candidates,
+                public.enrollment_consents, public.source_bindings, public.source_installations,
+                public.source_identity_keys, public.source_identity_key_envelopes,
+                public.clinical_events, public.clinical_event_representations,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
-                public.clinical_output_retractions,
-                public.clinical_questionnaire_contexts, public.clinical_point_derivations,
-                public.clinical_attribution_commands TO \(ident: role)
+                public.clinical_record_retractions, public.clinical_retraction_reversals, public.clinical_questionnaire_contexts,
+                public.clinical_point_derivations, public.clinical_attribution_commands, public.recording_transfers,
+                public.recording_transfer_attempts, public.recording_transfer_receipts, public.clinical_recording_attachments TO \(ident: role)
             """)
             .run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
+        try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
+        try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 
     /// SQL-role capability fixture, not a bypass of the production receiver's validation/authority checks.
@@ -371,6 +398,12 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
+            INSERT INTO clinical_event_representations (event_id, raw_sha256, raw_bytes, validator_identity, received_at, node_count)
+            VALUES (\(bind: eventID), \(bind: String(repeating: "b", count: 64)), \(bind: Data("synthetic-variant".utf8)),
+                'role-test', CURRENT_TIMESTAMP, 1)
+            """)
+            .run()
+        try await sql.raw("""
             INSERT INTO clinical_event_nodes (id, event_id, source_id, full_url, ordinal, resource_type)
             VALUES (\(bind: nodeID), \(bind: eventID), \(bind: sourceID), 'urn:runtime-fixture:point', 0, 'Observation')
             """)
@@ -378,9 +411,9 @@ extension DatabaseRuntimePrivilegesTests {
         let (recordID, bindingID) = try await appendRecordIdentity(on: sql, sourceID: sourceID, eventID: eventID)
         try await sql.raw("""
             INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                quantity_value, quantity_system, quantity_code, code_system, code)
+                effective_seconds, effective_fraction, value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
             VALUES (\(bind: nodeID), \(bind: sourceID), \(bind: eventID), \(bind: recordID), \(bind: bindingID),
-                \(bind: CollectionRequirement.supportedProfile), CURRENT_TIMESTAMP, '72',
+                \(bind: CollectionRequirement.supportedProfile), '2026-01-01T00:00:00Z', 1767225600, '', 'quantity', '72',
                 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4')
             """)
             .run()
@@ -392,7 +425,7 @@ extension DatabaseRuntimePrivilegesTests {
                 \(bind: consent.requireID()), \(bind: publication.requireID()), \(bind: publication.revision), CURRENT_TIMESTAMP)
             """)
             .run()
-        for table in ["clinical_events", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"] {
+        for table in ["clinical_events", "clinical_event_representations", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"] {
             let row = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM \(ident: table)").first())
             #expect(try row.decode(column: "count", as: Int.self) == 1)
         }
@@ -407,8 +440,8 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
-            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind)
-            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), 'active')
+            INSERT INTO clinical_record_events (event_id, source_id, record_id, kind, recorded_seconds, recorded_fraction)
+            VALUES (\(bind: eventID), \(bind: sourceID), \(bind: recordID), 'active', 1800000000, '')
             """)
             .run()
         try await sql.raw("""

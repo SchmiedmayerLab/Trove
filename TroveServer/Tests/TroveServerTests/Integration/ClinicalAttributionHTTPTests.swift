@@ -25,16 +25,23 @@ struct ClinicalAttributionHTTPTests {
                 commandId: UUID().uuidString,
                 targets: [.init(consentId: fixture.consentIDs[1].uuidString, outputFullUrls: ["urn:uuid:point"])]
             )
-            let first = try await Self.send(body, path: Self.path(fixture, event: event), token: token, on: app)
+            let first = try await Self.send(
+                body, path: Self.path(fixture, event: event), token: token, on: app, installationID: fixture.installationID
+            )
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: fixture.enrollmentIDs[1])
             }
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await configureServices(
-                    for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: FHIRValidationClient(application: reopened)
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: FHIRValidationClient(application: reopened),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
-                let retry = try await Self.send(body, path: Self.path(fixture, event: event), token: token, on: reopened)
+                let retry = try await Self.send(
+                    body, path: Self.path(fixture, event: event), token: token, on: reopened, installationID: fixture.installationID
+                )
                 #expect(retry == first)
                 #expect(retry.authorizedOutputCount == 1)
                 let store = ClinicalEventStore(database: reopened.db)
@@ -57,6 +64,7 @@ struct ClinicalAttributionHTTPTests {
             try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: "other-participant")
             try await app.test(.POST, Self.path(fixture, event: event), beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventAttribution(
                     commandId: UUID().uuidString,
                     targets: [.init(consentId: fixture.consentIDs[1].uuidString, outputFullUrls: ["urn:uuid:point"])]
@@ -76,6 +84,7 @@ struct ClinicalAttributionHTTPTests {
             let event = try await Self.seed(fixture, on: app)
             try await app.test(.POST, Self.path(fixture, event: event), beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventAttribution(
                     commandId: UUID().uuidString,
                     targets: [.init(consentId: fixture.consentIDs[1].uuidString, outputFullUrls: ["urn:uuid:point", output])]
@@ -94,7 +103,10 @@ extension ClinicalAttributionHTTPTests {
     private static func seed(_ fixture: ClinicalEventStoreTests.Fixture, on app: Application) async throws -> ClinicalEventReceipt {
         try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
             try await ClinicalEventStore(database: app.db).accept(
-                ClinicalEventStoreTests.event(source: fixture.source), sourceID: fixture.source.id, targets: [fixture.targets[0]]
+                ClinicalEventStoreTests.event(source: fixture.source),
+                sourceID: fixture.source.id,
+                targets: [fixture.targets[0]],
+                installation: fixture.installation
             )
         }
     }
@@ -104,11 +116,12 @@ extension ClinicalAttributionHTTPTests {
     }
 
     private static func send(
-        _ body: Components.Schemas.EventAttribution, path: String, token: String?, on app: Application
+        _ body: Components.Schemas.EventAttribution, path: String, token: String?, on app: Application, installationID: UUID
     ) async throws -> Components.Schemas.EventAttributionReceipt {
         var result: Components.Schemas.EventAttributionReceipt?
         try await app.test(.POST, path, beforeRequest: {
             $0.bearerAuth(token)
+            $0.sourceInstallation(installationID)
             try $0.encodeJSONBody(body)
         }) { response in
             try #require(response.status == .ok)

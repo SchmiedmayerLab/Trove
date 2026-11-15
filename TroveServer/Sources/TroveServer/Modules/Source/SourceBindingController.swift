@@ -17,35 +17,40 @@ extension Controller {
         guard case .json(let body) = input.body else {
             throw ServerError.jsonBodyRequired
         }
-        let binding = try await sourceBindingService.register(registrationID: body.registrationID.requireId())
-        return .ok(.init(body: .json(.init(binding))))
+        let registration = try await sourceInstallationService.register(
+            registrationID: body.registrationID.requireId(),
+            repositoryKind: SourceRepositoryKind(body.repositoryKind),
+            credential: SourceInstallationCredential(base64: body.credentialBase64)
+        )
+        return try .ok(.init(body: .json(.init(registration))))
     }
 
     func getParticipantSourcesSourceId(
         _ input: Operations.GetParticipantSourcesSourceId.Input
     ) async throws -> Operations.GetParticipantSourcesSourceId.Output {
         let binding = try await sourceBindingService.find(id: input.path.sourceId.requireId())
-        return .ok(.init(body: .json(.init(binding))))
+        return try .ok(.init(body: .json(.init(binding))))
     }
 
     func postParticipantSourcesSourceIdRevoke(
         _ input: Operations.PostParticipantSourcesSourceIdRevoke.Input
     ) async throws -> Operations.PostParticipantSourcesSourceIdRevoke.Output {
         let binding = try await sourceBindingService.revoke(id: input.path.sourceId.requireId())
-        return .ok(.init(body: .json(.init(binding))))
+        return try .ok(.init(body: .json(.init(binding))))
     }
 }
 
 
 extension Components.Schemas.ParticipantSource {
-    init(_ binding: SourceBinding) {
-        let kind: KindPayload = switch binding.kind {
-        case .participantApp: .participantApp
-        }
+    init(_ binding: SourceBinding) throws {
+        guard binding.kind == .participantApp else { throw ServerError.notFound("Native source binding not found") }
         self.init(
             id: binding.id.uuidString.lowercased(),
-            registrationID: binding.registrationID.uuidString.lowercased(),
-            kind: kind,
+            keyID: binding.keyID.uuidString.lowercased(),
+            keyEpoch: binding.keyEpoch.rawValue,
+            repositoryKind: try binding.repositoryKind.apiValue,
+            repositoryScope: .init(system: binding.identifierRoot + "/repository", value: binding.repositoryKind.rawValue),
+            kind: .participantApp,
             eventIdentifierSystem: binding.eventIdentifierSystem,
             identifierRoot: binding.identifierRoot,
             participantIdentifier: .init(system: binding.participantIdentifierSystem, value: binding.participantIdentifierValue),

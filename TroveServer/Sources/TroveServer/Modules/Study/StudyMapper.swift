@@ -25,7 +25,8 @@ extension Study {
 }
 
 extension StudyPatch {
-    init(_ schema: Components.Schemas.StudyPatchInput) {
+    init(_ schema: Components.Schemas.StudyPatchInput) throws {
+        let requirements = try schema.collectionRequirements?.map(CollectionRequirement.init)
         self.init(
             locales: schema.locales.map(Set.init),
             icon: schema.icon,
@@ -34,7 +35,8 @@ extension StudyPatch {
             consent: schema.consent,
             visibility: schema.visibility,
             enrollmentCondition: schema.enrollmentConditions,
-            collectionRequirements: schema.collectionRequirements?.map(CollectionRequirement.init)
+            enrollmentPeriod: schema.enrollmentPeriod,
+            collectionRequirements: requirements
         )
     }
 }
@@ -52,6 +54,7 @@ extension Components.Schemas.StudyListItem {
 extension Components.Schemas.StudyResponse {
     init(_ model: Study) throws {
         self.init(
+            enrollmentPeriod: model.enrollmentPeriod,
             draftRevision: model.draftRevision.uuidString,
             collectionRequirements: model.collectionRequirements.map(Components.Schemas.CollectionRequirement.init),
             id: try model.requireId().uuidString,
@@ -69,18 +72,34 @@ extension Components.Schemas.StudyResponse {
 // MARK: - ParticipationCriterion Mapping
 
 extension CollectionRequirement {
-    init(_ schema: Components.Schemas.CollectionRequirement) {
-        switch schema.sourceKind {
-        case .participantApp: self.init(profile: schema.profile, sourceKind: .participantApp)
+    init(_ schema: Components.Schemas.CollectionRequirement) throws {
+        let registration = try schema.providerRegistrationId.map { value -> UUID in
+            guard let id = UUID(uuidString: value) else { throw ServerError.badRequest("Invalid provider registration identifier") }
+            return id
         }
+        self.init(
+            profile: schema.profile,
+            sourceKind: schema.sourceKind == .participantApp ? .participantApp : .serverWorker,
+            measurementWindow: schema.measurementWindow,
+            includeWorkoutRoutes: schema.includeWorkoutRoutes ?? false,
+            providerRegistrationID: registration,
+            sourceTypeIdentifier: schema.sourceTypeIdentifier,
+            timeBasis: schema.timeBasis
+        )
     }
 }
 
 extension Components.Schemas.CollectionRequirement {
     init(_ model: CollectionRequirement) {
-        switch model.sourceKind {
-        case .participantApp: self.init(profile: model.profile, sourceKind: .participantApp)
-        }
+        self.init(
+            includeWorkoutRoutes: model.includeWorkoutRoutes,
+            measurementWindow: model.measurementWindow,
+            profile: model.profile,
+            sourceTypeIdentifier: model.sourceTypeIdentifier,
+            providerRegistrationId: model.providerRegistrationID?.uuidString.lowercased(),
+            sourceKind: model.sourceKind == .participantApp ? .participantApp : .serverWorker,
+            timeBasis: model.timeBasis
+        )
     }
 }
 

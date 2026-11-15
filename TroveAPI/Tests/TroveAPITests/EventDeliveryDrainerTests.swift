@@ -15,10 +15,34 @@ struct EventDeliveryDrainerTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     @Test(arguments: [false, true])
+    func revokedInstallationRecoversRetainedReceiptsButCannotResubmit(hasReceipt: Bool) async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            _ = try await DeliveryFixture.stage(journal, changes: ["installation-authority"])
+            let transport = DeliveryTransport()
+            await transport.configure(hasReceipt ? .loseFirstResponse : .reject(503))
+            _ = try await Self.drainer(journal, transport: transport).drain()
+            let headers = try #require(await transport.installationHeaders.first)
+            #expect(headers.id == DeliveryFixture.epoch.uuidString.lowercased())
+            let credential = try await journal.installationCredential(for: DeliveryFixture.epoch).base64EncodedString()
+            #expect(headers.credential?.removingPercentEncoding == credential)
+            let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
+            var binding = try #require(setup.binding)
+            binding.installation.revokedAt = binding.installation.createdAt
+            try await journal.confirmSource(binding, for: setup)
+            await transport.configure(.accept)
+            let results = try await Self.drainer(journal, transport: transport, at: Self.start.addingTimeInterval(600)).drain()
+            #expect(results.map(\.status) == [hasReceipt ? .delivered : .blocked(.rejected(statusCode: 409))])
+            #expect(await transport.paths.count == 2)
+            let lookupHeaders = try #require(await transport.installationHeaders.last)
+            #expect(lookupHeaders.id == nil && lookupHeaders.credential == nil)
+        }
+    }
+
+    @Test(arguments: [false, true])
     func lostResponseRecoversReceiptAfterReopeningWithoutResubmitting(restrictiveIntent: Bool) async throws {
         try await DeliveryFixture.withJournal { journal, url in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
-            let payload = DeliveryFixture.payload(sequence: 1, changes: ["change:a"])
+            let payload = try DeliveryFixture.payload(sequence: 1, changes: ["change:a"])
             let staged = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [
                 .init(bytes: payload.bytes, targets: restrictiveIntent ? [] : payload.targets)
             ])

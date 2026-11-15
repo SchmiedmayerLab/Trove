@@ -117,6 +117,14 @@ class StrictJSONTests(unittest.TestCase):
             with self.subTest(raw_prefix=raw[:20]), self.assertRaises((ValueError, UnicodeError)):
                 worker.strict_json(raw)
 
+    def test_larger_complete_json_and_exact_hard_boundary(self):
+        for size in (5 * 1024 * 1024, worker.MAX_BODY):
+            raw = b'{"x":"' + b'a' * (size - 8) + b'"}'
+            self.assertEqual(len(raw), size)
+            self.assertEqual(len(worker.strict_json(raw)["x"]), size - 8)
+        with self.assertRaises(worker.InvalidJSON):
+            worker.strict_json(raw + b' ')
+
     def test_accepts_valid_escaping_and_finite_numbers(self):
         value = worker.strict_json(b'{"x":"[\\\"{", "y":1.234, "z":"\\ud83d\\ude00"}')
         self.assertEqual(str(value["y"]), "1.234")
@@ -322,6 +330,37 @@ class EngineTests(unittest.TestCase):
         self.process.wait.assert_called_once_with(timeout=5)
         self.assertFalse(self.engine.ready)
         self.assertIsNone(self.engine.process)
+
+
+
+class RecordValidationTests(unittest.TestCase):
+    def test_original_number_tokens_reach_identity_validation_and_official_engine(self):
+        validator = object.__new__(worker.Validator)
+        validator.manifest = {"contractRevision": "pinned"}
+        validator.identity = "sha256:pinned"
+        validator.adapter_profiles = {"synthetic-profile"}
+        validator.engine = Mock()
+        raw = b'{"meta":{"profile":["active"]},"value":72.0000,"exponent":1e+02}'
+        lossless = object()
+        parse = Mock(return_value=lossless)
+        graph = Mock()
+        error = type("ProducerValidationError", (Exception,), {})
+        with patch.dict(worker.sys.modules, {
+            "Scripts.canonical_json": SimpleNamespace(loads_lossless=parse),
+            "Scripts.producer_validation.context": SimpleNamespace(EXCHANGE_BUNDLE_PROFILE="active", RETRACTION_BUNDLE_PROFILE="retraction"),
+            "Scripts.producer_validation.exchange_bundle": SimpleNamespace(
+                validate_exchange_bundle=graph, validate_resource_profile_claims=Mock()),
+            "Scripts.producer_validation.external_validator": SimpleNamespace(reject_validator_errors=Mock()),
+            "Scripts.producer_validation.diagnostics": SimpleNamespace(ProducerValidationError=error),
+        }):
+            status, response = validator.validate(raw)
+        self.assertEqual(status, 200)
+        self.assertTrue(response["valid"])
+        self.assertEqual(response["sha256"], hashlib.sha256(raw).hexdigest())
+        parse.assert_called_once_with(raw)
+        self.assertIs(graph.call_args.kwargs["lossless_resource"], lossless)
+        self.assertEqual(str(graph.call_args.args[0]["value"]), "72.0000")
+        validator.engine.validate.assert_called_once_with(raw)
 
 
 if __name__ == "__main__":

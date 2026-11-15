@@ -53,8 +53,10 @@ final class ParticipantEnrollmentService: Module, @unchecked Sendable {
             invitationCodeId: invitationCodeId
         )
 
+        _ = try publishedStudy.collectionPolicy.validatedRequirements(studyID: studyId, revision: publishedStudy.revision)
+
         do {
-            return try await enrollmentRepository.create(enrollment)
+            return try await enrollmentRepository.create(enrollment, period: publishedStudy.collectionPolicy.enrollmentPeriod)
         } catch where (error as? any DatabaseError)?.isConstraintFailure == true {
             throw ServerError.conflict("Already enrolled in this study or invitation code has already been used")
         }

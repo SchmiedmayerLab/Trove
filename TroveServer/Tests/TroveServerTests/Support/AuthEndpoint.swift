@@ -15,7 +15,9 @@ enum AuthEndpointRole: Sendable {
     case researcher(minRole: AuthContext.GroupRole, requiresGroupAccess: Bool)
     /// Independent capability, not another rank in the researcher/admin hierarchy.
     case auditReader
+    case dataReader
     case participant
+    case authenticated
 }
 
 
@@ -35,11 +37,18 @@ struct AuthEndpoint: Sendable {
         return false
     }
 
+    var requiresAuthenticationOnly: Bool {
+        if case .authenticated = role {
+            return true
+        }
+        return false
+    }
+
     var requiresGroupAccess: Bool {
         switch role {
         case .researcher(_, let required): required
-        case .auditReader: true
-        case .participant: false
+        case .auditReader, .dataReader: true
+        case .participant, .authenticated: false
         }
     }
 
@@ -47,12 +56,19 @@ struct AuthEndpoint: Sendable {
         switch role {
         case .researcher(let role, _): role
         case .auditReader: .admin
-        case .participant: .researcher
+        case .participant, .dataReader, .authenticated: .researcher
         }
     }
 
     var requiresAuditReader: Bool {
         if case .auditReader = role {
+            return true
+        }
+        return false
+    }
+
+    var requiresDataReader: Bool {
+        if case .dataReader = role {
             return true
         }
         return false

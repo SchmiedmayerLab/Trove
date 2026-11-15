@@ -19,12 +19,14 @@ struct ClinicalGraphStoreTests {
     func directlyIncludedLogicalContextUsesTheSameStudyGrant() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            var event = Self.event(source: fixture.source, sequence: 1, includesContext: true)
+            var event = try Self.event(source: fixture.source, sequence: 1, includesContext: true)
             let context = try #require(event.questionnaireContexts.first)
             event.derivations = [.init(outputFullURL: event.outputs[0].fullURL, target: .logical(context.identifier))]
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]))
+                _ = try await store.accept(
+                    event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]), installation: fixture.installation
+                )
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
             }
@@ -35,14 +37,18 @@ struct ClinicalGraphStoreTests {
     func bothArrivalOrdersResolveWithoutGrantingTheOtherStudy(targetFirst: Bool) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let target = Self.event(source: fixture.source, sequence: 1, includesContext: true)
-            let dependent = Self.event(source: fixture.source, sequence: 2, includesContext: false)
+            let target = try Self.event(source: fixture.source, sequence: 1, includesContext: true)
+            let dependent = try Self.event(source: fixture.source, sequence: 2, includesContext: false)
             let events = targetFirst ? [target, dependent] : [dependent, target]
             let receipts = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = try await store.accept(events[0], sourceID: fixture.source.id, targets: fixture.targets(for: events[0], studies: [0]))
+                let first = try await store.accept(
+                    events[0], sourceID: fixture.source.id, targets: fixture.targets(for: events[0], studies: [0]), installation: fixture.installation
+                )
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == (targetFirst ? 1 : 0))
-                let second = try await store.accept(events[1], sourceID: fixture.source.id, targets: fixture.targets(for: events[1], studies: [0]))
+                let second = try await store.accept(
+                    events[1], sourceID: fixture.source.id, targets: fixture.targets(for: events[1], studies: [0]), installation: fixture.installation
+                )
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
                 return [first, second]
@@ -51,7 +57,9 @@ struct ClinicalGraphStoreTests {
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                     let store = ClinicalEventStore(database: reopened.db)
                     for (event, receipt) in zip(events, receipts) {
-                        let replay = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]))
+                        let replay = try await store.accept(
+                            event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]), installation: fixture.installation
+                        )
                         #expect(replay == receipt)
                     }
                     #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
@@ -67,14 +75,22 @@ struct ClinicalGraphStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let target = Self.event(source: fixture.source, sequence: 1, includesContext: true)
-                let dependent = Self.event(source: fixture.source, sequence: 2, includesContext: false)
-                let receipt = try await store.accept(target, sourceID: fixture.source.id, targets: fixture.targets(for: target, studies: [1]))
-                _ = try await store.accept(dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent, studies: [0]))
+                let target = try Self.event(source: fixture.source, sequence: 1, includesContext: true)
+                let dependent = try Self.event(source: fixture.source, sequence: 2, includesContext: false)
+                let receipt = try await store.accept(
+                    target, sourceID: fixture.source.id, targets: fixture.targets(for: target, studies: [1]), installation: fixture.installation
+                )
+                _ = try await store.accept(
+                    dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent, studies: [0]), installation: fixture.installation
+                )
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
                 _ = try await ClinicalAttributionStore(database: app.db).attribute(
-                    eventID: receipt.eventID, sourceID: fixture.source.id, commandID: UUID(), targets: fixture.targets(for: target, studies: [0])
+                    eventID: receipt.eventID,
+                    sourceID: fixture.source.id,
+                    commandID: UUID(),
+                    targets: fixture.targets(for: target, studies: [0]),
+                    installation: fixture.installation
                 )
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
                 _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: fixture.enrollmentIDs[0])
@@ -91,8 +107,10 @@ struct ClinicalGraphStoreTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 for sequence in 1...3 {
-                    let event = Self.event(source: fixture.source, sequence: sequence, includesContext: sequence != 2)
-                    _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]))
+                    let event = try Self.event(source: fixture.source, sequence: sequence, includesContext: sequence != 2)
+                    _ = try await store.accept(
+                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event, studies: [0]), installation: fixture.installation
+                    )
                 }
                 // Both directly included contexts stay exact; the intervening logical reference is ambiguous.
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
@@ -107,12 +125,19 @@ struct ClinicalGraphStoreTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let other = try await SourceBindingService(database: app.db).register(registrationID: UUID())
-                let target = Self.event(source: other, sequence: 1, includesContext: true)
-                let dependent = Self.event(source: fixture.source, sequence: 2, includesContext: false)
+                let otherInstallationID = UUID()
+                let other = try await SourceBindingService(database: app.db).registerSource(
+                    registrationID: otherInstallationID, repositoryKind: .sensorKit
+                )
+                let target = try Self.event(source: other, sequence: 1, includesContext: true)
+                let dependent = try Self.event(source: fixture.source, sequence: 2, includesContext: false)
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(target, sourceID: other.id, targets: fixture.targets(for: target))
-                _ = try await store.accept(dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent))
+                _ = try await store.accept(
+                    target, sourceID: other.id, targets: fixture.targets(for: target), installation: SourceBindingFixture.proof(otherInstallationID)
+                )
+                _ = try await store.accept(
+                    dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent), installation: fixture.installation
+                )
                 for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 1) }
             }
         }
@@ -124,16 +149,19 @@ struct ClinicalGraphStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let target = Self.event(source: fixture.source, sequence: 1, includesContext: true)
-                let dependent = Self.event(source: fixture.source, sequence: 2, includesContext: false)
-                _ = try await store.accept(target, sourceID: fixture.source.id, targets: fixture.targets(for: target))
-                _ = try await store.accept(dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent))
-                var retraction = ClinicalRetractionTests.retraction(source: fixture.source)
-                retraction.retraction = .init(
-                    sourceRecordIdentifier: target.outputs[0].sourceRecordIdentifier,
-                    outputIdentifiers: [target.outputs[0].sourceOutputIdentifier]
+                let target = try Self.event(source: fixture.source, sequence: 1, includesContext: true)
+                let dependent = try Self.event(source: fixture.source, sequence: 2, includesContext: false)
+                _ = try await store.accept(
+                    target, sourceID: fixture.source.id, targets: fixture.targets(for: target), installation: fixture.installation
                 )
-                _ = try await store.accept(retraction, sourceID: fixture.source.id, targets: [])
+                _ = try await store.accept(
+                    dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent), installation: fixture.installation
+                )
+                var retraction = try ClinicalRetractionTests.retraction(source: fixture.source)
+                retraction.retraction = .init(
+                    sourceRecordIdentifier: target.outputs[0].sourceRecordIdentifier
+                )
+                _ = try await store.accept(retraction, sourceID: fixture.source.id, targets: [], installation: fixture.installation)
                 for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 0) }
                 try await ClinicalEventStoreTests.expectRows(events: 3, nodes: 6, facts: 2, grants: 4, on: app.db)
             }
@@ -146,10 +174,12 @@ struct ClinicalGraphStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let sql = try #require(app.db as? any SQLDatabase)
             try await sql.raw("DROP TABLE audit_events").run()
-            let event = Self.event(source: fixture.source, sequence: 1, includesContext: true)
+            let event = try Self.event(source: fixture.source, sequence: 1, includesContext: true)
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect(throws: (any Error).self) {
-                    try await ClinicalEventStore(database: app.db).accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event))
+                    try await ClinicalEventStore(database: app.db).accept(
+                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation
+                    )
                 }
             }
             for table in ["clinical_events", "clinical_questionnaire_contexts", "clinical_point_derivations"] {
@@ -164,9 +194,9 @@ struct ClinicalGraphStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 for sequence in [1, 2] {
-                    let event = Self.event(source: fixture.source, sequence: sequence, includesContext: sequence == 1)
+                    let event = try Self.event(source: fixture.source, sequence: sequence, includesContext: sequence == 1)
                     _ = try await ClinicalEventStore(database: app.db).accept(
-                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event)
+                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation
                     )
                 }
             }
@@ -200,8 +230,8 @@ struct ClinicalGraphStoreTests {
 
 
 extension ClinicalGraphStoreTests {
-    static func event(source: SourceBinding, sequence: Int, includesContext: Bool) -> ValidatedExchangeEvent {
-        var event = ClinicalRecordStoreTests.event(
+    static func event(source: SourceBinding, sequence: Int, includesContext: Bool) throws -> ValidatedExchangeEvent {
+        var event = try ClinicalRecordStoreTests.event(
             source: source, sequence: sequence, version: nil, writer: nil, record: "record-\(sequence)", outputs: ["output-\(sequence)"]
         )
         let identity = ValidatedExchangeEvent.Identifier(system: "urn:questionnaire-response", value: "response-1")
@@ -209,10 +239,10 @@ extension ClinicalGraphStoreTests {
         if includesContext {
             event = .init(
                 rawBytes: event.rawBytes,
+                recorded: event.recorded,
                 validatorIdentity: event.validatorIdentity,
                 eventIdentifierSystem: event.eventIdentifierSystem,
                 eventIdentifierValue: event.eventIdentifierValue,
-                producerInstance: event.producerInstance,
                 deploymentIdentifiers: event.deploymentIdentifiers,
                 participants: event.participants,
                 nodes: event.nodes + [.init(ordinal: event.nodes.count, fullURL: contextURL, resourceType: "QuestionnaireResponse")],

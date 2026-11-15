@@ -26,10 +26,10 @@ GATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GATE)
 
 SELECTORS = ("api", "server", "web", "ios", "ios_ui", "infrastructure", "devstack")
-JOBS = ("changes", "api", "server", "web", "ios", "ios-ui", "infrastructure",
+JOBS = ("changes", "api", "api-macos", "server", "web", "ios", "ios-ui", "infrastructure",
         "dev-stack", "native-line-coverage", "coverage", "secret-scan", "vulnerability-scan")
 EXPECTED = {
-    "api": {"api", "coverage"},
+    "api": {"api", "api-macos", "coverage"},
     "server": {"server", "dev-stack", "coverage"},
     "web": {"web", "dev-stack", "coverage"},
     "ios": {"ios", "native-line-coverage", "coverage"},
@@ -158,6 +158,21 @@ class CIResultTests(unittest.TestCase):
                 self.assertIn("python3", installs[0].split())
                 self.assertIn("libsqlite3-dev", installs[0].split())
 
+    def test_real_store_lane_requires_full_validator_execution_and_isolation(self) -> None:
+        workflow = yaml.safe_load((ROOT / ".github/workflows/swift-package.yml").read_text())
+        steps = workflow["jobs"]["postgres"]["steps"]
+        commands = "\n".join(step.get("run", "") for step in steps)
+        for required in ("--include-lifecycle-corpus", "--env TROVE_REQUIRE_FULL_VALIDATOR=1",
+                         "--env TROVE_TEST_VALIDATOR_ASSETS=", "--env TROVE_TEST_LIFECYCLE_CORPUS=",
+                         "--env FHIR_VALIDATOR_URL=", "--env FHIR_VALIDATOR_IDENTITY",
+                         "docker network create --internal", "--publish 127.0.0.1:18080:8080",
+                         "--read-only", "--cap-drop ALL", "--security-opt no-new-privileges"):
+            self.assertIn(required, commands)
+        cleanup = steps[-1]
+        self.assertEqual(cleanup["if"], "always()")
+        self.assertIn('"$VALIDATOR_CONTAINER"', cleanup["run"])
+        self.assertIn('docker network rm "$VALIDATOR_NETWORK"', cleanup["run"])
+
     def test_ruleset_requires_the_aggregate_not_conditionally_skipped_components(self) -> None:
         ruleset = json.loads((ROOT / ".github/rulesets/main.json").read_text())
         rule = next(rule for rule in ruleset["rules"] if rule["type"] == "required_status_checks")
@@ -193,13 +208,13 @@ class CIResultTests(unittest.TestCase):
     def test_fork_runner_routing_and_simulator_runtime_are_explicit(self) -> None:
         jobs = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())["jobs"]
         self.assertEqual(jobs["ios"]["with"]["destination"],
-                         "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0")
+                         "platform=iOS Simulator,name=iPhone 18 Pro,OS=27.2")
         ui_test = next(step["run"] for step in jobs["ios-ui"]["steps"]
                        if step.get("name") == "Run the real-stack UI test")
         prepare = next(step["run"] for step in jobs["ios-ui"]["steps"]
                        if step.get("id") == "simulator")
         self.assertIn("com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro", prepare)
-        self.assertIn("com.apple.CoreSimulator.SimRuntime.iOS-27-0", prepare)
+        self.assertIn("com.apple.CoreSimulator.SimRuntime.iOS-27-2", prepare)
         self.assertIn('platform=iOS Simulator,id=$TROVE_UI_SIMULATOR', ui_test)
         self.assertNotIn("--show-sdk-version", ui_test)
         for runner in (jobs["ios"]["with"]["runsonlabels"], jobs["ios-ui"]["runs-on"],

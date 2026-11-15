@@ -111,7 +111,7 @@ python3 -B TroveServer/Benchmarks/authenticated.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
   --events 6 --concurrency 2
 ```
@@ -237,7 +237,7 @@ must not be described as a larger-than-memory test.
 
 This comparison concerns the database container's RAM, including its charged page
 cache, not the host's total RAM. It does not establish cold storage latency,
-multi-day history or production capacity. The workload also does not yet measure
+multi-day history or production capacity. The workload also does not measure
 large recordings, query/export latency, lifecycle cleanup under independent
 traffic or backup restore. These bounds are not supported participant counts or
 an admission envelope.

@@ -11,6 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RouteHeader } from "@/components/ui/RouteHeader";
 import { componentListQueryOptions } from "@/lib/queries/component";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
+import { CollectionCard } from "./components/CollectionCard";
 import { ComponentsCard } from "./components/ComponentsCard/ComponentsCard";
 import { ConsentCard } from "./components/ConsentCard";
 import { EnrollmentCard } from "./components/EnrollmentCard";
@@ -33,6 +34,7 @@ const StudyConfigurationRoute = () => {
       <div className="flex max-w-7xl flex-col gap-14 p-6 pb-12">
         <GeneralCard study={study} isLoading={studyQuery.isLoading} />
         <EnrollmentCard study={study} isLoading={studyQuery.isLoading} />
+        <CollectionCard study={study} isLoading={studyQuery.isLoading} />
         <ConsentCard study={study} isLoading={studyQuery.isLoading} />
         <ComponentsCard
           components={components}

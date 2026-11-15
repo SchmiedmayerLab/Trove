@@ -102,7 +102,7 @@ def main():
     args = parser.parse_args()
     purpose = "questionnaire" if args.questionnaire else "event"
     raw = args.fixture.read_bytes()
-    if not 0 < len(raw) <= 4 * 1024 * 1024:
+    if not 0 < len(raw) <= 16 * 1024 * 1024:
         raise ValueError("Fixture size outside worker contract")
     name = "trove-validator-smoke-" + uuid.uuid4().hex[:12]
     resources = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",

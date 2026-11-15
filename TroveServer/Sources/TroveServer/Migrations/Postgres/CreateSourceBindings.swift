@@ -12,31 +12,56 @@ import SQLKit
 
 
 struct CreateSourceBindings: AsyncMigration {
+    private static func protect(on transaction: any Database) async throws {
+        guard let sql = transaction as? any SQLDatabase else {
+            throw AuditError.unsupportedDatabase
+        }
+        try await sql.raw("""
+            CREATE UNIQUE INDEX source_bindings_native_repository
+            ON source_bindings (participant_id, repository_kind) WHERE kind = 'participant-app'
+            """)
+            .run()
+        try await RevocableSourceSchema.protect(
+            table: "source_bindings",
+            immutableColumns: [
+                "id", "participant_id", "key_id", "key_epoch", "repository_kind", "kind", "provider_registration_id",
+                "identifier_root", "event_identifier_system",
+                "participant_identifier_system", "participant_identifier_value", "created_at"
+            ],
+            on: transaction
+        )
+    }
+
     func prepare(on database: any Database) async throws {
         try await database.transaction { transaction in
-            guard let sql = transaction as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
             try await transaction.schema("source_bindings")
                 .id()
                 .field("participant_id", .uuid, .required, .references("participants", "id", onDelete: .restrict))
-                .field("registration_id", .uuid, .required)
+                .field("key_id", .uuid, .required)
+                .field("key_epoch", .string, .required)
+                .field("repository_kind", .string, .required)
                 .field("kind", .string, .required)
+                .field("provider_registration_id", .uuid, .references("provider_registrations", "id", onDelete: .restrict))
                 .field("identifier_root", .string, .required)
                 .field("event_identifier_system", .string, .required)
                 .field("participant_identifier_system", .string, .required)
                 .field("participant_identifier_value", .string, .required)
                 .field("created_at", .datetime, .required)
                 .field("revoked_at", .datetime)
-                .unique(on: "participant_id", "registration_id")
+                .unique(on: "key_id")
                 .unique(on: "event_identifier_system")
                 .unique(on: "identifier_root")
                 .unique(on: "id", "participant_id", name: "source_participant_identity")
                 .constraint(.custom(SQLConstraint(algorithm: SQLTableConstraintAlgorithm.check(SQLRaw("""
-                    kind = 'participant-app' AND length(event_identifier_system) > 0 AND length(identifier_root) BETWEEN 1 AND 256
+                    ((kind = 'participant-app' AND repository_kind IN ('healthkit', 'sensorkit') AND provider_registration_id IS NULL)
+                        OR (kind = 'server-worker' AND repository_kind IN ('withings', 'oura', 'google-health-api')
+                            AND provider_registration_id IS NOT NULL)) AND key_epoch = '1'
+                    AND length(event_identifier_system) > 0 AND length(identifier_root) BETWEEN 1 AND 256
                     AND length(participant_identifier_system) > 0 AND length(participant_identifier_value) > 0
                     AND (revoked_at IS NULL OR revoked_at >= created_at)
                     """)))))
                 .create()
-            try await prepareIdentityGuard(on: sql, postgres: transaction is any PostgresDatabase)
+            try await Self.protect(on: transaction)
         }
     }
 
@@ -44,56 +69,8 @@ struct CreateSourceBindings: AsyncMigration {
         try await database.transaction { transaction in
             try await transaction.schema("source_bindings").delete()
             if transaction is any PostgresDatabase, let sql = transaction as? any SQLDatabase {
-                try await sql.raw("DROP FUNCTION trove_protect_source_binding()").run()
+                try await sql.raw("DROP FUNCTION trove_protect_source_bindings()").run()
             }
-        }
-    }
-
-    private func prepareIdentityGuard(on sql: any SQLDatabase, postgres: Bool) async throws {
-        let columns = [
-            "id", "participant_id", "registration_id", "kind", "identifier_root", "event_identifier_system",
-            "participant_identifier_system", "participant_identifier_value", "created_at"
-        ]
-        let differs = postgres ? "IS DISTINCT FROM" : "IS NOT"
-        let changed = columns.map { "NEW.\($0) \(differs) OLD.\($0)" }.joined(separator: " OR ")
-        let condition = "(\(changed)) OR (OLD.revoked_at IS NOT NULL AND NEW.revoked_at \(differs) OLD.revoked_at)"
-        if postgres {
-            try await sql.raw(SQLQueryString("""
-                CREATE FUNCTION trove_protect_source_binding() RETURNS trigger AS $$
-                BEGIN
-                    IF TG_OP <> 'UPDATE' THEN
-                        RAISE EXCEPTION 'Source binding history is retained' USING ERRCODE = '23514';
-                    END IF;
-                    IF \(unsafeRaw: condition) THEN
-                        RAISE EXCEPTION 'Source binding identity and revocation are immutable' USING ERRCODE = '23514';
-                    END IF;
-                    RETURN NEW;
-                END;
-                $$ LANGUAGE plpgsql
-                """))
-                .run()
-            try await sql.raw("""
-                CREATE TRIGGER source_bindings_identity BEFORE UPDATE ON source_bindings
-                FOR EACH ROW EXECUTE FUNCTION trove_protect_source_binding()
-                """)
-                .run()
-            try await sql.raw("""
-                CREATE TRIGGER source_bindings_no_removal BEFORE DELETE OR TRUNCATE ON source_bindings
-                FOR EACH STATEMENT EXECUTE FUNCTION trove_protect_source_binding()
-                """)
-                .run()
-        } else {
-            try await sql.raw(SQLQueryString("""
-                CREATE TRIGGER source_bindings_identity BEFORE UPDATE ON source_bindings
-                WHEN \(unsafeRaw: condition)
-                BEGIN SELECT RAISE(ABORT, 'Source binding identity and revocation are immutable'); END
-                """))
-                .run()
-            try await sql.raw("""
-                CREATE TRIGGER source_bindings_no_removal BEFORE DELETE ON source_bindings
-                BEGIN SELECT RAISE(ABORT, 'Source binding history is retained'); END
-                """)
-                .run()
         }
     }
 }

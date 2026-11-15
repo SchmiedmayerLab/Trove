@@ -19,8 +19,7 @@ Used by:
 
 ## Setup
 
-Until this breaking database change is released, build both application images from
-the same checkout. From the repository root:
+Build both application images from the same checkout. From the repository root:
 
 ```bash
 docker build -f TroveServer/Dockerfile -t ghcr.io/schmiedmayerlab/trove-server:main .
@@ -31,7 +30,15 @@ Then, from `TroveInfrastructure/docker`:
 
 ```bash
 cp .env.example .env
+docker compose run --rm source-keyring-init
 ```
+
+The initialization command creates the encryption keyring once in the
+`source_identity_keys` volume, owned by the same non-root user as the server. It
+refuses to overwrite an existing file. Normal startup mounts this volume read-only
+and never generates a replacement. Retain and back up the keyring together with
+the database; recreating the server container must reuse both volumes. Do not rerun
+initialization against retained data if the keyring is lost; restore its backup.
 
 ## Full Stack
 
@@ -75,9 +82,10 @@ docker compose up -d server-db keycloak-db keycloak keycloak-config-cli seaweedf
 docker compose run --rm server-grants
 ```
 
-Then run server/web against localhost ports. Configure only `DATABASE_*` for the server;
-`TIMESCALE_*` no longer selects another connection. The `keycloak-config-cli` job imports
-the realm, and SeaweedFS supplies local object storage.
+Then run server/web against localhost ports. Configure `DATABASE_*` for the server
+connection and `SOURCE_IDENTITY_KEYRING_FILE` for its keyring, as described in the
+[server documentation](../../TroveServer/README.md#participant-data-sources). The
+`keycloak-config-cli` job imports the realm, and SeaweedFS supplies local object storage.
 
 ## Development Database Lifecycle
 
@@ -89,9 +97,8 @@ database need not delete Keycloak identities or object-storage data. The setup n
 automatically deletes volumes or attaches an old data directory to a different image.
 
 After initialization, `./verify-timescale.sh` checks Timescale and the current schema.
-The historically named `./verify-fhir-ingestion.sh` now verifies that authenticated and
-anonymous requests receive 404 from the retired route. It does not test a replacement
-receiver. The [bounded event receiver](../../TroveServer/README.md) has separate
+`./verify-fhir-ingestion.sh` verifies that authenticated and anonymous requests to
+`/participant/fhir/resource` receive 404. It does not test the event receiver. The [bounded event receiver](../../TroveServer/README.md) has separate
 [full-validator verification](../validator/README.md).
 
 ## Schema Initialization
@@ -112,9 +119,10 @@ equivalence or import legacy records. Recreate disposable databases after schema
 reversion is unsupported. Schema creation and grants use `DATABASE_OPERATOR_*`;
 the server uses `DATABASE_*`.
 The [shared operator scripts](../database-operator/README.md) contain the explicit
-grant list for current core tables, audit append/read, and one fixed
-Boolean preload check. It grants no schema creation, role membership, migration-ledger
-mutation. New tables require a reviewed grant-list update; there
+grant list for the study, source identity, clinical, recording, reconciliation and
+provider tables, audit append/read, and one fixed Boolean preload check. It grants no
+schema creation, role membership or migration-ledger mutation, and no deletion of
+provider records. New tables require a reviewed grant-list update; there
 is no blanket future-table grant. Keep operator credentials out of the server process.
 Existing owner or privileged roles are rejected rather than silently converted.
 

@@ -64,6 +64,11 @@ const navBarItems: NavBarItem[] = [
         linkOptions: { to: "/$group/$study/configuration/enrollment" },
       },
       {
+        id: "collection",
+        title: "Health collection",
+        linkOptions: { to: "/$group/$study/configuration/collection" },
+      },
+      {
         id: "consent",
         title: "Consent",
         linkOptions: { to: "/$group/$study/configuration/consent" },
@@ -87,7 +92,7 @@ const navBarItems: NavBarItem[] = [
     id: "results",
     title: "Results",
     icon: ChartBar,
-    onClick: () => notImplementedToast("Results"),
+    linkOptions: { to: "/$group/$study/results" },
   },
 ];
 

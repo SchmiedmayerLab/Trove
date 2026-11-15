@@ -28,13 +28,13 @@ struct SourceBindingHTTPTests {
             #expect(first == retry)
             #expect(first.kind == .participantApp)
             #expect(first.identifierRoot == TestApp.issuer + "/trove/sources/" + first.id)
-            #expect(first.eventIdentifierSystem == first.identifierRoot + "/NamingSystem/grove-event-v0")
+            #expect(first.eventIdentifierSystem == first.identifierRoot + "/NamingSystem/grove-record-version-v0/" + first.keyID + "/1")
             #expect(first.participantIdentifier.system == TestApp.issuer + "/trove/participants")
             #expect(first.participantIdentifier.value == participant.id?.uuidString.lowercased())
             #expect(first.revokedAt == nil)
             let systems = try first.identifierSystems()
-            #expect(systems.event.rawValue == first.eventIdentifierSystem)
-            #expect(systems.sourceRecord != systems.event)
+            #expect(systems.recordVersion.rawValue == first.eventIdentifierSystem)
+            #expect(systems.sourceRecord != systems.recordVersion)
             try await app.test(.GET, "\(apiBasePath)/participant/sources/\(first.id)", beforeRequest: { $0.bearerAuth(token) }) { response in
                 #expect(response.status == .ok)
                 let loaded = try response.content.decode(Components.Schemas.ParticipantSource.self)
@@ -52,7 +52,7 @@ struct SourceBindingHTTPTests {
             #expect(try await Enrollment.query(on: app.db).count() == 0)
             let sql = try #require(app.db as? any SQLDatabase)
             let audit = try #require(try await sql.raw("SELECT count(*) AS count FROM audit_events").first())
-            #expect(try audit.decode(column: "count", as: Int.self) == 2)
+            #expect(try audit.decode(column: "count", as: Int.self) == 3)
         }
     }
 
@@ -71,7 +71,7 @@ struct SourceBindingHTTPTests {
                 participantRole: TestApp.participantRole
             )
             let source = try await AuthContext.$current.withValue(owner) {
-                try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                try await SourceBindingService(database: app.db).registerSource(registrationID: UUID())
             }
             let suffix = revoke ? "/revoke" : ""
             try await app.test(revoke ? .POST : .GET, "\(apiBasePath)/participant/sources/\(source.id)\(suffix)", beforeRequest: {
@@ -92,7 +92,10 @@ struct SourceBindingHTTPTests {
             }
             try await app.test(.POST, "\(apiBasePath)/participant/sources", beforeRequest: { request in
                 request.bearerAuth(token)
-                try request.encodeJSONBody(["registrationID": UUID().uuidString])
+                try request.encodeJSONBody([
+                    "registrationID": UUID().uuidString, "repositoryKind": "healthkit",
+                    "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+                ])
             }) { response in
                 #expect(response.status == expected)
             }
@@ -125,10 +128,12 @@ extension SourceBindingHTTPTests {
         var result: Components.Schemas.ParticipantSource?
         try await app.test(.POST, "\(apiBasePath)/participant/sources", beforeRequest: { request in
             request.bearerAuth(token)
-            try request.encodeJSONBody(["registrationID": nonce])
+            try request.encodeJSONBody([
+                "registrationID": nonce, "repositoryKind": "healthkit", "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+            ])
         }) { response in
             try #require(response.status == .ok)
-            result = try response.content.decode(Components.Schemas.ParticipantSource.self)
+            result = try response.content.decode(Components.Schemas.ParticipantSourceRegistration.self).source
         }
         return try #require(result)
     }

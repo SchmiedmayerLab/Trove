@@ -37,8 +37,8 @@ struct EventBatchClientTests {
 
     @Test
     func generatedClientPreservesBytesIntentAndMixedOutcomes() async throws {
-        let payload = DeliveryFixture.payload(sequence: 1, changes: ["sample"])
-        let original = payload.bytes + Data("\n  ".utf8)
+        let payload = try DeliveryFixture.payload(sequence: 1, changes: ["sample"])
+        let original = payload.bytes
         let commitment = try EventSubmissionCommitment(sourceID: DeliveryFixture.sourceID, originalBytes: original, targets: payload.targets)
         let receipt = Components.Schemas.EventReceipt(
             eventId: UUID().uuidString,
@@ -62,7 +62,12 @@ struct EventBatchClientTests {
             transport: Transport(submissions: submissions, outcomes: outcomes)
         )
         let response = try await client.submitParticipantEventBatch(.init(
-            path: .init(sourceId: DeliveryFixture.sourceID.uuidString), body: .json(.init(events: submissions))
+            path: .init(sourceId: DeliveryFixture.sourceID.uuidString),
+            headers: .init(
+                troveSourceInstallationID: UUID().uuidString,
+                troveSourceCredential: Data(repeating: 0x41, count: 32).base64EncodedString()
+            ),
+            body: .json(.init(events: submissions))
         ))
         #expect(try response.ok.body.json == outcomes)
     }

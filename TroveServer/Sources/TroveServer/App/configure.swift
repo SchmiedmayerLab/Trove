@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Crypto
 import Fluent
 import Grove
 import GroveVapor
@@ -49,21 +50,40 @@ private func configureDevelopmentCORS(for app: Application) {
         CORSMiddleware(configuration: .init(
             allowedOrigin: .any(["http://localhost:3000", "http://localhost:3001"]),
             allowedMethods: [.GET, .POST, .PUT, .PATCH, .DELETE, .OPTIONS],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch, "Trove-Delegation-ID"]
+            allowedHeaders: [
+                .accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch,
+                "Trove-Delegation-ID", "Trove-Source-Installation-ID", "Trove-Source-Credential"
+            ],
+            exposedHeaders: [.contentDisposition, "X-Recording-Content-Type"]
         )),
         at: .beginning
     )
 }
 
-private func configureObjectStorage(for app: Application, ephemeral: Bool, keycloak: KeycloakClient) async throws {
+private func configureObjectStorage(
+    for app: Application, ephemeral: Bool, keycloak: KeycloakClient, sourceKeyring: SourceIdentityKeyring
+) async throws {
+    let collectionCapacity = try CollectionCapacityConfiguration(environment: ProcessInfo.processInfo.environment)
+    let providerConfiguration = try ProviderRuntimeConfiguration.load(environment: ProcessInfo.processInfo.environment)
+    let recordingLimits = try RecordingTransferService.Limits(
+        storedBytes: Environment.get("RECORDING_MAX_STORED_BYTES"),
+        sourceBytes: Environment.get("RECORDING_MAX_SOURCE_BYTES"),
+        leaseSeconds: Environment.get("RECORDING_UPLOAD_LEASE_SECONDS")
+    )
     if ephemeral {
         app.logger.info("Configuring ephemeral UI-test object storage...")
         try await configureServices(
             for: app,
             storageProvider: InMemoryObjectStorageProvider(),
             validator: FHIRValidationClient(application: app),
+            sourceKeyring: sourceKeyring,
             grantorAuthority: keycloak.authorityProvider,
-            clientPolicy: keycloak.config.clientPolicy
+            clientPolicy: keycloak.config.clientPolicy,
+            recordingLimits: recordingLimits,
+            recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
+            collectionCapacity: collectionCapacity,
+            providerConfiguration: providerConfiguration,
+            nativeReconciliationSettings: try .init(seconds: Environment.get("NATIVE_RECONCILIATION_LEASE_SECONDS"))
         )
         return
     }
@@ -71,22 +91,32 @@ private func configureObjectStorage(for app: Application, ephemeral: Bool, keycl
     app.logger.info("Connecting to S3 object storage...")
     let validator = try FHIRValidationClient(application: app)
     let storageProvider = try S3ObjectStorageProvider(application: app, config: S3ObjectStorageConfiguration())
-    await configureServices(
-        for: app,
-        storageProvider: storageProvider,
-        validator: validator,
-        grantorAuthority: keycloak.authorityProvider,
-        clientPolicy: keycloak.config.clientPolicy
-    )
+    do {
+        try await configureServices(
+            for: app,
+            storageProvider: storageProvider,
+            validator: validator,
+            sourceKeyring: sourceKeyring,
+            grantorAuthority: keycloak.authorityProvider,
+            clientPolicy: keycloak.config.clientPolicy,
+            recordingLimits: recordingLimits,
+            recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
+            collectionCapacity: collectionCapacity,
+            providerConfiguration: providerConfiguration,
+            nativeReconciliationSettings: try .init(seconds: Environment.get("NATIVE_RECONCILIATION_LEASE_SECONDS"))
+        )
+    } catch {
+        // The storage lifecycle is not registered yet; release the provider's own HTTP client.
+        try? await storageProvider.shutdown()
+        throw error
+    }
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
     try await storageService.ensureBucketExists()
     app.logger.info("Object storage ready.")
 }
 
-/// Configures the application: database, migrations, and (when serving) services and routes.
-public func configure(_ app: Application) async throws {
-    let auditConfiguration = try AuditConfiguration(applicationRevision: Environment.get("APPLICATION_REVISION"))
+private func configureTransports(for app: Application) throws {
     if app.environment.isServing {
         try InboundTransportConfiguration(
             environment: Environment.appEnvironment,
@@ -98,9 +128,21 @@ public func configure(_ app: Application) async throws {
         environment: Environment.appEnvironment,
         certificateAuthorityFile: Environment.get("TLS_CA_FILE")
     ).configure(app)
+}
+
+/// Configures the application: database, migrations, and (when serving) services and routes.
+public func configure(_ app: Application) async throws {
+    app.asyncCommands.use(CreateSourceIdentityKeyringCommand(), as: CreateSourceIdentityKeyringCommand.name)
+    if app.environment.commandInput.arguments.first == CreateSourceIdentityKeyringCommand.name {
+        return
+    }
+    let auditConfiguration = try AuditConfiguration(applicationRevision: Environment.get("APPLICATION_REVISION"))
+    try configureTransports(for: app)
     app.asyncCommands.use(CleanupArtifactsCommand(auditConfiguration: auditConfiguration), as: "cleanup-artifacts")
+    app.asyncCommands.use(ReverseRetractionCommand(auditConfiguration: auditConfiguration), as: "reverse-retraction")
     let logger = app.logger
     let usesEphemeralServices = usesEphemeralUITestServices(app)
+    let sourceKeyring = try configuredSourceIdentityKeyring(app, ephemeral: usesEphemeralServices)
     let keycloakConfig: KeycloakConfiguration? = app.environment.isServing ? .init() : nil
     // Validate the trusted token boundary before connecting services or accepting traffic.
     let tokenPolicy = try keycloakConfig?.tokenPolicy
@@ -114,17 +156,16 @@ public func configure(_ app: Application) async throws {
     guard app.environment.isServing else {
         return
     }
-    guard let keycloakConfig, let tokenPolicy, let keycloak else {
+    guard let keycloakConfig, let tokenPolicy, let keycloak, let sourceKeyring else {
         throw ServerError.internalServerError("Token verification is not configured")
     }
 
     configureDevelopmentCORS(for: app)
-    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices, keycloak: keycloak)
+    try await configureObjectStorage(for: app, ephemeral: usesEphemeralServices, keycloak: keycloak, sourceKeyring: sourceKeyring)
 
     logger.info("Fetching groups from Keycloak")
     let groups = try await keycloak.fetchGroups()
-    let groupService = app.grove[GroupService.self]
-    try await groupService.syncGroups(from: groups)
+    try await app.grove[GroupService.self].syncGroups(from: groups)
 
     let jwks = try await keycloak.fetchJWKS()
     let signingKeys = try await KeycloakSigningKeys(initialJWKS: jwks) {
@@ -151,16 +192,41 @@ func configureServices(
     for app: Application,
     storageProvider: any ObjectStorageProvider,
     validator: FHIRValidationClient,
+    sourceKeyring: SourceIdentityKeyring,
     grantorAuthority: GrantorAuthorityProvider = .unavailable,
-    clientPolicy: KeycloakClientPolicy = .production
-) async {
+    clientPolicy: KeycloakClientPolicy = .production,
+    recordingLimits: RecordingTransferService.Limits = .standard,
+    recordingDownloadByteLimit: String? = nil,
+    collectionCapacity: CollectionCapacityConfiguration = .standard,
+    providerConfiguration: ProviderRuntimeConfiguration? = nil,
+    nativeReconciliationSettings: NativeReconciliationSettings? = nil
+) async throws {
+    let reconciliation = try nativeReconciliationSettings ?? NativeReconciliationSettings()
+    let storage = ObjectStorageService(provider: storageProvider)
+    let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
+    let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
+    let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
+    let studies = StudyRepository(database: app.db(.psql))
+    let providers = try await ProviderRuntime.configured(
+        application: app,
+        configuration: providerConfiguration,
+        sourceKeyring: sourceKeyring,
+        authorization: authorization,
+        studies: studies,
+        limits: collectionCapacity.admission,
+        validator: validator
+    )
     await app.grove.configure {
-        ObjectStorageService(provider: storageProvider)
+        reconciliation
+        providers
+        storage
+        recordings
+        downloads
 
-        AuthorizationService(grantorAuthority: grantorAuthority)
+        authorization
         DelegationService(clientPolicy: clientPolicy)
         GroupService()
-        StudyService()
+        StudyService(exportLimits: collectionCapacity.export)
         ComponentService()
         ComponentScheduleService()
         StudyBundleService()
@@ -168,14 +234,15 @@ func configureServices(
         InvitationCodeService()
         ProfileService()
         SourceBindingService(database: app.db(.psql))
-        ClinicalEventService(database: app.db(.psql), validator: validator)
+        SourceInstallationService(database: app.db(.psql), keyring: sourceKeyring)
+        ClinicalEventService(database: app.db(.psql), validator: validator, recordings: recordings, limits: collectionCapacity.admission)
         PublishedStudyService()
         EnrollmentService()
         ParticipantEnrollmentService()
         ConsentService()
 
         GroupRepository(database: app.db(.psql))
-        StudyRepository(database: app.db(.psql))
+        studies
         ComponentRepository(database: app.db(.psql))
         ComponentScheduleRepository(database: app.db(.psql))
         InvitationCodeRepository(database: app.db(.psql))
@@ -198,7 +265,7 @@ public func configureRoutes(for app: Application, middlewares: [any ServerMiddle
         on: transport,
         serverURL: try Servers.Server1.url(),
         configuration: .trove,
-        middlewares: middlewares + [ClinicalRequestBodyMiddleware()]
+        middlewares: middlewares + [ClinicalRequestBodyMiddleware(limits: app.grove[ClinicalEventService.self].limits)]
     )
 
     let components = apiBasePath.split(separator: "/")
@@ -218,4 +285,16 @@ struct ObjectStorageLifecycle: Vapor.LifecycleHandler {
             app.logger.error("Object storage shutdown failed")
         }
     }
+}
+
+
+private func configuredSourceIdentityKeyring(_ app: Application, ephemeral: Bool) throws -> SourceIdentityKeyring? {
+    guard app.environment.isServing else {
+        return nil
+    }
+    if ephemeral {
+        // This mode owns an ephemeral database; it never restores production identities.
+        return try .init(currentKeyID: "ephemeral-ui-test", keys: ["ephemeral-ui-test": SymmetricKey(size: .bits256)])
+    }
+    return try SourceIdentityKeyring.load(file: Environment.get("SOURCE_IDENTITY_KEYRING_FILE") ?? "")
 }

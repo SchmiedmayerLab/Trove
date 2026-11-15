@@ -54,17 +54,20 @@ struct FHIRDeploymentIdentifiers: Decodable, Sendable {
         }
     }
 
-    static func system(for role: GroveIdentifierRole, in expected: DeploymentIdentifierSystems) -> IdentifierSystem {
+    static func system(
+        for role: GroveIdentifierRole, in expected: DeploymentIdentifierSystems, provider: Bool = false
+    ) -> IdentifierSystem {
         switch role {
-        case .sourceRecord: expected.sourceRecord
-        case .sourceOutput: expected.sourceOutput
+        case .sourceRecord: provider ? expected.providerRecord : expected.sourceRecord
+        case .sourceOutput: provider ? expected.providerOutput : expected.sourceOutput
         case .writerRecord: expected.writerRecord
-        case .sourceArtifact: expected.sourceArtifact
+        case .sourceArtifact: provider ? expected.providerArtifact : expected.sourceArtifact
         case .sourceContext: expected.sourceContext
         case .recordingDevice: expected.recordingDevice
         case .deviceSnapshot: expected.deviceSnapshot
-        case .event: expected.event
-        case .entryNode: expected.entryNode
+        case .contextSnapshot: expected.contextSnapshot
+        case .recordVersion: expected.recordVersion
+        case .recordRetraction: expected.recordRetraction
         }
     }
 
@@ -72,12 +75,13 @@ struct FHIRDeploymentIdentifiers: Decodable, Sendable {
         for (role, values) in other.systems { systems[role, default: []].formUnion(values) }
     }
 
-    func matches(_ expected: DeploymentIdentifierSystems) -> Bool {
-        guard systems[.event] == [expected.event.rawValue] else {
+    func matches(_ expected: DeploymentIdentifierSystems, provider: Bool = false) -> Bool {
+        let lifecycleRoles = Set(systems.keys).intersection([.recordVersion, .recordRetraction])
+        guard lifecycleRoles.count == 1 else {
             return false
         }
         return systems.allSatisfy { role, values in
-            values == [Self.system(for: role, in: expected).rawValue]
+            values == [Self.system(for: role, in: expected, provider: provider).rawValue]
         }
     }
 }

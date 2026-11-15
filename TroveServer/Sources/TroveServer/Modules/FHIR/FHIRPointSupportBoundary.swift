@@ -7,6 +7,7 @@
 //
 
 import GroveFHIRContract
+import GroveSensorKitFHIR
 import ModelsR4
 
 
@@ -17,7 +18,6 @@ enum FHIRPointSupportBoundary {
     private static let gatewayDevice = "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice"
     private static let researchStudy = "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy"
     private static let completionMode = "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-completionMode"
-    private static let healthKitSourceType = Canonicals.root + "/healthkit/StructureDefinition/healthkit-source-type"
 
     static func validate(resources: [String: ResourceProxy]) throws {
         for resource in resources.values {
@@ -35,13 +35,14 @@ enum FHIRPointSupportBoundary {
             try patientContext(patient)
         case .observation(let observation):
             try observationContext(observation, resources: resources)
+        case .documentReference(let document):
+            try recordingContext(document, resources: resources)
         case .questionnaireResponse(let response):
             try questionnaire(response)
         case .device(let device):
             try deviceContext(device, resources: resources)
         case .researchSubject(let subject):
-            guard subject.consent == nil else { throw FHIRValidationClient.invalid }
-            try literal(subject.study, type: "ResearchStudy", resources: resources)
+            try subjectContext(subject, resources: resources)
         case .researchStudy(let study):
             try studyContext(study, resources: resources)
         case .planDefinition(let plan):
@@ -50,6 +51,11 @@ enum FHIRPointSupportBoundary {
             try provenanceContext(provenance, resources: resources)
         default: throw FHIRValidationClient.invalid
         }
+    }
+
+    private static func subjectContext(_ subject: ResearchSubject, resources: [String: ResourceProxy]) throws {
+        guard subject.consent == nil else { throw FHIRValidationClient.invalid }
+        try literal(subject.study, type: "ResearchStudy", resources: resources)
     }
 
     private static func patientContext(_ patient: Patient) throws {
@@ -64,6 +70,7 @@ enum FHIRPointSupportBoundary {
 
     private static func observationContext(_ observation: Observation, resources: [String: ResourceProxy]) throws {
         for reference in observation.derivedFrom ?? [] {
+            if try FHIRClinicalDerivations.outputTarget(reference, resources: resources) != nil { continue }
             if case .local(let fullURL) = try FHIRClinicalDerivations.target(reference) {
                 guard resources[fullURL]?.resourceType == "QuestionnaireResponse" else { throw FHIRValidationClient.invalid }
             }
@@ -73,6 +80,18 @@ enum FHIRPointSupportBoundary {
             // Notes remain in the exact retained version; do not discard their attribution references.
             guard note.extension?.isEmpty != false else { throw FHIRValidationClient.invalid }
             if case .reference? = note.author { throw FHIRValidationClient.invalid }
+        }
+    }
+
+    private static func recordingContext(_ document: DocumentReference, resources: [String: ResourceProxy]) throws {
+        guard document.authenticator == nil, document.custodian == nil, document.relatesTo?.isEmpty != false,
+              document.context?.encounter?.isEmpty != false, document.context?.sourcePatientInfo == nil else {
+            throw FHIRValidationClient.invalid
+        }
+        for author in document.author ?? [] { try literal(author, type: "Device", resources: resources) }
+        for related in document.context?.related ?? [] {
+            if try FHIRClinicalDerivations.outputTarget(related, resources: resources) != nil { continue }
+            try literal(related, type: "ResearchStudy", resources: resources)
         }
     }
 
@@ -93,13 +112,31 @@ enum FHIRPointSupportBoundary {
 
     private static func provenanceContext(_ provenance: Provenance, resources: [String: ResourceProxy]) throws {
         guard provenance.location == nil, provenance.signature?.isEmpty != false else { throw FHIRValidationClient.invalid }
-        for target in provenance.target { try literal(target, type: "Observation", resources: resources) }
+        if provenance.meta?.profile?.contains(Profile.groveMobileRetractionProvenance) == true {
+            // The IG validates these informative logical targets. The entity identifies the whole
+            // retracted source record; target cardinality never limits which versions are suppressed.
+            for target in provenance.target {
+                guard target.reference == nil, let identifier = target.identifier,
+                      [.sourceRecord, .sourceOutput].contains(try RoledIdentifier(identifier).role) else {
+                    throw FHIRValidationClient.invalid
+                }
+            }
+        } else {
+            for target in provenance.target {
+                guard let address = target.reference?.value?.string, let type = resources[address]?.resourceType,
+                      ["Observation", "DocumentReference"].contains(type) else { throw FHIRValidationClient.invalid }
+                try literal(target, type: type, resources: resources)
+            }
+        }
         for agent in provenance.agent {
             try provenanceAgent(agent, resources: resources)
         }
         for entity in provenance.entity ?? [] {
             // The pinned IG validator proves the single source-record entity identity and role.
-            guard entity.extension?.isEmpty != false,
+            guard entity.extension?.allSatisfy({
+                $0.url.value?.url.absoluteString == Canonicals.root + "/healthkit/StructureDefinition/healthkit-source-revision"
+                    || $0.url == HealthKitSourceDocumentTime.extensionURL
+            }) != false,
                   entity.modifierExtension?.isEmpty != false,
                   entity.what.reference == nil, entity.what.identifier != nil,
                   entity.what.extension?.isEmpty != false else { throw FHIRValidationClient.invalid }
@@ -147,16 +184,32 @@ enum FHIRPointSupportBoundary {
     }
 
     private static func extensions(_ values: [Extension], resourceType: String, resources: [String: ResourceProxy]) throws {
-        for value in values {
+        let ordinary = try values.filter {
+            try !FHIRHealthKitMetadataBoundary.accepts($0, resourceType: resourceType)
+                && !FHIRHealthKitECGBoundary.accepts($0, resourceType: resourceType)
+        }
+        for value in ordinary {
             guard value.extension?.isEmpty != false else { throw FHIRValidationClient.invalid }
             switch (resourceType, value.url.value?.url.absoluteString, value.value) {
             case ("Observation", gatewayDevice, .reference(let reference)):
                 try literal(reference, type: "Device", resources: resources)
             case ("Observation", researchStudy, .reference(let reference)):
                 try literal(reference, type: "ResearchStudy", resources: resources)
-            case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
+            case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string),
+                 ("DocumentReference", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
                 break // Complete pair, canonical text and cross-output consistency are checked by the revision projection.
-            case ("Observation", healthKitSourceType, .code),
+            case ("Provenance", Canonicals.recordVersion.value?.url.absoluteString, .identifier),
+                 ("QuestionnaireResponse", Canonicals.contextSnapshot.value?.url.absoluteString, .identifier):
+                break // Grove binds each identity extension to its resource's entry key.
+            case ("Observation", SensorKitContract.wristTemperatureAlgorithmVersionExtension, .string),
+                 ("Observation", Canonicals.healthKitSourceTypeExtension.value?.url.absoluteString, .code),
+                 ("DocumentReference", Canonicals.healthKitSourceTypeExtension.value?.url.absoluteString, .code),
+                 ("Observation", SensorKitContract.sourceTypeExtension, .code),
+                 ("DocumentReference", SensorKitContract.sourceTypeExtension, .code),
+                 ("Observation", Canonicals.providerExtension.value?.url.absoluteString, .code),
+                 ("DocumentReference", Canonicals.providerExtension.value?.url.absoluteString, .code),
+                 ("Observation", Canonicals.providerSourceTypeExtension.value?.url.absoluteString, .code),
+                 ("DocumentReference", Canonicals.providerSourceTypeExtension.value?.url.absoluteString, .code),
                  ("Observation", Canonicals.recordingMethod.value?.url.absoluteString, .coding):
                 // Full validation establishes the metadata; the location walk rejects nested extensions.
                 break // Retaining acquisition context grants no collection authority.

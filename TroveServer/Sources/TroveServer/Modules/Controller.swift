@@ -25,6 +25,14 @@ struct Controller: APIProtocol {
 // MARK: - Services
 
 extension Controller {
+    var nativeReconciliationSettings: NativeReconciliationSettings {
+        grove[NativeReconciliationSettings.self]
+    }
+
+    var providerRuntime: ProviderRuntime {
+        grove[ProviderRuntime.self]
+    }
+
     var delegationService: DelegationService {
         grove[DelegationService.self]
     }
@@ -59,6 +67,14 @@ extension Controller {
 
     var sourceBindingService: SourceBindingService {
         grove[SourceBindingService.self]
+    }
+
+    var sourceInstallationService: SourceInstallationService {
+        grove[SourceInstallationService.self]
+    }
+
+    var recordingTransferService: RecordingTransferService {
+        grove[RecordingTransferService.self]
     }
 
     var clinicalEventService: ClinicalEventService {

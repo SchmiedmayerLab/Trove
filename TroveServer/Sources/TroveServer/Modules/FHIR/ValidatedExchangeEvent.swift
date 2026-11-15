@@ -45,25 +45,28 @@ struct ValidatedExchangeEvent: Sendable {
         let resourceType: String
     }
 
-    struct PointOutput: Sendable {
+    struct Output: Sendable {
         let fullURL: String
         let profile: String
-        let effectiveAt: Date
+        var measurementBounds: ClinicalMeasurementBounds
+
+        var effectiveAt: Date { measurementBounds.startDate }
+        var effectiveEnd: Date? { measurementBounds.endDate }
         let sourceRecordIdentifier: Identifier
         let sourceOutputIdentifier: Identifier
         let writerIdentifier: Identifier?
         let writerVersion: String?
-        /// Lossless decimal text; no binary floating-point research projection.
-        let quantityValue: String
-        let quantitySystem: String
-        let quantityCode: String
+        let value: ClinicalOutputValue
         let codeSystem: String
         let code: String
+        var sourceTypeIdentifier: String?
+        var sourceRepositoryKind: SourceRepositoryKind?
+        /// Row extremes of a query-created recording batch, verified against its complete content.
+        var rowExtent: RecordingRowExtent?
     }
 
     struct Retraction: Sendable {
         let sourceRecordIdentifier: Identifier
-        let outputIdentifiers: [Identifier]
     }
 
     struct QuestionnaireContext: Sendable {
@@ -81,16 +84,55 @@ struct ValidatedExchangeEvent: Sendable {
         let target: Target
     }
 
+    struct OutputDependency: Sendable, Hashable {
+        enum Relation: String, Sendable {
+            case derivedFrom
+            case related
+        }
+
+        let outputFullURL: String
+        let targetFullURL: String
+        let relation: Relation
+    }
+
     let rawBytes: Data
+    var recorded: RecordedInstant
     let validatorIdentity: String
     let eventIdentifierSystem: String
     let eventIdentifierValue: String
-    let producerInstance: UUID
     var deploymentIdentifiers: FHIRDeploymentIdentifiers
     let participants: Set<Identifier>
     let nodes: [Node]
-    let outputs: [PointOutput]
+    let outputs: [Output]
     var retraction: Retraction?
+    /// Informative native UUID evidence, never a source authority or deduplication key.
+    var nativeRecordIdentifiers: [Identifier] = []
+    /// The readable HealthKit sync identifier, verbatim: informative evidence like the native UUID, never an identity,
+    /// entry key, deduplication key, version selector, receipt or retraction target.
+    var syncRecordIdentifiers: [Identifier] = []
+    var recordings: [ClinicalRecordingAttachment] = []
     var questionnaireContexts: [QuestionnaireContext] = []
     var derivations: [Derivation] = []
+    /// Producer graph dependencies preserve lineage but grant no access to the companion output.
+    var outputDependencies: [OutputDependency] = []
+}
+
+
+extension ValidatedExchangeEvent {
+    var collectionOutputs: [ClinicalGrantStore.Output] {
+        // A summary derived from a query-created batch describes every row of its companion recording.
+        let batchRows = outputs.compactMap(\.rowExtent)
+        let sharedRows = batchRows.count == 1 && Set(outputs.map(\.sourceRecordIdentifier)).count == 1 ? batchRows.first : nil
+        return outputs.map {
+            .init(
+                fullURL: $0.fullURL,
+                profile: $0.profile,
+                measurementBounds: $0.measurementBounds,
+                codeSystem: $0.codeSystem,
+                code: $0.code,
+                sourceTypeIdentifier: $0.sourceTypeIdentifier,
+                rowExtent: $0.rowExtent ?? sharedRows
+            )
+        }
+    }
 }

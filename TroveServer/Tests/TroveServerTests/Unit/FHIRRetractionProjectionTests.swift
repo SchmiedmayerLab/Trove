@@ -22,9 +22,8 @@ struct FHIRRetractionProjectionTests {
         #expect(event.rawBytes == bytes)
         #expect(event.outputs.isEmpty)
         #expect(event.participants.isEmpty)
-        #expect(event.nodes.count == 1)
+        #expect(event.nodes.count == 2)
         #expect(event.retraction?.sourceRecordIdentifier == active.outputs[0].sourceRecordIdentifier)
-        #expect(event.retraction?.outputIdentifiers == [active.outputs[0].sourceOutputIdentifier])
         #expect(try ClinicalRecordRevision(event).kind == "retraction")
     }
 

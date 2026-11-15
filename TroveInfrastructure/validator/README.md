@@ -5,20 +5,17 @@ SPDX-License-Identifier: MIT
 
 # Offline FHIR Validation
 
-This worker validates one exchange Bundle against the pinned Grove FHIR 0.6.0 contract. It runs the IG's own profile, graph and identity checks, then the official FHIR Validator against the complete local package closure. Trove separately authorizes the participant, source, supported output shape, consent and study attribution. A valid FHIR graph is not permission to store or disclose it.
+This worker validates one exchange Bundle against the pinned Grove FHIR 0.8.0 contract. It runs the IG's own profile, graph and identity checks, then the official FHIR Validator against the complete local package closure. Trove separately authorizes the participant, source, supported output shape, consent and study attribution. A valid FHIR graph is not permission to store or disclose it.
 
-`manifest.json` records the exact companion source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are the checksum-verified assets of the published Grove FHIR 0.6.0 release identified by `guideRelease`; rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
+`manifest.json` records the exact companion source revision, worker implementation, runtime images, Java validator and package archive checksums. The worker verifies its own implementation hash before startup. The guide archives are the checksum-verified assets of the published Grove FHIR 0.8.0 release identified by `guideRelease`; rebuilding an archive with different bytes requires an explicit manifest review, not an automatic checksum update.
 
-The runtime companion contract remains at `444e06fb25680c3af29e5d3ccbebeb0249be7318`.
-The published packages were built from release revision
-`83668d2d33325d2c1c9d42638fdc7557314f3d88`, not that earlier commit. All ten guide
-directories, catalogs, producer validators, Questionnaire companion and build-tool
-locks are identical at both revisions. The only source differences add an offline
-CI job and recognize one narrowly scoped BCP 47 Publisher QA warning in
-`Scripts/check-guide-qa.py`. These are compatible published package assets, not a
-new exchange contract. Their `ci-build`/`notForPublication` metadata remains an
-upstream preview designation; use here does not establish deployment approval or
-online terminology validation.
+The runtime companion and published packages use the same release source revision
+`cde0cdb92e4f63e96b463085f2a5765a77f5211f`. Package hashes are checked against both the release
+asset digests and its build provenance. The release is an offline structural preview;
+it does not cover canonical publication or online terminology verification.
+The published QA reports contain errors in the SensorKit and provider guide builds;
+these reports are not evidence that every adapter passes validation. Trove must execute
+its supported producer and receiver fixtures against this exact package set.
 
 Run `bash scripts/check validator-pin` to compare the locked Java tool with its
 official GitHub release asset. This online check is separate from offline context
@@ -60,13 +57,28 @@ and check `validator-pin` before preparing it. Never repin to make changed bytes
 pass.
 
 To reconstruct the locked inventory, download the named release assets
-`<packageId>-0.6.0.tgz` from the repository and release ID in `guideRelease`.
+`<packageId>-0.8.0.tgz` from the repository and release ID in `guideRelease`.
 Verify their SHA-256 against both the GitHub asset digest and each manifest entry,
 then place them under `packages/<file>` in the artifact directory. Keep the
 checksum-pinned validator JAR and bootstrap packages beside them. Preparation
 rechecks every byte; a matching version label alone is insufficient. Retain this
 inventory durably with its manifest, outside the source repository and temporary
 CI artifact retention. Do not rely on regenerating byte-identical archives.
+
+## Receiver Lifecycle Test Corpus
+
+Pass `--include-lifecycle-corpus` to `prepare.py` to extract the corpus locked by
+`lifecycle-corpus.json`. The source checkout must contain both that commit and the
+validator manifest's contract commit. Preparation verifies the archive checksum,
+extracts it into `corpus/Conformance/corpora/receiver-lifecycle`, and retains its
+identity in `corpus/identity.json`. No working-tree fixture or moving branch is used.
+
+This corpus supplies 43 expected revision transition sequences; it does not replace
+the separately pinned validator source or published guide packages. CI runs each
+sequence through the actual validator and receiver. The test adapter verifies
+fixture checksums and reproduces the original expectations with the pinned IG
+generator before binding fixtures to a synthetic enrollment. It preserves recorded
+lexemes and uses that same generator for the identifier tie-break after rebinding. See the [server test setup](../../TroveServer/README.md#required-full-validator-ci-lane).
 
 ## Deployment Boundary
 
@@ -100,7 +112,7 @@ a Questionnaire result does not replace exchange-admission evidence.
 
 ## Request and Result
 
-`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 4 MiB. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content, FHIR diagnostics or process output is logged or returned.
+`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 16 MiB. The application enforces its independently configured event-admission budget before calling the validator. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content, FHIR diagnostics or process output is logged or returned.
 
 The response is smaller than 2 KiB:
 
@@ -108,7 +120,7 @@ The response is smaller than 2 KiB:
 {
   "valid": true,
   "sha256": "<digest of the exact request bytes>",
-  "contractRevision": "444e06fb25680c3af29e5d3ccbebeb0249be7318",
+  "contractRevision": "cde0cdb92e4f63e96b463085f2a5765a77f5211f",
   "validatorIdentity": "sha256:<manifest digest>"
 }
 ```
@@ -130,20 +142,26 @@ The smoke check tests the CLI with networking disabled, then HTTP through a temp
 
 ## Backend Process Restart Check
 
-On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.6.1 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
+On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.8.0 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
 
 ```sh
 python3 TroveInfrastructure/validator/verify_process_restart.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 
 The harness owns fresh PostgreSQL and S3 containers, a restricted runtime database role, Keycloak, an offline worker, a fixed-destination loopback relay, and two successive backend processes. It uses ports 58032, 58033, 58080, 58081, 58180 and 59000 by default and refuses occupied ports. It never uses an existing application database or a test authentication bypass.
 
-Through authenticated REST, it publishes two studies, accepts exact-presentation consent, registers a source and admits one fully validated synthetic event to both studies. It checks exact retries, rejects changed bytes and targets, withdraws from only one study, terminates the backend, then starts a different process against the retained stores. The final checks cover unchanged event and receipt bytes, the complete node index, one point, two grants, the three admission/grant audit records, independent effective study access, and both retained consent PDFs.
+On a memory-constrained verification host, `--validator-container <name>` may reuse an already healthy stateless test worker. The harness requires the exact selected image, a read-only container with no published ports, and one internal network. It records the existing container/image/network identities and creates its own relay; cleanup never stops that worker or removes its network. All authentication, database, storage and backend processes remain fresh. This mode does not establish cold validator startup behavior; use the separate image smoke check for that evidence. Memory sampling starts before validator readiness, and an owned worker that exits during startup fails immediately with its exit/OOM state recorded in `summary.json`.
+
+Through authenticated REST, it publishes two studies, accepts exact-presentation consent, and registers two independent installations for one participant's HealthKit source. Both recover the same server-managed identity key and complete source context. The fixture tool receives recovery material through stdin; it never receives secrets as command-line arguments. The test uses synthetic records, not acquired HealthKit samples.
+
+The harness provisions a private keyring once outside the retained evidence directory and reuses it across both backend processes. It admits one fully validated record, adds the second study's grant through a separate attribution command, and retains an additional byte representation with its own receipt. It checks exact retries, rejects changed target intent, withdraws from only one study, and revokes one installation without revoking the other. A separate SensorKit source is already revoked before process replacement.
+
+After starting a different backend process, it recovers the same identity material and reproduces the same synthetic record bytes. The remaining checks cover retained source and installation revocations, unchanged original and representation receipts, the complete node index, one point, two grants, five admission/grant/attribution audit records, independent effective study access, and both retained consent PDFs. Cleanup removes the private keyring as well as the owned stack. This establishes neither physical-device acquisition nor independent conversions made by two real devices.
 
 The printed evidence directory contains logs and `summary.json` with binary/image identities, backend process IDs, elapsed time, and sampled backend RSS and worker memory. These samples are not an exact peak or a throughput benchmark. The run has a 30-minute deadline and removes only its owned processes, containers, temporary volumes and network, including on failure. Synthetic evidence, the copied binary and Keycloak directory remain locally; no credentials or clinical payloads are published.
 
@@ -160,9 +178,9 @@ python3 TroveInfrastructure/validator/verify_healthkit_acquisition.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
-  --runtime com.apple.CoreSimulator.SimRuntime.iOS-26-5
+  --runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
 
 Select an installed runtime explicitly. Optional `--workspace` and `--derived-data`
@@ -265,7 +283,7 @@ python3 -m venv /private/tmp/trove-recovery-tools
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 

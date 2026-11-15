@@ -19,35 +19,6 @@ final class SourceBindingService: Module, Sendable {
         self.database = database
     }
 
-    func register(registrationID: UUID) async throws -> SourceBinding {
-        let context = try AuthContext.checkIsParticipant()
-        return try await database.transaction { transaction in
-            let participantID = try await self.lockParticipant(context, on: transaction)
-            let sql = try self.sql(on: transaction)
-            if let existing = try await sql.raw("""
-                SELECT * FROM source_bindings WHERE participant_id = \(bind: participantID) AND registration_id = \(bind: registrationID)
-                """)
-                .first() {
-                // Retry is an immutable registration receipt, including after revocation.
-                return try SourceBinding(row: existing)
-            }
-            let id = UUID()
-            let createdAt = Date()
-            let root = context.issuer + "/trove/sources/" + id.uuidString.lowercased()
-            let systems = try SourceIdentityNamespaces.assign(root: root, registrationID: registrationID)
-            try await sql.raw("""
-                INSERT INTO source_bindings (id, participant_id, registration_id, kind, identifier_root, event_identifier_system,
-                    participant_identifier_system, participant_identifier_value, created_at)
-                VALUES (\(bind: id), \(bind: participantID), \(bind: registrationID), \(bind: SourceKind.participantApp.rawValue),
-                    \(bind: root), \(bind: systems.event.rawValue), \(bind: context.issuer + "/trove/participants"),
-                    \(bind: participantID.uuidString.lowercased()), \(bind: createdAt))
-                """)
-                .run()
-            try await self.audit(.sourceRegistered, id: id, participantID: participantID, context: context, on: transaction)
-            return try await self.find(id: id, participantID: participantID, on: transaction)
-        }
-    }
-
     func find(id: UUID) async throws -> SourceBinding {
         let context = try AuthContext.checkIsParticipant()
         let participant = try await ProfileRepository(database: database).findByIdentity(issuer: context.issuer, subject: context.subject)
@@ -60,7 +31,7 @@ final class SourceBindingService: Module, Sendable {
     func revoke(id: UUID) async throws -> SourceBinding {
         let context = try AuthContext.checkIsParticipant()
         return try await database.transaction { transaction in
-            let participantID = try await self.lockParticipant(context, on: transaction)
+            let participantID = try await Self.lockParticipant(context, on: transaction)
             let binding = try await self.find(id: id, participantID: participantID, on: transaction)
             guard binding.revokedAt == nil else {
                 return binding
@@ -76,27 +47,15 @@ final class SourceBindingService: Module, Sendable {
         }
     }
 
-    private func lockParticipant(_ context: AuthContext, on database: any Database) async throws -> UUID {
-        let sql = try sql(on: database)
-        // Lock before reading the registration nonce. All source mutations for this
-        // verified owner share the same transaction and serialize on this row.
-        let row = try await sql.raw("""
-            UPDATE participants SET id = id
-            WHERE identity_provider_issuer = \(bind: context.issuer) AND identity_provider_id = \(bind: context.subject)
-            RETURNING id
-            """)
-            .first()
-        guard let row else { throw ServerError.notFound("Participant profile not found") }
-        return try row.decode(column: "id", as: UUID.self)
-    }
-
     private func find(id: UUID, participantID: UUID, on database: any Database) async throws -> SourceBinding {
         let row = try await sql(on: database).raw("""
             SELECT * FROM source_bindings WHERE id = \(bind: id) AND participant_id = \(bind: participantID)
             """)
             .first()
         guard let row else { throw ServerError.notFound("Source binding not found") }
-        return try SourceBinding(row: row)
+        let source = try SourceBinding(row: row)
+        guard source.kind == .participantApp else { throw ServerError.notFound("Native source binding not found") }
+        return source
     }
 
     private func sql(on database: any Database) throws -> any SQLDatabase {
@@ -113,5 +72,22 @@ final class SourceBindingService: Module, Sendable {
             scope: .participantSource(participantID: participantID, sourceBindingID: id),
             target: .init(id: id)
         ), on: transaction)
+    }
+}
+
+
+extension SourceBindingService {
+    static func lockParticipant(_ context: AuthContext, on database: any Database) async throws -> UUID {
+        guard let sql = database as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
+        // Lock before reading the registration nonce. All source mutations for this
+        // verified owner share the same transaction and serialize on this row.
+        let row = try await sql.raw("""
+            UPDATE participants SET id = id
+            WHERE identity_provider_issuer = \(bind: context.issuer) AND identity_provider_id = \(bind: context.subject)
+            RETURNING id
+            """)
+            .first()
+        guard let row else { throw ServerError.notFound("Participant profile not found") }
+        return try row.decode(column: "id", as: UUID.self)
     }
 }

@@ -13,37 +13,48 @@ import TroveAPIServer
 
 extension ClinicalEventService {
     /// Single and batched submissions share byte decoding, validation and atomic admission.
-    func accept(submission: Components.Schemas.EventSubmission, sourceID: UUID) async throws -> ClinicalEventReceipt {
+    func accept(
+        submission: Components.Schemas.EventSubmission,
+        sourceID: UUID,
+        installation: SourceInstallationProof,
+        attachments: [Components.Schemas.RecordingAttachmentBinding] = []
+    ) async throws -> ClinicalEventReceipt {
         _ = try AuthContext.checkIsParticipant()
-        guard submission.eventBase64.utf8.count <= EventSubmissionLimits.maximumBase64Bytes else { throw FHIRValidationClient.tooLarge }
+        guard submission.eventBase64.utf8.count <= limits.recordBase64Bytes else { throw FHIRValidationClient.tooLarge }
         guard let bytes = Data(base64Encoded: submission.eventBase64), !bytes.isEmpty,
               bytes.base64EncodedString() == submission.eventBase64 else {
             throw ServerError.badRequest("Provide canonical base64 of the original event")
         }
-        guard bytes.count <= FHIRValidationClient.maximumBytes else { throw FHIRValidationClient.tooLarge }
-        return try await accept(body: HTTPBody(bytes), sourceID: sourceID, targets: submission.targets.map { try $0.domainTarget })
+        guard bytes.count <= limits.recordBytes else { throw FHIRValidationClient.tooLarge }
+        return try await accept(
+            body: HTTPBody(bytes),
+            sourceID: sourceID,
+            targets: submission.targets.map { try $0.domainTarget },
+            installation: installation,
+            attachments: attachments
+        )
     }
 
     func acceptBatch(
-        _ submissions: [Components.Schemas.EventSubmission], sourceID: UUID
+        _ submissions: [Components.Schemas.EventSubmission], sourceID: UUID, installation: SourceInstallationProof
     ) async throws -> [Components.Schemas.EventBatchResult] {
         _ = try AuthContext.checkIsParticipant()
-        guard (1...EventSubmissionLimits.maximumBatchEvents).contains(submissions.count) else {
-            throw ServerError.badRequest("Submit between 1 and \(EventSubmissionLimits.maximumBatchEvents) events")
+        guard (1...limits.batchRecords).contains(submissions.count) else {
+            throw ServerError.badRequest("Submit between 1 and \(limits.batchRecords) events")
         }
         var total = 0
         for submission in submissions {
-            guard submission.eventBase64.utf8.count <= EventSubmissionLimits.maximumBase64Bytes - total else { throw FHIRValidationClient.tooLarge }
+            guard submission.eventBase64.utf8.count <= limits.recordBase64Bytes - total else { throw FHIRValidationClient.tooLarge }
             total += submission.eventBase64.utf8.count
         }
         try Task.checkCancellation()
         let source = try await SourceBindingService(database: database).find(id: sourceID)
-        guard source.revokedAt == nil else { throw ServerError.conflict("Source binding is not active") }
+        _ = try await installation.validate(source: source, on: database)
         var results: [Components.Schemas.EventBatchResult] = []
         for submission in submissions {
             try Task.checkCancellation()
             do {
-                let receipt = try await accept(submission: submission, sourceID: sourceID)
+                let receipt = try await accept(submission: submission, sourceID: sourceID, installation: installation)
                 results.append(.EventReceipt(receipt.apiRepresentation))
             } catch {
                 // A lost/cancelled response can hide a committed prefix. Exact receipt recovery resolves it.

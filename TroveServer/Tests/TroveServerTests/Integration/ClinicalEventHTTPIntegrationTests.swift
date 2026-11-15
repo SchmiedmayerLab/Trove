@@ -9,6 +9,7 @@
 import Crypto
 import Fluent
 import Foundation
+import GroveFHIRContract
 import SQLKit
 import Testing
 import TroveAPIServer
@@ -44,7 +45,7 @@ struct ClinicalEventHTTPIntegrationTests {
                 let retry = try await Self.upload(bytes, fixture: fixture, token: token, on: app)
                 #expect(receipt == retry)
                 try await Self.expectState(fixture, receipt: receipt, bytes: bytes, withdrawn: false, on: app)
-                try await Self.expectConflict(bytes + Data(" ".utf8), fixture: fixture, token: token, on: app)
+                try await Self.expectRepresentationAndConflict(bytes, receipt: receipt, fixture: fixture, token: token, on: app)
                 try await Self.expectConflict(bytes, fixture: fixture, token: token, on: app, oneTarget: true)
                 try await app.test(.POST, "\(apiBasePath)/participant/enrollments/\(fixture.enrollmentIDs[0])/withdraw", beforeRequest: {
                     $0.bearerAuth(token)
@@ -55,7 +56,9 @@ struct ClinicalEventHTTPIntegrationTests {
                 try await TestDatabase.withRestartedApplication(app) { restarted in
                     let reopenedStorage = try S3ObjectStorageProvider(application: restarted, config: configuration)
                     do {
-                        try await configureServices(for: restarted, storageProvider: reopenedStorage, validator: .init(application: restarted))
+                        let validator = try FHIRValidationClient(application: restarted)
+                        let keyring = try TestApp.sourceKeyring()
+                        try await configureServices(for: restarted, storageProvider: reopenedStorage, validator: validator, sourceKeyring: keyring)
                         _ = try await TestApp.configureTransport(for: restarted)
                         let afterRestart = try await Self.upload(bytes, fixture: fixture, token: token, on: restarted)
                         #expect(afterRestart == receipt)
@@ -94,6 +97,7 @@ extension ClinicalEventHTTPIntegrationTests {
         var receipt: Components.Schemas.EventReceipt?
         try await app.test(.POST, path(fixture), beforeRequest: { request in
             request.bearerAuth(token)
+            request.sourceInstallation(fixture.installationID)
             try request.encodeJSONBody(submission(bytes, fixture: fixture))
         }) { response in
             try #require(response.status == .ok)
@@ -102,11 +106,25 @@ extension ClinicalEventHTTPIntegrationTests {
         return try #require(receipt)
     }
 
+    /// Equivalent bytes add a custody representation of the retained version; changed clinical content conflicts.
+    private static func expectRepresentationAndConflict(
+        _ bytes: Data, receipt: Components.Schemas.EventReceipt, fixture: ClinicalEventStoreTests.Fixture, token: String?, on app: Application
+    ) async throws {
+        let representation = try await upload(bytes + Data(" ".utf8), fixture: fixture, token: token, on: app)
+        #expect(representation.producerEventIdentifier == receipt.producerEventIdentifier)
+        #expect(representation.payloadSHA256 != receipt.payloadSHA256)
+        try await expectState(fixture, receipt: receipt, bytes: bytes, withdrawn: false, on: app)
+        let changed = try #require(String(data: bytes, encoding: .utf8)).replacingOccurrences(of: "\"value\":72", with: "\"value\":73")
+        try #require(Data(changed.utf8) != bytes)
+        try await expectConflict(Data(changed.utf8), fixture: fixture, token: token, on: app)
+    }
+
     private static func expectConflict(
         _ bytes: Data, fixture: ClinicalEventStoreTests.Fixture, token: String?, on app: Application, oneTarget: Bool = false
     ) async throws {
         try await app.test(.POST, path(fixture), beforeRequest: { request in
             request.bearerAuth(token)
+            request.sourceInstallation(fixture.installationID)
             try request.encodeJSONBody(submission(bytes, fixture: fixture, oneTarget: oneTarget))
         }) { response in
             #expect(response.status == .conflict)
@@ -116,10 +134,9 @@ extension ClinicalEventHTTPIntegrationTests {
     private static func expectState(
         _ fixture: ClinicalEventStoreTests.Fixture, receipt: Components.Schemas.EventReceipt, bytes: Data, withdrawn: Bool, on app: Application
     ) async throws {
-        let bundle = try #require(try JSONSerialization.jsonObject(with: bytes) as? [String: Any])
-        let identifier = try #require(bundle["identifier"] as? [String: Any])
-        #expect(receipt.producerEventIdentifier.system == identifier["system"] as? String)
-        #expect(receipt.producerEventIdentifier.value == identifier["value"] as? String)
+        let identifier = try ExchangeRecord(validating: bytes).version.identifier.identifier
+        #expect(receipt.producerEventIdentifier.system == identifier.system.rawValue)
+        #expect(receipt.producerEventIdentifier.value == identifier.value)
         #expect(receipt.payloadSHA256 == SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
         try await ClinicalEventStoreTests.expectRows(events: 1, nodes: receipt.nodeCount, facts: 1, grants: 2, on: app.db)
         let store = ClinicalEventStore(database: app.db)

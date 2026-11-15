@@ -19,6 +19,7 @@ struct ClinicalRequestBodyTests {
         try await TestApp.withApp(token: .participant(subject: "body-test")) { app, token in
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/events", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(UUID())
                 try $0.encodeJSONBody(Self.body(encoded))
             }) { #expect($0.status == .badRequest) }
         }
@@ -30,6 +31,7 @@ struct ClinicalRequestBodyTests {
         try await TestApp.withApp(token: .participant(subject: "body-test")) { app, token in
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/events", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(UUID())
                 try $0.encodeJSONBody(Self.body(encoded))
             }) { #expect($0.status == .payloadTooLarge) }
         }
@@ -42,6 +44,7 @@ struct ClinicalRequestBodyTests {
         try await TestApp.withApp(token: identity) { app, token in
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/events", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(UUID())
                 $0.headers.contentType = .json
                 $0.body = .init(data: Data(repeating: 32, count: 6 * 1024 * 1024 + 1))
             }) { #expect($0.status == status) }

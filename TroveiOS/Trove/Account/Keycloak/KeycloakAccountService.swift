@@ -51,6 +51,7 @@ public final class KeycloakAccountService: AccountService {
     public let keycloakConfiguration: KeycloakConfiguration
 
     private var authState: OIDAuthState?
+    private var authStateObserver: KeycloakAuthStateObserver?
     private var session: OIDExternalUserAgentSession?
     private let lifecycle = KeycloakSessionLifecycle()
 
@@ -104,7 +105,11 @@ public final class KeycloakAccountService: AccountService {
             for await update in stream { await self?.applyExternalUpdate(update) }
         }
         let generation = lifecycle.generation
-        Task { await self.restoreSession(generation: generation) }
+        Task { [weak self] in
+            let unlocked = NotificationCenter.default.notifications(named: UIApplication.protectedDataDidBecomeAvailableNotification)
+            await self?.restoreSession(generation: generation)
+            for await _ in unlocked { await self?.restoreSession(generation: generation) }
+        }
     }
 
     // MARK: - AccountService
@@ -148,6 +153,10 @@ public final class KeycloakAccountService: AccountService {
         try lifecycle.validate(snapshot)
         guard let state = authState, identityDetails(state: state, isNew: false)?.accountId == snapshot.subject else {
             throw CancellationError()
+        }
+        guard state.isAuthorized else {
+            clearFailedSession(generation: snapshot.generation)
+            throw KeycloakAccountError.notSignedIn
         }
     }
 
@@ -228,16 +237,24 @@ public final class KeycloakAccountService: AccountService {
     // MARK: - Details
 
     private func restoreSession(generation: UUID) async {
-        guard lifecycle.generation == generation else {
+        guard lifecycle.generation == generation, sessionSnapshot == nil else {
             return
         }
-        guard let state = try? loadState() else {
-            try? clearState()
+        let state: OIDAuthState
+        do {
+            guard let retained = try loadState() else {
+                return
+            }
+            state = retained
+        } catch {
+            // A locked or unavailable keychain is not evidence of logout or corrupt credentials.
+            // The protected-data notification retries restoration after the first device unlock.
             return
         }
         do {
             try install(state, generation: generation)
-            _ = try await currentAccessToken()
+            // Restore the known account without requiring a live access token. Profile retrieval
+            // runs independently; requests still refresh and validate tokens before network access.
             try await publishDetails(state: state, isNew: false, generation: generation)
         } catch {
             clearFailedSession(generation: generation)
@@ -285,9 +302,10 @@ public final class KeycloakAccountService: AccountService {
         details.keycloakAccountConsole = "managed-by-keycloak"
         return details
     }
+}
 
-    // MARK: - Keychain
 
+extension KeycloakAccountService {
     private func install(_ state: OIDAuthState, generation: UUID) throws {
         try lifecycle.requireGeneration(generation)
         try KeycloakAuthStateBinding.validate(state, configuration: keycloakConfiguration)
@@ -296,14 +314,34 @@ public final class KeycloakAccountService: AccountService {
         }
         authState = state
         try lifecycle.install(subject: identity.accountId, issuer: keycloakConfiguration.issuer, for: generation)
+        let observer = KeycloakAuthStateObserver { [weak self] in self?.persistAuthState(for: generation) }
+        authStateObserver = observer
+        state.stateChangeDelegate = observer
     }
 
     private func invalidateSession() {
         lifecycle.invalidate()
+        authState?.stateChangeDelegate = nil
+        authStateObserver = nil
         authState = nil
         let previous = session
         session = nil
         previous?.cancel()
+    }
+
+    /// AppAuth may finish a refresh after its awaiting task was cancelled. Persist rotation and
+    /// confirmed authorization failures independently of that task, without touching a newer account.
+    private func persistAuthState(for generation: UUID) {
+        guard lifecycle.generation == generation, let state = authState else {
+            return
+        }
+        guard state.isAuthorized,
+              (try? KeycloakAuthStateBinding.validate(state, configuration: keycloakConfiguration)) != nil,
+              identityDetails(state: state, isNew: false)?.accountId == sessionSnapshot?.subject else {
+            clearFailedSession(generation: generation)
+            return
+        }
+        try? saveState(state)
     }
 
     private func clearFailedSession(generation: UUID) {

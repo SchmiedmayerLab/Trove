@@ -44,16 +44,17 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(values["ports"]["web"]["nodePort"], 30080)
         self.assertEqual(values["ports"]["websecure"]["nodePort"], 30443)
 
-    def test_audit_reader_capability_is_available_but_never_assigned_by_default(self):
+    def test_data_reader_capabilities_are_available_but_never_assigned_by_default(self):
         for path in (ROOT / "docker/keycloak/realm.json", ROOT / "infrastructure/dev/realm/00-realm.json"):
             with self.subTest(path=path):
                 realm = json.loads(path.read_text())
                 group = next(item for item in realm["groups"] if item["name"] == "Schmiedmayer Lab")
-                readers = [item for item in group["subGroups"] if item["name"] == "audit-reader"]
-                self.assertEqual(readers, [{"name": "audit-reader", "subGroups": []}])
-                for user in realm.get("users", []):
-                    self.assertFalse(any(value.endswith("/audit-reader") for value in user.get("groups", [])))
-                self.assertFalse(any(value.endswith("/audit-reader") for value in realm.get("defaultGroups", [])))
+                for capability in ("audit-reader", "data-reader"):
+                    readers = [item for item in group["subGroups"] if item["name"] == capability]
+                    self.assertEqual(readers, [{"name": capability, "subGroups": []}])
+                    for user in realm.get("users", []):
+                        self.assertFalse(any(value.endswith("/" + capability) for value in user.get("groups", [])))
+                    self.assertFalse(any(value.endswith("/" + capability) for value in realm.get("defaultGroups", [])))
 
     def test_local_cluster_uses_the_verified_extension_compatible_node(self):
         configuration = yaml.safe_load((ROOT / "tools/kind-config.yaml").read_text())
@@ -96,6 +97,51 @@ class DeploymentContractTests(unittest.TestCase):
                     capture_output=True, text=True, check=True, timeout=30,
                 )
                 cls.rendered[layer, environment] = list(yaml.safe_load_all(result.stdout))
+
+    def test_source_keyring_is_restricted_to_serving_and_never_seeded_in_production(self):
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                documents = self.rendered["apps", environment]
+                pod = named(documents, "Deployment", "trove-server")["spec"]["template"]["spec"]
+                self.assertEqual(pod["securityContext"]["fsGroup"], 999)
+                volume = next(item for item in pod["volumes"] if item["name"] == "source-identity-keyring")
+                self.assertEqual(volume["secret"], {
+                    "secretName": "trove-source-identity-keyring", "defaultMode": 0o440,
+                    "items": [{"key": "keyring.secret", "path": "keyring.secret"}],
+                })
+                server = pod["containers"][0]
+                mount = next(item for item in server["volumeMounts"] if item["name"] == volume["name"])
+                self.assertEqual(mount, {"name": volume["name"], "mountPath": "/run/secrets/source-identity", "readOnly": True})
+                config = named(documents, "ConfigMap", "trove-server-config")["data"]
+                self.assertEqual(config["SOURCE_IDENTITY_KEYRING_FILE"], mount["mountPath"] + "/keyring.secret")
+                for kind, name in (("Job", "trove-database-operator"), ("Deployment", "trove-web")):
+                    self.assertNotIn("source-identity-keyring", json.dumps(named(documents, kind, name)))
+                external = named(self.rendered["infrastructure", environment], "ExternalSecret", "trove-source-identity-keyring")
+                self.assertEqual(external["spec"]["data"], [{"secretKey": "keyring.secret", "remoteRef": {
+                    "key": "source-identity-keyring", "conversionStrategy": "Default",
+                    "decodingStrategy": "None", "metadataPolicy": "None",
+                }}])
+        production = json.dumps(self.rendered["infrastructure", "prod"])
+        self.assertNotIn("keyBase64", production)
+        self.assertNotIn("vault-source-identity-keyring-setup", production)
+
+    def test_compose_initializes_keys_explicitly_and_serving_reuses_them_read_only(self):
+        compose = yaml.safe_load((ROOT / "docker/docker-compose.yml").read_text())
+        initializer = compose["services"]["source-keyring-init"]
+        server = compose["services"]["server"]
+        path = "/var/lib/trove/source-identity"
+        self.assertIn("source_identity_keys", compose["volumes"])
+        self.assertEqual(initializer["profiles"], ["tools"])
+        self.assertEqual(initializer["image"], server["image"])
+        self.assertEqual(initializer["command"], ["create-source-keyring", "--output", path + "/keyring.secret"])
+        self.assertNotIn("environment", initializer)
+        self.assertNotIn("depends_on", initializer)
+        self.assertNotIn("source-keyring-init", server["depends_on"])
+        self.assertEqual(initializer["volumes"], ["source_identity_keys:" + path])
+        self.assertIn("source_identity_keys:" + path + ":ro", server["volumes"])
+        self.assertEqual(server["environment"]["SOURCE_IDENTITY_KEYRING_FILE"], path + "/keyring.secret")
+        for name in ("web", "server-migrate", "server-grants"):
+            self.assertNotIn("source_identity_keys", json.dumps(compose["services"][name]))
 
     def test_serving_never_receives_operator_credentials_or_initializes_schema(self):
         for environment in ("dev", "prod"):

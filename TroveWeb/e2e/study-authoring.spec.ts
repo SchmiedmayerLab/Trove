@@ -7,8 +7,8 @@
 //
 
 import type { Page } from "@playwright/test";
-import { expect, openNewStudyDialog, test } from "./fixtures";
 import { zStudyDraftValidation } from "../src/lib/api/generated/zod.gen";
+import { expect, openNewStudyDialog, test } from "./fixtures";
 
 const questionnaire = JSON.stringify({
   resourceType: "Questionnaire",

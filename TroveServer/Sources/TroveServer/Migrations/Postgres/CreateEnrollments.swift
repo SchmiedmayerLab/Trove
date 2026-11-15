@@ -21,6 +21,7 @@ struct CreateEnrollments: AsyncMigration {
                 .field("invitation_code_id", .uuid, .references("invitation_codes", "id", onDelete: .restrict))
                 .field("current_revision", .int, .required, .sql(unsafeRaw: "CHECK (current_revision > 0)"))
                 .field("state_version", .int64, .required, .sql(.default(SQLLiteral.numeric("1"))), .sql(unsafeRaw: "CHECK (state_version > 0)"))
+                .field("ends_at", .datetime)
                 .field("withdrawn_at", .datetime)
                 .field("participation_data", .json, .required)
                 .timestamps()

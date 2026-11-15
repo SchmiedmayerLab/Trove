@@ -14,8 +14,10 @@ import type { ParticipationCriterion } from "@/lib/api/generated/types.gen";
 import { zParticipationCriterion } from "@/lib/api/generated/zod.gen";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
+import { enrollmentPeriodSchema, ongoingEnrollment } from "./enrollmentPeriod";
 
 export const enrollmentFormSchema = z.object({
+  enrollmentPeriod: enrollmentPeriodSchema,
   enrollmentConditions: z.enum(["none", "requiresInvitationCode"]),
   visibility: z.enum(["public", "unlisted"]),
   participationCriterion: z
@@ -27,6 +29,7 @@ export const enrollmentFormSchema = z.object({
 });
 
 const defaultValues: z.infer<typeof enrollmentFormSchema> = {
+  enrollmentPeriod: ongoingEnrollment(),
   enrollmentConditions: "none",
   visibility: "public",
   participationCriterion: null,
@@ -43,6 +46,7 @@ export const useEnrollmentForm = () => {
   const formValues =
     studyResponse ?
       {
+        enrollmentPeriod: studyResponse.enrollmentPeriod,
         enrollmentConditions: studyResponse.enrollmentConditions,
         visibility: studyResponse.visibility,
         participationCriterion: studyResponse.participationCriterion,
@@ -60,6 +64,7 @@ export const useEnrollmentForm = () => {
     form.formState.isDirty,
     (loaded) =>
       form.reset({
+        enrollmentPeriod: loaded.enrollmentPeriod,
         enrollmentConditions: loaded.enrollmentConditions,
         visibility: loaded.visibility,
         participationCriterion: loaded.participationCriterion,

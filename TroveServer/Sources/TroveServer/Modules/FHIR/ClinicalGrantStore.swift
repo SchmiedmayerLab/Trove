@@ -8,7 +8,9 @@
 
 import Fluent
 import Foundation
+import GroveFHIRContract
 import SQLKit
+import TroveAPITypes
 
 
 /// Shared by initial admission and late attribution inside the source-owner transaction.
@@ -16,7 +18,43 @@ struct ClinicalGrantStore: Sendable {
     struct Output: Sendable {
         let fullURL: String
         let profile: String
-        let effectiveAt: Date
+        var measurementBounds: ClinicalMeasurementBounds
+
+        var effectiveAt: Date { measurementBounds.startDate }
+        var effectiveEnd: Date? { measurementBounds.endDate }
+        var codeSystem: String?
+        var code: String?
+        var sourceTypeIdentifier: String?
+        /// Verified row extremes of a query-created batch. A window must select every row, not merely overlap.
+        var rowExtent: RecordingRowExtent?
+        /// A transfer declaration precedes its bytes; clinical admission repeats authorization with verified rows.
+        var awaitsContentVerification = false
+
+        /// A query-created recording without verified row evidence can never enter custody or be attributed.
+        var lacksRowEvidence: Bool {
+            guard rowExtent == nil, !awaitsContentVerification, codeSystem == FHIRRecordingProjection.formatSystem,
+                  let format = code.flatMap(RegisteredRecordingFormat.init(rawValue:)) else {
+                return false
+            }
+            return RecordingRowExtent.applies(to: format)
+        }
+
+        var timeBasis: CollectionTimeBasis {
+            .required(profile: profile, sourceTypeIdentifier: sourceTypeIdentifier)
+        }
+
+        var isWorkoutRoute: Bool {
+            profile == FHIRRecordingProjection.profile && codeSystem == FHIRRecordingProjection.formatSystem
+                && code == FHIRRecordingProjection.routeFormat
+        }
+
+        var collectionProfile: String? {
+            if profile == FHIRRecordingProjection.profile {
+                isWorkoutRoute ? CollectionObservationProfile.workout.rawValue : profile
+            } else {
+                profile
+            }
+        }
     }
 
     struct Authority: Sendable {
@@ -32,11 +70,31 @@ struct ClinicalGrantStore: Sendable {
 
     let database: any Database
     let source: SourceBinding
-    let context: AuthContext
+    let auditContext: AuditEvent.Context
     let acceptedAt: Date
+    let providerRegistrationID: UUID?
+
+    init(database: any Database, source: SourceBinding, context: AuthContext, acceptedAt: Date) {
+        self.init(database: database, source: source, auditContext: context.auditContext, acceptedAt: acceptedAt)
+    }
+
+    init(
+        database: any Database,
+        source: SourceBinding,
+        auditContext: AuditEvent.Context,
+        acceptedAt: Date,
+        providerRegistrationID: UUID? = nil
+    ) {
+        self.database = database
+        self.source = source
+        self.auditContext = auditContext
+        self.acceptedAt = acceptedAt
+        self.providerRegistrationID = providerRegistrationID
+    }
 
     func authorities(outputs: [Output], intent: ClinicalEventIntent, requireCustodyCoverage: Bool) async throws -> [Authority] {
         guard database.inTransaction else { throw ServerError.unexpectedError }
+        guard (source.kind == .serverWorker) == (providerRegistrationID != nil) else { throw ProviderFailure.fenced }
         var records: [(ClinicalEventTarget, EnrollmentConsent)] = []
         for target in intent.targets {
             // Do not read signatures or artifact metadata to resolve a collection target.
@@ -97,7 +155,7 @@ struct ClinicalGrantStore: Sendable {
             """)
             .run()
         try await AuditRepository.recordMutation(.init(
-            context: context.auditContext,
+            context: auditContext,
             action: .studyDataGranted,
             scope: .study(studyID: authority.studyID, groupID: authority.groupID),
             target: .init(id: id, version: String(authority.revision))
@@ -119,19 +177,35 @@ extension ClinicalGrantStore {
               let study = try await Study.find(enrollment.$study.id, on: database) else {
             throw ServerError.forbidden("Exact reviewed publication is required for study data")
         }
-        let permitted = Set(outputs.filter { output in
-            output.effectiveAt <= acceptedAt && (interval.end.map { output.effectiveAt < $0 } ?? true)
+        let selection = try FHIRHealthKitECGBoundary.collectionOutputs(FHIRWorkoutProjection.collectionOutputs(outputs))
+        let permitted = Set(selection.filter { output in
+            guard let profile = output.collectionProfile else {
+                return false
+            }
+            return !output.lacksRowEvidence
+                && (try? output.measurementBounds.ends(onOrBefore: acceptedAt)) == true
                 && publication.collectionPolicy.permits(
                     studyID: enrollment.$study.id,
                     revision: consent.revision,
-                    profile: output.profile,
+                    profile: profile,
                     sourceKind: source.kind,
                     effectiveAt: output.effectiveAt,
-                    consentAcceptedAt: consent.acceptedAt
+                    consentAcceptedAt: consent.acceptedAt,
+                    effectiveEnd: output.effectiveEnd,
+                    preciseBounds: output.measurementBounds,
+                    scope: consent.collectionScope,
+                    adoptionEnd: interval.end,
+                    requiresWorkoutRoute: output.isWorkoutRoute,
+                    providerRegistrationID: providerRegistrationID,
+                    sourceTypeIdentifier: output.sourceTypeIdentifier,
+                    timeBasis: output.timeBasis,
+                    rowExtent: output.rowExtent
                 )
         }
         .map(\.fullURL))
         let selected = Set(target.outputFullURLs)
+        try FHIRWorkoutProjection.requireCompleteSelection(selected, outputs: outputs)
+        try FHIRHealthKitECGBoundary.requireCompleteSelection(selected, outputs: outputs)
         guard selected.isSubset(of: permitted) else {
             throw ServerError.forbidden("Requested output is absent or outside the exact consent's collection interval")
         }

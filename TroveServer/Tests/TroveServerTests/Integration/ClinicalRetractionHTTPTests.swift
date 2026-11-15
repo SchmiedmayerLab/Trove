@@ -34,6 +34,7 @@ struct ClinicalRetractionHTTPTests {
                 let body = bodies[index]
                 try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events", beforeRequest: {
                     $0.bearerAuth(token)
+                    $0.sourceInstallation(fixture.installationID)
                     try $0.encodeJSONBody(body)
                 }) { response in
                     try #require(response.status == .ok, "Synthetic retraction flow returned: \(response.body.string)")
@@ -42,7 +43,7 @@ struct ClinicalRetractionHTTPTests {
             }
             let retained = try #require(receipt)
             #expect(retained.targetIntentSHA256 == "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945")
-            #expect(retained.nodeCount == 1)
+            #expect(retained.nodeCount == 2) // Retraction Provenance and its converter Device.
             let store = ClinicalEventStore(database: app.db)
             for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 0) }
             try await Self.recoverAfterRevocation(retained, sourceID: fixture.source.id, on: app, token: token)

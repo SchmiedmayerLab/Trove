@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GroveFHIRContract
 import Testing
 @testable import TroveServer
 
@@ -15,7 +16,7 @@ enum ImmutablePointEventFixture {
     /// Synthetic immutable Mobile point output derived from a questionnaire response.
     /// Binding and consent are established by the real server services before rekeying this event.
     static func bytes(
-        source: SourceBinding, effectiveAt: Date = Date(), fixtureURL: URL? = nil, sequence: UInt64 = 50
+        source: SourceBinding, effectiveAt: Date = Date(), fixtureURL: URL? = nil, sequence: UInt64 = 50, recordID: String? = nil
     ) throws -> Data {
         let url = try #require(fixtureURL ?? Bundle.module.url(forResource: "ImmutablePointEvent", withExtension: "json"))
         let assets = try #require(ProcessInfo.processInfo.environment["TROVE_TEST_VALIDATOR_ASSETS"])
@@ -33,11 +34,11 @@ enum ImmutablePointEventFixture {
         process.arguments = [
             "python3", root.appendingPathComponent("TroveInfrastructure/validator/rekey_fixture.py").path,
             "--assets", assets, "--fixture", url.path,
-            "--event-system", source.eventIdentifierSystem, "--producer-instance", source.id.uuidString.lowercased(),
-            "--identifier-root", source.identifierRoot, "--registration-id", source.registrationID.uuidString.lowercased(),
+            "--identifier-root", source.identifierRoot, "--registration-id", source.keyID.uuidString.lowercased(),
             "--participant-system", source.participantIdentifierSystem, "--participant-value", source.participantIdentifierValue,
             "--effective-at", timestamp, "--sequence", String(sequence)
         ]
+        if let recordID { process.arguments?.append(contentsOf: ["--native-record-id", recordID]) }
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -46,6 +47,7 @@ enum ImmutablePointEventFixture {
         process.waitUntilExit()
         try #require(process.terminationStatus == 0, "Pinned test fixture identity generation must succeed")
         try #require(!bytes.isEmpty && bytes.count <= FHIRValidationClient.maximumBytes)
-        return bytes
+        // The client stages Grove's canonical one-record form, without example Bundle header fields.
+        return try ExchangeRecord(validating: bytes).json
     }
 }

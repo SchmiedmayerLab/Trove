@@ -7,23 +7,25 @@
 //
 
 import Foundation
+import OpenAPIRuntime
 
 
 final class InMemoryObjectStorageProvider: ObjectStorageProvider, @unchecked Sendable {
     private var storage: [String: Data] = [:]
     private let lock = NSLock()
 
-    func upload(data: Data, key: String, contentType: String) async throws {
+    func upload(body: HTTPBody, key: String, contentType: String) async throws {
+        let data = try await Data(collecting: body, upTo: Int(Int32.max))
+        try Task.checkCancellation()
         lock.withLock { storage[key] = data }
     }
 
-    func download(key: String, maximumBytes: Int) async throws -> Data {
+    func downloadBody(key: String) async throws -> HTTPBody {
         let value = lock.withLock { storage[key] }
         guard let value else {
             throw ServerError.notFound("Object not found: \(key)")
         }
-        guard value.count <= maximumBytes else { throw ServerError.internalServerError("Stored object exceeds the read limit") }
-        return value
+        return HTTPBody(value)
     }
 
     func ensureBucketExists() async throws {}

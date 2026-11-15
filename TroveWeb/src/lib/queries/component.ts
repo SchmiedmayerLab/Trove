@@ -7,8 +7,6 @@
 //
 
 import type { QueryClient } from "@tanstack/react-query";
-import { draftSnapshotQueryOptions, readDraftSnapshot } from "./draft";
-import { createMutationHook } from "./mutationCallbacks";
 import {
   getStudiesByStudyIdComponentsOptions,
   getStudiesByStudyIdComponentsInformationalByComponentIdOptions,
@@ -34,6 +32,8 @@ import {
   getStudiesByStudyIdComponentsByComponentIdSchedules,
 } from "../api/generated/sdk.gen";
 import type { ComponentType } from "../api/types";
+import { draftSnapshotQueryOptions, readDraftSnapshot } from "./draft";
+import { createMutationHook } from "./mutationCallbacks";
 
 // --- Queries ---
 
@@ -45,17 +45,17 @@ export const loadComponentDraft = async (
 ) => {
   switch (type) {
     case "informational":
-      await queryClient.fetchQuery(informationalRetrieveQueryOptions(path));
+      await queryClient.query(informationalRetrieveQueryOptions(path));
       break;
     case "questionnaire":
-      await queryClient.fetchQuery(questionnaireRetrieveQueryOptions(path));
+      await queryClient.query(questionnaireRetrieveQueryOptions(path));
       break;
     case "health-data":
-      await queryClient.fetchQuery(healthDataRetrieveQueryOptions(path));
+      await queryClient.query(healthDataRetrieveQueryOptions(path));
       break;
   }
   if (path.componentId && type !== "health-data") {
-    await queryClient.fetchQuery(scheduleListQueryOptions(path));
+    await queryClient.query(scheduleListQueryOptions(path));
   }
 };
 

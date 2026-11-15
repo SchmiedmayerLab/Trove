@@ -89,7 +89,9 @@ struct AuthIntegrationTests {
     @Test
     func researcherAllowedActions() async throws {
         let endpoints = Self.allEndpoints(.dummy)
-        for index in endpoints.indices where endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
+        for index in endpoints.indices where endpoints[index].requiresAuthenticationOnly
+            || endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
+            guard !endpoints[index].requiresDataReader else { continue }
             try await withFixtures(token: .researcher(groups: ["/Test Group/researcher"])) { app, token, endpoints in
                 let endpoint = endpoints[index]
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
@@ -124,12 +126,28 @@ struct AuthIntegrationTests {
         }
     }
 
+    @Test(arguments: [
+        (["/Test Group/admin"], HTTPStatus.forbidden),
+        (["/Test Group/researcher"], HTTPStatus.forbidden),
+        (["/Test Group/data-reader"], HTTPStatus.forbidden),
+        (["/Test Group/admin", "/Test Group/data-reader"], HTTPStatus.ok),
+        (["/Test Group/researcher", "/Test Group/data-reader"], HTTPStatus.ok),
+        (["/Test Group/data-reader", "/Test Group/researcher", "/Test Group/admin"], HTTPStatus.ok)
+    ])
+    func dataReadersRequireExplicitCapability(groups: [String], expected: HTTPStatus) async throws {
+        try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
+            for endpoint in endpoints where endpoint.requiresDataReader {
+                try await self.expectStatus(expected == .ok ? endpoint.successStatus : expected, for: endpoint, token: token, on: app)
+            }
+        }
+    }
+
     @Test
     func participantDeniedResearcherEndpoints() async throws {
         try await TestApp.withApp(token: .participant(subject: "participant-test-user")) { app, token in
             let endpoints = Self.allEndpoints(.dummy)
 
-            for endpoint in endpoints where !endpoint.isParticipant {
+            for endpoint in endpoints where !endpoint.isParticipant && !endpoint.requiresAuthenticationOnly {
                 try await self.expectStatus(.forbidden, for: endpoint, token: token, on: app)
             }
         }
@@ -149,7 +167,7 @@ struct AuthIntegrationTests {
     @Test
     func participantAllowedActions() async throws {
         try await withFixtures(token: .participant(subject: "participant-test-user")) { app, token, endpoints in
-            for endpoint in endpoints where endpoint.isParticipant {
+            for endpoint in endpoints where endpoint.isParticipant || endpoint.requiresAuthenticationOnly {
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
             }
         }
@@ -225,6 +243,12 @@ struct AuthIntegrationTests {
         on app: Application
     ) async throws {
         try await app.test(endpoint.method, endpoint.path, beforeRequest: { req in
+            let sourceWrite = endpoint.path.contains("/participant/sources/")
+                && (endpoint.path.contains("/events") || endpoint.path.hasSuffix("/record-bundles")
+                    || endpoint.path.contains("/recording-transfers/"))
+            if sourceWrite || endpoint.path.contains("/collection-reconciliations") {
+                req.sourceInstallation(dummyUUID)
+            }
             req.bearerAuth(token)
             if let ifMatch = endpoint.ifMatch {
                 req.headers.replaceOrAdd(name: "If-Match", value: ifMatch)

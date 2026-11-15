@@ -21,7 +21,7 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let events = [
+                let events = try [
                     Self.event(source: fixture.source, sequence: 1, version: "9007199254740992"),
                     Self.event(source: fixture.source, sequence: 2, version: "9007199254740992"),
                     Self.event(source: fixture.source, sequence: 3, version: "18446744073709551616")
@@ -29,14 +29,20 @@ struct ClinicalRecordStoreTests {
                 var receipts: [Int: ClinicalEventReceipt] = [:]
                 for index in order {
                     receipts[index] = try await store.accept(
-                        events[index - 1], sourceID: fixture.source.id, targets: fixture.targets(for: events[index - 1])
+                        events[index - 1],
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets(for: events[index - 1]),
+                        installation: fixture.installation
                     )
                 }
                 let highest = try #require(receipts[3])
                 #expect(try await Self.current(on: app.db) == [highest.eventID])
                 for index in order {
                     let replay = try await store.accept(
-                        events[index - 1], sourceID: fixture.source.id, targets: fixture.targets(for: events[index - 1])
+                        events[index - 1],
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets(for: events[index - 1]),
+                        installation: fixture.installation
                     )
                     #expect(replay == receipts[index])
                 }
@@ -49,23 +55,59 @@ struct ClinicalRecordStoreTests {
     }
 
     @Test(arguments: ["equal", "missing", "different"])
-    func competingEvidenceNeverUsesArrivalOrderToDisclose(kind: String) async throws {
+    func competingEvidenceUsesRecordedTime(kind: String) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = Self.event(source: fixture.source, sequence: 1, version: "10")
-                let second = Self.event(
+                let first = try Self.event(source: fixture.source, sequence: 1, version: "10")
+                let second = try Self.event(
                     source: fixture.source,
                     sequence: 2,
                     version: kind == "missing" ? nil : kind == "equal" ? "10" : "999",
                     writer: kind == "missing" ? nil : kind == "different" ? "other" : "writer"
                 )
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first))
-                _ = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second))
-                #expect(try await Self.current(on: app.db).isEmpty)
-                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first), installation: fixture.installation
+                )
+                let selected = try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second), installation: fixture.installation
+                )
+                #expect(try await Self.current(on: app.db) == [selected.eventID])
+                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
                 try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 4, facts: 2, grants: 4, on: app.db)
+            }
+        }
+    }
+
+    @Test(arguments: [false, true], ["fraction", "identity", "writer"])
+    func selectionSurvivesReverseArrivalAndRestart(reverse: Bool, ordering: String) async throws {
+        try await TestApp.withApp { app, _ in
+            let fixture = try await ClinicalEventStoreTests.prepare(on: app)
+            let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                let store = ClinicalEventStore(database: app.db)
+                var first = try Self.event(source: fixture.source, sequence: 1, version: "10")
+                var second = try Self.event(source: fixture.source, sequence: 2, version: ordering == "writer" ? "11" : "10")
+                first.recorded = .init(seconds: 100, fraction: "000000000000000001")
+                second.recorded = .init(
+                    seconds: ordering == "writer" ? 99 : 100,
+                    fraction: ordering == "fraction" ? "000000000000000002" : "000000000000000001"
+                )
+                let events = reverse ? [second, first] : [first, second]
+                var selected: ClinicalEventReceipt?
+                for event in events {
+                    let receipt = try await store.accept(
+                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation
+                    )
+                    if event.eventIdentifierValue == second.eventIdentifierValue { selected = receipt }
+                }
+                let receipt = try #require(selected)
+                #expect(try await Self.current(on: app.db) == [receipt.eventID])
+                return receipt
+            }
+            try await TestDatabase.withRestartedApplication(app) { reopened in
+                #expect(try await Self.current(on: reopened.db) == [expected.eventID])
+                try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 4, facts: 2, grants: 4, on: reopened.db)
             }
         }
     }
@@ -76,15 +118,21 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
-                let second = Self.event(source: fixture.source, sequence: 2, version: "10")
-                let third = Self.event(source: fixture.source, sequence: 3, version: "11", outputs: ["primary", "secondary"])
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]))
-                let next = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                let first = try Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
+                let second = try Self.event(source: fixture.source, sequence: 2, version: "10")
+                let third = try Self.event(source: fixture.source, sequence: 3, version: "11", outputs: ["primary", "secondary"])
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]), installation: fixture.installation
+                )
+                let next = try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                )
                 #expect(try await Self.current(on: app.db) == [next.eventID])
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
-                let last = try await store.accept(third, sourceID: fixture.source.id, targets: fixture.targets(for: third, studies: [0]))
+                let last = try await store.accept(
+                    third, sourceID: fixture.source.id, targets: fixture.targets(for: third, studies: [0]), installation: fixture.installation
+                )
                 #expect(try await Self.current(on: app.db) == [last.eventID])
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
@@ -100,8 +148,8 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                async let first = Self.attempt(store, event: Self.event(source: fixture.source, sequence: 1, version: "1"), fixture: fixture)
-                async let second = Self.attempt(
+                async let first = try Self.attempt(store, event: Self.event(source: fixture.source, sequence: 1, version: "1"), fixture: fixture)
+                async let second = try Self.attempt(
                     store, event: Self.event(source: fixture.source, sequence: 2, version: "2", record: "contradiction"), fixture: fixture
                 )
                 let outcomes = try await [first, second]
@@ -118,12 +166,16 @@ struct ClinicalRecordStoreTests {
     func reopenedDatabaseRetainsSelectionAndExactIndependentGrants() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let first = Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
-            let second = Self.event(source: fixture.source, sequence: 2, version: "10")
+            let first = try Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
+            let second = try Self.event(source: fixture.source, sequence: 2, version: "10")
             let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]))
-                return try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]), installation: fixture.installation
+                )
+                return try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                )
             }
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 let store = ClinicalEventStore(database: reopened.db)
@@ -131,7 +183,9 @@ struct ClinicalRecordStoreTests {
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                    let retry = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                    let retry = try await store.accept(
+                        second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                    )
                     #expect(retry == expected)
                 }
                 try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 5, facts: 3, grants: 3, on: reopened.db)
@@ -145,7 +199,10 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
-                    Self.event(source: fixture.source, sequence: 1, version: "1"), sourceID: fixture.source.id, targets: fixture.targets
+                    Self.event(source: fixture.source, sequence: 1, version: "1"),
+                    sourceID: fixture.source.id,
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
             }
             let sql = try #require(app.db as? any SQLDatabase)
@@ -170,7 +227,8 @@ struct ClinicalRecordStoreTests {
                     try await ClinicalEventStore(database: app.db).accept(
                         Self.event(source: fixture.source, sequence: 1, version: "1"),
                         sourceID: fixture.source.id,
-                        targets: fixture.targets
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 }
             }
@@ -186,8 +244,8 @@ struct ClinicalRecordStoreTests {
 extension ClinicalRecordStoreTests {
     static func event(
         source: SourceBinding, sequence: Int, version: String?, writer: String? = "writer", record: String = "record", outputs: [String] = ["primary"]
-    ) -> ValidatedExchangeEvent {
-        let base = ClinicalEventStoreTests.event(source: source, sequence: sequence)
+    ) throws -> ValidatedExchangeEvent {
+        let base = try ClinicalEventStoreTests.event(source: source, sequence: sequence)
         let nodes = [base.nodes[0]] + outputs.enumerated().map {
             ValidatedExchangeEvent.Node(
                 ordinal: $0.offset + 1,
@@ -196,27 +254,25 @@ extension ClinicalRecordStoreTests {
             )
         }
         let points = outputs.map { output in
-            ValidatedExchangeEvent.PointOutput(
+            ValidatedExchangeEvent.Output(
                 fullURL: output == "primary" ? "urn:uuid:point" : "urn:point:" + output,
                 profile: CollectionRequirement.supportedProfile,
-                effectiveAt: Date(),
+                measurementBounds: base.outputs[0].measurementBounds,
                 sourceRecordIdentifier: .init(system: "urn:source-record", value: record),
                 sourceOutputIdentifier: .init(system: "urn:source-output", value: output),
                 writerIdentifier: writer.map { .init(system: "urn:writer-record", value: $0) },
                 writerVersion: version,
-                quantityValue: "72",
-                quantitySystem: "http://unitsofmeasure.org",
-                quantityCode: "/min",
+                value: .quantity(value: "72", system: "http://unitsofmeasure.org", code: "/min"),
                 codeSystem: "http://loinc.org",
                 code: "8867-4"
             )
         }
         return .init(
             rawBytes: base.rawBytes,
+            recorded: base.recorded,
             validatorIdentity: base.validatorIdentity,
             eventIdentifierSystem: base.eventIdentifierSystem,
             eventIdentifierValue: base.eventIdentifierValue,
-            producerInstance: base.producerInstance,
             deploymentIdentifiers: base.deploymentIdentifiers,
             participants: base.participants,
             nodes: nodes,
@@ -243,7 +299,7 @@ extension ClinicalRecordStoreTests {
         _ store: ClinicalEventStore, event: ValidatedExchangeEvent, fixture: ClinicalEventStoreTests.Fixture
     ) async throws -> Bool {
         do {
-            _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event))
+            _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation)
             return true
         } catch let error as ServerError where error.status.code == 409 {
             return false

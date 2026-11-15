@@ -286,16 +286,16 @@ extension ConsentSafetyIntegrationTests {
 
 
 extension ConsentSafetyIntegrationTests {
-    private actor UploadCounter: ObjectStorageProvider {
+    private actor UploadCounter: BufferedTestObjectStorageProvider {
         private(set) var uploads = 0
 
         func delete(key: String) { }
 
-        func upload(data: Data, key: String, contentType: String) async throws {
+        func uploadBuffered(data: Data, key: String, contentType: String) async throws {
             uploads += 1
         }
 
-        func download(key: String, maximumBytes: Int) async throws -> Data {
+        func downloadBuffered(key: String, maximumBytes: Int) async throws -> Data {
             throw ServerError.notFound("No accepted evidence exists")
         }
 

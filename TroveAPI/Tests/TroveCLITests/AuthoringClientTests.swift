@@ -20,6 +20,7 @@ struct AuthoringClientTests {
 
     private var studyResponse: Components.Schemas.StudyResponse {
         .init(
+            enrollmentPeriod: .init(calendar: .gregorian, timeZone: "UTC"),
             draftRevision: revision.uuidString,
             collectionRequirements: [],
             id: study.uuidString,

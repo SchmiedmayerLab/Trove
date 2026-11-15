@@ -18,6 +18,31 @@ security:
   - bearerAuth: []
 
 paths:
+  /collection-capabilities:
+    get:
+      operationId: getCollectionCapabilities
+      tags:
+        - Studies
+      summary: List implemented native collection capabilities
+      description: >-
+        Describes the native acquisition and receiver capabilities enabled by this deployment.
+        Guide inventory membership alone does not enable collection. Provider capabilities are
+        separately qualified by an approved provider registration; this list grants no authority.
+      responses:
+        '200':
+          description: Native collection capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 512
+                items:
+                  $ref: '#/components/schemas/CollectionCapability'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /groups:
     get:
       tags:
@@ -274,6 +299,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StudyDelegation'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/data:
+    get:
+      operationId: getStudyData
+      tags: [Studies]
+      summary: Read an authorized page of derived study data
+      description: >
+        Requires interactive researcher identity, researcher or admin membership,
+        and explicit data-reader membership in the study's group. Admin and
+        audit-reader membership alone do not authorize clinical data access.
+        Selects each granted point output once, with current versions by default.
+        History includes superseded versions with isCurrent false; neither mode
+        includes withdrawn or retracted data. Enrollment end alone preserves history.
+        Each record is a derived FHIR collection Bundle with exact clinical numeric
+        tokens, study-specific subject/context and derivation Provenance. It is not
+        the original custody Bundle. Original profile names describe source lineage,
+        not conformance claims for derived resources. Records are Base64 encoded to
+        prevent JSON clients from rounding FHIR numeric values.
+        The server holds the current-authority fence through committed disclosure
+        intent. A page contains up to 100 records and 1024 outputs, without splitting a record.
+        The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data;
+        a byte-capacity failure returns no partial page. Request fewer records to reduce
+        page size. before is an opaque cursor scoped to this study and version view,
+        not an authorization token. Changed eligibility can require restarting from
+        the first page. Newly attributed historical data also requires a fresh first
+        page. This is a live view, not a frozen dataset snapshot.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: versions
+          in: query
+          schema:
+            $ref: '#/components/schemas/StudyDataVersions'
+      responses:
+        '200':
+          description: Derived study data after committed disclosure intent
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDataPage'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/data/recordings/{grantId}:
+    get:
+      operationId: getStudyRecording
+      tags: [Studies]
+      summary: Download an authorized recording's original source bytes
+      description: >
+        Requires the same interactive researcher membership and explicit data-reader
+        capability as study data pages. The grant identifier is an exact study grant
+        from export Provenance, not an authorization token. Current and history
+        selection exclude withdrawn and retracted data. The server checks authority
+        before storage access and again after preparing the complete verified file,
+        then commits disclosure intent before returning any bytes. The response is
+        the original decoded source bytes in binary transport, matching its FHIR hash and size even
+        when the stored transport representation is compressed. X-Recording-Content-Type preserves the validated original attachment media type. Transfer expiry does
+        not expire retained clinical custody. Storage, integrity or configured
+        capacity failures return no partial successful response and can be retried.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: grantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: versions
+          in: query
+          schema:
+            $ref: '#/components/schemas/StudyDataVersions'
+      responses:
+        '200':
+          description: Complete verified source recording after committed disclosure intent
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                enum: [no-store]
+            Content-Disposition:
+              required: true
+              schema:
+                type: string
+            X-Recording-Content-Type:
+              required: true
+              description: Original attachment media type validated against its registered Grove recording format, URI-component encoded by the OpenAPI simple header representation. Decode exactly once before interpreting the media type. The response body uses binary transport to preserve source bytes.
+              schema:
+                type: string
+                enum:
+                  - text/csv
+                  - application/json
+                  - application/octet-stream
+                  - application/fhir+json
+                  - 'application/fhir+json; fhirVersion=1.0'
+                  - 'application/fhir+json; fhirVersion=4.0'
+                  - application/hl7-cda+xml
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         default:
           $ref: '#/components/responses/OperationFailure'
 
@@ -1083,15 +1229,17 @@ paths:
     post:
       tags:
         - Participant
-      summary: Register a participant-owned app data stream
+      summary: Register an installation against the participant's logical source
       description: >
-        Requires an existing participant profile. A registrationID is an
-        idempotency key scoped to that participant. Repeating it returns the same
-        stream, including its revoked state; it never reactivates a stream.
-        Registration grants no study access and does not attest the data origin.
-        The server assigns all identity namespaces. Preserve the event sequence
-        and exact retry bytes across restarts; register a new stream if that
-        journal is lost, including after reinstalling the app.
+        Requires a verified participant profile. Persist a fresh registrationID
+        and random 256-bit installation credential before the first request.
+        Retries with the same repository and credential return the retained
+        registration, including revocation. Reusing a nonce with a different
+        credential or repository is rejected. Authorized installations for the
+        same participant and repository share one server-provisioned logical
+        source, key ID, epoch and namespace. Registration grants no study access
+        and does not attest the data origin. Missing or unverifiable retained
+        identity state never creates replacement identifiers.
       requestBody:
         required: true
         content:
@@ -1099,19 +1247,22 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required:
-                - registrationID
+              required: [registrationID, repositoryKind, credentialBase64]
               properties:
                 registrationID:
                   type: string
                   format: uuid
+                repositoryKind:
+                  $ref: '#/components/schemas/NativeSourceRepository'
+                credentialBase64:
+                  $ref: '#/components/schemas/SourceInstallationCredential'
       responses:
         '200':
-          description: The registered stream, or the original result of a retry
+          description: The logical source and independently revocable installation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParticipantSource'
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1120,6 +1271,125 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/source-installations/{registrationId}:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getParticipantSourceInstallation
+      tags: [Participant]
+      summary: Restore an account-owned installation's public registration state
+      responses:
+        '200':
+          description: Retained source and installation state, including revocation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/source-installations/{registrationId}/revoke:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: revokeParticipantSourceInstallation
+      tags: [Participant]
+      summary: Permanently revoke one account-owned installation
+      description: >
+        Idempotent. The verified owner may revoke a lost installation without its
+        credential. Other installations and the logical source remain active.
+        This does not withdraw enrollment, retract source records or erase data.
+      responses:
+        '200':
+          description: Retained source and revoked installation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/source-installations/{registrationId}/identity:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: recoverParticipantSourceIdentity
+      tags: [Participant]
+      summary: Recover the complete logical-source identity for an active installation
+      description: >
+        Requires both verified participant ownership and the installation
+        credential. The server commits a disclosure-intent audit event before
+        returning the source identity key. Keep the response out of logs, caches
+        and exports. The derivation key is independent of installation credentials
+        and optional signing keys. Unavailable key-encryption material or corrupt
+        retained state returns an explicit failure without minting a replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [credentialBase64]
+              properties:
+                credentialBase64:
+                  $ref: '#/components/schemas/SourceInstallationCredential'
+      responses:
+        '200':
+          description: The retained registration and its participant identity key
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceIdentityRecovery'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/OperationFailure'
 
   /participant/sources/{sourceId}:
     parameters:
@@ -1180,6 +1450,181 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /participant/sources/{sourceId}/recording-transfers/{transferId}/declaration:
+    parameters:
+    - name: sourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: transferId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: declareParticipantRecordingTransfer
+      tags:
+      - Participant
+      summary: Register an immutable recording transfer declaration
+      description: Requires current participant source ownership, installation proof and collection authority. Persist
+        a transfer UUID and the unchanged declaration before sending. Replays return the same declaration commitment;
+        changing it under the same source/UUID returns 409. The JSON envelope is limited to 64 KiB. Registration is
+        audited and does not store recording bytes, accept a clinical record or create study grants. Retain the declaration
+        commitment for matching upload and recovery receipts. Workout consent alone does not authorize route collection.
+      parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordingTransferDeclaration'
+      responses:
+        '200':
+          description: Register an immutable recording transfer declaration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingTransferRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '413':
+          description: Declaration or recording exceeds its configured budget
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Interrupted request; retry unchanged declaration and bytes
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /participant/sources/{sourceId}/recording-transfers/{transferId}/content:
+    parameters:
+    - name: sourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: transferId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    put:
+      operationId: uploadParticipantRecordingTransfer
+      tags:
+      - Participant
+      summary: Stream the exact bytes of a registered recording transfer
+      description: Send application/octet-stream with Content-Length equal to storedByteCount. For zstd, send the
+        declared Zstandard frame without an HTTP Content-Encoding header. Current source/installation and collection
+        authority are checked before body consumption and before issuing a receipt. Stored count and SHA-256 are verified
+        by readback. An active attempt returns 409; failed attempts can be retried and crashed attempts expire. Late
+        attempts cannot replace newer uploads. Recover a lost response before resending bytes. This receipt attests
+        stored transport bytes only, not decoded-source validity, FHIR admission or researcher access. Keep the source
+        recording until its clinical record has a custody receipt.
+      parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Stream the exact bytes of a registered recording transfer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingTransferReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '413':
+          description: Declaration or recording exceeds its configured budget
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: Interrupted request; retry unchanged declaration and bytes
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /participant/sources/{sourceId}/recording-transfers/{transferId}/receipt:
+    parameters:
+    - name: sourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: transferId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: lookupParticipantRecordingTransferReceipt
+      tags:
+      - Participant
+      summary: Recover the latest completed recording transfer receipt
+      description: Requires participant source ownership and a committed disclosure audit. Works after withdrawal
+        or source revocation without admitting bytes or restoring access. Returns 404 when the latest attempt has
+        no committed receipt or the source is not owned. Match the source/transfer identity, retained declaration
+        commitment and stored byte count/digest. expiresAt bounds attachment acceptance; an expired receipt proves
+        the past transfer, not current retention.
+      responses:
+        '200':
+          description: Recover the latest completed recording transfer receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingTransferReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /participant/sources/{sourceId}/event-receipts/lookup:
     parameters:
       - name: sourceId
@@ -1194,10 +1639,11 @@ paths:
         - Participant
       summary: Recover an immutable receipt for an event owned by the participant
       description: >
-        Matches the original event identifier, payload digest and exact consent/output intent.
+        Matches an accepted representation by event identifier, payload digest and exact consent/output intent.
         Works after source revocation or enrollment withdrawal without admitting data,
         restoring access or returning samples. Requires source ownership and a committed
-        audit disclosure intent. An unknown or foreign-owned event returns 404.
+        audit disclosure intent. An unknown or foreign-owned event or an unaccepted payload digest returns 404;
+        a different consent/output intent returns 409. Unknown bytes must be submitted for validation.
         A receipt proves past custody only; clients must match its identity and digest
         to their staged bytes before retirement. The JSON request is limited to 1 MiB.
       requestBody:
@@ -1234,6 +1680,8 @@ paths:
 
   /participant/sources/{sourceId}/events/{eventId}/attributions:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1253,7 +1701,7 @@ paths:
       description: >
         Requires participant source ownership and independently eligible exact consent
         targets. Never changes event bytes, original submission intent or current
-        revision selection. New grants require active enrollment and source, including
+        revision selection. New grants require active enrollment, source and installation, including
         for historical measurements. Pre-consent collection is not implicitly eligible.
         Each command is atomic and idempotent within its source. Exact command retries
         return the original outcome even after withdrawal or revocation; changed event
@@ -1293,6 +1741,8 @@ paths:
 
   /participant/sources/{sourceId}/events:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1310,18 +1760,23 @@ paths:
         relabel delayed measurements. Every retained clinical output requires coverage
         by a named consent; only explicitly selected outputs receive that study's grant.
         A source retraction requires an empty target list and creates no study grants.
-        It requires an authenticated, active source binding but no active enrollment.
-        Its source-scoped logical Observation targets suppress every version, including
-        later arrivals, without deleting retained evidence or affecting other sources.
+        It requires an authenticated, active source and installation but no active enrollment.
+        It suppresses every output of every version of the source record, including later arrivals,
+        without deleting retained evidence or affecting other sources. The first accepted retraction
+        retains its lifecycle effect when another report repeats its record-retraction identity.
         Event, point indexes or retraction assertions, study grants and audit commit together.
         The same event bytes and consent/output intent return
-        the original receipt without creating new grants. Reusing an event identity
-        with different bytes or consent/output intent is a conflict. The receipt records
+        the original receipt without creating new grants. Equivalent JSON serialization and changed
+        enrollment snapshots outside the clinical version may be retained as additional byte representations
+        under the same event ID, with their own payload digest, receipt time and node count. New representations
+        require current collection authority; they create no additional clinical facts or study grants.
+        Changed clinical resource tokens, a changed body under a retained snapshot key, or different
+        consent/output intent under an existing version identity is a conflict. The receipt records
         acceptance, not current permission to access study data. Initially supports
-        immutable, single-participant point-quantity events and Observation retractions; unsupported valid FHIR
+        immutable, single-participant heart-rate and body-weight point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR
         shapes are rejected explicitly. No clinical payload is returned. The JSON
-        envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized
-        target intent to 512 KiB. Base64 preserves exact producer bytes; the server
+        envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes
+        to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server
         never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
       requestBody:
         required: true
@@ -1372,6 +1827,8 @@ paths:
 
   /participant/sources/{sourceId}/events/batch:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1385,7 +1842,9 @@ paths:
       description: >
         Submit 1–16 original event submissions for one owned active source.
         Authentication and envelope bounds precede processing. The JSON envelope
-        is limited to 6 MiB and the sum of eventBase64 UTF-8 lengths to 5592408 bytes.
+        budget defaults to 6 MiB (hard ceiling 24 MiB). The sum of eventBase64 UTF-8
+        lengths is bounded by the configured record-byte budget after Base64 expansion,
+        with a hard ceiling of 22369624 bytes.
         Each member retains the single-event validation, consent and size limits.
         The response has one receipt or sanitized problem per member in input order.
         Members commit independently and are processed sequentially. One rejection
@@ -1422,6 +1881,77 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           description: Batch exceeds the request size limit; no member was processed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/sources/{sourceId}/record-bundles:
+    parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: submitParticipantRecordBundle
+      tags: [Participant]
+      summary: Admit a Grove Bundle with independent record outcomes
+      description: >
+        Submit one Grove active or retraction Bundle for one owned active source, with
+        1–16 record commitments in response order. Active records and retractions cannot mix.
+        Shared entries travel once. Each commitment names the original staged record's
+        ordered entry addresses, exact payload digest and study targets. The receiver
+        reconstructs and validates that record before independently committing it.
+        The configured JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB),
+        the decoded Bundle budget to 4 MiB plus 1 KiB (hard ceiling 16 MiB plus 1 KiB),
+        and each restored record budget to 4 MiB (hard ceiling 16 MiB).
+        A malformed Bundle or a mismatch between its lifecycle records and the commitment
+        list rejects the envelope before admission. Record-level validation or authorization
+        failures do not roll back accepted siblings. Receipts commit the original record
+        bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each
+        uncertain receipt before retrying; remaining records may be packed differently.
+        Transport-only framing and rejected records are not retained as accepted custody.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordBundleSubmission'
+      responses:
+        '200':
+          description: One independent outcome per submitted event, in input order
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 16
+                items:
+                  $ref: '#/components/schemas/EventBatchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Batch exceeds the request size limit; no member was processed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Invalid Grove exchange graph; no record was admitted
           content:
             application/problem+json:
               schema:
@@ -1545,9 +2075,14 @@ paths:
         artifacts or samples are returned. Withdrawal or no accepted consent yields
         no windows. Publication alone does not change the timeline. Inconsistent
         history or unknown policy fails the whole read, never a partial plan.
-        This snapshot is not an upload capability or permission for continued
-        offline collection. Refresh before collection and after enrollment or
-        consent changes; the receiver independently checks every submitted target.
+        Retain a complete, account-bound set of accepted plans for offline collection
+        until each enrollment ends. Observation time is not an expiration and no
+        elapsed-time lease or per-page network authorization is required. Enforce
+        local withdrawal, account changes, known source revocation and known
+        enrollment end. Refresh on reconnect and enrollment or consent changes;
+        initial consent and broader revision adoption require server authorization.
+        A retained plan is not an upload capability: the receiver independently
+        checks every submitted target against its original consent and revision.
       parameters:
         - $ref: '#/components/parameters/EnrollmentId'
       responses:
@@ -1570,6 +2105,105 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/enrollments/{enrollmentId}/collection-reconciliations:
+    post:
+      operationId: requestParticipantCollectionReconciliations
+      tags:
+        - Participant
+      summary: Request current instructions for finite sweeps of ended sleep and workout windows
+      description: >
+        Participant and installation authenticated. A sleep or workout session that
+        overlaps an accepted collection window can be finalized after the enrollment
+        ended. For an ended, not withdrawn enrollment this returns one instruction per
+        closed accepted sleep, workout or opted-in workout-route window whose sweep is
+        unfinished, after checking current withdrawal, source ownership and an active
+        installation. Each instruction fixes the original window and carries a short
+        lease; a repeated request renews unfinished sweeps under the same identity and
+        never returns a completed one. An instruction never extends the cached
+        collection plan, opens a new measurement window or authorizes upload.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - $ref: '#/components/parameters/SourceInstallationID'
+        - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeCollectionReconciliationRequest'
+      responses:
+        '200':
+          description: Current instructions, excluding completed sweeps; empty when nothing is eligible
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeCollectionReconciliationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete:
+    post:
+      operationId: completeParticipantCollectionReconciliation
+      tags:
+        - Participant
+      summary: Acknowledge a durably completed sweep
+      description: >
+        Idempotent. Records that the installation exhausted the instruction's bounded
+        query. It does not assert upload or historical completeness: queued records
+        and receipt recovery remain independent, and a completed sweep is never issued
+        again for the same source and window.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - name: reconciliationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/SourceInstallationID'
+        - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeCollectionReconciliationRequest'
+      responses:
+        '204':
+          description: Completion retained, including an identical retry
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1791,8 +2425,202 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /participant/provider-registrations:
+    get:
+      operationId: getParticipantProviderRegistrations
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderRegistration"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+  /studies/{studyId}/collection-provider-capabilities:
+    get:
+      operationId: getStudyCollectionProviderCapabilities
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderRegistration"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      parameters:
+        - name: studyId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-registrations/{registrationId}/link-intents:
+    post:
+      operationId: startParticipantProviderLink
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLinkIntent"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderLinkRequest"
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-link-intents/{intentId}/complete:
+    post:
+      operationId: completeParticipantProviderLink
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConnection"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderLinkCompletion"
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-connections:
+    get:
+      operationId: getParticipantProviderConnections
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderConnection"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+  /participant/provider-connections/{connectionId}/disconnect:
+    post:
+      operationId: disconnectParticipantProviderConnection
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConnection"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+
 components:
   parameters:
+    SourceInstallationID:
+      name: Trove-Source-Installation-ID
+      in: header
+      required: true
+      description: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+      schema:
+        type: string
+        format: uuid
+    SourceInstallationProof:
+      name: Trove-Source-Credential
+      in: header
+      required: true
+      description: >
+        Private installation credential. Requires independently verified participant
+        authentication and ownership of the named source. New writes require an active
+        installation; the server rechecks under the revocation lock before committing.
+        Never include this value in logs, URLs, clinical resources or exports.
+      schema:
+        $ref: '#/components/schemas/SourceInstallationCredential'
     DelegationId:
       name: Trove-Delegation-ID
       in: header
@@ -1926,6 +2754,241 @@ components:
       bearerFormat: JWT
       description: Keycloak-issued JWT access token
   schemas:
+    ProviderRedirect:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - uri
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        uri:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+    ProviderCollectionMeasurement:
+      type: object
+      additionalProperties: false
+      required:
+        - profile
+        - displayNameEnglish
+        - displayNameGerman
+      properties:
+        profile:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+        displayNameEnglish:
+          type: string
+          minLength: 1
+          maxLength: 512
+        displayNameGerman:
+          type: string
+          minLength: 1
+          maxLength: 512
+    ProviderCollectionCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceTypeIdentifier
+        - measurements
+        - effectiveTime
+      properties:
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        measurements:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderCollectionMeasurement"
+          minItems: 1
+          maxItems: 32
+        effectiveTime:
+          type: string
+          enum:
+            - point
+            - interval
+            - point-or-interval
+    ProviderRegistration:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - provider
+        - displayName
+        - controller
+        - region
+        - redirects
+        - capabilities
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        provider:
+          type: string
+          enum:
+            - withings
+            - oura
+            - google-health-api
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        controller:
+          type: string
+          minLength: 1
+          maxLength: 255
+        region:
+          type: string
+          minLength: 1
+          maxLength: 255
+        redirects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderRedirect"
+          minItems: 1
+          maxItems: 8
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderCollectionCapability"
+          minItems: 1
+          maxItems: 512
+    ProviderLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - redirectId
+      properties:
+        redirectId:
+          type: string
+          minLength: 1
+          maxLength: 64
+    ProviderLinkIntent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - authorizationUrl
+        - redirectUri
+        - expiresAt
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        authorizationUrl:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          format: uri
+        redirectUri:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    ProviderLinkCompletion:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - code
+      properties:
+        state:
+          type: string
+          minLength: 32
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_-]{32,128}$
+        code:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    ProviderConnection:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registrationId
+        - sourceId
+        - state
+        - generation
+        - requiresReauthorization
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        registrationId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        sourceId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        state:
+          type: string
+          enum:
+            - active
+            - disconnected
+            - reauthorization-required
+        generation:
+          type: integer
+          format: int64
+          minimum: 1
+        lastAttempt:
+          type: string
+          format: date-time
+        lastSuccessfulFetch:
+          type: string
+          format: date-time
+        acceptedThrough:
+          type: string
+          format: date-time
+        requiresReauthorization:
+          type: boolean
+        collectionAttempt:
+          $ref: '#/components/schemas/ProviderCollectionAttempt'
+    ProviderCollectionAttempt:
+      type: object
+      additionalProperties: false
+      description: Most recent collection attempt for one exact source. This is not a completeness claim for every source on the connected account.
+      required: [sourceTypeIdentifier, outcome, nextAttempt]
+      properties:
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        outcome:
+          type: string
+          enum:
+          - scheduled
+          - deferred
+          - accepted
+          - no-current-demand
+          - transient-failure
+          - capacity-blocked
+          - source-blocked
+          - authorization-changed
+        nextAttempt:
+          type: string
+          format: date-time
+
     # ── Shared ────────────────────────────────────────────────────────────
 
     ProblemDetails:
@@ -1945,6 +3008,74 @@ components:
           type: string
           description: A human-readable explanation specific to this occurrence
 
+    StudyDataVersions:
+      type: string
+      enum: [current, history]
+      default: current
+
+    StudyDataOutput:
+      type: object
+      additionalProperties: false
+      required: [fullUrl, isCurrent, sourceProfiles]
+      properties:
+        fullUrl:
+          type: string
+          description: Address of the derived Observation inside this response record's Bundle.
+        isCurrent:
+          type: boolean
+        sourceProfiles:
+          type: array
+          description: Original profile names retained as lineage, not derived-resource conformance claims.
+          items:
+            type: string
+
+    StudyDataRecord:
+      type: object
+      additionalProperties: false
+      required: [id, bundleBase64, outputs]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Newly assigned derived Bundle identity, not the retained source record identity.
+        bundleBase64:
+          type: string
+          maxLength: 89478488
+          description: Base64 encoded FHIR R4 collection Bundle. The configured decoded budget defaults to 16 MiB and cannot exceed 64 MiB.
+        outputs:
+          type: array
+          minItems: 1
+          maxItems: 512
+          items:
+            $ref: '#/components/schemas/StudyDataOutput'
+
+    StudyDataPage:
+      type: object
+      additionalProperties: false
+      required: [id, studyId, versions, policy, records]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Page identity recorded in the committed disclosure-intent audit.
+        studyId:
+          type: string
+          format: uuid
+        versions:
+          $ref: '#/components/schemas/StudyDataVersions'
+        policy:
+          type: string
+          enum: [study-point-view-v1]
+        records:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/StudyDataRecord'
+        nextBefore:
+          type: string
+          format: uuid
+          description: Opaque continuation cursor. Omitted when the captured page has no continuation.
+
     StudyAuditAction:
       type: string
       enum:
@@ -1952,6 +3083,8 @@ components:
         - consent.pdf.disclosure
         - consent.records.disclosure
         - collection.plan.disclosure
+        - collection.reconciliation.issued
+        - collection.reconciliation.completed
         - enrollment.withdrawn
         - study.published
         - study.publication.disclosure
@@ -1967,6 +3100,8 @@ components:
         - artifact.discard.scheduled
         - study.data.granted
         - study.audit.disclosure
+        - study.data.disclosure
+        - study.recording.disclosure
 
     StudyPublicationInput:
       type: object
@@ -2189,8 +3324,8 @@ components:
         eventBase64:
           type: string
           minLength: 4
-          maxLength: 5592408
-          description: RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+          maxLength: 22369624
+          description: RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. The configured decoded budget defaults to 4 MiB and cannot exceed 16 MiB.
         targets:
           $ref: '#/components/schemas/EventTargets'
 
@@ -2205,6 +3340,227 @@ components:
           maxItems: 16
           items:
             $ref: '#/components/schemas/EventSubmission'
+
+    RecordingTransferDeclaration:
+      type: object
+      additionalProperties: false
+      required:
+      - attachmentPath
+      - outputFullUrl
+      - profile
+      - format
+      - effectiveAt
+      - effectiveEnd
+      - content
+      - targets
+      properties:
+        attachmentPath:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[A-Za-z0-9_./-]+$
+          description: Stable relative attachment path; no empty, dot or parent segments, escapes, query or fragment.
+        outputFullUrl:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Exact recording DocumentReference address in its immutable clinical record.
+        profile:
+          type: string
+          description: Supported recording-document profile, independently checked against collection authority.
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
+        format:
+          type: string
+          description: Registered Grove recording-format code, checked with the exact source token and output profile.
+        effectiveAt:
+          type: string
+          format: date-time
+        effectiveEnd:
+          type: string
+          format: date-time
+          description: Inclusive measurement end, at or after effectiveAt; actual recording bounds are checked at clinical
+            admission.
+        content:
+          $ref: '#/components/schemas/RecordingTransferContent'
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/EventTarget'
+          description: Distinct consent targets, each selecting only outputFullUrl.
+    RecordingTransferContent:
+      type: object
+      additionalProperties: false
+      required:
+      - encoding
+      - storedByteCount
+      - storedSHA256
+      - sourceByteCount
+      - sourceSHA256
+      properties:
+        encoding:
+          type: string
+          enum:
+          - identity
+          - zstd
+          description: Encoding inside the octet-stream body, not HTTP Content-Encoding.
+        storedByteCount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483647
+        storedSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        sourceByteCount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483647
+        sourceSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      description: Exact stored and decoded-source commitments, bounded separately by deployment configuration. Identity
+        encoding requires identical counts and digests. Source commitments and format validity are checked when admitting
+        the clinical attachment.
+    RecordingTransferRegistration:
+      type: object
+      additionalProperties: false
+      required:
+      - sourceId
+      - transferId
+      - declarationSHA256
+      - storedByteCount
+      - storedSHA256
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        transferId:
+          type: string
+          format: uuid
+        declarationSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Server commitment to the entire declaration; retain it to match subsequent receipts.
+        storedByteCount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483647
+        storedSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+    RecordingTransferReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - sourceId
+      - transferId
+      - artifactId
+      - declarationSHA256
+      - storedByteCount
+      - storedSHA256
+      - verifiedAt
+      - expiresAt
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        transferId:
+          type: string
+          format: uuid
+        artifactId:
+          type: string
+          format: uuid
+          description: Opaque identifier for binding these exact owned bytes to a clinical attachment.
+        declarationSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        storedByteCount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483647
+        storedSHA256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        verifiedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: Latest time to accept the unretained attachment; not a permanent storage promise.
+
+    RecordBundleSubmission:
+      type: object
+      additionalProperties: false
+      required: [bundleBase64, records]
+      properties:
+        bundleBase64:
+          type: string
+          minLength: 4
+          maxLength: 22370988
+          description: Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle. The configured decoded budget defaults to 4 MiB plus 1 KiB and cannot exceed 16 MiB plus 1 KiB.
+        records:
+          type: array
+          minItems: 1
+          maxItems: 16
+          description: Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+          items:
+            $ref: '#/components/schemas/RecordBundleMember'
+
+    RecordBundleMember:
+      type: object
+      additionalProperties: false
+      required: [commitment, entryFullUrls]
+      properties:
+        commitment:
+          $ref: '#/components/schemas/EventReceiptLookup'
+        recordings:
+          type: array
+          maxItems: 16
+          description: >
+            Exact uploaded artifacts for this record's relative recording attachments. Paths, transfer IDs and artifact
+            IDs must be distinct. The receiver verifies ownership, the retained declaration, decoded content and current
+            consent before retaining artifacts with clinical custody. Omit for records without external recordings.
+          items:
+            $ref: '#/components/schemas/RecordingAttachmentBinding'
+        entryFullUrls:
+          type: array
+          minItems: 1
+          maxItems: 512
+          uniqueItems: true
+          description: Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 512
+
+    RecordingAttachmentBinding:
+      type: object
+      additionalProperties: false
+      required: [attachmentPath, transferId, artifactId]
+      properties:
+        attachmentPath:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[A-Za-z0-9_./-]+$
+          description: Exact relative Attachment.url in the original record and retained transfer declaration.
+        transferId:
+          type: string
+          format: uuid
+        artifactId:
+          type: string
+          format: uuid
+          description: The artifact from the completed transfer receipt; an identifier alone confers no authority.
 
     EventBatchResult:
       description: >
@@ -2279,11 +3635,14 @@ components:
       type: object
       additionalProperties: false
       description: >
-        Durable custody acknowledgement for one original producer event, not a
+        Durable custody acknowledgement for one source-record version or retraction, not a
         statement of current study access or graph visibility. Before retiring
         staged bytes, the client must match the source, complete producer event
         identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP
-        success alone is insufficient. Exact retries return the persisted receipt.
+        success alone is insufficient. Exact retries return the persisted receipt. Accepted byte
+        representations of the same clinical version share eventId; payloadSHA256, receivedAt and
+        nodeCount describe the specific retained representation. Additional representations do not
+        create new clinical facts, versions or study grants.
       required:
         - eventId
         - sourceId
@@ -2296,14 +3655,14 @@ components:
         eventId:
           type: string
           format: uuid
-          description: Server-assigned immutable custody record ID, not the producer's event identifier.
+          description: Server-assigned clinical version or retraction ID, shared by its accepted byte representations.
         sourceId:
           type: string
           format: uuid
         producerEventIdentifier:
           type: object
           additionalProperties: false
-          description: Complete identifier from the accepted original Bundle.
+          description: Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
           required:
             - system
             - value
@@ -2336,11 +3695,22 @@ components:
     ParticipantCollectionPlan:
       type: object
       additionalProperties: false
-      required: [enrollmentId, stateVersion, asOf, windows]
+      required: [enrollmentId, studyId, title, stateVersion, asOf, windows]
       properties:
         enrollmentId:
           type: string
           format: uuid
+        studyId:
+          type: string
+          format: uuid
+          description: Stable study identity for this enrollment; checked against complete enrollment discovery.
+        title:
+          $ref: '#/components/schemas/LocalizedString'
+          description: Study title from the enrollment's adopted publication, retained for offline collection settings and withdrawal.
+        endsAt:
+          type: string
+          format: date-time
+          description: Exclusive enrollment end resolved once by the server; omitted means ongoing. Stops acquisition, not receipt recovery.
         stateVersion:
           type: integer
           format: int64
@@ -2355,6 +3725,106 @@ components:
           description: Ordered by consent adoption, never by latest publication. Empty means no collection.
           items:
             $ref: '#/components/schemas/ConsentCollectionWindow'
+
+    NativeCollectionReconciliationRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceId]
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+
+    NativeCollectionReconciliationResponse:
+      type: object
+      additionalProperties: false
+      required: [instructions]
+      properties:
+        instructions:
+          type: array
+          maxItems: 256
+          items:
+            $ref: '#/components/schemas/NativeCollectionReconciliationInstruction'
+
+    NativeCollectionReconciliationInstruction:
+      type: object
+      additionalProperties: false
+      description: >
+        Current online authority for one finite sweep of an ended, originally accepted
+        window. It does not extend the enrollment's cached collection plan. Renewal
+        keeps the identity, source, accepted scope and window, and only moves the lease.
+      required:
+        - id
+        - sourceId
+        - enrollmentId
+        - studyId
+        - stateVersion
+        - issuedAt
+        - expiresAt
+        - consentId
+        - publicationId
+        - revision
+        - profile
+        - sourceTypeIdentifier
+        - start
+        - end
+        - includeWorkoutRoutes
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable sweep identity for this source and window, unchanged by renewal.
+        sourceId:
+          type: string
+          format: uuid
+        enrollmentId:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        stateVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        issuedAt:
+          type: string
+          format: date-time
+          description: Server time of this issuance or renewal; not a clinical or source insertion time.
+        expiresAt:
+          type: string
+          format: date-time
+          description: End of the lease. Unfinished work pauses and keeps its position until renewed online.
+        consentId:
+          type: string
+          format: uuid
+        publicationId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          minimum: 1
+        profile:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: Exact output profile, including the recording profile for an opted-in workout route.
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact native source token. Profile membership alone does not authorize a stream.
+        start:
+          type: string
+          format: date-time
+          description: Original accepted window start; whole overlapping sessions remain eligible.
+        end:
+          type: string
+          format: date-time
+          description: Original closed window end, no later than issuedAt.
+        includeWorkoutRoutes:
+          type: boolean
+          description: The accepted workout-route option of the window; an instruction cannot add it.
 
     ConsentCollectionWindow:
       type: object
@@ -2373,87 +3843,278 @@ components:
         start:
           type: string
           format: date-time
-          description: Inclusive measurement-time boundary at exact consent acceptance.
+          description: Consent adoption time; measurement boundaries are carried by each resolved requirement.
         end:
           type: string
           format: date-time
-          description: Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+          description: Next consent adoption time, if any. This does not change the retained historical measurement starts.
         requirements:
           type: array
-          maxItems: 1
+          maxItems: 512
           items:
-            $ref: '#/components/schemas/CollectionRequirement'
+            $ref: '#/components/schemas/CollectionPlanRequirement'
+
+    EnrollmentPeriod:
+      type: object
+      additionalProperties: false
+      description: >
+        Published enrollment end rule. Resolve once from the stored enrollment instant
+        using the declared calendar and time zone. A duration and a fixed end may be
+        combined; the earlier bound wins. Omitting both means ongoing enrollment.
+        Later publication or revision adoption does not change an existing enrollment's end.
+      required: [calendar, timeZone]
+      properties:
+        calendar:
+          type: string
+          enum: [gregorian]
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: IANA time-zone identifier or UTC.
+        duration:
+          $ref: '#/components/schemas/DateComponents'
+          description: Positive calendar duration from enrollment; all components must be nonnegative.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive fixed closing instant; new enrollment at or beyond it is refused.
+
+    CollectionMeasurementWindow:
+      type: object
+      additionalProperties: false
+      description: >
+        Measurement scope resolved once when this publication is accepted, not
+        when a device starts a query. Omitted start means consent adoption;
+        oldestSample authorizes all available history. Relative components must
+        be nonnegative and at least one must be positive. An end is exclusive.
+      required: [calendar, timeZone]
+      properties:
+        calendar:
+          type: string
+          enum: [gregorian]
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: IANA time-zone identifier, or UTC; never the device's implicit current zone.
+        start:
+          $ref: '#/components/schemas/ExportSessionStartDate'
+        end:
+          type: string
+          format: date-time
+
+    CollectionTimeBasis:
+      type: string
+      enum: [measurement-time, clinical-record-download, cda-source-document-period]
+      description: Time basis used by the retained collection window. Omission means measurement-time for existing measurement scopes. Clinical and CDA document requirements must explicitly preserve their source-date basis; embedded care dates are not inferred or used for selection.
+
+    CollectionPlanRequirement:
+      type: object
+      additionalProperties: false
+      description: Exact measurement scope retained for an accepted publication.
+      required: [profile, sourceKind, start]
+      properties:
+        includeWorkoutRoutes:
+          type: boolean
+          default: false
+          description: Whether this accepted requirement includes precise workout routes. Only valid for the workout profile; omission means false.
+        profile:
+          type: string
+          format: uri
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+        providerRegistrationId:
+          type: string
+          format: uuid
+          description: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+        sourceKind:
+          type: string
+          enum: [participant-app, server-worker]
+        start:
+          type: string
+          format: date-time
+          description: Inclusive window start; may precede consent adoption. Sleep records are included whole when they overlap the window.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive window end, bounded by the next adoption when applicable. Overlapping sleep records may end after this boundary.
+
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
+
+    CollectionCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - profile
+        - repositoryKind
+        - sourceTypeIdentifier
+        - displayNameEnglish
+        - displayNameGerman
+        - effectiveTime
+        - supportsWorkoutRoutes
+      properties:
+        profile:
+          type: string
+          format: uri
+        repositoryKind:
+          type: string
+          enum: [healthkit, sensorkit]
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        displayNameEnglish:
+          type: string
+          minLength: 1
+          maxLength: 256
+        displayNameGerman:
+          type: string
+          minLength: 1
+          maxLength: 256
+        effectiveTime:
+          type: string
+          enum: [point, interval, point-or-interval]
+          description: Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+        supportsWorkoutRoutes:
+          type: boolean
+          description: Whether precise workout route collection can be opted into independently for this measurement.
+        isOriginalRecording:
+          type: boolean
+          description: This output includes an original source recording, separately selected from structured summaries.
+        requiredCompanionProfiles:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            format: uri
+          description: Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
 
     CollectionRequirement:
       type: object
       additionalProperties: false
       description: >
         Explicit backend collection permission, independent of native HealthKit
-        components. The current receiver supports the Grove Mobile heart-rate
-        profile as immutable point quantities from participant-app streams,
-        measured at or after the exact consent acceptance. This does not attest
-        the source device or authorize historical data.
+        components. The receiver supports Grove Mobile heart-rate and body-weight point quantities
+        and sleep-stage intervals and workout sessions from participant-app streams. A point must be
+        inside the accepted half-open measurement window. A sleep interval or workout session is
+        collected in full if it overlaps that window, including all workout segments and statistics; touching a boundary alone
+        is insufficient. Omitting the window starts collection at consent adoption.
+        This does not attest the source device.
       required:
         - profile
         - sourceKind
       properties:
+        includeWorkoutRoutes:
+          type: boolean
+          default: false
+          description: Request precise workout routes in addition to workout sessions. Only valid for the workout profile; defaults to false and requires participant acceptance of the published revision.
+        measurementWindow:
+          $ref: '#/components/schemas/CollectionMeasurementWindow'
         profile:
           type: string
           format: uri
           examples:
             - https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate
+            - https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-body-weight
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+        providerRegistrationId:
+          type: string
+          format: uuid
+          description: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
         sourceKind:
           type: string
           enum:
             - participant-app
+            - server-worker
+
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
+
+    NativeSourceRepository:
+      type: string
+      enum: [healthkit, sensorkit]
+      description: Native repository identity; assignment alone does not imply receiver support for every data type.
+
+    SourceInstallationCredential:
+      type: string
+      minLength: 44
+      maxLength: 44
+      pattern: '^[A-Za-z0-9+/]{43}=$'
+      description: Canonical base64 of a random 256-bit installation secret, independent of identity and signing keys.
+
+    SourceBusinessIdentifier:
+      type: object
+      additionalProperties: false
+      required: [system, value]
+      properties:
+        system:
+          type: string
+          format: uri
+          maxLength: 512
+        value:
+          type: string
+          minLength: 1
+          maxLength: 256
 
     ParticipantSource:
       type: object
       additionalProperties: false
       description: >
-        Server-assigned identity for an unverified participant-app stream.
-        Identifiers are not credentials. Every use requires participant
-        authentication and ownership checks. This is not provider attestation.
-      required:
-        - id
-        - registrationID
-        - kind
-        - eventIdentifierSystem
-        - identifierRoot
-        - participantIdentifier
-        - createdAt
+        Server-assigned logical source shared by a participant's authorized
+        installations for one native repository. Identifiers are not credentials
+        or provider attestation. Reinstalling does not change this identity.
+      required: [id, keyID, keyEpoch, repositoryKind, repositoryScope, kind, eventIdentifierSystem, identifierRoot, participantIdentifier, createdAt]
       properties:
         id:
           type: string
           format: uuid
-        registrationID:
+        keyID:
           type: string
           format: uuid
+        keyEpoch:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: '^[1-9][0-9]*$'
+          description: Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+        repositoryKind:
+          $ref: '#/components/schemas/NativeSourceRepository'
+        repositoryScope:
+          $ref: '#/components/schemas/SourceBusinessIdentifier'
         kind:
           type: string
-          enum:
-            - participant-app
+          enum: [participant-app]
         eventIdentifierSystem:
           type: string
           format: uri
-          description: Immutable namespace for event identifiers only, not HMAC identifiers.
+          description: Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
         identifierRoot:
           type: string
           format: uri
           maxLength: 256
           description: >
-            Immutable, server-assigned root for this source's Grove identifiers.
-            Derive DeploymentIdentifierSystems with registrationID as keyID and
-            epoch 1. The derived event system must equal eventIdentifierSystem.
-            The client persists its privacy key and Grove producer ledger together;
-            producer instances are allocated by that ledger, not by the server.
+            Derive DeploymentIdentifierSystems from this server-assigned root,
+            keyID and keyEpoch. The derived recordVersion system must equal
+            eventIdentifierSystem. Use the supplied repositoryScope in all
+            conversions and retain exact staged record bytes across retries.
         participantIdentifier:
           type: object
           additionalProperties: false
-          description: Complete FHIR Patient business identifier assigned to this participant.
-          required:
-            - system
-            - value
+          description: Complete FHIR Patient business identifier assigned to this participant within this deployment.
+          required: [system, value]
           properties:
             system:
               type: string
@@ -2466,7 +4127,50 @@ components:
         revokedAt:
           type: string
           format: date-time
-          description: Present only after permanent revocation; never cleared.
+          description: Permanent logical-source revocation affects every installation; never cleared.
+
+    ParticipantSourceInstallation:
+      type: object
+      additionalProperties: false
+      required: [registrationID, sourceID, createdAt]
+      properties:
+        registrationID:
+          type: string
+          format: uuid
+        sourceID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          description: Permanent installation revocation; other installations retain independent authority.
+
+    ParticipantSourceRegistration:
+      type: object
+      additionalProperties: false
+      required: [source, installation]
+      properties:
+        source:
+          $ref: '#/components/schemas/ParticipantSource'
+        installation:
+          $ref: '#/components/schemas/ParticipantSourceInstallation'
+
+    ParticipantSourceIdentityRecovery:
+      type: object
+      additionalProperties: false
+      required: [registration, identityKeyBase64]
+      properties:
+        registration:
+          $ref: '#/components/schemas/ParticipantSourceRegistration'
+        identityKeyBase64:
+          type: string
+          minLength: 44
+          maxLength: 44
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+          description: Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
 
     LocalizationKey:
       type: string
@@ -2485,7 +4189,7 @@ components:
     DateComponents:
       type: object
       description: >
-        Calendar-relative offset applied from the session creation time.
+        Calendar-relative offset from the anchor specified by the containing policy.
         At least one component must be provided. Uses Swift DateComponents naming (singular).
       properties:
         year:
@@ -2722,9 +4426,11 @@ components:
       type: object
       description: Partial update for a study. All fields are optional.
       properties:
+        enrollmentPeriod:
+          $ref: '#/components/schemas/EnrollmentPeriod'
         collectionRequirements:
           type: array
-          maxItems: 1
+          maxItems: 512
           uniqueItems: true
           description: Empty disables backend collection in the next publication; existing publications are unchanged.
           items:
@@ -2758,6 +4464,7 @@ components:
       type: object
       description: Full study response
       required:
+        - enrollmentPeriod
         - collectionRequirements
         - draftRevision
         - id
@@ -2769,13 +4476,15 @@ components:
         - visibility
         - enrollmentConditions
       properties:
+        enrollmentPeriod:
+          $ref: '#/components/schemas/EnrollmentPeriod'
         draftRevision:
           type: string
           format: uuid
           description: Opaque revision of the complete editable study draft.
         collectionRequirements:
           type: array
-          maxItems: 1
+          maxItems: 512
           uniqueItems: true
           items:
             $ref: '#/components/schemas/CollectionRequirement'
@@ -3534,6 +5243,10 @@ components:
         enrolledAt:
           type: string
           format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          description: Exclusive enrollment end retained when joining; independent of withdrawal and historical measurement ranges.
         withdrawnAt:
           type: string
           format: date-time

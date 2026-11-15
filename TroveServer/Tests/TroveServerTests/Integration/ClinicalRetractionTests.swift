@@ -19,7 +19,8 @@ struct ClinicalRetractionTests {
     func tombstoneSuppressesEveryVersionInAnyArrivalOrderAndAfterReopening(order: [Int]) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let events = [
+            let sourceID = fixture.source.id, proof = fixture.installation
+            let events = try [
                 ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1"),
                 ClinicalRecordStoreTests.event(source: fixture.source, sequence: 2, version: "2"),
                 Self.retraction(source: fixture.source)
@@ -29,9 +30,8 @@ struct ClinicalRetractionTests {
                 var receipts: [Int: ClinicalEventReceipt] = [:]
                 for index in order {
                     let event = events[index - 1]
-                    receipts[index] = try await store.accept(
-                        event, sourceID: fixture.source.id, targets: index == 3 ? [] : fixture.targets(for: event, studies: [0])
-                    )
+                    let targets = index == 3 ? [] : fixture.targets(for: event, studies: [0])
+                    receipts[index] = try await store.accept(event, sourceID: sourceID, targets: targets, installation: proof)
                     if receipts[3] != nil { #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0) }
                     #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
                 }
@@ -43,62 +43,72 @@ struct ClinicalRetractionTests {
                     for index in order {
                         let event = events[index - 1]
                         let replay = try await store.accept(
-                            event, sourceID: fixture.source.id, targets: index == 3 ? [] : fixture.targets(for: event, studies: [0])
+                            event, sourceID: sourceID, targets: index == 3 ? [] : fixture.targets(for: event, studies: [0]), installation: proof
                         )
                         #expect(replay == receipts[index])
                     }
                     #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                     #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0], currentOnly: false) == 0)
                     try await ClinicalEventStoreTests.expectRows(events: 3, nodes: 5, facts: 2, grants: 2, on: reopened.db)
-                    #expect(try await Self.count("clinical_output_retractions", on: reopened.db) == 1)
+                    #expect(try await Self.count("clinical_record_retractions", on: reopened.db) == 1)
                 }
             }
         }
     }
 
     @Test
-    func retractionIsOutputScopedAndDoesNotCrossSourceBindings() async throws {
+    func retractionSuppressesAllOutputsButDoesNotCrossSourceBindings() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let other = try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                let otherInstallationID = UUID()
+                let other = try await SourceBindingService(database: app.db).registerSource(
+                    registrationID: otherInstallationID, repositoryKind: .sensorKit
+                )
                 let store = ClinicalEventStore(database: app.db)
-                let first = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
-                let second = ClinicalRecordStoreTests.event(source: other, sequence: 1, version: "1")
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first))
-                _ = try await store.accept(second, sourceID: other.id, targets: fixture.targets(for: second))
-                _ = try await store.accept(Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [])
-                for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 2) }
+                let first = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
+                let second = try ClinicalRecordStoreTests.event(source: other, sequence: 1, version: "1")
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first), installation: fixture.installation
+                )
+                _ = try await store.accept(
+                    second, sourceID: other.id, targets: fixture.targets(for: second), installation: SourceBindingFixture.proof(otherInstallationID)
+                )
+                _ = try await store.accept(
+                    Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [], installation: fixture.installation
+                )
+                for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 1) }
                 try await ClinicalEventStoreTests.expectRows(events: 3, nodes: 6, facts: 3, grants: 6, on: app.db)
             }
         }
     }
 
     @Test(arguments: [true, false])
-    func contradictoryFirstClaimsRejectAtomically(retractionFirst: Bool) async throws {
+    func retractionDoesNotReserveAnotherRecordsOutputIdentity(retractionFirst: Bool) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let active = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
-            let retraction = Self.retraction(source: fixture.source)
+            let active = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
+            let retraction = try Self.retraction(source: fixture.source)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 _ = try await store.accept(
                     retractionFirst ? retraction : active,
                     sourceID: fixture.source.id,
-                    targets: retractionFirst ? [] : fixture.targets
+                    targets: retractionFirst ? [] : fixture.targets,
+                    installation: fixture.installation
                 )
-                await #expect {
-                    try await store.accept(
-                        retractionFirst ? active : retraction,
-                        sourceID: fixture.source.id,
-                        targets: retractionFirst ? fixture.targets : []
-                    )
-                } throws: { ($0 as? ServerError)?.status.code == 409 }
-                #expect(try await Self.count("clinical_events", on: app.db) == 1)
-                #expect(try await Self.count("clinical_source_records", on: app.db) == 1)
+                #expect(try await Self.count("clinical_output_bindings", on: app.db) == (retractionFirst ? 0 : 1))
+                _ = try await store.accept(
+                    retractionFirst ? active : retraction,
+                    sourceID: fixture.source.id,
+                    targets: retractionFirst ? fixture.targets : [],
+                    installation: fixture.installation
+                )
+                #expect(try await Self.count("clinical_events", on: app.db) == 2)
+                #expect(try await Self.count("clinical_source_records", on: app.db) == 2)
                 #expect(try await Self.count("clinical_output_bindings", on: app.db) == 1)
-                #expect(try await Self.count("clinical_output_retractions", on: app.db) == (retractionFirst ? 1 : 0))
-                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == (retractionFirst ? 0 : 1))
+                #expect(try await Self.count("clinical_record_retractions", on: app.db) == 1)
+                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
             }
         }
     }
@@ -110,10 +120,17 @@ struct ClinicalRetractionTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 for id in fixture.enrollmentIDs { _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: id) }
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [])
+                _ = try await store.accept(
+                    Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [], installation: fixture.installation
+                )
                 _ = try await SourceBindingService(database: app.db).revoke(id: fixture.source.id)
                 await #expect {
-                    try await store.accept(Self.retraction(source: fixture.source, sequence: 4), sourceID: fixture.source.id, targets: [])
+                    try await store.accept(
+                        Self.retraction(source: fixture.source, sequence: 4),
+                        sourceID: fixture.source.id,
+                        targets: [],
+                        installation: fixture.installation
+                    )
                 } throws: { ($0 as? ServerError)?.status.code == 409 }
                 try await ClinicalEventStoreTests.expectRows(events: 1, nodes: 1, facts: 0, grants: 0, on: app.db)
             }
@@ -121,19 +138,29 @@ struct ClinicalRetractionTests {
     }
 
     @Test
-    func concurrentCrossKindClaimsCommitOnlyOneBinding() async throws {
+    func concurrentRetractionAndDifferentRecordCannotReserveEachOthersIdentities() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let active = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
-                async let first = Self.attempt(store, event: active, sourceID: fixture.source.id, targets: fixture.targets)
-                async let second = Self.attempt(store, event: Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [])
+                let active = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
+                async let first = Self.attempt(
+                    store, event: active, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
+                )
+                async let second = Self.attempt(
+                    store,
+                    event: Self.retraction(source: fixture.source),
+                    sourceID: fixture.source.id,
+                    targets: [],
+                    installation: fixture.installation
+                )
                 let outcomes = try await [first, second]
-                #expect(outcomes.filter { $0 }.count == 1)
-                #expect(try await Self.count("clinical_events", on: app.db) == 1)
+                #expect(outcomes.allSatisfy { $0 })
+                #expect(try await Self.count("clinical_events", on: app.db) == 2)
                 #expect(try await Self.count("clinical_output_bindings", on: app.db) == 1)
-                #expect(try await Self.count("clinical_source_records", on: app.db) == 1)
+                #expect(try await Self.count("clinical_source_records", on: app.db) == 2)
+                #expect(try await Self.count("clinical_record_retractions", on: app.db) == 1)
+                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
             }
         }
     }
@@ -154,7 +181,7 @@ struct ClinicalRetractionTests {
             await AuthContext.$current.withValue(foreign) {
                 await #expect {
                     try await ClinicalEventStore(database: app.db).accept(
-                        Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: []
+                        Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [], installation: fixture.installation
                     )
                 } throws: { ($0 as? ServerError)?.status.code == 404 }
             }
@@ -171,23 +198,26 @@ struct ClinicalRetractionTests {
                 _ = try await store.accept(
                     ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1"),
                     sourceID: fixture.source.id,
-                    targets: fixture.targets
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
-                _ = try await store.accept(Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [])
+                _ = try await store.accept(
+                    Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [], installation: fixture.installation
+                )
             }
             let sql = try #require(app.db as? any SQLDatabase)
-            for statement in ["UPDATE clinical_output_retractions SET kind = kind", "DELETE FROM clinical_output_retractions"] {
+            for statement in ["UPDATE clinical_record_retractions SET kind = kind", "DELETE FROM clinical_record_retractions"] {
                 await #expect { try await sql.raw("\(unsafeRaw: statement)").run() }
                     throws: { ($0 as? any DatabaseError)?.isConstraintFailure == true }
             }
             await #expect {
                 try await sql.raw("""
-                    INSERT INTO clinical_output_retractions (event_id, source_id, record_id, output_binding_id, kind)
-                    SELECT event_id, source_id, record_id, output_binding_id, 'retraction' FROM clinical_point_facts
+                    INSERT INTO clinical_record_retractions (event_id, source_id, record_id, kind)
+                    SELECT event_id, source_id, record_id, 'retraction' FROM clinical_point_facts
                     """)
                     .run()
             } throws: { ($0 as? any DatabaseError)?.isConstraintFailure == true }
-            #expect(try await Self.count("clinical_output_retractions", on: app.db) == 1)
+            #expect(try await Self.count("clinical_record_retractions", on: app.db) == 1)
         }
     }
 
@@ -198,10 +228,20 @@ struct ClinicalRetractionTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 await #expect {
-                    try await store.accept(ClinicalEventStoreTests.event(source: fixture.source), sourceID: fixture.source.id, targets: [])
+                    try await store.accept(
+                        ClinicalEventStoreTests.event(source: fixture.source),
+                        sourceID: fixture.source.id,
+                        targets: [],
+                        installation: fixture.installation
+                    )
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
                 await #expect {
-                    try await store.accept(Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: fixture.targets)
+                    try await store.accept(
+                        Self.retraction(source: fixture.source),
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets,
+                        installation: fixture.installation
+                    )
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
                 try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
             }
@@ -217,12 +257,12 @@ struct ClinicalRetractionTests {
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect(throws: (any Error).self) {
                     try await ClinicalEventStore(database: app.db).accept(
-                        Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: []
+                        Self.retraction(source: fixture.source), sourceID: fixture.source.id, targets: [], installation: fixture.installation
                     )
                 }
             }
             let tables = [
-                "clinical_events", "clinical_source_records", "clinical_record_events", "clinical_output_bindings", "clinical_output_retractions"
+                "clinical_events", "clinical_source_records", "clinical_record_events", "clinical_output_bindings", "clinical_record_retractions"
             ]
             for table in tables {
                 #expect(try await Self.count(table, on: app.db) == 0)
@@ -234,31 +274,35 @@ struct ClinicalRetractionTests {
 
 extension ClinicalRetractionTests {
     private static func attempt(
-        _ store: ClinicalEventStore, event: ValidatedExchangeEvent, sourceID: UUID, targets: [ClinicalEventTarget]
+        _ store: ClinicalEventStore,
+        event: ValidatedExchangeEvent,
+        sourceID: UUID,
+        targets: [ClinicalEventTarget],
+        installation: SourceInstallationProof
     ) async throws -> Bool {
         do {
-            _ = try await store.accept(event, sourceID: sourceID, targets: targets)
+            _ = try await store.accept(event, sourceID: sourceID, targets: targets, installation: installation)
             return true
         } catch let error as ServerError where error.status.code == 409 {
             return false
         }
     }
 
-    static func retraction(source: SourceBinding, sequence: Int = 3) -> ValidatedExchangeEvent {
-        let base = ClinicalRecordStoreTests.event(source: source, sequence: sequence, version: nil, writer: nil)
+    static func retraction(source: SourceBinding, sequence: Int = 3) throws -> ValidatedExchangeEvent {
+        let base = try ClinicalRecordStoreTests.event(source: source, sequence: sequence, version: nil, writer: nil)
+        let system = base.eventIdentifierSystem.replacingOccurrences(of: "grove-record-version-v0", with: "grove-record-retraction-v0")
         return .init(
             rawBytes: base.rawBytes,
+            recorded: base.recorded,
             validatorIdentity: base.validatorIdentity,
-            eventIdentifierSystem: base.eventIdentifierSystem,
+            eventIdentifierSystem: system,
             eventIdentifierValue: base.eventIdentifierValue,
-            producerInstance: base.producerInstance,
-            deploymentIdentifiers: base.deploymentIdentifiers,
+            deploymentIdentifiers: .init(systems: [.recordRetraction: [system]]),
             participants: [],
             nodes: [.init(ordinal: 0, fullURL: "urn:uuid:retraction", resourceType: "Provenance")],
             outputs: [],
             retraction: .init(
-                sourceRecordIdentifier: base.outputs[0].sourceRecordIdentifier,
-                outputIdentifiers: [base.outputs[0].sourceOutputIdentifier]
+                sourceRecordIdentifier: base.outputs[0].sourceRecordIdentifier
             )
         )
     }

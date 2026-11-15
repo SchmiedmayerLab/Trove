@@ -39,6 +39,8 @@ struct AuditEvent: Sendable {
         case consentPDFDisclosure = "consent.pdf.disclosure"
         case consentRecordsDisclosure = "consent.records.disclosure"
         case collectionPlanDisclosure = "collection.plan.disclosure"
+        case collectionReconciliationIssued = "collection.reconciliation.issued"
+        case collectionReconciliationCompleted = "collection.reconciliation.completed"
         case enrollmentWithdrawn = "enrollment.withdrawn"
         case studyPublished = "study.published"
         case studyPublicationDisclosure = "study.publication.disclosure"
@@ -52,32 +54,74 @@ struct AuditEvent: Sendable {
         case delegationDisclosure = "delegation.disclosure"
         case studyBundleDisclosure = "study.bundle.disclosure"
         case artifactDiscardScheduled = "artifact.discard.scheduled"
+        case recordingTransferDeclared = "recording.transfer.declared"
+        case recordingTransferStored = "recording.transfer.stored"
+        case recordingTransferReceiptDisclosure = "recording.transfer.receipt.disclosure"
+        case recordingArtifactDiscardScheduled = "recording.artifact.discard.scheduled"
         case sourceRegistered = "source.registered"
         case sourceRevoked = "source.revoked"
+        case sourceInstallationRegistered = "source.installation.registered"
+        case sourceInstallationRevoked = "source.installation.revoked"
+        case sourceIdentityDisclosure = "source.identity.disclosure"
         case clinicalEventAccepted = "clinical.event.accepted"
         case clinicalEventAttributed = "clinical.event.attributed"
+        case clinicalRetractionReversed = "clinical.retraction.reversed"
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
         case studyDataGranted = "study.data.granted"
         case studyAuditDisclosure = "study.audit.disclosure"
+        case studyDataDisclosure = "study.data.disclosure"
+        case studyRecordingDisclosure = "study.recording.disclosure"
+        case providerRegistrationDisclosure = "provider.registration.disclosure"
+        case providerRegistrationChanged = "provider.registration.changed"
+        case providerLinkStarted = "provider.link.started"
+        case providerLinkDispatched = "provider.link.dispatched"
+        case providerLinkCompleted = "provider.link.completed"
+        case providerConnectionDisconnected = "provider.connection.disconnected"
+        case providerRefreshDispatched = "provider.refresh.dispatched"
+        case providerCredentialRotated = "provider.credential.rotated"
+        case providerCredentialUncertain = "provider.credential.uncertain"
+        case providerCredentialRetired = "provider.credential.retired"
+        case providerFetchDispatched = "provider.fetch.dispatched"
+        case providerPageStaged = "provider.page.staged"
+        case providerPageAccepted = "provider.page.accepted"
+        case providerStatusDisclosure = "provider.status.disclosure"
 
         var scopeKind: Scope.Kind {
             switch self {
-            case .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
+            case .providerRegistrationChanged: .providerRegistration
+            case .providerRegistrationDisclosure, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted,
+                 .providerConnectionDisconnected, .providerRefreshDispatched, .providerCredentialRotated,
+                 .providerCredentialUncertain, .providerCredentialRetired, .providerFetchDispatched, .providerPageStaged, .providerPageAccepted,
+                 .providerStatusDisclosure: .participantProvider
+            case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure, .recordingArtifactDiscardScheduled,
+                 .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
+                 .sourceIdentityDisclosure,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
+                 .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
-                 .studyDataGranted, .studyAuditDisclosure, .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
+                 .studyDataGranted, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure,
+                 .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
                  .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure: .study
             }
         }
 
         var isDisclosure: Bool {
             switch self {
-            case .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .studyBundleDisclosure,
-                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDraftDisclosure,
-                 .delegationDisclosure, .studyPublicationDisclosure: true
+            case .providerStatusDisclosure, .providerRegistrationDisclosure: true
+            case .providerRegistrationChanged, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted, .providerConnectionDisconnected,
+                 .providerRefreshDispatched, .providerCredentialRotated, .providerCredentialUncertain, .providerCredentialRetired,
+                 .providerFetchDispatched, .providerPageStaged, .providerPageAccepted: false
+            case .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
+                 .collectionPlanDisclosure, .studyBundleDisclosure,
+                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
+                 .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
             case .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
-                 .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
+                 .collectionReconciliationIssued, .collectionReconciliationCompleted,
+                 .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
+                 .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
             }
         }
@@ -96,16 +140,22 @@ struct AuditEvent: Sendable {
     enum Scope: Sendable {
         case study(studyID: UUID, groupID: UUID? = nil)
         case participantSource(participantID: UUID, sourceBindingID: UUID)
+        case providerRegistration(registrationID: UUID)
+        case participantProvider(participantID: UUID, registrationID: UUID)
 
         enum Kind: String, Sendable {
             case study
             case participantSource = "participant_source"
+            case providerRegistration = "provider_registration"
+            case participantProvider = "participant_provider"
         }
 
         var kind: Kind {
             switch self {
             case .study: .study
             case .participantSource: .participantSource
+            case .providerRegistration: .providerRegistration
+            case .participantProvider: .participantProvider
             }
         }
     }

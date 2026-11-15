@@ -84,7 +84,7 @@ struct SharedDeliveryJournalTests {
         }
     }
 
-    @Test(arguments: [4, 5, 999])
+    @Test(arguments: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 999])
     func incompatibleSchemaIsRejectedWithoutRecreatingState(version: Int64) async throws {
         try await withJournal { journal, url, _ in
             await journal.close()
@@ -116,7 +116,7 @@ struct SharedDeliveryJournalTests {
         do {
             let setup = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
             let sourceID = UUID()
-            try await journal.confirmSource(.init(id: sourceID, registrationID: setup.localID), for: setup)
+            try await journal.confirmSource(.init(id: sourceID, registrationID: setup.localID), for: setup, identityKey: DeliveryFixture.identityKey)
             try await operation(journal, url, sourceID)
             await journal.close()
         } catch {

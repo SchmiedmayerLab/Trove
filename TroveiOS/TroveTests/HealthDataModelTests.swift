@@ -16,6 +16,39 @@ import TroveAPIClient
 @Suite(.timeLimit(.minutes(1)))
 struct HealthDataModelTests {
     @Test
+    func explicitDocumentReviewCanBeCanceledAndRetriedWithoutPublishingStaleStatus() async throws {
+        let fixture = try Fixture()
+        let model = fixture.model()
+        let review = Task { await model.run(.reviewDocuments) }
+        await fixture.waitForStart()
+        #expect(model.isReviewingDocuments)
+        model.cancelDocumentReview()
+        fixture.finish(.ready, at: 0)
+        await review.value
+        #expect(fixture.cancellations == [true])
+        #expect(!model.isBusy && model.status == .documentReviewCancelled)
+        let retry = Task { await model.run(.reviewDocuments) }
+        await fixture.waitForStart()
+        fixture.finish(.waiting, at: 1)
+        await retry.value
+        #expect(fixture.actions == [.reviewDocuments, .reviewDocuments])
+        #expect(!model.isReviewingDocuments && model.status == .waiting)
+    }
+
+    @Test
+    func backgroundWakeUsesCaptureWithoutDocumentReview() async throws {
+        let fixture = try Fixture()
+        let model = fixture.model()
+        let session = try #require(fixture.session)
+        let wake = Task { await model.receiveHealthUpdate(for: session, context: .background) }
+        await fixture.waitForStart()
+        #expect(fixture.actions == [.capture])
+        #expect(!model.isReviewingDocuments)
+        fixture.finish(.ready, at: 0)
+        await wake.value
+    }
+
+    @Test
     func repeatedActionsCannotStartConcurrentCollection() async throws {
         let fixture = try Fixture()
         let model = fixture.model()
@@ -186,7 +219,49 @@ struct HealthDataModelTests {
     }
 
     @Test
+    func withdrawalWaitsForJournalCleanupAndExcludesQueuedObserverCapture() async throws {
+        let fixture = try Fixture()
+        let captured = try #require(fixture.session)
+        let model = fixture.model()
+        let sync = Task { await model.run(.sync) }
+        await fixture.waitForStart()
+        let observer = await fixture.start { await model.receiveHealthUpdate(for: captured, context: .foreground) }
+        let withdrawal = Task { try await model.stopCollection(enrollmentId: "enrollment", for: captured) }
+        await fixture.waitForCancellation()
+        #expect(model.isBusy && fixture.stops.isEmpty)
+        await model.run(.capture)
+        #expect(fixture.actions == [.sync])
+        fixture.finish(.syncFinished, at: 0)
+        await sync.value
+        try await withdrawal.value
+        await observer.value
+        #expect(fixture.cancellations == [true])
+        #expect(fixture.stops == ["enrollment"] && fixture.actions == [.sync])
+        #expect(!model.isBusy && model.status == .refreshNeeded && model.needsAutomaticRetry)
+    }
+
+    @Test
+    func accountChangeWhileWaitingToStopDoesNotWriteUnderReplacementSession() async throws {
+        let fixture = try Fixture()
+        let captured = try #require(fixture.session)
+        let model = fixture.model()
+        let sync = Task { await model.run(.sync) }
+        await fixture.waitForStart()
+        let withdrawal = Task { try await model.stopCollection(enrollmentId: "enrollment", for: captured) }
+        await fixture.waitForCancellation()
+        fixture.session = try Fixture.session()
+        model.invalidateSession()
+        await #expect(throws: CancellationError.self) { try await withdrawal.value }
+        #expect(fixture.stops.isEmpty)
+        fixture.finish(.syncFinished, at: 0)
+        await sync.value
+        #expect(model.status == .signedOut && !model.isBusy)
+    }
+
+    @Test
     func knownFailuresHaveSafeLocalizableStates() {
+        #expect(HealthDataStatus(error: EventDeliveryJournal.JournalError.staleCheckpoint) == .refreshNeeded)
+        #expect(HealthDataStatus(error: EventDeliveryJournal.JournalError.staleCollectionState) == .refreshNeeded)
         #expect(HealthDataStatus(error: EventDeliveryJournal.JournalError.corruptJournal) == .blocked)
         #expect(HealthDataStatus(error: EventDeliveryJournal.JournalError.sourceRevoked) == .revoked)
         #expect(HealthDataStatus(error: ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized) == .notAuthorized)
@@ -202,6 +277,7 @@ extension HealthDataModelTests {
         var completions: [CheckedContinuation<HealthDataStatus, Never>?] = []
         var actions: [HealthDataModel.Action] = []
         var cancellations: [Bool] = []
+        var stops: [String] = []
         private let starts = AsyncStream<Void>.makeStream()
         private let cancellationRequests = AsyncStream<Void>.makeStream()
 
@@ -214,20 +290,29 @@ extension HealthDataModelTests {
         func model(
             waitForDeadline: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: .seconds(20)) }
         ) -> HealthDataModel {
-            HealthDataModel(transport: .init(session: { self.session }, run: { action, _ in
-                self.actions.append(action)
-                let cancelled = self.cancellationRequests.continuation
-                let result = await withTaskCancellationHandler {
-                    await withCheckedContinuation { continuation in
-                        self.completions.append(continuation)
-                        self.starts.continuation.yield(())
+            HealthDataModel(
+                transport: .init(
+                    session: { self.session },
+                    run: { action, _ in
+                        self.actions.append(action)
+                        let cancelled = self.cancellationRequests.continuation
+                        let result = await withTaskCancellationHandler {
+                            await withCheckedContinuation { continuation in
+                                self.completions.append(continuation)
+                                self.starts.continuation.yield(())
+                            }
+                        } onCancel: {
+                            cancelled.yield(())
+                        }
+                        self.cancellations.append(Task.isCancelled)
+                        return result
+                    },
+                    stopCollection: { enrollmentID, _ in
+                        self.stops.append(enrollmentID)
                     }
-                } onCancel: {
-                    cancelled.yield(())
-                }
-                self.cancellations.append(Task.isCancelled)
-                return result
-            }), waitForCaptureDeadline: waitForDeadline)
+                ),
+                waitForCaptureDeadline: waitForDeadline
+            )
         }
 
         func start(_ operation: @escaping @MainActor () async -> Void) async -> Task<Void, Never> {

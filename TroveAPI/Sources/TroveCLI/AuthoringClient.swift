@@ -35,9 +35,17 @@ private struct AuthoringAuthorization: ClientMiddleware {
             throw CLIError.requestFailed
         }
         authenticated.headerFields[.authorization] = "Bearer \(token)"
+        let recording = operationID == Operations.GetStudyRecording.id
+        if recording {
+            authenticated.headerFields[.acceptEncoding] = "identity"
+        }
         let (response, responseBody) = try await next(authenticated, body, baseURL)
         guard (200..<300).contains(response.status.code) else {
             throw CLIError.httpStatus(response.status.code)
+        }
+        if recording, let encoding = response.headerFields[.contentEncoding],
+           encoding.trimmingCharacters(in: .whitespaces).lowercased() != "identity" {
+            throw CLIError.requestFailed
         }
         return (response, responseBody)
     }
@@ -116,6 +124,43 @@ struct AuthoringClient: Sendable {
                 headers: .init(ifMatch: CLIInput.revisionHeader(revision)),
                 body: .json(.init(validationId: validation.uuidString))
             )).created.body.json
+        }
+    }
+
+    func getStudyData(
+        _ study: UUID,
+        versions: Components.Schemas.StudyDataVersions,
+        limit: Int,
+        before: UUID?
+    ) async throws -> Components.Schemas.StudyDataPage {
+        guard (1...100).contains(limit) else {
+            throw CLIError.invalidInput
+        }
+        return try await request(revision: nil) { client in
+            let page = try await client.getStudyData(.init(
+                path: .init(studyId: study.uuidString),
+                query: .init(limit: limit, before: before?.uuidString, versions: versions)
+            )).ok.body.json
+            guard UUID(uuidString: page.studyId) == study, page.versions == versions,
+                  page.records.count <= limit,
+                  page.records.allSatisfy({ (1...512).contains($0.outputs.count) }),
+                  page.records.reduce(0, { $0 + $1.outputs.count }) <= 1024 else {
+                throw CLIError.requestFailed
+            }
+            return page
+        }
+    }
+
+    func getStudyRecording(
+        _ study: UUID,
+        grant: UUID,
+        versions: Components.Schemas.StudyDataVersions
+    ) async throws -> HTTPBody {
+        try await request(revision: nil) { client in
+            try await client.getStudyRecording(.init(
+                path: .init(studyId: study.uuidString, grantId: grant.uuidString),
+                query: .init(versions: versions)
+            )).ok.body.binary
         }
     }
 

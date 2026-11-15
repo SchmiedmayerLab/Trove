@@ -8,6 +8,7 @@
 
 import Foundation
 import GroveHealthKit
+import GroveSensorKit
 import HealthKit
 import TroveAPIClient
 import TroveHealthKit
@@ -18,13 +19,11 @@ import TroveHealthKit
 struct HealthDataSession {
     let api: TroveAPIModule
     let healthKit: GroveHealthKit.HealthKit
+    let sensorKit: GroveSensorKit.SensorKit
     let session: KeycloakSessionSnapshot
 
     func run(_ action: HealthDataModel.Action) async throws -> HealthDataStatus {
         try checkSession()
-        guard HKHealthStore.isHealthDataAvailable() else {
-            return .unavailable
-        }
         let scope = EventDeliveryJournal.Scope(
             backend: Config.apiBaseURL.absoluteString, issuer: session.issuer.absoluteString, subject: session.subject
         )
@@ -45,12 +44,70 @@ struct HealthDataSession {
     }
 
     private func perform(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus {
-        let acquisition = try api.makeHeartRateAcquisition(journal: journal, for: session)
-        var sources = try await journal.sourceSetups()
+        let refreshed = try await refreshPlansIfNeeded(action, journal: journal)
+        var statuses: [HealthDataStatus] = []
+        if HKHealthStore.isHealthDataAvailable(), let status = try await performHealthKit(action, journal: journal) {
+            statuses.append(status)
+        }
+        if GroveSensorKit.SensorKit.isAvailable {
+            if let status = try await performSensorKit(action, journal: journal) { statuses.append(status) }
+        } else if try await journal.collectionState().snapshot?.active().permitsSensorKitAcquisition == true {
+            statuses.append(.sensorConfigurationRequired)
+        }
+        try checkSession()
+        // Both adapters stage into one journal before its one shared upload/recovery pass.
+        if action == .sync {
+            let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
+            _ = try await drainer.drain(limit: 128)
+            _ = try await journal.pruneDelivered()
+        }
+        let pending = try await journal.pendingDeliveryIDs(limit: 128)
+        for id in pending {
+            if case .blocked = try await journal.status(for: id) {
+                return .blocked
+            }
+        }
+        return HealthDataStatus.combining(statuses, pending: !pending.isEmpty, synchronized: action == .sync && refreshed)
+    }
+
+    private func performSensorKit(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus? {
+        do {
+            return try await SensorDataSession(api: api, sensorKit: sensorKit, session: session).perform(action, journal: journal)
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            return .storageFull
+        } catch ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized {
+            return .notAuthorized
+        } catch EventDeliveryJournal.JournalError.sourceRevoked {
+            return .revoked
+        }
+    }
+
+    private func refreshPlansIfNeeded(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> Bool {
+        guard action == .setUp || action == .sync else {
+            return false
+        }
+        do {
+            try await api.refreshCollectionPlans(journal: journal, for: session)
+            try checkSession()
+            return true
+        } catch ParticipantCollectionRefresh.RefreshError.unavailable where action == .sync {
+            try checkSession()
+            return false
+        }
+    }
+
+    private func performHealthKit(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus? {
+        let acquisition = try api.makeHealthKitAcquisition(journal: journal, for: session)
+        var sources = try await journal.sourceSetups().filter {
+            $0.binding?.source.repositoryKind == .healthkit || (try? HealthKitQueryDefinition(bytes: $0.queryDefinition)) != nil
+        }
+        if sources.isEmpty, try await requestedStreams(journal).isEmpty {
+            return nil
+        }
         try checkSession()
         guard sources.count <= 1 else { throw EventDeliveryJournal.JournalError.sourceConflict }
         if action == .setUp, sources.isEmpty {
-            let definition = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollmentIDs())
+            let definition = try await acquisition.prepareQueryDefinition()
             try checkSession()
             sources = [try await journal.createSource(localID: UUID(), queryDefinition: definition)]
         }
@@ -65,13 +122,14 @@ struct HealthDataSession {
             return try await queueStatus(journal, source: restored)
         }
         if action == .requestAccess {
-            _ = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollmentIDs())
-            let refreshed = try await api.synchronizeSource(localID: source.localID, journal: journal, for: session)
+            _ = try await acquisition.prepareQueryDefinition()
             try checkSession()
-            guard refreshed.binding?.revokedAt == nil else {
+            guard source.binding != nil, source.binding?.isRevoked != true else {
                 return .revoked
             }
-            try await healthKit.askForAuthorization(for: .init(read: [HKQuantityType(.heartRate)]))
+            let streams = try await requestedStreams(journal)
+            let types = try streams.flatMap { try HealthKitAcquisition.readTypes(for: $0) }
+            try await healthKit.askForAuthorization(for: .init(read: types))
             try checkSession()
             return .permissionRequested
         }
@@ -80,52 +138,114 @@ struct HealthDataSession {
 
     private func collect(
         _ action: HealthDataModel.Action,
-        acquisition: HeartRateAcquisition,
+        acquisition: HealthKitAcquisition,
         source: EventDeliveryJournal.SourceSetup,
         journal: EventDeliveryJournal
     ) async throws -> HealthDataStatus {
-        if action == .sync {
-            let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
-            _ = try await drainer.drain(limit: 128)
-            _ = try await journal.pruneDelivered()
-        }
+        // Background observer capture is entirely local. Foreground sync refreshes once;
+        // an unavailable network cannot prevent capture under a previously accepted plan.
+        let refreshed = action == .sync ? try await refreshAuthority(journal, localID: source.localID) : false
         try checkSession()
-        guard source.binding?.revokedAt == nil else {
-            return .revoked
+        let currentSource = try await journal.sourceSetup(for: source.localID)
+        var progress = HealthKitAcquisition.Progress.caughtUp
+        var collectionStatus: HealthDataStatus?
+        do {
+            if currentSource.binding?.isRevoked == true { throw EventDeliveryJournal.JournalError.sourceRevoked }
+            if try await hasRequestedAccess(journal) {
+                try checkSession()
+                progress = try await acquisition.catchUp(
+                    localID: source.localID, healthKit: healthKit, reviewDocuments: action == .reviewDocuments
+                )
+                if try await requestedStreams(journal).isEmpty { collectionStatus = .notAuthorized }
+            } else {
+                collectionStatus = .permissionNeeded
+            }
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            // Preserve the uncommitted page. Delivery can free space without resetting its anchor.
+            progress = .needsAnotherPass
+        } catch ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized {
+            collectionStatus = .notAuthorized
+        } catch EventDeliveryJournal.JournalError.sourceRevoked {
+            collectionStatus = .revoked
         }
-        let enrollments = try await enrollmentIDs()
-        guard await healthKit.didAskForAuthorization(toRead: SampleType.heartRate) else {
-            _ = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollments)
-            return .permissionNeeded
+        if refreshed, collectionStatus != .revoked, collectionStatus != .permissionNeeded,
+           try await sweepEndedWindows(acquisition: acquisition, source: currentSource, journal: journal) == .needsAnotherPass {
+            progress = .needsAnotherPass
         }
-        try checkSession()
-        let progress = try await acquisition.catchUp(localID: source.localID, enrollmentIDs: enrollments, healthKit: healthKit)
-        if action == .capture {
-            return try await queueStatus(journal, source: source, progress: progress)
+        let status = try await queueStatus(journal, source: currentSource, finished: action == .sync && refreshed, progress: progress)
+        if status == .blocked {
+            return status
         }
-        let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
-        _ = try await drainer.drain(limit: 128)
-        _ = try await journal.pruneDelivered()
-        return try await queueStatus(journal, source: source, finished: true, progress: progress)
+        if let collectionStatus {
+            return collectionStatus
+        }
+        return action == .sync && !refreshed && status == .ready ? .unavailable : status
     }
 
-    private func enrollmentIDs() async throws -> [UUID] {
-        try checkSession()
-        let enrollments = try await api.requireClient(for: session).getParticipantEnrollments(.init()).ok.body.json
-        try checkSession()
-        return try enrollments.filter { $0.withdrawnAt == nil }.map {
-            guard let id = UUID(uuidString: $0.id) else { throw ParticipantCollectionSnapshot.CollectionError.invalidPlan }
-            return id
+    /// A sleep or workout session can be finalized after its enrollment ended. Only an online synchronization
+    /// obtains the short-lived instruction for that fixed window; an unreachable server leaves the sweep for later.
+    private func sweepEndedWindows(
+        acquisition: HealthKitAcquisition, source: EventDeliveryJournal.SourceSetup, journal: EventDeliveryJournal
+    ) async throws -> HealthKitAcquisition.Progress {
+        guard let binding = source.binding, !binding.isRevoked, let sourceID = UUID(uuidString: binding.source.id) else {
+            return .caughtUp
         }
+        var progress = HealthKitAcquisition.Progress.caughtUp
+        do {
+            for sweep in try await api.requestEndedWindowSweeps(journal: journal, sourceID: sourceID, for: session) {
+                try checkSession()
+                if try await acquisition.reconcile(localID: source.localID, instructionID: sweep, healthKit: healthKit) == .needsAnotherPass {
+                    progress = .needsAnotherPass
+                }
+            }
+            try checkSession()
+            try await api.acknowledgeEndedWindowSweeps(journal: journal, sourceID: sourceID, for: session)
+        } catch ParticipantNativeReconciliation.RequestError.unavailable {
+            progress = .needsAnotherPass
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            progress = .needsAnotherPass
+        } catch EventDeliveryJournal.JournalError.staleCheckpoint {
+            // The lease expired or collection changed during the pass; the retained position resumes after renewal.
+            progress = .needsAnotherPass
+        }
+        try checkSession()
+        return progress
+    }
+
+    private func refreshAuthority(_ journal: EventDeliveryJournal, localID: UUID) async throws -> Bool {
+        do {
+            _ = try await api.synchronizeSource(localID: localID, journal: journal, for: session)
+            try checkSession()
+            return true
+        } catch SourceRegistration.RegistrationError.unavailable {
+            try checkSession()
+            return false
+        } catch SourceRegistration.RegistrationError.rejected(let status) where status == 429 || status >= 500 {
+            try checkSession()
+            return false
+        } catch ParticipantCollectionRefresh.RefreshError.unavailable {
+            try checkSession()
+            return false
+        }
+    }
+
+    private func requestedStreams(_ journal: EventDeliveryJournal) async throws -> [HealthKitQueryDefinition.Stream] {
+        let state = try await journal.collectionState()
+        return try state.snapshot?.active().acquisitionStreams ?? []
+    }
+
+    private func hasRequestedAccess(_ journal: EventDeliveryJournal) async throws -> Bool {
+        let types = try await requestedStreams(journal).flatMap { try HealthKitAcquisition.readTypes(for: $0) }
+        return await healthKit.didAskForAuthorization(toRead: Set(types))
     }
 
     private func queueStatus(
         _ journal: EventDeliveryJournal,
         source: EventDeliveryJournal.SourceSetup,
         finished: Bool = false,
-        progress: HeartRateAcquisition.Progress = .caughtUp
+        progress: HealthKitAcquisition.Progress = .caughtUp
     ) async throws -> HealthDataStatus {
-        if source.binding?.revokedAt != nil {
+        if source.binding?.isRevoked == true {
             return .revoked
         }
         let pending = try await journal.pendingDeliveryIDs(limit: 128)

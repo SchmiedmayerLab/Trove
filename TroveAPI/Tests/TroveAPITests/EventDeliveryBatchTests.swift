@@ -7,12 +7,36 @@
 //
 
 import Foundation
+import GroveFHIRContract
 import Testing
 import TroveAPIClient
 
 
 struct EventDeliveryBatchTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test
+    func configuredRecordCountSplitsBundlesWithoutDroppingRecords() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let ids = try await Self.stage(journal, count: 5)
+            let transport = DeliveryTransport()
+            let limits = try EventSubmissionLimits.Configuration(
+                recordBytes: 4 * 1024 * 1024,
+                bundleBytes: 4 * 1024 * 1024 + 1024,
+                envelopeBytes: 6 * 1024 * 1024,
+                batchRecords: 2
+            )
+            let drainer = try EventDeliveryDrainer(
+                journal: journal,
+                scope: DeliveryFixture.scope,
+                client: Client(serverURL: #require(URL(string: DeliveryFixture.scope.backend)), configuration: .trove, transport: transport),
+                limits: limits,
+                validateSession: {}
+            )
+            #expect(try await drainer.drain().map(\.deliveryID) == ids)
+            #expect(await transport.submittedBatches.map { $0.events.count } == [2, 2, 1])
+        }
+    }
 
     @Test
     func countBoundCreatesThreeBatchesWithoutReordering() async throws {
@@ -24,6 +48,30 @@ struct EventDeliveryBatchTests {
             #expect(results.map(\.status) == Array(repeating: .delivered, count: 34))
             #expect(await transport.submittedBatches.map { $0.events.count } == [16, 16, 2])
             #expect(await transport.paths.count == 3)
+        }
+    }
+
+    @Test
+    func sharedNodesTravelOnceAndOriginalRecordBytesRemainRecoverable() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let ids = try await Self.stage(journal, count: 2)
+            let transport = DeliveryTransport()
+            #expect(try await Self.drainer(journal, transport: transport).drain().map(\.status) == [.delivered, .delivered])
+            let bundles = await transport.submittedBundleBytes
+            try #require(bundles.count == 1)
+            let graph = try ExchangeGraph(validating: bundles[0], kind: .active)
+            #expect(try graph.records().count == 2)
+            #expect(graph.bundle.entry?.count == 6) // Two outputs, two Provenances, two shared Devices.
+            let originals = await transport.submittedBytes
+            for (id, bytes) in zip(ids, originals) {
+                let receipt = try #require(await journal.receipt(for: id))
+                let commitment = try EventSubmissionCommitment(
+                    sourceID: DeliveryFixture.sourceID,
+                    originalBytes: bytes,
+                    targets: [.init(consentID: DeliveryFixture.consentID, outputFullURLs: ["urn:output:a"])]
+                )
+                try commitment.verify(receipt)
+            }
         }
     }
 
@@ -46,6 +94,27 @@ struct EventDeliveryBatchTests {
             #expect(submitted == expectedPayloadIndices.map { originals[$0] })
             for id in ids { #expect(try await reopened.receipt(for: id) != nil) }
             await reopened.close()
+        }
+    }
+
+    @Test
+    func revisionsOfOneMeasurementTravelSeparatelyWithoutLosingEitherVersion() async throws {
+        try await DeliveryFixture.withJournal { journal, _ in
+            let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let records = try ["first", "revised"].map {
+                try RecordFixture.make(sourceID: DeliveryFixture.sourceID, registrationID: checkpoint.epoch, seed: $0)
+            }
+            #expect(records[0].sourceRecord == records[1].sourceRecord)
+            #expect(records[0].version != records[1].version)
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([2]), payloads: records.map {
+                .init(bytes: $0.json, targets: [])
+            })
+            let transport = DeliveryTransport()
+            let outcomes = try await Self.drainer(journal, transport: transport).drain()
+            #expect(outcomes.map(\.deliveryID) == ids)
+            #expect(outcomes.map(\.status) == [.delivered, .delivered])
+            #expect(await transport.submittedBatches.map { $0.events.count } == [1, 1])
+            #expect(await transport.submittedBytes == records.map(\.json))
         }
     }
 
@@ -174,10 +243,22 @@ extension EventDeliveryBatchTests {
         let checkpoint = try await journal.checkpoint(for: sourceID)
         let producer = UUID()
         let payloads = try (0..<count).map { index -> EventDeliveryJournal.Payload in
-            let payload = DeliveryFixture.payload(sequence: Int64(index + 1), changes: ["sample"], sourceID: sourceID, producerID: producer)
-            let size = byteCount ?? payload.bytes.count
-            try #require(size >= payload.bytes.count)
-            let bytes = payload.bytes + Data(repeating: 32, count: size - payload.bytes.count)
+            let seed = "\(producer):\(index)"
+            let record = try RecordFixture.make(sourceID: sourceID, registrationID: checkpoint.epoch, seed: seed, note: "x", sourceSeed: seed)
+            let bytes: Data
+            if let byteCount {
+                try #require(byteCount >= record.json.count)
+                bytes = try RecordFixture.make(
+                    sourceID: sourceID,
+                    registrationID: checkpoint.epoch,
+                    seed: seed,
+                    note: String(repeating: "x", count: byteCount - record.json.count + 1),
+                    sourceSeed: seed
+                ).json
+                try #require(bytes.count == byteCount)
+            } else {
+                bytes = record.json
+            }
             return .init(bytes: bytes, targets: targets)
         }
         return try await journal.stage(from: checkpoint, nextCursor: Data(UUID().uuidString.utf8), payloads: payloads)

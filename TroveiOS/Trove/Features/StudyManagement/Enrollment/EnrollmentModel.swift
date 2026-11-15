@@ -40,13 +40,17 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
         var session: @MainActor () -> KeycloakSessionSnapshot?
         var list: @MainActor (KeycloakSessionSnapshot) async throws -> [Trove.Enrollment]
         var enroll: @MainActor (KeycloakSessionSnapshot, String, String?) async throws -> Trove.Enrollment
+        var stopCollection: @MainActor (KeycloakSessionSnapshot, String) async throws -> Void
+        var stoppedEnrollments: @MainActor (KeycloakSessionSnapshot) async throws -> Set<String>
         var withdraw: @MainActor (KeycloakSessionSnapshot, String) async throws -> Trove.Enrollment
     }
 
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
+    @ObservationIgnored @Dependency(HealthDataModel.self) private var healthData
     @ObservationIgnored private let transport: Transport?
 
     private var storedState: LoadingState<[Trove.Enrollment]> = .idle
+    private var storedCollectionStops: Set<String> = []
     private var storedSession: KeycloakSessionSnapshot?
     private var refreshID: UUID?
     private var mutationID: UUID?
@@ -74,6 +78,7 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
     func invalidateSession() {
         storedState = .idle
         storedSession = nil
+        storedCollectionStops = []
         refreshID = nil
         mutationID = nil
     }
@@ -96,6 +101,12 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
             } else {
                 enrollments = try await api.requireClient(for: session).getParticipantEnrollments(.init()).ok.body.json
             }
+            let stopped: Set<String>
+            if let transport {
+                stopped = try await transport.stoppedEnrollments(session)
+            } else {
+                stopped = try await api.stoppedEnrollments(for: session)
+            }
             guard isCurrent(session), refreshID == identifier else {
                 return
             }
@@ -103,6 +114,7 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
                 storedState.cancelLoading()
                 return
             }
+            storedCollectionStops = stopped
             storedState.resolve(with: enrollments)
         } catch {
             guard isCurrent(session), refreshID == identifier else {
@@ -131,7 +143,33 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
     }
 
     func withdraw(enrollmentId: String) async throws {
-        try await mutate { session in
+        try await withdraw(enrollmentId: enrollmentId, reloadServerState: false)
+    }
+
+    /// Saved settings permit a restrictive local stop even when profile/enrollment discovery is offline.
+    /// Capture the presenting session so an old confirmation cannot affect a replacement account.
+    func withdrawSavedCollection(enrollmentId: String, for captured: KeycloakSessionSnapshot) async throws {
+        guard currentSession == captured else { throw CancellationError() }
+        try await withdraw(enrollmentId: enrollmentId, reloadServerState: true)
+    }
+
+    func isCollectionStopped(enrollmentId: String) -> Bool {
+        currentSession != nil && currentSession == storedSession && storedCollectionStops.contains(enrollmentId.lowercased())
+    }
+
+    private func withdraw(enrollmentId: String, reloadServerState: Bool) async throws {
+        try await mutate(requiresLoadedState: !reloadServerState) { session in
+            if let transport = self.transport {
+                try await transport.stopCollection(session, enrollmentId)
+            } else {
+                try await self.healthData.stopCollection(enrollmentId: enrollmentId, for: session)
+            }
+            guard self.isCurrent(session) else { throw CancellationError() }
+            self.storedCollectionStops.insert(enrollmentId.lowercased())
+            if reloadServerState, let completed = try await self.confirmExistingWithdrawal(enrollmentId: enrollmentId, for: session) {
+                return completed
+            }
+            try Task.checkCancellation()
             if let transport = self.transport {
                 return try await transport.withdraw(session, enrollmentId)
             }
@@ -141,8 +179,29 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
         }
     }
 
+    /// A lost withdrawal response must not trap retries in an "already withdrawn" conflict.
+    private func confirmExistingWithdrawal(enrollmentId: String, for session: KeycloakSessionSnapshot) async throws -> Trove.Enrollment? {
+        let values: [Trove.Enrollment]
+        if let transport { values = try await transport.list(session) } else {
+            values = try await api.requireClient(for: session).getParticipantEnrollments(.init()).ok.body.json
+        }
+        guard isCurrent(session) else { throw CancellationError() }
+        guard let enrollment = values.first(where: { $0.id.lowercased() == enrollmentId.lowercased() }) else {
+            throw EnrollmentModelError.enrollmentStateUnavailable
+        }
+        storedState.resolve(with: values)
+        return enrollment.withdrawnAt == nil ? nil : enrollment
+    }
+
+    func isWithdrawalPending(for enrollment: Trove.Enrollment) -> Bool {
+        currentSession != nil && currentSession == storedSession && enrollment.withdrawnAt == nil
+            && storedCollectionStops.contains(enrollment.id.lowercased())
+    }
+
     func activeEnrollment(forStudy studyId: String) -> Trove.Enrollment? {
-        latestEnrollment(forStudy: studyId).flatMap { $0.withdrawnAt == nil ? $0 : nil }
+        latestEnrollment(forStudy: studyId).flatMap {
+            $0.withdrawnAt == nil && ($0.endsAt.map { Date() < $0 } ?? true) ? $0 : nil
+        }
     }
 
     func latestEnrollment(forStudy studyId: String) -> Trove.Enrollment? {
@@ -178,9 +237,11 @@ final class EnrollmentModel: Module, EnvironmentAccessible {
         currentSession == session && storedSession == session
     }
 
-    private func mutate(_ operation: @MainActor (KeycloakSessionSnapshot) async throws -> Trove.Enrollment) async throws {
-        guard let session = synchronizeSession(), storedState.value != nil,
-              storedState.isLoaded || storedState.isLoading else {
+    private func mutate(
+        requiresLoadedState: Bool = true, _ operation: @MainActor (KeycloakSessionSnapshot) async throws -> Trove.Enrollment
+    ) async throws {
+        guard let session = synchronizeSession(),
+              !requiresLoadedState || storedState.value != nil && (storedState.isLoaded || storedState.isLoading) else {
             throw EnrollmentModelError.enrollmentStateUnavailable
         }
         guard mutationID == nil else {

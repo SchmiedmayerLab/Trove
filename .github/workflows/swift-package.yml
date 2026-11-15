@@ -28,7 +28,7 @@ jobs:
     name: Swift Test
     runs-on: ubuntu-24.04
     container:
-      image: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
+      image: swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca
     steps:
       - uses: actions/checkout@v7
       - name: Install verification and client journal build dependencies
@@ -56,22 +56,73 @@ jobs:
           if-no-files-found: error
 
   postgres:
-    name: PostgreSQL and Timescale Tests
+    name: PostgreSQL, Timescale and Full Validator Tests
     if: inputs.path == 'TroveServer'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       DATABASE_CONTAINER: trove-test-database-${{ github.run_id }}-${{ github.run_attempt }}
       STORAGE_CONTAINER: trove-test-storage-${{ github.run_id }}-${{ github.run_attempt }}
       SWIFT_CONTAINER: trove-test-swift-${{ github.run_id }}-${{ github.run_attempt }}
+      VALIDATOR_CONTAINER: trove-test-validator-${{ github.run_id }}-${{ github.run_attempt }}
+      VALIDATOR_RELAY: trove-test-validator-relay-${{ github.run_id }}-${{ github.run_attempt }}
+      VALIDATOR_NETWORK: trove-test-validator-${{ github.run_id }}-${{ github.run_attempt }}
       # Exercise supported PG17 here; the development stack and native checks use PG18.
       TIMESCALE_IMAGE: timescale/timescaledb:latest-pg17@sha256:bc8527e62f70f0766b29515077965025872fabb5349db421565f69ee273baf2d
-      SWIFT_IMAGE: swift:6.4.0-noble@sha256:64bab762bc73a3fda6d9ebc559258bd6d7660c10a705bb25ecacad2f99d066f9
-      STORAGE_IMAGE: chrislusf/seaweedfs@sha256:f7cbc8bdbbf60a1aaba7d61784a3bdff3ec1e0657f6ad0b26d5b6ab2cd9d0dc6
+      SWIFT_IMAGE: swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca
+      STORAGE_IMAGE: chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     steps:
       - uses: actions/checkout@v7
       - name: Prepare hosted runner disk capacity
         run: bash scripts/prepare-hosted-disk.sh
+      - name: Restore pinned public validator artifacts
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/validator-artifacts
+          key: fhir-validator-artifacts-v1-${{ hashFiles('TroveInfrastructure/validator/manifest.json') }}
+      - name: Prepare the pinned validator and receiver corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 TroveInfrastructure/validator/fetch.py --output "$RUNNER_TEMP/validator-artifacts"
+          manifest=TroveInfrastructure/validator/manifest.json
+          corpus=TroveInfrastructure/validator/lifecycle-corpus.json
+          source="$RUNNER_TEMP/grove-fhir"
+          git init "$source"
+          git -C "$source" remote add origin https://github.com/SchmiedmayerLab/grove-fhir.git
+          git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")" "$(jq -r '.revision' "$corpus")"
+          python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
+            --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context" \
+            --include-lifecycle-corpus
+          docker build --network=none -t "trove-fhir-validator:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$RUNNER_TEMP/validator-context"
+          echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect "trove-fhir-validator:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - name: Start the isolated offline validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create --internal "$VALIDATOR_NETWORK"
+          docker run --detach --name "$VALIDATOR_CONTAINER" --network "$VALIDATOR_NETWORK" \
+            --read-only --user 10001:10001 \
+            --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 4g --cpus 2 \
+            --tmpfs /tmp:size=2g,mode=1777,noexec,nosuid,nodev \
+            --ulimit fsize=268435456 --ulimit nofile=256 "$FHIR_VALIDATOR_IMAGE"
+          # Internal Docker networks do not publish ports. Reuse the bounded,
+          # fixed-destination relay from the process-restart verifier.
+          relay="$(python3 -c 'import sys; sys.path.insert(0, "TroveInfrastructure/validator"); from verify_process_restart import RELAY; print(RELAY)')"
+          docker create --name "$VALIDATOR_RELAY" --network bridge --publish 127.0.0.1:18080:8080 \
+            --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --pids-limit 32 \
+            --entrypoint python3 "$FHIR_VALIDATOR_IMAGE" -c "$relay" "$VALIDATOR_CONTAINER"
+          docker network connect "$VALIDATOR_NETWORK" "$VALIDATOR_RELAY"
+          docker start "$VALIDATOR_RELAY"
+          for _ in $(seq 1 150); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:18080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Isolated validator did not become healthy." >&2
+          exit 1
       - name: Start an isolated test database
         shell: bash
         run: |
@@ -98,15 +149,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Each integration suite writes to its own bucket. SeaweedFS grows seven volumes for every
+          # new bucket by default, which exhausts the 32 volume slots after four buckets; grow one.
           docker run --detach --name "$STORAGE_CONTAINER" \
             --publish 127.0.0.1:18333:8333 \
             --tmpfs /data:rw,size=2g \
-            --health-cmd 'wget -qO- http://127.0.0.1:8333/ || exit 1' \
+            --env AWS_ACCESS_KEY_ID=trove_test \
+            --env AWS_SECRET_ACCESS_KEY=trove_test \
+            --env WEED_MASTER_VOLUME_GROWTH_COPY_1=1 \
+            --health-cmd 'wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q "HTTP/1.1 403"' \
             --health-interval 2s --health-timeout 5s --health-retries 60 \
             "$STORAGE_IMAGE" server -s3 -dir=/data -master.volumeSizeLimitMB=100 \
             -volume.port=8081 -volume.max=32 -master.telemetry=false
           for _ in $(seq 1 60); do
-            # Test objects are tiny and disposable. Keep their storage independent
+            # Test objects are disposable, including the large streaming fixture. Keep their storage independent
             # of the cold Swift build, and require allocation, not just HTTP health.
             if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$STORAGE_CONTAINER")" == healthy ]] && \
                 docker exec "$STORAGE_CONTAINER" wget -T 5 -qO- http://127.0.0.1:9333/dir/assign | \
@@ -117,7 +173,7 @@ jobs:
           done
           echo "Isolated object storage did not become healthy." >&2
           exit 1
-      - name: Run the full server suite against PostgreSQL, Timescale and S3
+      - name: Run the full server suite against PostgreSQL, Timescale, S3 and the pinned validator
         shell: bash
         run: |
           set -euo pipefail
@@ -125,6 +181,11 @@ jobs:
           docker run --name "$SWIFT_CONTAINER" --network host \
             --env TROVE_TEST_POSTGRES_PORT=15432 \
             --env TROVE_TEST_S3_PORT=18333 \
+            --env TROVE_REQUIRE_FULL_VALIDATOR=1 \
+            --env TROVE_TEST_VALIDATOR_ASSETS=/validator-context/assets \
+            --env TROVE_TEST_LIFECYCLE_CORPUS=/validator-context/corpus/Conformance/corpora/receiver-lifecycle \
+            --env FHIR_VALIDATOR_URL=http://127.0.0.1:18080/validate --env FHIR_VALIDATOR_IDENTITY \
+            --volume "$RUNNER_TEMP/validator-context:/validator-context:ro" \
             --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
             "$SWIFT_IMAGE" bash -euo pipefail -c '
               apt-get update
@@ -146,6 +207,15 @@ jobs:
           # permissions while allowing this runner's artifact uploader to read them.
           if [[ -d TroveServer/.build/verification ]]; then
             sudo chown -R "$(id -u):$(id -g)" TroveServer/.build/verification
+          fi
+      - name: Retain the validator and corpus identities
+        if: success() || failure()
+        shell: bash
+        run: |
+          mkdir -p TroveServer/.build/verification/inputs
+          cp TroveInfrastructure/validator/manifest.json TroveInfrastructure/validator/lifecycle-corpus.json TroveServer/.build/verification/inputs/
+          if [[ -n "${FHIR_VALIDATOR_IMAGE:-}" ]]; then
+            docker image inspect "$FHIR_VALIDATOR_IMAGE" > TroveServer/.build/verification/inputs/validator-image.json
           fi
       - name: Upload real-store test diagnostics
         if: success() || failure()
@@ -170,8 +240,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for container in "$SWIFT_CONTAINER" "$DATABASE_CONTAINER" "$STORAGE_CONTAINER"; do
+          for container in "$SWIFT_CONTAINER" "$DATABASE_CONTAINER" "$STORAGE_CONTAINER" "$VALIDATOR_RELAY" "$VALIDATOR_CONTAINER"; do
             if docker inspect "$container" >/dev/null 2>&1; then
               docker rm --force --volumes "$container"
             fi
           done
+          if docker network inspect "$VALIDATOR_NETWORK" >/dev/null 2>&1; then
+            docker network rm "$VALIDATOR_NETWORK"
+          fi

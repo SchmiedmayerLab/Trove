@@ -36,12 +36,12 @@ startup, not trigger a development-mode fallback.
 
 Development and verification SeaweedFS instances use 32 volume slots and disable
 anonymous telemetry. The explicit slot limit permits separate test collections;
-the default allocation exhausted available slots when two database test lanes
-shared one store. This is not additional disk capacity: existing data-volume and
+the default allocation can exhaust available slots when two database test lanes
+share one store. This is not additional disk capacity: existing data-volume and
 container limits still apply. Production object storage needs its own provisioned
 capacity and security acceptance.
 
-Development now uses one digest-pinned PostgreSQL/Timescale StatefulSet for the server,
+Development uses one digest-pinned PostgreSQL/Timescale StatefulSet for the server,
 plus the separate Keycloak database. Database and object-store data use retained volume
 claims instead of ephemeral pod storage. These claims survive pod replacement, not
 deletion of the namespace or KIND cluster; they are not backups or high availability.
@@ -52,6 +52,29 @@ and provisions the restricted runtime login. Serving pods receive no owner crede
 and run no initializer. Docker, Kubernetes and recovery verification reuse the same
 grant scripts. The production secret resources contain no seeded passwords: operators
 must supply real values through Secret Manager before synchronization.
+
+### Source Identity Encryption Keys
+
+The serving deployment mounts `trove-source-identity-keyring` read-only with mode
+0440 and group 999. Only the server receives this file; database operator and web
+pods do not. External Secrets reads the complete version-1 keyring JSON from
+`source-identity-keyring` in the configured secret store. Production Terraform
+creates the secret container without generating or retaining its value in state.
+Provision the value before synchronization using the server's
+`create-source-keyring --output <absolute-new-file>` command and your secret-store
+upload workflow. Never commit or include the resulting file in verification artifacts.
+
+Retain encryption keys and their IDs through server replacement and rotation.
+Adding a current encryption key must preserve keys needed by retained envelopes;
+restart serving processes after updating the secret. Back up the secret separately
+with the database and exercise restoration before using real participant data.
+Participant identity keys remain unchanged when their storage encryption is rotated.
+
+The disposable development Vault setup creates a random keyring using create-only
+compare-and-set. It cannot overwrite an existing value. Development Vault itself is
+in-memory: losing it loses this keyring unless separately backed up. Restoring a
+retained database requires restoring the corresponding keyring; reseeding Vault is
+not identity recovery. Production never uses this development seeder.
 
 ### Production Database
 
@@ -68,8 +91,8 @@ The Cluster preloads TimescaleDB and disables its telemetry. The `Database/trove
 resource installs the extension at the pinned SQL version. On first installation,
 wait for the Cluster to become Ready and the Database's `status.applied` to be true
 before running the schema Job. The server verifies these prerequisites and fails
-closed if they are missing. These are fresh-database definitions, not an in-place
-upgrade of the former PostgreSQL 17 setup.
+closed if they are missing. These are fresh-database definitions, not in-place
+upgrades.
 
 The maintained extension image contains the Apache-2 edition. It supports the
 current receiver and basic hypertables; it does not provide the additional

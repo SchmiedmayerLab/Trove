@@ -62,11 +62,15 @@ final class StudyBundleService: Module, @unchecked Sendable {
             throw ServerError.internalServerError("Study draft snapshot is incomplete")
         }
         guard capturedComponents.count <= 256 else { throw Self.resourceLimitExceeded }
-        let collectionPolicy = try PublishedCollectionPolicy.compile(studyID: studyId, revision: revision, requirements: study.collectionRequirements)
+        let collectionPolicy = try PublishedCollectionPolicy.compile(
+            studyID: studyId, revision: revision, requirements: study.collectionRequirements, enrollmentPeriod: study.enrollmentPeriod
+        )
 
         var consentMarkdown = LocalizationsDictionary<String>()
         for (locale, content) in study.consent {
             let markdown = ConsentPresentation.markdown(content: content)
+                + (try CollectionScopePresentation.markdown(requirements: collectionPolicy.requirements, locale: locale.description))
+                + (try EnrollmentPeriodPresentation.markdown(collectionPolicy.enrollmentPeriod, locale: locale.description))
             do {
                 _ = try ConsentResponseRequirements(markdown: markdown)
             } catch {
@@ -344,9 +348,7 @@ extension StudyBundleService {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
         let policyURL = tempDir.appendingPathComponent(PublishedCollectionPolicy.filename)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        try encoder.encode(collectionPolicy).write(to: policyURL, options: .atomic)
+        try collectionPolicy.archiveBytes().write(to: policyURL, options: .atomic)
         let policyFile = StudyBundle.FileResourceInput(pathInBundle: PublishedCollectionPolicy.filename, contentsOf: policyURL)
 
         let bundle: StudyBundle

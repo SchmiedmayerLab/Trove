@@ -2,21 +2,24 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 @_spi(Generated) public import OpenAPIRuntime
-#if os(Linux)
-@preconcurrency public import struct Foundation.URL
-@preconcurrency public import struct Foundation.Data
-@preconcurrency public import struct Foundation.Date
-#else
 public import struct Foundation.URL
 public import struct Foundation.Data
 public import struct Foundation.Date
-#endif
 public import GroveLocalization
 public import GroveHealthKit
 public import GroveStudyDefinition
 extension Components {
     /// Types generated from the `#/components/parameters` section of the OpenAPI document.
     public enum Parameters {
+        /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+        ///
+        /// - Remark: Generated from `#/components/parameters/SourceInstallationID`.
+        public typealias SourceInstallationID = Swift.String
+        /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/parameters/SourceInstallationProof`.
+        public typealias SourceInstallationProof = Components.Schemas.SourceInstallationCredential
         /// Selects a server-side grant for a registered draft-only OAuth client. It cannot authorize a request by itself. Interactive clients must omit it.
         ///
         ///
