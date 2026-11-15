@@ -181,34 +181,6 @@ The participant experience should continue beyond data submission. Reviewed stud
 
 Any protocol-required human support or concern-reporting route must be available. A conversational task or technical status screen is not an emergency or clinical-monitoring service.
 
-## Assisted Study Preparation
-
-Planned authoring assistance will reuse study-definition fields in consent
-documents, institutional forms and participant communications. Researchers review
-the extracted facts and proposed wording before applying them.
-
-A source document can produce proposed fields with citations and unresolved questions. It cannot silently invent endpoints, sample sizes, eligibility or approval. Researchers review the proposed differences through the same operations used for manual editing.
-
-Institutional templates are adapters over those facts. Stanford IRB and data-risk-assessment preparation are initial targets, but the underlying study model is not tied to one institution. Consent documents and the application's Markdown presentation derive from the same reviewed section model; edits made during institutional review must be reconciled before either representation is published. Generated documents remain drafts; formal decisions and approved revisions remain distinct.
-
-The same source references support translation review, amendment comparisons and
-methods summaries. Validation reports missing required fields before a researcher
-requests generated assistance.
-
-### Safe Document and Questionnaire Authoring
-
-Swift authoring orchestration reuses governed artifacts and a restricted parser worker without core-database or inference-secret credentials. DOCX, PDF and text inputs have bounded expansion, processing time, memory and output. Established parsers may be invoked behind that boundary. Macros, embedded network fetches and instructions inside documents do not execute. Unsupported scanned input and ambiguous extraction remain explicit rather than guessed.
-
-Proposed fields distinguish extracted evidence from suggestions and retain source locations. Applying a proposal requires the current draft revision and normal validation. Questionnaire diagnostics identify severity, rule, element path, exact content digest and validator/package versions. Invalid, unavailable and not fully evaluated are distinct outcomes. Missing terminology or expression support cannot become a pass.
-
-The planned authoring kit includes a concise AGENTS.md, pinned package and CLI versions, supported renderer capabilities and synthetic examples. It directs authoring tools to preserve canonical identity, linkIds, referenced terminology, wording and unresolved questions. Repair has explicit attempt/time/cost limits; it cannot delete required behavior just to satisfy a validator. Dependencies resolve through approved pinned packages, not URLs embedded in an uploaded instrument.
-
-The output is a reviewable draft, source mapping and diagnostics. Manual entry remains available. Publication, participant contact, allocation and dataset release require separate authorized commands; neither a document nor generated text can grant that authority.
-
-Authoring jobs retain candidate references and executed actions. Applying content
-uses typed updates with the expected revision and current source access. An
-uncertain provider outcome requires usage reconciliation before another request.
-
 ## Data Review and Closeout
 
 Formal dataset review, freezing and closeout are planned research operations.

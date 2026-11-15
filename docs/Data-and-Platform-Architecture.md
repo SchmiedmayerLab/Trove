@@ -42,7 +42,7 @@ extensions to that foundation; their design is described below.
 
 ## Database and Object Storage
 
-The Swift service owns identity relationships, study revisions, consent, data attribution and access decisions. Planned task and worker services use the same domain operations.
+The Swift service owns identity relationships, study revisions, consent, data attribution and access decisions.
 
 Core study and clinical tables share one PostgreSQL database. The design assigns
 records to storage according to their transaction and query requirements:
@@ -57,7 +57,7 @@ records to storage according to their transaction and query requirements:
 An operation passes the same transaction handle through repositories that update
 core tables and Timescale projections. Separate databases or independently acquired
 connections would not provide that atomicity. Keycloak maintains its own identity
-store; the planned extension-document service also remains outside core transactions.
+store outside core transactions.
 
 A clinical database per study would duplicate measurements and complicate
 consent and source-history updates. Separate services are reserved for workloads
@@ -164,7 +164,7 @@ Study-interaction profiles are separate from the mobile measurement exchange. Sc
 
 ## Artifact Storage
 
-Bundles, consent PDFs and collected recordings use object storage. A participant client declares a recording transfer, uploads the file and binds it to its clinical record only after the server verifies the content against the declaration and returns a receipt. Authorized study readers download recordings through the study data API under the same grant and audit checks as other study data. The planned common artifact interface extends staging, ownership, size limits, checksum verification and authorized retrieval to instruments and other immutable files.
+Bundles, consent PDFs and collected recordings use object storage. A participant client declares a recording transfer, uploads the file and binds it to its clinical record only after the server verifies the content against the declaration and returns a receipt. Authorized study readers download recordings through the study data API under the same grant and audit checks as other study data.
 
 The same mechanics can serve a consent document, a raw recording and a retrieval corpus without giving them the same readers or retention rules. Feature modules decide which purpose and permissions apply.
 
@@ -174,8 +174,8 @@ Files become reachable only after durable acceptance and verification. Opaque ar
 ## API Contracts
 
 OpenAPI owns routes and schemas; Swift and TypeScript consumers are generated
-from it. The dashboard and CLI use the same contract. Planned hosted tools and
-delegated clients will use it as well, with permissions enforced by the server.
+from it. The dashboard and CLI use the same contract, with permissions enforced
+by the server.
 
 Questionnaire APIs follow the [localization contract](Study-Model-and-Research-Workflows.md#localization-sites-and-accessibility):
 one multilingual artifact, revision-checked updates and language-specific diagnostics.
@@ -230,8 +230,6 @@ Restoration must reapply relevant erasures and access invalidations before servi
 Operational query design is limited to running a study: task state, collection counts, freshness, coverage, setup problems and export progress. Counts and status views still need subject, study and field-level authorization.
 
 Coverage is reported only where the admitted source provides a meaningful denominator. Recent synchronization can still be partial. Missing records do not prove non-adherence, and absent source-quality evidence remains unknown.
-
-The planned export format preserves exact membership, resource and instrument versions, attribution, provenance and artifact checksums. A codebook explains the exported fields and relevant source limitations. Preparing an export and releasing it are separate stages; access is checked again at release.
 
 Scientific analysis belongs in separately governed tools or environments consuming authorized exports. Direct database access is not the platform's integration contract.
 
