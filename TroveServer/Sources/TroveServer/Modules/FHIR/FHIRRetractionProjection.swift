@@ -22,7 +22,9 @@ enum FHIRRetractionProjection {
               let entries = graph.bundle.entry, (1...512).contains(entries.count) else { throw FHIRValidationClient.invalid }
         let (nodes, resources) = try FHIRPointProjection.index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
-        guard nodes.filter({ $0.resourceType == "Provenance" }).count == 1,
+        // A retraction names its record by the native UUID alone; a readable sync identifier never addresses one.
+        guard try FHIRSyncRecordIdentifier.count(in: bytes) == 0,
+              nodes.filter({ $0.resourceType == "Provenance" }).count == 1,
               nodes.allSatisfy({ $0.resourceType == "Provenance" || $0.resourceType == "Device" }) else {
             throw FHIRValidationClient.invalid
         }

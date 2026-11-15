@@ -491,6 +491,16 @@ source ownership, consent, retraction authority or revision selection. Existing
 records without this optional evidence remain admissible. The study data endpoint
 preserves this evidence in authorized derived exports.
 
+A primary Observation or DocumentReference that carries the writer-record
+identity and exactly one writer-record version may also carry one readable
+HealthKit sync identifier, typed only `healthkit-identifier-type#healthkit-sync-id`,
+under `<store scope>/healthkit-sync-identifier/<bundle identifier>`. Its text
+is retained verbatim and treated like the native UUID: it is never an identity,
+entry key, deduplication key, version selector, receipt or retraction target, and
+derived exports preserve it. A sync identifier anywhere else, more than one, or
+one under a Grove identity system fails the record. Requiring the native UUID
+beside it remains a guide and validator invariant.
+
 `StudyDataQuery` provides the internal selection layer for that work. It returns
 at most 100 exact output addresses per page, deduplicates overlapping consent
 grants, and applies the same study, withdrawal, retraction and derivation rules as
@@ -510,7 +520,7 @@ the transaction open through projection and disclosure-intent persistence.
 
 `StudyPointExport` assembles a derived FHIR R4 collection Bundle for one retained
 record and one enrollment. Its `study-point-view-v1` policy preserves exact
-numeric tokens, native UUIDs, writer facts and conversion Provenance. It selects
+numeric tokens, native UUIDs, readable sync identifiers, writer facts and conversion Provenance. It selects
 only granted observations or recording documents and their necessary device graph, uses a stable
 study-specific logical patient identity supplied by the caller, and includes the
 exact historical ResearchStudy/PlanDefinition/ResearchSubject context for each

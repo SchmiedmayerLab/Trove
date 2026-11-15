@@ -31,7 +31,8 @@ enum FHIRRecordingSourcePeriod {
         let sources = entities.filter { $0.role.value == .source }
         guard sources.count == 1, let source = sources.first, let identifier = source.what.identifier else { throw FHIRValidationClient.invalid }
         let sourceIdentity = try RoledIdentifier(identifier)
-        let outputs = try FHIRNativeRecordIdentifiers.output(document.identifier ?? []).roles.filter { $0.role == .sourceRecord }
+        let outputs = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [], extensions: document.extension ?? [])
+            .roles.filter { $0.role == .sourceRecord }
         guard sourceIdentity.role == .sourceRecord, outputs.count == 1,
               outputs.first?.identifier == sourceIdentity.identifier else { throw FHIRValidationClient.invalid }
         return try HealthKitDocumentSelectionTime(entities: entities, expectedBasis: basis).period

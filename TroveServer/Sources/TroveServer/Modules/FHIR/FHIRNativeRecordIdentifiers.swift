@@ -14,18 +14,29 @@ import ModelsR4
 /// Supported HealthKit native identifier evidence after complete IG validation.
 /// The source owner separately checks the registered store namespace at admission.
 enum FHIRNativeRecordIdentifiers {
-    static func output(_ identifiers: [Identifier]) throws -> (roles: [RoledIdentifier], native: [ValidatedExchangeEvent.Identifier]) {
+    struct Output {
         var roles: [RoledIdentifier] = []
         var native: [ValidatedExchangeEvent.Identifier] = []
+        var sync: [ValidatedExchangeEvent.Identifier] = []
+    }
+
+    /// An output's Grove roles, its native UUID and its readable sync identifier, each at most once. `extensions` are the
+    /// output's own, which must state the writer-record version a sync identifier travels beside.
+    static func output(_ identifiers: [Identifier], extensions: [Extension]) throws -> Output {
+        var output = Output()
+        var sync: [Identifier] = []
         for identifier in identifiers {
             if identifier.type?.coding?.contains(where: { $0.system == Canonicals.identifierRoleCodeSystem }) == true {
-                roles.append(try RoledIdentifier(identifier))
+                output.roles.append(try RoledIdentifier(identifier))
+            } else if FHIRSyncRecordIdentifier.isTyped(identifier) {
+                sync.append(identifier)
             } else {
-                native.append(try nativeIdentifier(identifier))
+                output.native.append(try nativeIdentifier(identifier))
             }
         }
-        guard native.count <= 1 else { throw FHIRValidationClient.invalid }
-        return (roles, native)
+        guard output.native.count <= 1, sync.count <= 1 else { throw FHIRValidationClient.invalid }
+        output.sync = try sync.map { try FHIRSyncRecordIdentifier.validated($0, roles: output.roles, extensions: extensions) }
+        return output
     }
 
     static func retraction(in resources: [String: ResourceProxy]) throws -> [ValidatedExchangeEvent.Identifier] {

@@ -10,7 +10,7 @@ import GroveFHIRContract
 
 
 /// Fixed, declared study-point-view-v1 policy. It preserves authorized measurement content,
-/// native UUIDs and writer/conversion facts. It is not anonymization or free-text redaction.
+/// native UUIDs, readable sync identifiers and writer/conversion facts. It is not anonymization or free-text redaction.
 struct StudyPointResourceProjection {
     private static let researchStudy = "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy"
     private static let roleSystem = Canonicals.root + "/mobile/CodeSystem/grove-identifier-role"
