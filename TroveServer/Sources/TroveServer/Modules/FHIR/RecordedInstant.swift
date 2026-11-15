@@ -12,7 +12,7 @@ import ModelsR4
 
 /// Exact ordering evidence from validated Provenance, independent of receipt time.
 /// Fraction digits remain text so database ordering never rounds them through Double.
-struct RecordedInstant: Sendable, Equatable {
+struct RecordedInstant: Sendable, Equatable, Codable {
     let seconds: Int64
     let fraction: String
 }

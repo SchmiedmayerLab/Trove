@@ -221,7 +221,8 @@ enum FHIRPointProjection {
             codeSystem: FHIRRecordingProjection.formatSystem,
             code: facts.format.rawValue,
             sourceTypeIdentifier: facts.source.identifier,
-            sourceRepositoryKind: facts.source.repository
+            sourceRepositoryKind: facts.source.repository,
+            rowExtent: facts.rows
         )
     }
 

@@ -29,3 +29,48 @@ extension StudyDataQuery {
         return try .init(outputs: [Output(row: row)], nextBefore: nil)
     }
 }
+
+
+extension StudyDataQuery {
+    /// Proves again, before any recording byte is read, that the grant's exact consent window selects
+    /// every row of a query-created batch. A grant without this proof discloses nothing.
+    func requireEveryRowSelected(
+        _ event: ValidatedExchangeEvent, output: Output, grant: StudyDataFence.Grant, studyID: UUID
+    ) async throws {
+        guard database.inTransaction else { throw AuditError.transactionRequired }
+        let unavailable = ServerError.notFound("Study recording not found")
+        guard let facts = event.collectionOutputs.first(where: { $0.fullURL == output.fullURL }), !facts.lacksRowEvidence else {
+            throw unavailable
+        }
+        guard facts.rowExtent != nil else {
+            return
+        }
+        guard let profile = facts.collectionProfile,
+              let enrollment = try await Enrollment.find(grant.enrollmentID, on: database), enrollment.$study.id == studyID,
+              let publication = try await PublishedStudy.find(grant.publicationID, on: database),
+              publication.$study.id == studyID, publication.revision == grant.revision,
+              let interval = try await ConsentCollectionTimeline.load(enrollment: enrollment, on: database, asOf: Date())
+                  .first(where: { $0.acceptance.consentID == grant.consentID }),
+              let sql = database as? any SQLDatabase,
+              let row = try await sql.raw("SELECT * FROM source_bindings WHERE id = \(bind: output.sourceID)").first() else {
+            throw unavailable
+        }
+        let source = try SourceBinding(row: row)
+        guard publication.collectionPolicy.permits(
+            studyID: studyID,
+            revision: grant.revision,
+            profile: profile,
+            sourceKind: source.kind,
+            effectiveAt: facts.effectiveAt,
+            consentAcceptedAt: interval.acceptance.acceptedAt,
+            effectiveEnd: facts.effectiveEnd,
+            preciseBounds: facts.measurementBounds,
+            scope: interval.acceptance.collectionScope,
+            adoptionEnd: interval.end,
+            providerRegistrationID: source.providerRegistrationID,
+            sourceTypeIdentifier: facts.sourceTypeIdentifier,
+            timeBasis: facts.timeBasis,
+            rowExtent: facts.rowExtent
+        ) else { throw unavailable }
+    }
+}

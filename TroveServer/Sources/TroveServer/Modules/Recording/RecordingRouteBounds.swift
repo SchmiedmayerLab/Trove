@@ -14,11 +14,13 @@ import GroveFHIRContract
 struct RecordingRouteBounds: Sendable {
     private(set) var first: Date?
     private(set) var last: Date?
+    /// Present only for a query-created batch of independent rows.
+    private(set) var rows: RecordingRowExtent?
 
     init() {}
 
     /// Reconstructs receiver-verified bounds from the immutable custody ledger.
-    init(first: Date?, last: Date?) throws {
+    init(first: Date?, last: Date?, rows: RecordingRowExtent? = nil) throws {
         switch (first, last) {
         case (nil, nil): break
         case let (first?, last?) where CollectionMeasurementWindow.valid(first)
@@ -27,6 +29,7 @@ struct RecordingRouteBounds: Sendable {
         }
         self.first = first
         self.last = last
+        self.rows = rows
     }
 
     mutating func include(_ row: RecordingCSVReader.Row, format: RegisteredRecordingFormat = .locationTrackSamples) throws {
@@ -48,5 +51,10 @@ struct RecordingRouteBounds: Sendable {
         }
         first = first.map { min($0, lower) } ?? lower
         last = last.map { max($0, upper) } ?? upper
+        if RecordingRowExtent.applies(to: format) {
+            var extent = rows ?? RecordingRowExtent()
+            try extent.include(row, format: format)
+            rows = extent
+        }
     }
 }

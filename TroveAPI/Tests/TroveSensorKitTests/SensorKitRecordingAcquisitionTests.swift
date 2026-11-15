@@ -114,6 +114,44 @@ struct SensorKitRecordingAcquisitionTests {
         }
     }
 
+    @Test
+    func eachStudyReceivesOnlySlicesInsideItsWindowAndSliceCoverageIsRetained() async throws {
+        let fixture = SensorKitRecordingFixture()
+        // The second study accepted only rows 50-99 of the 128-row native batch.
+        let snapshot = try fixture.snapshot(studyWindows: [(-3600, nil), (0.5, 1)])
+        try await fixture.journal.withJournal(sourceToken: fixture.entry.sourceToken, collectionSnapshot: snapshot) { journal, _ in
+            let preparation = try fixture.slicePreparation(snapshot: snapshot, state: await journal.collectionState())
+            let slices = preparation.slices
+            #expect(slices.map(\.rows) == [0..<50, 50..<100, 100..<128])
+            var batch = try fixture.batch()
+            batch.slicePreparation = preparation
+            batch.usesRecordingSlices = true
+            let acquisition = try SensorKitAcquisition(journal: journal, scope: fixture.journal.scope, validateSession: {})
+            _ = try await acquisition.stage(batch, localID: fixture.journal.localID, queryID: fixture.journal.localID)
+
+            let both = Set([fixture.journal.consentID, fixture.recordingConsentID].map { $0.uuidString.lowercased() })
+            var targets: [Date: Set<String>] = [:]
+            for eventID in try await journal.pendingDeliveryIDs() {
+                let recording = try #require(await journal.recordingReferences(for: eventID).first)
+                let declaration = try #require(await journal.recordingTransfer(for: recording.id)).commitment.declaration
+                let attempt = try #require(await journal.prepareAttempt(eventID))
+                let consents = Set(attempt.commitment.targetIntent.targets.map { $0.consentID.uuidString.lowercased() })
+                #expect(Set(declaration.targets.map(\.consentId)) == consents)
+                targets[declaration.effectiveAt] = consents
+            }
+            #expect(targets.count == 3)
+            #expect(targets[fixture.rowInterval(0).lowerBound] == [fixture.journal.consentID.uuidString.lowercased()])
+            #expect(targets[fixture.rowInterval(50).lowerBound] == both)
+            #expect(targets[fixture.rowInterval(100).lowerBound] == [fixture.journal.consentID.uuidString.lowercased()])
+            #expect(try await journal.sensorKitRecordingSlices(
+                sourceID: fixture.journal.sourceID,
+                sourceTypeIdentifier: batch.sourceToken,
+                deviceProductType: batch.deviceProductType,
+                coordinate: batch.coordinate
+            ) == slices)
+        }
+    }
+
     private func emitFixture(_ bytes: Data) throws {
         guard let path = ProcessInfo.processInfo.environment["TROVE_SENSOR_KIT_FIXTURE_DIRECTORY"] else {
             return

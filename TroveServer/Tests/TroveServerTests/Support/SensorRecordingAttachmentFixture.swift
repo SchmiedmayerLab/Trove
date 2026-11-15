@@ -23,16 +23,22 @@ struct SensorRecordingAttachmentFixture {
         }
     }
 
-    let recording: RecordingAttachmentFixture
+    /// The first row's whole-second source time; later rows follow one second apart.
+    static var firstRow: Date { Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970) - 10) }
+
+    var recording: RecordingAttachmentFixture
     let summaryURL: String
     let original: Data
 
-    static func make(source: SourceBinding, consentID: UUID, compressed: Bool) async throws -> Self {
-        let start = Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970) - 10)
-        let end = start.addingTimeInterval(1)
-        let bytes = Data(("timestamp,identifier,x,y,z,device\n"
-            + "\(Int(start.timeIntervalSince1970)),1,-0.1,0.2,0.3,Watch\n"
-            + "\(Int(end.timeIntervalSince1970)),1,0.2,-0.3,0.4,Watch\n").utf8)
+    var recordingURL: String { recording.declaration.outputFullUrl }
+    var outputURLs: [String] { [recordingURL, summaryURL] }
+
+    static func make(
+        source: SourceBinding, consentID: UUID, compressed: Bool, firstRow start: Date = firstRow, rowCount: Int = 2
+    ) async throws -> Self {
+        let end = start.addingTimeInterval(Double(rowCount - 1))
+        let rows = (0..<rowCount).map { "\(Int(start.timeIntervalSince1970) + $0),1,-0.1,0.2,0.3,Watch\n" }
+        let bytes = Data(("timestamp,identifier,x,y,z,device\n" + rows.joined()).utf8)
         let path = "recordings/acceleration.csv"
         let record = try SensorKitAccelerometerRecord(
             sourceRecordID: SensorKitSourceRecordID(UUID()),

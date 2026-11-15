@@ -98,7 +98,7 @@ struct ClinicalAttributionStore: Sendable {
             WHERE f.event_id = \(bind: eventID) AND f.source_id = \(bind: sourceID)
             """)
             .all()
-        let outputs = try rows.map {
+        var outputs = try rows.map {
             try ClinicalGrantStore.Output(
                 fullURL: $0.decode(column: "full_url", as: String.self),
                 profile: $0.decode(column: "profile", as: String.self),
@@ -107,6 +107,15 @@ struct ClinicalAttributionStore: Sendable {
                 code: $0.decode(column: "code", as: String.self),
                 sourceTypeIdentifier: $0.decode(column: "source_type_identifier", as: String?.self)
             )
+        }
+        if outputs.contains(where: \.lacksRowEvidence) {
+            // Row evidence comes from retained custody, never from the attribution command or the recording envelope.
+            let retained = try await StudyDataExportStore(database: transaction).retainedEvent(id: eventID).collectionOutputs
+            outputs = outputs.map { output in
+                var output = output
+                output.rowExtent = retained.first { $0.fullURL == output.fullURL }?.rowExtent
+                return output
+            }
         }
         let authorities = try await grants.authorities(outputs: outputs, intent: intent, requireCustodyCoverage: false)
         for row in rows {

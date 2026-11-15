@@ -28,6 +28,8 @@ enum FHIRRecordingProjection {
         let format: RegisteredRecordingFormat
         let source: FHIRSourceTypeEvidence
         let bounds: ClinicalMeasurementBounds
+        /// Receiver-verified row extremes of a query-created batch; absent for a native session.
+        let rows: RecordingRowExtent?
     }
 
     static let profile: String = {
@@ -51,7 +53,7 @@ enum FHIRRecordingProjection {
         )
         guard bounds.end != nil else { throw FHIRValidationClient.invalid }
         try external?.validate(document: document, bounds: bounds)
-        return .init(profile: descriptor.profile, format: descriptor.format, source: descriptor.source, bounds: bounds)
+        return .init(profile: descriptor.profile, format: descriptor.format, source: descriptor.source, bounds: bounds, rows: rows.rows)
     }
 
     static func routeBounds(_ document: DocumentReference, external: ClinicalRecordingAttachment? = nil) throws -> ClinicalMeasurementBounds {

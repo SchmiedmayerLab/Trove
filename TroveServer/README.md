@@ -124,6 +124,19 @@ content evidence, clinical rows, study grants and mandatory audit commit togethe
 transaction yields a retryable failure. Cleanup excludes clinically referenced
 artifacts even if their registry state is damaged.
 
+A SensorKit recording fetched as a query batch (acceleration, ambient light and
+pressure, heart rate, pedometer, headphone motion and settings) contains independent
+rows rather than one native session. Complete content verification retains the exact
+earliest and latest row instants with the attachment evidence. A consent may be
+granted such a recording, or the summary derived from it, only when its accepted
+measurement window selects every row: point rows half-open, rows with a native
+interval when they overlap. Overlap with the enclosing period alone is refused with
+HTTP 403, at admission and at later attribution, and a batch without verified row
+evidence cannot be granted. The retained file and its source identifier never change;
+studies with different windows receive separate client-assigned row slices. Native
+sessions such as electrocardiograms, wrist temperature, workout routes and heartbeat
+series keep whole-overlap selection.
+
 The client journal retains queue-owned files and transfer evidence across restarts;
 `RecordingTransferDrainer` recovers upload receipts before resending bytes, and
 `EventDeliveryDrainer` recovers clinical receipts before another submission. Transport
@@ -294,11 +307,13 @@ current/history selection. These locations require the same authenticated resear
 and group data-reader access as the page. They are not bearer links. Original custody
 documents and their attachment paths remain unchanged.
 
-A recording download checks study eligibility before reading storage, then stages
-and verifies the complete stored and decoded bytes in private, unnamed temporary
+A recording download checks study eligibility before reading storage. For a query
+batch it also proves again that the grant's exact consent window selects every
+verified row; a grant without that proof returns HTTP 404 and releases no bytes.
+The server then stages and verifies the complete stored and decoded bytes in private, unnamed temporary
 files. Zstandard decoding uses an 8 MiB window and file reads use 64 KiB chunks.
 Compressed preparation can hold both a stored and a decoded temporary file; neither
-whole representation is collected in memory. The server then rechecks the same grant,
+whole representation is collected in memory. It then rechecks the same grant,
 withdrawal/retraction state, current version, researcher access and token expiry,
 and commits `study.recording.disclosure` before returning bytes. The audit target is
 the exact study grant and its version view. No database locks span storage reads.
