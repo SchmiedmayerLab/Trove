@@ -15146,6 +15146,631 @@ public enum Operations {
             }
         }
     }
+    /// Request current instructions for finite sweeps of ended sleep and workout windows
+    ///
+    /// Participant and installation authenticated. A sleep or workout session that overlaps an accepted collection window can be finalized after the enrollment ended. For an ended, not withdrawn enrollment this returns one instruction per closed accepted sleep, workout or opted-in workout-route window whose sweep is unfinished, after checking current withdrawal, source ownership and an active installation. Each instruction fixes the original window and carries a short lease; a repeated request renews unfinished sweeps under the same identity and never returns a completed one. An instruction never extends the cached collection plan, opens a new measurement window or authorizes upload.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)`.
+    public enum RequestParticipantCollectionReconciliations {
+        public static let id: Swift.String = "requestParticipantCollectionReconciliations"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/path/enrollmentId`.
+                public var enrollmentId: Components.Parameters.EnrollmentId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - enrollmentId:
+                public init(enrollmentId: Components.Parameters.EnrollmentId) {
+                    self.enrollmentId = enrollmentId
+                }
+            }
+            public var path: Operations.RequestParticipantCollectionReconciliations.Input.Path
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RequestParticipantCollectionReconciliations.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///   - accept:
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RequestParticipantCollectionReconciliations.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RequestParticipantCollectionReconciliations.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.NativeCollectionReconciliationRequest)
+            }
+            public var body: Operations.RequestParticipantCollectionReconciliations.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.RequestParticipantCollectionReconciliations.Input.Path,
+                headers: Operations.RequestParticipantCollectionReconciliations.Input.Headers,
+                body: Operations.RequestParticipantCollectionReconciliations.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.NativeCollectionReconciliationResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.NativeCollectionReconciliationResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Headers = .init(),
+                    body: Operations.RequestParticipantCollectionReconciliations.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Current instructions, excluding completed sweeps; empty when nothing is eligible
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RequestParticipantCollectionReconciliations.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RequestParticipantCollectionReconciliations.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Acknowledge a durably completed sweep
+    ///
+    /// Idempotent. Records that the installation exhausted the instruction's bounded query. It does not assert upload or historical completeness: queued records and receipt recovery remain independent, and a completed sweep is never issued again for the same source and window.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)`.
+    public enum CompleteParticipantCollectionReconciliation {
+        public static let id: Swift.String = "completeParticipantCollectionReconciliation"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/path/enrollmentId`.
+                public var enrollmentId: Components.Parameters.EnrollmentId
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/path/reconciliationId`.
+                public var reconciliationId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - enrollmentId:
+                ///   - reconciliationId:
+                public init(
+                    enrollmentId: Components.Parameters.EnrollmentId,
+                    reconciliationId: Swift.String
+                ) {
+                    self.enrollmentId = enrollmentId
+                    self.reconciliationId = reconciliationId
+                }
+            }
+            public var path: Operations.CompleteParticipantCollectionReconciliation.Input.Path
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantCollectionReconciliation.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///   - accept:
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantCollectionReconciliation.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CompleteParticipantCollectionReconciliation.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.NativeCollectionReconciliationRequest)
+            }
+            public var body: Operations.CompleteParticipantCollectionReconciliation.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.CompleteParticipantCollectionReconciliation.Input.Path,
+                headers: Operations.CompleteParticipantCollectionReconciliation.Input.Headers,
+                body: Operations.CompleteParticipantCollectionReconciliation.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/responses/204/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/responses/204/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/POST/responses/204/headers/Cache-Control`.
+                    public var cacheControl: Operations.CompleteParticipantCollectionReconciliation.Output.NoContent.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.CompleteParticipantCollectionReconciliation.Output.NoContent.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CompleteParticipantCollectionReconciliation.Output.NoContent.Headers
+                /// Creates a new `NoContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                public init(headers: Operations.CompleteParticipantCollectionReconciliation.Output.NoContent.Headers = .init()) {
+                    self.headers = headers
+                }
+            }
+            /// Completion retained, including an identical retry
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.CompleteParticipantCollectionReconciliation.Output.NoContent)
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.CompleteParticipantCollectionReconciliation.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Read the exact consent presentation for an active enrollment
     ///
     /// Returns retained Markdown for the exact locale and explicitly selected current or forward revision. Omitting revision selects the enrollment's current revision, never the latest publication. Every forward adoption requires fresh consent, even when its text is unchanged. Historical publications without a retained presentation cannot accept new consent.

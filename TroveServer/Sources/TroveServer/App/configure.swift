@@ -82,7 +82,8 @@ private func configureObjectStorage(
             recordingLimits: recordingLimits,
             recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
             collectionCapacity: collectionCapacity,
-            providerConfiguration: providerConfiguration
+            providerConfiguration: providerConfiguration,
+            nativeReconciliationSettings: try .init(seconds: Environment.get("NATIVE_RECONCILIATION_LEASE_SECONDS"))
         )
         return
     }
@@ -100,7 +101,8 @@ private func configureObjectStorage(
         recordingLimits: recordingLimits,
         recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
         collectionCapacity: collectionCapacity,
-        providerConfiguration: providerConfiguration
+        providerConfiguration: providerConfiguration,
+        nativeReconciliationSettings: try .init(seconds: Environment.get("NATIVE_RECONCILIATION_LEASE_SECONDS"))
     )
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
@@ -189,8 +191,10 @@ func configureServices(
     recordingLimits: RecordingTransferService.Limits = .standard,
     recordingDownloadByteLimit: String? = nil,
     collectionCapacity: CollectionCapacityConfiguration = .standard,
-    providerConfiguration: ProviderRuntimeConfiguration? = nil
+    providerConfiguration: ProviderRuntimeConfiguration? = nil,
+    nativeReconciliationSettings: NativeReconciliationSettings? = nil
 ) async throws {
+    let reconciliation = try nativeReconciliationSettings ?? NativeReconciliationSettings()
     let storage = ObjectStorageService(provider: storageProvider)
     let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
     let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
@@ -206,6 +210,7 @@ func configureServices(
         validator: validator
     )
     await app.grove.configure {
+        reconciliation
         providers
         storage
         recordings

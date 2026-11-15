@@ -813,6 +813,8 @@ extension Components {
             case consent_pdf_disclosure = "consent.pdf.disclosure"
             case consent_records_disclosure = "consent.records.disclosure"
             case collection_plan_disclosure = "collection.plan.disclosure"
+            case collection_reconciliation_issued = "collection.reconciliation.issued"
+            case collection_reconciliation_completed = "collection.reconciliation.completed"
             case enrollment_withdrawn = "enrollment.withdrawn"
             case study_published = "study.published"
             case study_publication_disclosure = "study.publication.disclosure"
@@ -2600,6 +2602,256 @@ extension Components {
                     "stateVersion",
                     "asOf",
                     "windows"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationRequest`.
+        public struct NativeCollectionReconciliationRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationRequest/sourceId`.
+            public var sourceId: Swift.String
+            /// Creates a new `NativeCollectionReconciliationRequest`.
+            ///
+            /// - Parameters:
+            ///   - sourceId:
+            public init(sourceId: Swift.String) {
+                self.sourceId = sourceId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceId"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationResponse`.
+        public struct NativeCollectionReconciliationResponse: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationResponse/instructions`.
+            public var instructions: [Components.Schemas.NativeCollectionReconciliationInstruction]
+            /// Creates a new `NativeCollectionReconciliationResponse`.
+            ///
+            /// - Parameters:
+            ///   - instructions:
+            public init(instructions: [Components.Schemas.NativeCollectionReconciliationInstruction]) {
+                self.instructions = instructions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case instructions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.instructions = try container.decode(
+                    [Components.Schemas.NativeCollectionReconciliationInstruction].self,
+                    forKey: .instructions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "instructions"
+                ])
+            }
+        }
+        /// Current online authority for one finite sweep of an ended, originally accepted window. It does not extend the enrollment's cached collection plan. Renewal keeps the identity, source, accepted scope and window, and only moves the lease.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction`.
+        public struct NativeCollectionReconciliationInstruction: Codable, Hashable, Sendable {
+            /// Stable sweep identity for this source and window, unchanged by renewal.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/enrollmentId`.
+            public var enrollmentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/studyId`.
+            public var studyId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/stateVersion`.
+            public var stateVersion: Swift.Int64
+            /// Server time of this issuance or renewal; not a clinical or source insertion time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/issuedAt`.
+            public var issuedAt: Foundation.Date
+            /// End of the lease. Unfinished work pauses and keeps its position until renewed online.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/consentId`.
+            public var consentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/publicationId`.
+            public var publicationId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/revision`.
+            public var revision: Swift.Int
+            /// Exact output profile, including the recording profile for an opted-in workout route.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/profile`.
+            public var profile: Swift.String
+            /// Exact native source token. Profile membership alone does not authorize a stream.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// Original accepted window start; whole overlapping sessions remain eligible.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/start`.
+            public var start: Foundation.Date
+            /// Original closed window end, no later than issuedAt.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/end`.
+            public var end: Foundation.Date
+            /// The accepted workout-route option of the window; an instruction cannot add it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NativeCollectionReconciliationInstruction/includeWorkoutRoutes`.
+            public var includeWorkoutRoutes: Swift.Bool
+            /// Creates a new `NativeCollectionReconciliationInstruction`.
+            ///
+            /// - Parameters:
+            ///   - id: Stable sweep identity for this source and window, unchanged by renewal.
+            ///   - sourceId:
+            ///   - enrollmentId:
+            ///   - studyId:
+            ///   - stateVersion:
+            ///   - issuedAt: Server time of this issuance or renewal; not a clinical or source insertion time.
+            ///   - expiresAt: End of the lease. Unfinished work pauses and keeps its position until renewed online.
+            ///   - consentId:
+            ///   - publicationId:
+            ///   - revision:
+            ///   - profile: Exact output profile, including the recording profile for an opted-in workout route.
+            ///   - sourceTypeIdentifier: Exact native source token. Profile membership alone does not authorize a stream.
+            ///   - start: Original accepted window start; whole overlapping sessions remain eligible.
+            ///   - end: Original closed window end, no later than issuedAt.
+            ///   - includeWorkoutRoutes: The accepted workout-route option of the window; an instruction cannot add it.
+            public init(
+                id: Swift.String,
+                sourceId: Swift.String,
+                enrollmentId: Swift.String,
+                studyId: Swift.String,
+                stateVersion: Swift.Int64,
+                issuedAt: Foundation.Date,
+                expiresAt: Foundation.Date,
+                consentId: Swift.String,
+                publicationId: Swift.String,
+                revision: Swift.Int,
+                profile: Swift.String,
+                sourceTypeIdentifier: Swift.String,
+                start: Foundation.Date,
+                end: Foundation.Date,
+                includeWorkoutRoutes: Swift.Bool
+            ) {
+                self.id = id
+                self.sourceId = sourceId
+                self.enrollmentId = enrollmentId
+                self.studyId = studyId
+                self.stateVersion = stateVersion
+                self.issuedAt = issuedAt
+                self.expiresAt = expiresAt
+                self.consentId = consentId
+                self.publicationId = publicationId
+                self.revision = revision
+                self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.start = start
+                self.end = end
+                self.includeWorkoutRoutes = includeWorkoutRoutes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case sourceId
+                case enrollmentId
+                case studyId
+                case stateVersion
+                case issuedAt
+                case expiresAt
+                case consentId
+                case publicationId
+                case revision
+                case profile
+                case sourceTypeIdentifier
+                case start
+                case end
+                case includeWorkoutRoutes
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.enrollmentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .enrollmentId
+                )
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.stateVersion = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .stateVersion
+                )
+                self.issuedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .issuedAt
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                self.consentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .consentId
+                )
+                self.publicationId = try container.decode(
+                    Swift.String.self,
+                    forKey: .publicationId
+                )
+                self.revision = try container.decode(
+                    Swift.Int.self,
+                    forKey: .revision
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.start = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .start
+                )
+                self.end = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                self.includeWorkoutRoutes = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .includeWorkoutRoutes
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "sourceId",
+                    "enrollmentId",
+                    "studyId",
+                    "stateVersion",
+                    "issuedAt",
+                    "expiresAt",
+                    "consentId",
+                    "publicationId",
+                    "revision",
+                    "profile",
+                    "sourceTypeIdentifier",
+                    "start",
+                    "end",
+                    "includeWorkoutRoutes"
                 ])
             }
         }

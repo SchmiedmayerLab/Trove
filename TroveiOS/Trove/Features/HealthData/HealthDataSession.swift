@@ -168,6 +168,10 @@ struct HealthDataSession {
         } catch EventDeliveryJournal.JournalError.sourceRevoked {
             collectionStatus = .revoked
         }
+        if refreshed, collectionStatus != .revoked, collectionStatus != .permissionNeeded,
+           try await sweepEndedWindows(acquisition: acquisition, source: currentSource, journal: journal) == .needsAnotherPass {
+            progress = .needsAnotherPass
+        }
         let status = try await queueStatus(journal, source: currentSource, finished: action == .sync && refreshed, progress: progress)
         if status == .blocked {
             return status
@@ -176,6 +180,36 @@ struct HealthDataSession {
             return collectionStatus
         }
         return action == .sync && !refreshed && status == .ready ? .unavailable : status
+    }
+
+    /// A sleep or workout session can be finalized after its enrollment ended. Only an online synchronization
+    /// obtains the short-lived instruction for that fixed window; an unreachable server leaves the sweep for later.
+    private func sweepEndedWindows(
+        acquisition: HealthKitAcquisition, source: EventDeliveryJournal.SourceSetup, journal: EventDeliveryJournal
+    ) async throws -> HealthKitAcquisition.Progress {
+        guard let binding = source.binding, !binding.isRevoked, let sourceID = UUID(uuidString: binding.source.id) else {
+            return .caughtUp
+        }
+        var progress = HealthKitAcquisition.Progress.caughtUp
+        do {
+            for sweep in try await api.requestEndedWindowSweeps(journal: journal, sourceID: sourceID, for: session) {
+                try checkSession()
+                if try await acquisition.reconcile(localID: source.localID, instructionID: sweep, healthKit: healthKit) == .needsAnotherPass {
+                    progress = .needsAnotherPass
+                }
+            }
+            try checkSession()
+            try await api.acknowledgeEndedWindowSweeps(journal: journal, sourceID: sourceID, for: session)
+        } catch ParticipantNativeReconciliation.RequestError.unavailable {
+            progress = .needsAnotherPass
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            progress = .needsAnotherPass
+        } catch EventDeliveryJournal.JournalError.staleCheckpoint {
+            // The lease expired or collection changed during the pass; the retained position resumes after renewal.
+            progress = .needsAnotherPass
+        }
+        try checkSession()
+        return progress
     }
 
     private func refreshAuthority(_ journal: EventDeliveryJournal, localID: UUID) async throws -> Bool {

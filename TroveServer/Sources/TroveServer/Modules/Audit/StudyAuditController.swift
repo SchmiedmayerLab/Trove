@@ -57,6 +57,8 @@ extension Components.Schemas.StudyAuditAction {
         case .consentPDFDisclosure: self = .consent_pdf_disclosure
         case .consentRecordsDisclosure: self = .consent_records_disclosure
         case .collectionPlanDisclosure: self = .collection_plan_disclosure
+        case .collectionReconciliationIssued: self = .collection_reconciliation_issued
+        case .collectionReconciliationCompleted: self = .collection_reconciliation_completed
         case .enrollmentWithdrawn: self = .enrollment_withdrawn
         case .studyPublished: self = .study_published
         case .studyPublicationDisclosure: self = .study_publication_disclosure

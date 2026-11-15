@@ -46,6 +46,7 @@ enum TestDatabase {
             CreateInvitationCodes().name,
             CreateEnrollments().name,
             CreateEnrollmentConsents().name,
+            CreateNativeReconciliations().name,
             CreateAuditEvents().name,
             CreateClinicalEvents().name,
             CreateRecordingTransfers().name,

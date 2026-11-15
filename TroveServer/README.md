@@ -135,6 +135,30 @@ per download, defaults to 536870912 (512 MiB), and accepts positive decimal inte
 up to 2147483647. Invalid settings prevent startup. Capacity failure is explicit
 and does not change upload or collection authority.
 
+### Ended sleep and workout windows
+
+`POST /participant/enrollments/{enrollmentId}/collection-reconciliations` lets an
+installation finish a bounded sweep for sessions that were finalized after the
+enrollment ended. The request names the participant's HealthKit source and carries
+the installation proof. Under the participant and enrollment locks the server checks
+ownership, an active source and installation, and that the enrollment has ended and
+is not withdrawn. It then resolves the accepted consent timeline exactly as the
+collection plan does and issues one instruction per closed sleep or workout
+requirement, plus one for workout routes where that consent accepted them. Heart
+rate and other point streams are not eligible. `native_collection_reconciliations`
+keeps one row per source, enrollment and exact scope; a repeated request renews the
+lease of an unfinished row under the same identity, and
+`.../{reconciliationId}/complete` marks it complete idempotently. A completed scope
+is never issued again. Both operations record a study-scoped audit event
+(`collection.reconciliation.issued`, `collection.reconciliation.completed`).
+Issuance grants no upload authority: admission still checks every submitted record
+against its consent window.
+
+`NATIVE_RECONCILIATION_LEASE_SECONDS` sets the lease, 900 seconds by default. It
+must be a positive finite number; an invalid value prevents startup. A lease only
+bounds how long one online request authorizes local querying; unfinished work
+resumes at its retained position after the next request.
+
 The development SeaweedFS service receives the same `S3_ACCESS_KEY` and
 `S3_SECRET_KEY` as the server, through its standard AWS credential variables.
 Authentication is required to verify signed streaming chunks. Its health probe

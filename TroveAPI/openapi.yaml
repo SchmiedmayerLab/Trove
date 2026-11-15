@@ -2108,6 +2108,105 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /participant/enrollments/{enrollmentId}/collection-reconciliations:
+    post:
+      operationId: requestParticipantCollectionReconciliations
+      tags:
+        - Participant
+      summary: Request current instructions for finite sweeps of ended sleep and workout windows
+      description: >
+        Participant and installation authenticated. A sleep or workout session that
+        overlaps an accepted collection window can be finalized after the enrollment
+        ended. For an ended, not withdrawn enrollment this returns one instruction per
+        closed accepted sleep, workout or opted-in workout-route window whose sweep is
+        unfinished, after checking current withdrawal, source ownership and an active
+        installation. Each instruction fixes the original window and carries a short
+        lease; a repeated request renews unfinished sweeps under the same identity and
+        never returns a completed one. An instruction never extends the cached
+        collection plan, opens a new measurement window or authorizes upload.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - $ref: '#/components/parameters/SourceInstallationID'
+        - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeCollectionReconciliationRequest'
+      responses:
+        '200':
+          description: Current instructions, excluding completed sweeps; empty when nothing is eligible
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeCollectionReconciliationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete:
+    post:
+      operationId: completeParticipantCollectionReconciliation
+      tags:
+        - Participant
+      summary: Acknowledge a durably completed sweep
+      description: >
+        Idempotent. Records that the installation exhausted the instruction's bounded
+        query. It does not assert upload or historical completeness: queued records
+        and receipt recovery remain independent, and a completed sweep is never issued
+        again for the same source and window.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - name: reconciliationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/SourceInstallationID'
+        - $ref: '#/components/parameters/SourceInstallationProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeCollectionReconciliationRequest'
+      responses:
+        '204':
+          description: Completion retained, including an identical retry
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /participant/enrollments/{enrollmentId}/consent-presentation:
     get:
       tags:
@@ -2984,6 +3083,8 @@ components:
         - consent.pdf.disclosure
         - consent.records.disclosure
         - collection.plan.disclosure
+        - collection.reconciliation.issued
+        - collection.reconciliation.completed
         - enrollment.withdrawn
         - study.published
         - study.publication.disclosure
@@ -3624,6 +3725,106 @@ components:
           description: Ordered by consent adoption, never by latest publication. Empty means no collection.
           items:
             $ref: '#/components/schemas/ConsentCollectionWindow'
+
+    NativeCollectionReconciliationRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceId]
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+
+    NativeCollectionReconciliationResponse:
+      type: object
+      additionalProperties: false
+      required: [instructions]
+      properties:
+        instructions:
+          type: array
+          maxItems: 256
+          items:
+            $ref: '#/components/schemas/NativeCollectionReconciliationInstruction'
+
+    NativeCollectionReconciliationInstruction:
+      type: object
+      additionalProperties: false
+      description: >
+        Current online authority for one finite sweep of an ended, originally accepted
+        window. It does not extend the enrollment's cached collection plan. Renewal
+        keeps the identity, source, accepted scope and window, and only moves the lease.
+      required:
+        - id
+        - sourceId
+        - enrollmentId
+        - studyId
+        - stateVersion
+        - issuedAt
+        - expiresAt
+        - consentId
+        - publicationId
+        - revision
+        - profile
+        - sourceTypeIdentifier
+        - start
+        - end
+        - includeWorkoutRoutes
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable sweep identity for this source and window, unchanged by renewal.
+        sourceId:
+          type: string
+          format: uuid
+        enrollmentId:
+          type: string
+          format: uuid
+        studyId:
+          type: string
+          format: uuid
+        stateVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        issuedAt:
+          type: string
+          format: date-time
+          description: Server time of this issuance or renewal; not a clinical or source insertion time.
+        expiresAt:
+          type: string
+          format: date-time
+          description: End of the lease. Unfinished work pauses and keeps its position until renewed online.
+        consentId:
+          type: string
+          format: uuid
+        publicationId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          minimum: 1
+        profile:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: Exact output profile, including the recording profile for an opted-in workout route.
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact native source token. Profile membership alone does not authorize a stream.
+        start:
+          type: string
+          format: date-time
+          description: Original accepted window start; whole overlapping sessions remain eligible.
+        end:
+          type: string
+          format: date-time
+          description: Original closed window end, no later than issuedAt.
+        includeWorkoutRoutes:
+          type: boolean
+          description: The accepted workout-route option of the window; an instruction cannot add it.
 
     ConsentCollectionWindow:
       type: object

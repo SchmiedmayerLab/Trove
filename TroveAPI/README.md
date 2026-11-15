@@ -127,7 +127,7 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 19 upgrades formats 17 and 18 in place and rejects earlier or
+later response. Journal format 20 upgrades formats 17 to 19 in place and rejects earlier or
 unknown formats without migration or deletion.
 
 Recording files are staged beside the journal in an owner-only directory. The
@@ -359,6 +359,38 @@ including changes written through another journal connection and expiry of an
 enrollment while querying, converting or staging. Other studies can continue on
 the next pass; expiry does not erase queued data or become a withdrawal.
 
+A sleep or workout session that overlaps an accepted window can be finalized in
+HealthKit after its enrollment ended, when the retained plan no longer permits a
+query. `POST /participant/enrollments/{enrollmentId}/collection-reconciliations`
+(participant and installation authenticated) returns one instruction per closed,
+originally accepted sleep, workout or opted-in workout-route window of an ended,
+not withdrawn enrollment. An instruction fixes source, enrollment state version,
+consent, publication, revision, source token and the original window, and carries a
+short lease (`issuedAt`, `expiresAt`). It opens no new measurement window and never
+changes the plan's `endsAt`. Repeating the request renews unfinished sweeps under
+the same `id`; a completed sweep is not issued again.
+`ParticipantNativeReconciliation.request` asks only for ended enrollments after a
+complete plan refresh and retains each instruction with a compare-and-swap on the
+collection revision, so a response that crosses a local withdrawal is discarded.
+`NativeCollectionReconciliation` validates an instruction against the retained plan;
+a changed state version, consent, publication, revision, window or source refuses it.
+
+Each instruction owns a separate historical query, keyed by its `id`. Ordinary
+query planning ignores it, and `nativeReconciliationSelection` is the only path that
+supplies an ended enrollment to acquisition: as a temporary snapshot restricted to
+that one requirement, with the lease as its acquisition deadline.
+`retainCollectionSnapshot` rejects that temporary snapshot. Whole-overlap selection,
+conversion identity, staging and delivery are the ordinary ones, so a session that
+was already uploaded keeps its identity. `stage` rechecks lease, collection revision
+and query in its transaction; expiry, withdrawal, cancellation and a full queue keep
+the previous cursor. The sweep ends when an empty page is staged. Its completion is
+then reported through `.../collection-reconciliations/{reconciliationId}/complete`
+until the server acknowledges it; a lost acknowledgement is retried without another
+HealthKit query. Completion states that the bounded query was exhausted once, not
+that every later source publication was captured or that uploads finished. HealthKit
+has no insertion-time filter, so `issuedAt` is never used as a measurement bound.
+The lease is evaluated on the device clock, like the enrollment end.
+
 The native HealthKit adapter has no network client. It uses the retained plan,
 source binding and local session checks on each page. Foreground sync refreshes
 source and collection authority once; an unavailable network preserves previously
@@ -520,7 +552,7 @@ operating budget stays pending and reports capacity backpressure; raising the
 budget permits retry without changing its bytes or identity.
 
 Pending storage has independent settings: `COLLECTION_MAX_PENDING_BYTES` (64 MiB
-by default), `COLLECTION_MAX_DATABASE_BYTES` (128 MiB; at least 128 KiB, the room an empty journal needs),
+by default), `COLLECTION_MAX_DATABASE_BYTES` (128 MiB; at least 136 KiB, the room an empty journal needs),
 `COLLECTION_MAX_RECORDING_BYTES` (128 MiB per recording), and
 `COLLECTION_MAX_PENDING_RECORDING_BYTES` (1 GiB). Count settings are
 `COLLECTION_MAX_PENDING_EVENTS` (2,048), `COLLECTION_MAX_QUERIES` (2,048), and

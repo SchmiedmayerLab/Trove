@@ -75,6 +75,7 @@ the entire participant journey.
 | --- | --- |
 | Accepted history and whole sessions | `CollectionMeasurementWindowTests`, `HistoricalCollectionScopeTests`, `HistoricalMixedCollectionTests`: six calendar months resolve once in the declared calendar/time zone; an overlapping sleep/workout session remains complete. The mixed Bundle stores shared heart rate once and grants only the authorized profiles to each study, including after database reopen. |
 | Offline lifetime and query progress | `HeartRateOfflineTests`, `EnrollmentEndCollectionTests`, `HeartRateQuerySchedulingTests`, `ParticipantCollectionRefreshTests`: retained plans survive restart without a per-page network dependency; enrollment end and known withdrawal stop affected collection; independent live/history progress remains recoverable. |
+| Sessions finalized after enrollment end | `NativeCollectionReconciliationTests` (client and server), `NativeReconciliationJournalTests`, `NativeReconciliationClientTests`, `NativeReconciliationAcquisitionTests`: an ended plan alone never queries; an online instruction selects whole overlapping sleep, workout and accepted route windows only; renewal keeps identity, window and cursor; lease expiry and local withdrawal stop a selected page; the sweep completes once and its acknowledgement is retried without another query. |
 | Participant identity | `SourceIdentityRecoveryTests`, `SourceSetupRecoveryTests`, `SourceIdentityKeyStoreTests`: authorized installations recover the same derivation context with independent credentials and cursors. Conflicting or missing recovery material fails explicitly. |
 | Versioning, retraction and retries | `ClinicalRecordBundleTests`, `RecordBundleRecoveryTests`, `ClientDeliveryRecoveryTests`, `ClinicalRetractionTests`: partial outcomes and regrouped retries retain exact commitments; retractions and selected versions do not double-count logical measurements. |
 | Source fidelity and route scope | `WorkoutRouteAcquisitionTests`, `WorkoutRouteStudyDataTests`, `WorkoutStudyDataTests`, `SleepCollectionTests`: complete sessions, native UUIDs and supporting context survive the permitted path; routes require their own accepted setting. Later route authorization can grant retained eligible data without uploading it again. |
@@ -130,6 +131,10 @@ query does not prove permission denial or missing source data.
    restart. Separately revoke remotely while the device is offline, reconnect, and
    verify collection stops when the change is learned and server admission enforces
    current authority. Preserve an explicit disposition for pending work.
+   After the near-term enrollment ended, finalize a sleep or workout session that
+   overlaps its last window, then synchronize online. The session must arrive once
+   under its original consent, no sample wholly outside the window may be collected,
+   and a later synchronization must not query that window again.
 6. **Verify reinstall and two-device replay.** First retain a known sample UUID and
    its source/output identifiers. Reinstall only the dedicated test installation,
    authenticate the same participant, recover the registered identity context,

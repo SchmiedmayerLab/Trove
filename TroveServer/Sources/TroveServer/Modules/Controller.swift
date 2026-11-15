@@ -25,6 +25,10 @@ struct Controller: APIProtocol {
 // MARK: - Services
 
 extension Controller {
+    var nativeReconciliationSettings: NativeReconciliationSettings {
+        grove[NativeReconciliationSettings.self]
+    }
+
     var providerRuntime: ProviderRuntime {
         grove[ProviderRuntime.self]
     }

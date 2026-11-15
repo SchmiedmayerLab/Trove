@@ -369,6 +369,22 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/collection-plan`.
     /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-plan/get(getParticipantCollectionPlan)`.
     func getParticipantCollectionPlan(_ input: Operations.GetParticipantCollectionPlan.Input) async throws -> Operations.GetParticipantCollectionPlan.Output
+    /// Request current instructions for finite sweeps of ended sleep and workout windows
+    ///
+    /// Participant and installation authenticated. A sleep or workout session that overlaps an accepted collection window can be finalized after the enrollment ended. For an ended, not withdrawn enrollment this returns one instruction per closed accepted sleep, workout or opted-in workout-route window whose sweep is unfinished, after checking current withdrawal, source ownership and an active installation. Each instruction fixes the original window and carries a short lease; a repeated request renews unfinished sweeps under the same identity and never returns a completed one. An instruction never extends the cached collection plan, opens a new measurement window or authorizes upload.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)`.
+    func requestParticipantCollectionReconciliations(_ input: Operations.RequestParticipantCollectionReconciliations.Input) async throws -> Operations.RequestParticipantCollectionReconciliations.Output
+    /// Acknowledge a durably completed sweep
+    ///
+    /// Idempotent. Records that the installation exhausted the instruction's bounded query. It does not assert upload or historical completeness: queued records and receipt recovery remain independent, and a completed sweep is never issued again for the same source and window.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)`.
+    func completeParticipantCollectionReconciliation(_ input: Operations.CompleteParticipantCollectionReconciliation.Input) async throws -> Operations.CompleteParticipantCollectionReconciliation.Output
     /// Read the exact consent presentation for an active enrollment
     ///
     /// Returns retained Markdown for the exact locale and explicitly selected current or forward revision. Omitting revision selects the enrollment's current revision, never the latest publication. Every forward adoption requires fresh consent, even when its text is unchanged. Historical publications without a retained presentation cannot accept new consent.
@@ -1285,6 +1301,42 @@ extension APIProtocol {
         try await getParticipantCollectionPlan(Operations.GetParticipantCollectionPlan.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Request current instructions for finite sweeps of ended sleep and workout windows
+    ///
+    /// Participant and installation authenticated. A sleep or workout session that overlaps an accepted collection window can be finalized after the enrollment ended. For an ended, not withdrawn enrollment this returns one instruction per closed accepted sleep, workout or opted-in workout-route window whose sweep is unfinished, after checking current withdrawal, source ownership and an active installation. Each instruction fixes the original window and carries a short lease; a repeated request renews unfinished sweeps under the same identity and never returns a completed one. An instruction never extends the cached collection plan, opens a new measurement window or authorizes upload.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/post(requestParticipantCollectionReconciliations)`.
+    public func requestParticipantCollectionReconciliations(
+        path: Operations.RequestParticipantCollectionReconciliations.Input.Path,
+        headers: Operations.RequestParticipantCollectionReconciliations.Input.Headers,
+        body: Operations.RequestParticipantCollectionReconciliations.Input.Body
+    ) async throws -> Operations.RequestParticipantCollectionReconciliations.Output {
+        try await requestParticipantCollectionReconciliations(Operations.RequestParticipantCollectionReconciliations.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Acknowledge a durably completed sweep
+    ///
+    /// Idempotent. Records that the installation exhausted the instruction's bounded query. It does not assert upload or historical completeness: queued records and receipt recovery remain independent, and a completed sweep is never issued again for the same source and window.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/collection-reconciliations/{reconciliationId}/complete/post(completeParticipantCollectionReconciliation)`.
+    public func completeParticipantCollectionReconciliation(
+        path: Operations.CompleteParticipantCollectionReconciliation.Input.Path,
+        headers: Operations.CompleteParticipantCollectionReconciliation.Input.Headers,
+        body: Operations.CompleteParticipantCollectionReconciliation.Input.Body
+    ) async throws -> Operations.CompleteParticipantCollectionReconciliation.Output {
+        try await completeParticipantCollectionReconciliation(Operations.CompleteParticipantCollectionReconciliation.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Read the exact consent presentation for an active enrollment

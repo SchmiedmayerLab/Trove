@@ -100,3 +100,15 @@ Apple documents the managed entitlement and usage descriptions in
 [Configuring your project for sensor reading](https://developer.apple.com/documentation/sensorkit/configuring-your-project-for-sensor-reading).
 Simulator tests do not establish managed signing, physical-device authorization,
 background scheduling, retention availability or successful research deployment.
+
+## HealthKit collection after an enrollment ends
+
+Collection under a retained plan stops at the enrollment's end, also offline. A
+sleep or workout session that overlaps the last accepted window can still be
+finalized in HealthKit afterwards. When the participant synchronizes in the
+foreground with a reachable server, the app requests a short-lived instruction
+for each such closed window, runs its bounded query, and reports completion. It
+never does so in the background or from the ended plan alone. If the lease expires,
+the server is unreachable or local storage is full, the sweep keeps its position
+and continues at the next synchronization. A HealthKit type whose read access was
+never requested is not swept, because HealthKit would answer with no samples.

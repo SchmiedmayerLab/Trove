@@ -33,6 +33,30 @@ extension TroveAPIModule {
         )
     }
 
+    /// Foreground synchronization only. Requests or renews the finite sweeps of ended sleep and workout windows;
+    /// the ended plan itself never authorizes a query.
+    func requestEndedWindowSweeps(
+        journal: EventDeliveryJournal, sourceID: UUID, for session: KeycloakSessionSnapshot
+    ) async throws -> [UUID] {
+        try await ParticipantNativeReconciliation.request(
+            journal: journal,
+            sourceID: sourceID,
+            state: journal.collectionState(),
+            client: try requireClient(for: session),
+            validateSession: { try await self.validateSession(session) }
+        )
+    }
+
+    /// Reports locally completed sweeps, including ones whose earlier acknowledgement was lost.
+    func acknowledgeEndedWindowSweeps(journal: EventDeliveryJournal, sourceID: UUID, for session: KeycloakSessionSnapshot) async throws {
+        try await ParticipantNativeReconciliation.acknowledgeCompleted(
+            journal: journal,
+            sourceID: sourceID,
+            client: try requireClient(for: session),
+            validateSession: { try await self.validateSession(session) }
+        )
+    }
+
     func stoppedEnrollments(for session: KeycloakSessionSnapshot) async throws -> Set<String> {
         try validateSession(session)
         let scope = EventDeliveryJournal.Scope(
