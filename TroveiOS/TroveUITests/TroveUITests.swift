@@ -47,12 +47,11 @@ final class TroveUITests: XCTestCase {
             username.waitForExistence(timeout: Self.authenticationTimeout),
             "Keycloak did not present its username field."
         )
-        username.tap()
-        username.typeText("alice@example.com")
+        enter("alice@example.com", into: username, in: authenticationSession)
 
         let passwordField = authenticationSession.secureTextFields["Password"]
         XCTAssertTrue(passwordField.waitForExistence(timeout: 5), "Keycloak did not present its password field.")
-        passwordField.tap()
+        focus(passwordField, in: authenticationSession)
         // Return submits the web form without relying on a button that the software keyboard can obscure.
         passwordField.typeText("password123\n") // Local development realm fixture; not a production credential.
 
@@ -65,6 +64,27 @@ final class TroveUITests: XCTestCase {
         let studies = app.navigationBars["Studies"]
         XCTAssertTrue(studies.waitForExistence(timeout: 30), "The app did not reach the study list after sign-in.")
         return app
+    }
+
+    /// A web field can report focus before its keyboard accepts input, which drops the first keystrokes.
+    @MainActor
+    private func focus(_ field: XCUIElement, in application: XCUIApplication) {
+        field.tap()
+        XCTAssertTrue(application.keyboards.firstMatch.waitForExistence(timeout: 10), "The keyboard did not appear for the focused field.")
+    }
+
+    /// Types into a readable field and retypes when the field did not retain the complete text.
+    @MainActor
+    private func enter(_ text: String, into field: XCUIElement, in application: XCUIApplication) {
+        for _ in 0..<3 {
+            focus(field, in: application)
+            field.typeText(text)
+            guard let entered = field.value as? String, entered != text else {
+                return
+            }
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: entered.count))
+        }
+        XCTFail("The field did not retain the typed text.")
     }
 
     @MainActor
