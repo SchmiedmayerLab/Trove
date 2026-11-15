@@ -149,11 +149,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Each integration suite writes to its own bucket. SeaweedFS grows seven volumes for every
+          # new bucket by default, which exhausts the 32 volume slots after four buckets; grow one.
           docker run --detach --name "$STORAGE_CONTAINER" \
             --publish 127.0.0.1:18333:8333 \
             --tmpfs /data:rw,size=2g \
             --env AWS_ACCESS_KEY_ID=trove_test \
             --env AWS_SECRET_ACCESS_KEY=trove_test \
+            --env WEED_MASTER_VOLUME_GROWTH_COPY_1=1 \
             --health-cmd 'wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q "HTTP/1.1 403"' \
             --health-interval 2s --health-timeout 5s --health-retries 60 \
             "$STORAGE_IMAGE" server -s3 -dir=/data -master.volumeSizeLimitMB=100 \
