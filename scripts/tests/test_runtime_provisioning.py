@@ -125,3 +125,9 @@ esac
         })
         for table in append_only:
             self.assertEqual(privileges[table], {"SELECT, INSERT"})
+        # Startup refuses a runtime login that could rewrite, delete or delegate append-only provider evidence.
+        check = (sources / "Core/DatabaseRuntimePrivileges.swift").read_text()
+        protected = re.search(r"c\.relname IN \(([^)]*)\)", check).group(1)
+        protected_tables = re.findall(r"'([a-z_]+)'", protected)
+        self.assertLessEqual(append_only, set(protected_tables))
+        self.assertIn(f"(SELECT count(*) FROM protected_relations) = {len(set(protected_tables))}", check)
