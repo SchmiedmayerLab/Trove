@@ -16,9 +16,10 @@ and physical-device results separately. A passing synthetic or simulator test
 does not establish HealthKit acquisition, background execution or device data
 protection. Physical-device acceptance has not been established by this guide.
 
-Use the [shared checks](../scripts/README.md), [API collection guide](../TroveAPI/README.md),
-[server verification setup](../TroveServer/README.md#required-full-validator-ci-lane)
-and [validator setup](../TroveInfrastructure/validator/README.md). The
+Use the [shared checks](https://github.com/SchmiedmayerLab/Trove/blob/main/scripts/README.md),
+[API collection guide](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/README.md),
+[server verification setup](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveServer/README.md#required-full-validator-ci-lane)
+and [validator setup](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveInfrastructure/validator/README.md). The
 [engineering requirements](Engineering-and-Verification.md) govern evidence and
 schema changes. Use isolated test accounts, studies and disposable infrastructure;
 retain existing queues and custody when a test encounters an unsupported schema.
