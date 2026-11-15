@@ -411,9 +411,9 @@ extension DatabaseRuntimePrivilegesTests {
         let (recordID, bindingID) = try await appendRecordIdentity(on: sql, sourceID: sourceID, eventID: eventID)
         try await sql.raw("""
             INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
+                effective_seconds, effective_fraction, value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
             VALUES (\(bind: nodeID), \(bind: sourceID), \(bind: eventID), \(bind: recordID), \(bind: bindingID),
-                \(bind: CollectionRequirement.supportedProfile), CURRENT_TIMESTAMP, 'quantity', '72',
+                \(bind: CollectionRequirement.supportedProfile), '2026-01-01T00:00:00Z', 1767225600, '', 'quantity', '72',
                 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4')
             """)
             .run()
