@@ -88,8 +88,12 @@ struct ClinicalEventStore: Sendable {
     }
 
     private func acceptAuthorized(
-        _ event: ValidatedExchangeEvent, source: SourceBinding, targets: [ClinicalEventTarget],
-        auditContext: AuditEvent.Context, providerRegistrationID: UUID? = nil, on transaction: any Database
+        _ event: ValidatedExchangeEvent,
+        source: SourceBinding,
+        targets: [ClinicalEventTarget],
+        auditContext: AuditEvent.Context,
+        on transaction: any Database,
+        providerRegistrationID: UUID? = nil
     ) async throws -> ClinicalEventReceipt {
         guard transaction.inTransaction else { throw AuditError.transactionRequired }
         try validateBounds(event)
@@ -104,21 +108,34 @@ struct ClinicalEventStore: Sendable {
         let representations = ClinicalEventRepresentationStore(
             database: transaction, source: source, auditContext: auditContext, providerRegistrationID: providerRegistrationID
         )
-        if let receipt = try await representations.replay(event, intent: intent, digest: digest) { return receipt }
+        if let receipt = try await representations.replay(event, intent: intent, digest: digest) {
+            return receipt
+        }
         let receivedAt = Date()
         let grants = ClinicalGrantStore(
-            database: transaction, source: source, auditContext: auditContext,
-            acceptedAt: receivedAt, providerRegistrationID: providerRegistrationID
+            database: transaction,
+            source: source,
+            auditContext: auditContext,
+            acceptedAt: receivedAt,
+            providerRegistrationID: providerRegistrationID
         )
         let authorities = try await grants.authorities(outputs: event.collectionOutputs, intent: intent, requireCustodyCoverage: true)
         let receipt = ClinicalEventReceipt(
-            eventID: UUID(), sourceID: source.id,
+            eventID: UUID(),
+            sourceID: source.id,
             producerEventIdentifier: .init(system: event.eventIdentifierSystem, value: event.eventIdentifierValue),
-            payloadSHA256: digest, targetIntentSHA256: intent.sha256, receivedAt: receivedAt, nodeCount: event.nodes.count
+            payloadSHA256: digest,
+            targetIntentSHA256: intent.sha256,
+            receivedAt: receivedAt,
+            nodeCount: event.nodes.count
         )
         let acceptance = Acceptance(
-            receipt: receipt, source: source, intent: intent.serialized, digest: digest,
-            auditContext: auditContext, providerRegistrationID: providerRegistrationID
+            receipt: receipt,
+            source: source,
+            intent: intent.serialized,
+            digest: digest,
+            auditContext: auditContext,
+            providerRegistrationID: providerRegistrationID
         )
         try await insert(event, revision: revision, acceptance: acceptance, authorities: authorities, on: transaction)
         guard let persisted = try await representations.replay(event, intent: intent, digest: digest) else {
@@ -208,8 +225,11 @@ struct ClinicalEventStore: Sendable {
             .run()
         let records = ClinicalRecordStore(sql: sql)
         let grants = ClinicalGrantStore(
-            database: transaction, source: acceptance.source, auditContext: acceptance.auditContext,
-            acceptedAt: receipt.receivedAt, providerRegistrationID: acceptance.providerRegistrationID
+            database: transaction,
+            source: acceptance.source,
+            auditContext: acceptance.auditContext,
+            acceptedAt: receipt.receivedAt,
+            providerRegistrationID: acceptance.providerRegistrationID
         )
         let recordID = try await records.insert(revision, eventID: receipt.eventID, sourceID: receipt.sourceID)
         if event.retraction != nil {

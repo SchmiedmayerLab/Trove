@@ -7,8 +7,8 @@
 //
 
 import Foundation
-import GroveProviderFHIR
 import GroveFHIRContract
+import GroveProviderFHIR
 
 
 enum ConnectedProvider: String, Codable, CaseIterable, Sendable {
