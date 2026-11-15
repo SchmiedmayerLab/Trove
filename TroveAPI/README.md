@@ -520,7 +520,7 @@ operating budget stays pending and reports capacity backpressure; raising the
 budget permits retry without changing its bytes or identity.
 
 Pending storage has independent settings: `COLLECTION_MAX_PENDING_BYTES` (64 MiB
-by default), `COLLECTION_MAX_DATABASE_BYTES` (128 MiB),
+by default), `COLLECTION_MAX_DATABASE_BYTES` (128 MiB; at least 128 KiB, the room an empty journal needs),
 `COLLECTION_MAX_RECORDING_BYTES` (128 MiB per recording), and
 `COLLECTION_MAX_PENDING_RECORDING_BYTES` (1 GiB). Count settings are
 `COLLECTION_MAX_PENDING_EVENTS` (2,048), `COLLECTION_MAX_QUERIES` (2,048), and

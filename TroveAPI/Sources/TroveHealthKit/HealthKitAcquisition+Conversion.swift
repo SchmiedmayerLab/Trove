@@ -41,13 +41,21 @@ extension HealthKitAcquisition {
     /// Source revision is assigned by the HealthKit store and can differ from an unsaved object's
     /// revision. Include it so changed writer facts receive a new conversion time.
     static func recordConfiguration(for sample: HKSample, converter: Data) throws -> Data {
-        let revision = sample.sourceRevision
-        let writer = try JSONEncoder().encode([
+        let writer = try JSONEncoder().encode(writerFacts(of: sample))
+        return try JSONEncoder().encode([converter, writer])
+    }
+
+    /// An object that was never saved has no source revision, although the imported property is not optional.
+    /// Read it dynamically and state no writer facts for it; reading the missing revision yields undefined values.
+    private static func writerFacts(of sample: HKSample) -> [String?] {
+        guard let revision = sample.value(forKey: "sourceRevision") as? HKSourceRevision else {
+            return []
+        }
+        return [
             revision.source.name, revision.source.bundleIdentifier, revision.version, revision.productType,
             String(revision.operatingSystemVersion.majorVersion), String(revision.operatingSystemVersion.minorVersion),
             String(revision.operatingSystemVersion.patchVersion)
-        ])
-        return try JSONEncoder().encode([converter, writer])
+        ]
     }
 
     static func exporter(

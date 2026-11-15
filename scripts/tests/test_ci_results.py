@@ -26,10 +26,10 @@ GATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GATE)
 
 SELECTORS = ("api", "server", "web", "ios", "ios_ui", "infrastructure", "devstack")
-JOBS = ("changes", "api", "server", "web", "ios", "ios-ui", "infrastructure",
+JOBS = ("changes", "api", "api-macos", "server", "web", "ios", "ios-ui", "infrastructure",
         "dev-stack", "native-line-coverage", "coverage", "secret-scan", "vulnerability-scan")
 EXPECTED = {
-    "api": {"api", "coverage"},
+    "api": {"api", "api-macos", "coverage"},
     "server": {"server", "dev-stack", "coverage"},
     "web": {"web", "dev-stack", "coverage"},
     "ios": {"ios", "native-line-coverage", "coverage"},

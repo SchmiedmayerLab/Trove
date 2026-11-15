@@ -29,6 +29,9 @@ enum DeliveryJournalSchema {
     }
 
     static let maximumPayloadBytes = EventSubmissionLimits.maximumEventBytes
+    /// An empty journal of the current format occupies 31 pages of 4 KiB (124 KiB). A smaller budget cannot hold
+    /// the schema, so it is rejected as configuration and not left to fail inside SQLite.
+    static let minimumDatabaseBytes = 128 * 1024
     private static let version: Int64 = 19
 
     static func checkByteLimit(_ database: DeliverySQLite, maximumBytes: Int) throws {

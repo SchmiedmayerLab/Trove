@@ -130,6 +130,7 @@ full matrix of its upstream Grove repository.
 | Job | Runs when |
 |----------|-------------|
 | API | `TroveAPI/**` |
+| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit acquisition tests that Linux cannot build |
 | Server | `TroveServer/**`, `TroveAPI/**` |
 | Web | `TroveWeb/**`, `TroveAPI/openapi.yaml` |
 | iOS | `TroveiOS/**`, `TroveAPI/**` |
