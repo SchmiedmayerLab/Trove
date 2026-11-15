@@ -13,8 +13,7 @@ a TypeScript dashboard. Clients use the same authenticated HTTP API; they do not
 connect directly to the database or object store.
 
 The [platform tour](Platform-Tour.md) shows the available interfaces.
-The integration designs below identify capabilities that are still planned;
-delivery status is maintained in [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones).
+Sections headed Planned or Future describe designs, not implemented capabilities.
 
 ## Current Clients
 
@@ -30,7 +29,7 @@ editing, publication and a results page for study-scoped data and recording
 downloads. The [researcher CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)
 uses Swift Argument Parser and the generated OpenAPI client; `trove study data`
 retrieves the same study-scoped data. It accepts an already-issued access token;
-interactive login and token renewal are not yet provided. Its guide lists the
+it does not provide interactive login or token renewal. Its guide lists the
 supported commands and output formats.
 
 Custom applications can use the API without adopting Trove's navigation or

@@ -32,14 +32,13 @@ The diagram also appears in the [repository README](https://github.com/Schmiedma
 OpenAPI defines the shared server interface and generated client types.
 All clients use the server's authorization checks; none receives direct database
 or object-store credentials. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)
-accepts an already-issued token; it does not yet provide a login flow.
+accepts an already-issued token; it does not provide a login flow.
 
 The implemented foundation covers study publication, enrollment and consent,
 record-based health-data collection, source-event custody, independent study
 grants, study-scoped data retrieval and scoped audit reads. Task synchronization,
 conversations, generalized artifacts, frozen research exports and erasure are
-extensions to that foundation; their design is described below. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
-[issues](https://github.com/SchmiedmayerLab/Trove/issues) track implementation.
+extensions to that foundation; their design is described below.
 
 ## Database and Object Storage
 

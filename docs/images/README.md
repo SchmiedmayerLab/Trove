@@ -121,7 +121,7 @@ device background delivery, HealthKit authorization, or data-protection behavior
 
 Review the [Platform Tour](../Platform-Tour.md) against the captures. Screenshots
 must show the documented revision, synthetic data and the named view without
-clipping or stale branding. Planned features should not appear as working UI.
+clipping or stale branding. Show only working UI.
 
 Record the source and dependency revisions with test results when updating images.
 Raw captures and temporary evidence stay outside the committed documentation.

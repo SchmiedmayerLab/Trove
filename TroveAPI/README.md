@@ -62,10 +62,6 @@ overlapping records. Each native photoplethysmogram sample is
 retained in Grove's registered binary format beside a coverage summary; the two
 outputs are consented separately.
 
-Keyboard metrics, face metrics, media events, odometer, rotation rate and the Siri
-and telephony speech metrics are not collected; [issue #158](https://github.com/SchmiedmayerLab/Trove/issues/158)
-tracks them. Acoustic settings are deferred in the guide.
-
 Acceleration, ambient light, ambient pressure, heart rate, pedometer, device motion and
 headphone recordings arrive as query batches of independent rows. The client divides a retained
 batch into immutable row slices: each uncovered run of rows with one exact set of
@@ -534,8 +530,7 @@ At or after the retained end, the server refuses new consent commands while
 preserving exact receipt replay. Previously collected pre-end measurements can
 still be admitted under their original consent; timestamps at the end are
 excluded. Withdrawal and source revocation retain their independent restrictions.
-Apple-platform and physical-device acceptance remain separate gates from portable
-journal tests; the native scheduler has not yet completed those gates.
+Portable journal tests do not establish Apple-platform or physical-device behavior.
 
 ## Record Representations and Receipts
 
@@ -727,15 +722,6 @@ and simulator checks are separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
 
-The profiles Grove emits follow the Grove FHIR implementation-guide branches
-[`metadata-preservation`](https://github.com/SchmiedmayerLab/grove-fhir/pull/72), then
-`sdk-27-2-baseline`, `healthkit-audiogram-details`, `provider-source-time-precision`,
-`healthkit-clinical-source-time` and `healthkit-ecg-symptoms-unavailable`. The server's
-validator manifest separately pins the published Grove FHIR 0.8.0 guides.
-
-This remains a development revision. Grove's producer conformance source and
-Trove's validator source/package closure have separate identities. The validator
-manifest is not advanced merely because the Swift dependency builds. The
-[released-dependency gate](https://github.com/SchmiedmayerLab/Trove/issues/82)
-still requires reviewed releases, matching package inventories and the affected
-producer/receiver and consent/collection checks on that final graph.
+Grove's producer conformance source and Trove's validator source/package closure
+have separate identities; the validator manifest pins its own inputs independently
+of the Swift dependency.

@@ -19,7 +19,7 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally)
 
 ## For Research Teams
 
@@ -54,8 +54,7 @@ under the accepted study settings, and withdrawal stops it on the device at once
 Trove is in beta and is being actively tested and used at Stanford.
 These screenshots use a fictional Daily Activity
 Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
-current flows; [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
-track planned features and implementation status.
+current flows.
 
 Health-data exchange follows the Grove FHIR implementation guide. See the
 [event-admission contract](TroveServer/README.md#event-admission) for supported data
@@ -163,7 +162,7 @@ branch protection automatically; keep the hosted `main` ruleset synchronized wit
 
 Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
 use GitHub-hosted Xcode 27 runners. Swift CodeQL uses hosted macOS 26 with Xcode
-26.6 until its [build tracer supports Xcode 27](https://github.com/github/codeql/issues/22742).
+26.6 because its [build tracer does not support Xcode 27](https://github.com/github/codeql/issues/22742).
 All external contributors' runs require maintainer approval.
 Before approving a fork, review workflow changes and the code that will execute:
 runner selection in a pull request is not an isolation boundary. Self-hosted
@@ -208,9 +207,7 @@ successful candidate record and does not deploy them.
 ## Design Documentation
 
 The [design documentation](docs/Vision.md) explains the architecture, study model
-and integration contracts. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
-define delivery scope; the [project board](https://github.com/orgs/SchmiedmayerLab/projects/4)
-tracks implementation. The documentation does not maintain a separate roadmap.
+and integration contracts.
 
 ## Contributing
 

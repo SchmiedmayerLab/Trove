@@ -15,9 +15,7 @@ Specialized procedures remain in study applications.
 Study revisions, enrollment, consent and health-data collection requirements are
 implemented. Server-assigned tasks,
 multilingual questionnaire authoring, randomization and the research operations
-below describe the intended design, not currently available end-to-end workflows.
-[GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
-[issues](https://github.com/SchmiedmayerLab/Trove/issues) track implementation.
+below describe their design, not available end-to-end workflows.
 
 ## Study Definitions and Revisions
 

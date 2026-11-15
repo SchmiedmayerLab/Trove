@@ -100,12 +100,9 @@ define the exchange contracts.
 ## Beta Release
 
 Trove is in beta and is being actively tested and used at Stanford.
-The [tour](Platform-Tour.md) documents the current interfaces. GitHub milestones
-track planned work and delivery status; issues contain the implementation details
-and acceptance criteria.
+The [tour](Platform-Tour.md) documents the current interfaces.
 
-[GitHub Milestones](https://github.com/SchmiedmayerLab/Trove/milestones){ .md-button .md-button--primary }
-[Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button }
+[Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button .md-button--primary }
 
 </section>
 

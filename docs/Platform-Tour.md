@@ -106,7 +106,5 @@ The screenshots cover study authoring, health-collection settings, publication,
 discovery, enrollment and consent review. The [Swift CLI guide](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)
 documents the command-line authoring and study-data operations.
 
-Randomization, automated follow-up, questionnaire branching previews and hosted
-authoring are tracked in [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones).
 Trove is in beta and is being actively tested and used at Stanford.
 The illustrated study and accounts are synthetic.
