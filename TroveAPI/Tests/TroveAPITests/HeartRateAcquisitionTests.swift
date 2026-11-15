@@ -22,7 +22,7 @@ struct HealthKitAcquisitionTests {
     private enum Interruption: CaseIterable { case queryFailure, cancellation }
     private enum QueryFailure: Error { case unavailable }
 
-    @Test(arguments: ["https://trove.test/events", "urn:uuid:19e5294b-859b-4670-8c58-9f34f5417cd1"])
+    @Test(arguments: ["https://trove.test/events", "http://localhost:8080/realms/trove/trove/sources/19e5294b-859b-4670-8c58-9f34f5417cd1"])
     func groveConversionStagesOneEventForTwoStudiesAndRestoresExactBytes(identifierRoot: String) async throws {
         try await Self.withFixture(identifierRoot: identifierRoot) { fixture, url in
             let sample = Self.sample()
