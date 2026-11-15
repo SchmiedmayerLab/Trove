@@ -53,6 +53,19 @@ struct FHIRSyncRecordIdentifierTests {
         #expect(event.outputs.map(\.writerVersion) == base.outputs.map(\.writerVersion))
     }
 
+    /// Trove roots every native system under the server's issuer URL, which may carry a port and a path.
+    @Test
+    func syncIdentifierExtendsAnyNativeSystemThatNamesAnAuthority() throws {
+        let native = "http://localhost:8080/realms/trove/trove/sources/19e5294b-859b-4670-8c58-9f34f5417cd1/native-healthkit-record"
+        let text = String(decoding: try SyncIdentifierFixture.bytes(), as: UTF8.self)
+            .replacingOccurrences(of: SyncIdentifierFixture.nativeSystem, with: native)
+        let event = try FHIRPointProjection.project(validatedBytes: Data(text.utf8), validatorIdentity: "test-only")
+        #expect(event.syncRecordIdentifiers == [
+            .init(system: native + "/healthkit-sync-identifier/org.example.writer", value: SyncIdentifierFixture.value)
+        ])
+        #expect(event.nativeRecordIdentifiers.map(\.system) == [native])
+    }
+
     @Test
     func documentPrimaryAdmitsTheSyncIdentifierExactlyAsAnObservation() throws {
         let name = "heartbeat-series-sync-identifier-disclosure"
@@ -86,14 +99,20 @@ struct FHIRSyncRecordIdentifierTests {
 
     @Test(arguments: [
         "duplicate", "second-coding", "type-text", "period", "path-segment", "bundle-identifier", "empty-bundle-identifier",
-        "relative-scope", "missing-value", "writer-version", "writer-record", "grove-identity-system", "device"
+        "relative-scope", "other-scope", "missing-value", "writer-version", "writer-record", "without-native", "source-type",
+        "native-typed-as-sync", "native-without-authority", "grove-identity-system", "device"
     ])
     func unsupportedSyncIdentifierShapesFailClosed(kind: String) throws {
         let golden = try SyncIdentifierFixture.bytes()
         let bytes: Data
         switch kind {
-        case "duplicate", "writer-version", "writer-record":
+        case "duplicate", "writer-version", "writer-record", "without-native", "source-type", "native-typed-as-sync":
             bytes = try changingPrimary(golden, kind: kind)
+        case "native-without-authority":
+            // Grove refuses to disclose under a native system without an authority, so no sync identifier extends one.
+            let text = String(decoding: golden, as: UTF8.self)
+                .replacingOccurrences(of: SyncIdentifierFixture.nativeSystem, with: "urn:trove:test:native-healthkit-record")
+            bytes = Data(text.utf8)
         case "grove-identity-system":
             // The writer-record identity numbered under the sync identifier's own system.
             let text = String(decoding: golden, as: UTF8.self).replacingOccurrences(
@@ -120,6 +139,14 @@ struct FHIRSyncRecordIdentifierTests {
             switch kind {
             case "duplicate": identifiers += identifiers.filter(SyncIdentifierFixture.isSyncIdentifier)
             case "writer-version": extensions.removeAll { $0["url"] as? String == Canonicals.writerRecordVersion.value?.url.absoluteString }
+            case "without-native": identifiers.removeAll { $0["type"] == nil }
+            case "native-typed-as-sync":
+                // Grove refuses to type the native UUID with the sync identifier's coding, which types that identifier alone.
+                let sync = try #require(identifiers.first(where: SyncIdentifierFixture.isSyncIdentifier))
+                let native = try #require(identifiers.firstIndex { $0["type"] == nil })
+                identifiers[native]["type"] = sync["type"]
+            case "source-type":
+                extensions.removeAll { $0["url"] as? String == Canonicals.healthKitSourceTypeExtension.value?.url.absoluteString }
             default: identifiers.removeAll { ($0["system"] as? String)?.contains("/writer-record/") == true }
             }
             resource["identifier"] = identifiers
@@ -139,6 +166,7 @@ struct FHIRSyncRecordIdentifierTests {
         case "bundle-identifier": identifier["system"] = scope + "/healthkit-sync-identifier/org_example"
         case "empty-bundle-identifier": identifier["system"] = scope + "/healthkit-sync-identifier/"
         case "relative-scope": identifier["system"] = "native-healthkit-record/healthkit-sync-identifier/org.example.writer"
+        case "other-scope": identifier["system"] = "https://example.org/other-store/healthkit-sync-identifier/org.example.writer"
         default: identifier["value"] = nil
         }
     }

@@ -26,20 +26,22 @@ enum FHIRSyncRecordIdentifier {
         identifier.type?.coding?.contains { $0.system?.value?.url.absoluteString == typeSystem && $0.code?.value?.string == typeCode } == true
     }
 
-    /// Validates the sync identifier of an Observation or DocumentReference primary: its coding is its only type, it
-    /// travels beside the writer-record identity and exactly one writer-record version, and its system is an absolute
-    /// store scope, the path segment and one writing application's bundle identifier.
+    /// Validates the sync identifier of an Observation or DocumentReference primary as Grove produces and checks it: its
+    /// coding is its only type; it travels on a HealthKit output beside the native UUID, the writer-record identity and
+    /// exactly one writer-record version; and its system is exactly the native system, which names an authority and has no
+    /// query or fragment, then the path segment and one writing application's bundle identifier.
     static func validated(
-        _ identifier: Identifier, roles: [RoledIdentifier], extensions: [Extension]
+        _ identifier: Identifier, native: ValidatedExchangeEvent.Identifier, roles: [RoledIdentifier], extensions: [Extension]
     ) throws -> ValidatedExchangeEvent.Identifier {
+        let prefix = native.system + "/" + systemPathSegment + "/"
         guard identifier.type?.coding?.count == 1, identifier.type?.text == nil,
               identifier.use == nil, identifier.period == nil, identifier.assigner == nil, identifier.extension?.isEmpty != false,
+              extensions.contains(where: { $0.url == Canonicals.healthKitSourceTypeExtension }),
               roles.contains(where: { $0.role == .writerRecord }),
               extensions.filter({ $0.url == Canonicals.writerRecordVersion }).count == 1,
+              namesAuthority(native.system),
               let system = identifier.system?.value?.url.absoluteString, (1...512).contains(system.utf8.count),
-              let separator = system.range(of: "/\(systemPathSegment)/", options: .backwards),
-              (try? IdentifierSystem(String(system[..<separator.lowerBound]))) != nil,
-              isWriterSegment(system[separator.upperBound...]) else {
+              system.hasPrefix(prefix), isWriterSegment(system.dropFirst(prefix.count)) else {
             throw FHIRValidationClient.invalid
         }
         let business = try BusinessIdentifier(identifier)
@@ -58,6 +60,15 @@ enum FHIRSyncRecordIdentifier {
             return (value as? [Any])?.reduce(0) { $0 + count($1) } ?? 0
         }
         return count(try JSONSerialization.jsonObject(with: bytes))
+    }
+
+    /// Whether a native system can carry readable sync identifiers: it names an authority and has no query or fragment,
+    /// so the sync identifier's segments extend its path. Grove refuses to disclose under any other system.
+    private static func namesAuthority(_ system: String) -> Bool {
+        guard let components = URLComponents(string: system) else {
+            return false
+        }
+        return components.percentEncodedHost != nil && components.percentEncodedQuery == nil && components.percentEncodedFragment == nil
     }
 
     /// An Apple bundle identifier: nonempty ASCII letters, digits, hyphens and periods.

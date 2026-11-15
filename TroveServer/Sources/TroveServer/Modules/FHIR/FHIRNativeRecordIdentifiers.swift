@@ -20,8 +20,9 @@ enum FHIRNativeRecordIdentifiers {
         var sync: [ValidatedExchangeEvent.Identifier] = []
     }
 
-    /// An output's Grove roles, its native UUID and its readable sync identifier, each at most once. `extensions` are the
-    /// output's own, which must state the writer-record version a sync identifier travels beside.
+    /// An output's Grove roles, its native UUID and its readable sync identifier, each at most once. A sync identifier
+    /// travels only beside the native UUID, whose system it extends. `extensions` are the output's own, which must state
+    /// the HealthKit source type and the writer-record version a sync identifier travels beside.
     static func output(_ identifiers: [Identifier], extensions: [Extension]) throws -> Output {
         var output = Output()
         var sync: [Identifier] = []
@@ -35,7 +36,10 @@ enum FHIRNativeRecordIdentifiers {
             }
         }
         guard output.native.count <= 1, sync.count <= 1 else { throw FHIRValidationClient.invalid }
-        output.sync = try sync.map { try FHIRSyncRecordIdentifier.validated($0, roles: output.roles, extensions: extensions) }
+        output.sync = try sync.map { identifier in
+            guard let native = output.native.first else { throw FHIRValidationClient.invalid }
+            return try FHIRSyncRecordIdentifier.validated(identifier, native: native, roles: output.roles, extensions: extensions)
+        }
         return output
     }
 

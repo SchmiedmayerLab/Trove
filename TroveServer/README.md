@@ -477,15 +477,18 @@ source ownership, consent, retraction authority or revision selection. Existing
 records without this optional evidence remain admissible. The study data endpoint
 preserves this evidence in authorized derived exports.
 
-A primary Observation or DocumentReference that carries the writer-record
-identity and exactly one writer-record version may also carry one readable
-HealthKit sync identifier, typed only `healthkit-identifier-type#healthkit-sync-id`,
-under `<store scope>/healthkit-sync-identifier/<bundle identifier>`. Its text
+A primary HealthKit Observation or DocumentReference that carries its native
+UUID, the writer-record identity and exactly one writer-record version may also
+carry one readable HealthKit sync identifier, typed only
+`healthkit-identifier-type#healthkit-sync-id`, under
+`<native UUID system>/healthkit-sync-identifier/<bundle identifier>`, where the
+native system names an authority and has no query or fragment, as Grove requires
+before it discloses one. Its text
 is retained verbatim and treated like the native UUID: it is never an identity,
 entry key, deduplication key, version selector, receipt or retraction target, and
 derived exports preserve it. A sync identifier anywhere else, more than one, or
-one under a Grove identity system fails the record. Requiring the native UUID
-beside it remains a guide and validator invariant.
+one under a Grove identity system fails the record, and so does one without the
+native UUID beside it or under any other system.
 
 `StudyDataQuery` provides the internal selection layer for the study data endpoint. It returns
 at most 100 exact output addresses per page, deduplicates overlapping consent
