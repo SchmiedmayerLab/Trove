@@ -192,7 +192,8 @@ enum FHIRPointSupportBoundary {
                 try literal(reference, type: "Device", resources: resources)
             case ("Observation", researchStudy, .reference(let reference)):
                 try literal(reference, type: "ResearchStudy", resources: resources)
-            case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
+            case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string),
+                 ("DocumentReference", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
                 break // Complete pair, canonical text and cross-output consistency are checked by the revision projection.
             case ("Provenance", Canonicals.recordVersion.value?.url.absoluteString, .identifier),
                  ("QuestionnaireResponse", Canonicals.contextSnapshot.value?.url.absoluteString, .identifier):

@@ -87,6 +87,31 @@ struct FHIRHeartbeatRecordingTests {
         #expect(throws: (any Error).self) { try ClinicalRecordingAttachment.validate(document: document, declaration: declaration) }
     }
 
+    @Test("Grove's heartbeat series states its writer revision on the primary document")
+    func projectsTheGoldenWriterRevision() throws {
+        let url = try #require(Bundle.module.url(forResource: "HealthKitHeartbeatSeriesWriterRecordEvent", withExtension: "json"))
+        var bundle = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        var entries = try #require(bundle["entry"] as? [[String: Any]])
+        let index = try #require(entries.firstIndex { ($0["resource"] as? [String: Any])?["resourceType"] as? String == "DocumentReference" })
+        var document = try #require(entries[index]["resource"] as? [String: Any])
+        // The readable sync identifier beside the native identifier is not yet admitted; the writer revision does not depend on it.
+        let identifiers = try #require(document["identifier"] as? [[String: Any]])
+        document["identifier"] = identifiers.filter { identifier in
+            ((identifier["type"] as? [String: Any])?["coding"] as? [[String: Any]])?.contains { $0["code"] as? String == "healthkit-sync-id" } != true
+        }
+        entries[index]["resource"] = document
+        bundle["entry"] = entries
+        let bytes = try JSONSerialization.data(withJSONObject: bundle)
+        let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "synthetic-shape-only")
+        let output = try #require(event.outputs.first)
+        let pair = try FHIRRecordingProjectionTests.goldenWriterRevision()
+        #expect(event.outputs.count == 1 && output.value == .recording)
+        #expect(output.code == RegisteredRecordingFormat.beatIntervalSeries.rawValue)
+        #expect(output.writerIdentifier?.value == pair.identifier["value"] as? String)
+        #expect(output.writerVersion == "3")
+        #expect(event.nativeRecordIdentifiers.count == 1)
+    }
+
     @Test(arguments: ["source", "format", "period", "gap", "reverse", "outside"])
     func refusesMismatchedOrInvalidSeries(_ corruption: String) throws {
         var payload = "timestamp,precededByGap\n1787005801,0\n1787005802,1\n"
