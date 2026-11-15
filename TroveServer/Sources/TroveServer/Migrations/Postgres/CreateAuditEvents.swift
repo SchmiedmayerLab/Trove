@@ -56,6 +56,7 @@ struct CreateAuditEvents: AsyncMigration {
                 .field("group_id", .uuid)
                 .field("participant_id", .uuid)
                 .field("source_binding_id", .uuid)
+                .field("provider_registration_id", .uuid)
                 .field("target_id", .uuid, .required)
                 .field("target_version", .string)
                 .field("outcome", .string, .required)
@@ -63,9 +64,13 @@ struct CreateAuditEvents: AsyncMigration {
                 .field("application_revision", .string)
                 .constraint(check("""
                     (scope_kind = 'study' AND study_id IS NOT NULL
-                        AND participant_id IS NULL AND source_binding_id IS NULL)
+                        AND participant_id IS NULL AND source_binding_id IS NULL AND provider_registration_id IS NULL)
                     OR (scope_kind = 'participant_source' AND study_id IS NULL AND group_id IS NULL
-                        AND participant_id IS NOT NULL AND source_binding_id IS NOT NULL)
+                        AND participant_id IS NOT NULL AND source_binding_id IS NOT NULL AND provider_registration_id IS NULL)
+                    OR (scope_kind = 'provider_registration' AND study_id IS NULL AND group_id IS NULL
+                        AND participant_id IS NULL AND source_binding_id IS NULL AND provider_registration_id IS NOT NULL)
+                    OR (scope_kind = 'participant_provider' AND study_id IS NULL AND group_id IS NULL
+                        AND participant_id IS NOT NULL AND source_binding_id IS NULL AND provider_registration_id IS NOT NULL)
                     """, name: "audit_events_scope"))
                 .constraint(check(actionScopeConstraint(), name: "audit_events_action_scope"))
                 .create()
@@ -74,7 +79,7 @@ struct CreateAuditEvents: AsyncMigration {
     /// Canonical fresh schema and application share one closed action catalog.
     /// Values are compile-time enum constants, never request-provided SQL fragments.
     private func actionScopeConstraint() -> String {
-        let scopes: [AuditEvent.Scope.Kind] = [.study, .participantSource]
+        let scopes: [AuditEvent.Scope.Kind] = [.study, .participantSource, .providerRegistration, .participantProvider]
         return scopes.map { scope in
             let actions = AuditEvent.Action.allCases.filter { $0.scopeKind == scope }
                 .map { "'\($0.rawValue)'" }

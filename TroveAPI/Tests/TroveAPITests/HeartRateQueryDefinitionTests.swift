@@ -31,7 +31,7 @@ struct HealthKitQueryDefinitionTests {
         #expect(!query.contains(end, ending: end.addingTimeInterval(60)))
         #expect(!query.contains(end, ending: start))
         #expect(!query.contains(start))
-        let point = try HealthKitQueryDefinition(profile: .heartRate, kind: .historical, start: start, end: end)
+        let point = try HealthKitQueryDefinition(profile: .bodyWeight, kind: .historical, start: start, end: end)
         #expect(!point.contains(start, ending: end))
     }
 

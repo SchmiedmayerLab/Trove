@@ -18,6 +18,12 @@ struct ClinicalRecordingAttachment: Sendable {
     let content: RecordingContentVerification
 
     static func validate(document: DocumentReference, declaration: RecordingTransferDeclaration) throws {
+        let source = try FHIRSourceTypeEvidence.extract(document.extension ?? [])
+        if let declaredSource = declaration.output.sourceTypeIdentifier {
+            guard source?.identifier == declaredSource else { throw FHIRValidationClient.invalid }
+        } else {
+            guard declaration.output.isWorkoutRoute else { throw FHIRValidationClient.invalid }
+        }
         guard document.meta?.profile?.contains(where: { $0.value?.url.absoluteString == declaration.output.profile }) == true,
               document.content.count == 1, let content = document.content.first,
               content.format?.system?.value?.url.absoluteString == FHIRRecordingProjection.formatSystem,
@@ -28,11 +34,9 @@ struct ClinicalRecordingAttachment: Sendable {
               let hash = content.attachment.hash?.value?.data(), hash.count == 20 else { throw FHIRValidationClient.invalid }
     }
 
-    func validate(document: DocumentReference, bounds: (Date, Date)) throws {
+    func validate(document: DocumentReference, bounds: ClinicalMeasurementBounds) throws {
         try Self.validate(document: document, declaration: declaration)
-        let dates = TroveDateTranscoder()
         guard document.content.first?.attachment.hash?.value?.data() == content.attachmentSHA1,
-              try dates.decode(dates.encode(bounds.0)) == declaration.output.effectiveAt,
-              try dates.decode(dates.encode(bounds.1)) == declaration.output.effectiveEnd else { throw FHIRValidationClient.invalid }
+              bounds == declaration.output.measurementBounds else { throw FHIRValidationClient.invalid }
     }
 }

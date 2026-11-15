@@ -9,6 +9,9 @@
 import Crypto
 import Foundation
 import GroveFHIRContract
+import GroveHealthKit
+import GroveProviderFHIR
+import GroveSensorKitFHIR
 
 
 /// Exact declaration evidence shared by the sender and receiver. This is not clinical validation or collection authority.
@@ -24,6 +27,7 @@ public struct RecordingTransferCommitment: Sendable {
         let attachmentPath: String
         let outputFullURL: String
         let profile: String
+        let sourceTypeIdentifier: String?
         let format: String
         let effectiveAt: Date
         let effectiveEnd: Date
@@ -43,8 +47,8 @@ public struct RecordingTransferCommitment: Sendable {
         guard (1...512).contains(path.utf8.count),
               path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
               path.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || [45, 46, 47, 95].contains($0) }),
-              declaration.profile == Profile.healthkitRecordingDocument.value?.url.absoluteString,
-              RegisteredRecordingFormat(rawValue: declaration.format) != nil,
+              Self.admitsSourceFormat(declaration),
+              declaration.sourceTypeIdentifier.map({ (1...256).contains($0.utf8.count) && $0.utf8.allSatisfy { (33...126).contains($0) } }) ?? true,
               Self.validDate(declaration.effectiveAt), Self.validDate(declaration.effectiveEnd),
               declaration.effectiveAt <= declaration.effectiveEnd,
               (1...Int64(Int32.max)).contains(content.storedByteCount), (1...Int64(Int32.max)).contains(content.sourceByteCount),
@@ -69,6 +73,7 @@ public struct RecordingTransferCommitment: Sendable {
             attachmentPath: path,
             outputFullURL: declaration.outputFullUrl,
             profile: declaration.profile,
+            sourceTypeIdentifier: declaration.sourceTypeIdentifier,
             format: declaration.format,
             effectiveAt: declaration.effectiveAt,
             effectiveEnd: declaration.effectiveEnd,
@@ -92,6 +97,7 @@ public struct RecordingTransferCommitment: Sendable {
                 attachmentPath: evidence.attachmentPath,
                 outputFullUrl: evidence.outputFullURL,
                 profile: evidence.profile,
+                sourceTypeIdentifier: evidence.sourceTypeIdentifier,
                 format: evidence.format,
                 effectiveAt: evidence.effectiveAt,
                 effectiveEnd: evidence.effectiveEnd,
@@ -123,6 +129,45 @@ public struct RecordingTransferCommitment: Sendable {
 
 
 extension RecordingTransferCommitment {
+    /// Closed producer contracts only. Active study consent and actual record evidence are checked separately.
+    private static func admitsSourceFormat(_ declaration: Components.Schemas.RecordingTransferDeclaration) -> Bool {
+        guard let format = RegisteredRecordingFormat(rawValue: declaration.format) else {
+            return false
+        }
+        if declaration.profile == Profile.healthkitRecordingDocument.value?.url.absoluteString {
+            switch format {
+            case .locationTrackSamples:
+                return declaration.sourceTypeIdentifier == nil
+                    || declaration.sourceTypeIdentifier == SampleType.workoutRoute.hkSampleType.identifier
+            case .beatIntervalSeries:
+                return declaration.sourceTypeIdentifier == SampleType.heartbeatSeries.hkSampleType.identifier
+            case .clinicalDocument:
+                return CollectionTimeBasis.required(profile: declaration.profile, sourceTypeIdentifier: declaration.sourceTypeIdentifier)
+                    == .cdaSourceDocumentPeriod
+            default: return false
+            }
+        }
+        if format == .fhirResource,
+           CollectionTimeBasis.required(profile: declaration.profile, sourceTypeIdentifier: declaration.sourceTypeIdentifier)
+            == .clinicalRecordDownload {
+            return true
+        }
+        if declaration.profile == Profile.groveSensorRecordingDocument.value?.url.absoluteString {
+            guard format == .providerRecording, let token = declaration.sourceTypeIdentifier else {
+                return false
+            }
+            return ProviderCapabilities.Provider.allCases.contains { provider in
+                ProviderCapabilities.sources(for: provider).contains { $0.token == token && $0.conversionSupport == .nativeRecording }
+            }
+        }
+        guard declaration.profile == SensorKitContract.recordingDocumentProfile,
+              let token = declaration.sourceTypeIdentifier,
+              let source = SensorKitCatalog.current.entry(sourceToken: token)?.implementedOutput else {
+            return false
+        }
+        return source.recordingProfiles.contains(declaration.profile) && source.recordingFormats.contains(format)
+    }
+
     private static func validDate(_ date: Date) -> Bool { (0...253_402_300_799).contains(date.timeIntervalSince1970) }
 
     private static func isDigest(_ value: String) -> Bool {

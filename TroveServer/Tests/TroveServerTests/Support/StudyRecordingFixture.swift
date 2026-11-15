@@ -30,7 +30,12 @@ struct StudyRecordingFixture: Sendable {
         let result = try await ClinicalRecordingAttachmentTests.submit(
             recording.submission(sourceID: source.source.id, receipt: receipt), source: source, on: app, token: token
         )
-        guard case .EventReceipt = try #require(result.first) else { throw ServerError.unexpectedError }
+        let first = try #require(result.first)
+        if case .ProblemDetails(let problem) = first {
+            Issue.record("Synthetic recording admission failed: status=\(problem.status), detail=\(problem.detail ?? "none")")
+            throw ServerError.unexpectedError
+        }
+        guard case .EventReceipt = first else { throw ServerError.unexpectedError }
         let sql = try #require(app.db as? any SQLDatabase)
         let grant = try #require(try await sql.raw("SELECT id FROM study_data_grants WHERE study_id = \(bind: source.studyIDs[0])").first())
         return try .init(

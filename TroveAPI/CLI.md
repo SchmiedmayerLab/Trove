@@ -77,9 +77,12 @@ attachment URL in the derived study Bundle. Use `--history` if that URL selects
 credential. The server independently verifies current researcher and study access
 for every download and audits the release.
 
-The output contains the original CSV bytes described by the attachment, including
+The output contains the original bytes described by the attachment, including
 when the server stores a compressed representation. The CLI requests identity HTTP
-encoding and rejects an encoded response before saving any output bytes. Downloads stream with
+encoding and rejects an encoded response before saving any output bytes. Binary HTTP transport
+preserves CSV, JSON, FHIR, CDA and PPG source bytes; the required original-media
+header must name a registered supported type. JSON values and version parameters
+are not decoded or rewritten. Downloads stream with
 backpressure on macOS and Linux into a private temporary file in the destination
 directory. On macOS, inherited extended ACLs on staging storage are rejected
 before requesting or writing recording data. Successful completion publishes an

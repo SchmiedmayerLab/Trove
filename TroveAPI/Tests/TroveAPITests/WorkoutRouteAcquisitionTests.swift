@@ -46,14 +46,14 @@ struct WorkoutRouteAcquisitionTests {
                 application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
                 host: .init(operatingSystemVersion: "27.2")
             ) { _, _ in
-                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1))) { route in
+                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1)), readRoute: { route in
                     try await HealthKitRecordingFile.workoutRoute(
                         route,
                         locations: RepeatedLocations(remaining: count),
                         relativePath: "recordings/route.csv",
                         maximumByteCount: 16 * 1024 * 1024
                     )
-                }
+                })
             }
             let eventID = try #require(page.eventIDs.first)
             let attempt = try #require(try await journal.prepareAttempt(eventID))
@@ -73,7 +73,7 @@ struct WorkoutRouteAcquisitionTests {
         let sample = try WorkoutRouteFixture.sample(start: Fixture.date(25), end: Fixture.date(150), count: 2)
         let plans = Self.plans()
         let snapshot = try ParticipantCollectionSnapshot(plans: plans, enrollmentIDs: plans.compactMap { UUID(uuidString: $0.enrollmentId) })
-        #expect(HealthKitAcquisition.sampleType(for: HealthKitQueryDefinition.Stream.workoutRoute) == HKSeriesType.workoutRoute())
+        #expect(try HealthKitAcquisition.sampleType(for: HealthKitQueryDefinition.Stream.workoutRoute) == HKSeriesType.workoutRoute())
         let consents = try HealthKitAcquisition.consentIDs(for: sample, stream: .workoutRoute, snapshot: snapshot)
         #expect(consents == [UUID(uuidString: plans[0].windows[0].consentId)])
         #expect(throws: HealthKitAcquisition.AcquisitionError.unsupportedDelta) {
@@ -93,10 +93,10 @@ struct WorkoutRouteAcquisitionTests {
                 application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
                 host: .init(operatingSystemVersion: "27.2")
             ) { _, _ in
-                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1))) { _ in
+                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1)), readRoute: { _ in
                     Issue.record("An excluded route must not load companion locations")
                     throw ReadFailure.interrupted
-                }
+                })
             }
             #expect(page.eventIDs.isEmpty && page.changeCount == 1 && !page.isCaughtUp)
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID).cursor != nil)
@@ -119,9 +119,9 @@ struct WorkoutRouteAcquisitionTests {
                     host: .init(operatingSystemVersion: "27.2")
                 ) { query, _ in
                     #expect(query.stream == .workoutRoute)
-                    return .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1))) { _ in
+                    return .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1)), readRoute: { _ in
                         throw ReadFailure.interrupted
-                    }
+                    })
                 }
             }
             #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)

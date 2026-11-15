@@ -34,7 +34,7 @@ struct StudyDataFenceTests {
     func retainsEveryExactRevisionGrantWithoutOtherStudyGrants() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             let receipt = try await Self.accept(event, fixture: fixture, on: app)
             try await StudyDataQueryTests.addHistoricalGrant(fixture: fixture, receipt: receipt, on: app)
             let enrollment = try #require(try await Enrollment.find(fixture.enrollmentIDs[0], on: app.db))
@@ -75,7 +75,7 @@ struct StudyDataFenceTests {
     func supersededAndRetractedCandidatesRequireARefresh() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let older = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1")
+            let older = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1")
             _ = try await Self.accept(older, fixture: fixture, on: app)
             let query = StudyDataQuery(database: app.db)
             let before = try await query.page(studyID: fixture.studyIDs[0])
@@ -83,7 +83,7 @@ struct StudyDataFenceTests {
             try await Self.expectChanged(before, studyID: fixture.studyIDs[0], on: app)
             let history = try await query.page(studyID: fixture.studyIDs[0], versions: .history)
             #expect(history.outputs.count == 2)
-            var removed = ClinicalRetractionTests.retraction(source: fixture.source)
+            var removed = try ClinicalRetractionTests.retraction(source: fixture.source)
             removed.retraction = .init(sourceRecordIdentifier: older.outputs[0].sourceRecordIdentifier)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
@@ -98,7 +98,7 @@ struct StudyDataFenceTests {
     func lateAttributionDoesNotRefillTheCapturedPage() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "second"])
+            let event = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "second"])
             let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 try await ClinicalEventStore(database: app.db).accept(
                     event,

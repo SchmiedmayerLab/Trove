@@ -12,7 +12,10 @@ import SQLKit
 
 
 /// Supported producer authority; unknown persisted values must fail decoding.
-enum SourceKind: String, Codable, Sendable { case participantApp = "participant-app" }
+enum SourceKind: String, Codable, Sendable {
+    case participantApp = "participant-app"
+    case serverWorker = "server-worker"
+}
 
 
 /// Account-owned producer stream, not evidence of device attestation or provider origin.
@@ -23,6 +26,8 @@ struct SourceBinding: Sendable, Equatable {
     let keyEpoch: KeyEpoch
     let repositoryKind: SourceRepositoryKind
     let kind: SourceKind
+    /// Registration that first provisioned a provider identity; current authority comes only from the connection fence.
+    let providerRegistrationID: UUID?
     let eventIdentifierSystem: String
     let identifierRoot: String
     let participantIdentifierSystem: String
@@ -37,6 +42,7 @@ struct SourceBinding: Sendable, Equatable {
         keyEpoch = try KeyEpoch(row.decode(column: "key_epoch", as: String.self))
         repositoryKind = try row.decode(column: "repository_kind", as: SourceRepositoryKind.self)
         kind = try row.decode(column: "kind", as: SourceKind.self)
+        providerRegistrationID = try row.decode(column: "provider_registration_id", as: UUID?.self)
         eventIdentifierSystem = try row.decode(column: "event_identifier_system", as: String.self)
         identifierRoot = try row.decode(column: "identifier_root", as: String.self)
         guard try SourceIdentityNamespaces.assign(root: identifierRoot, keyID: keyID, epoch: keyEpoch).recordVersion.rawValue

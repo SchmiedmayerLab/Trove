@@ -46,7 +46,7 @@ struct FHIRWorkoutProjectionTests {
         #expect(sessions.count == 1 && session.effectiveEnd?.timeIntervalSince(session.effectiveAt) == 3600)
         #expect(session.value == .coded(system: FHIRWorkoutProjection.activitySystem, code: "running"))
         let selections = try FHIRWorkoutProjection.collectionOutputs(event.outputs.map {
-            .init(fullURL: $0.fullURL, profile: $0.profile, effectiveAt: $0.effectiveAt, effectiveEnd: $0.effectiveEnd)
+            .init(fullURL: $0.fullURL, profile: $0.profile, measurementBounds: $0.measurementBounds)
         })
         #expect(selections.count == 14)
         #expect(selections.allSatisfy { $0.effectiveAt == session.effectiveAt && $0.effectiveEnd == session.effectiveEnd })

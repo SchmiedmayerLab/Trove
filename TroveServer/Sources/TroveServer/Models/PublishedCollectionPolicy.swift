@@ -11,25 +11,67 @@ import TroveAPITypes
 
 
 struct CollectionRequirement: Codable, Sendable, Hashable {
+    struct Identity: Hashable {
+        let profile: String
+        let sourceKind: SourceKind
+        let providerRegistrationID: UUID?
+        let sourceTypeIdentifier: String?
+    }
+
+
     /// Receiver capability, not a duplicate measurement catalog or substitute for IG validation.
     static let supportedProfile = CollectionObservationProfile.heartRate.rawValue
 
     let profile: String
     let sourceKind: SourceKind
+    let providerRegistrationID: UUID?
+    let sourceTypeIdentifier: String?
+    let timeBasis: CollectionTimeBasis?
     let measurementWindow: CollectionMeasurementWindow?
     let includeWorkoutRoutes: Bool
 
-    init(profile: String, sourceKind: SourceKind, measurementWindow: CollectionMeasurementWindow? = nil, includeWorkoutRoutes: Bool = false) {
+    var identity: Identity {
+        .init(profile: profile, sourceKind: sourceKind, providerRegistrationID: providerRegistrationID, sourceTypeIdentifier: sourceTypeIdentifier)
+    }
+
+    init(
+        profile: String,
+        sourceKind: SourceKind,
+        measurementWindow: CollectionMeasurementWindow? = nil,
+        includeWorkoutRoutes: Bool = false,
+        providerRegistrationID: UUID? = nil,
+        sourceTypeIdentifier: String? = nil,
+        timeBasis: CollectionTimeBasis? = nil
+    ) {
         self.profile = profile
         self.sourceKind = sourceKind
+        self.providerRegistrationID = providerRegistrationID
+        self.sourceTypeIdentifier = sourceTypeIdentifier
+        self.timeBasis = timeBasis
         self.measurementWindow = measurementWindow
         self.includeWorkoutRoutes = includeWorkoutRoutes
     }
 
+    private static func validSource(_ requirement: Self) -> Bool {
+        guard let profile = CollectionObservationProfile(rawValue: requirement.profile) else {
+            return false
+        }
+        if requirement.sourceKind == .participantApp {
+            return profile.permitsNativeSource(requirement.sourceTypeIdentifier)
+        }
+        guard let identifier = requirement.sourceTypeIdentifier else {
+            return false
+        }
+        return !identifier.isEmpty && identifier.utf8.count <= 256
+    }
+
     static func validate(_ requirements: [Self]) throws {
-        guard requirements.count <= CollectionObservationProfile.allCases.count,
-              Set(requirements.map(\.profile)).count == requirements.count,
-              requirements.allSatisfy({ CollectionObservationProfile(rawValue: $0.profile) != nil
+        guard requirements.count <= CollectionObservationProfile.maximumRequirements,
+              Set(requirements.map(\.identity)).count == requirements.count,
+              requirements.allSatisfy({ validSource($0)
+                  && CollectionTimeBasis.accepts($0.timeBasis, profile: $0.profile, sourceTypeIdentifier: $0.sourceTypeIdentifier)
+                  && ($0.sourceKind == .serverWorker) == ($0.providerRegistrationID != nil)
+                  && ($0.sourceKind == .participantApp || !$0.includeWorkoutRoutes)
                   && (!$0.includeWorkoutRoutes || $0.profile == CollectionObservationProfile.workout.rawValue) }) else {
             throw ServerError.badRequest("Collection requirements contain duplicate or unsupported receiver capabilities")
         }
@@ -44,6 +86,9 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
     struct ResolvedRequirement: Sendable {
         let profile: String
         let sourceKind: SourceKind
+        let providerRegistrationID: UUID?
+        let sourceTypeIdentifier: String?
+        let timeBasis: CollectionTimeBasis?
         let start: Date
         let end: Date?
         let includeWorkoutRoutes: Bool
@@ -137,14 +182,21 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         guard CollectionMeasurementWindow.valid(acceptedAt),
               scope.map({ $0.requirements.count == requirements.count }) ?? true else { throw Self.missingScope }
         return try requirements.map { requirement in
-            let retained = scope?.requirements.filter { $0.profile == requirement.profile && $0.sourceKind == requirement.sourceKind }
+            let retained = scope?.requirements.filter {
+                $0.profile == requirement.profile && $0.sourceKind == requirement.sourceKind
+                    && $0.providerRegistrationID == requirement.providerRegistrationID && $0.sourceTypeIdentifier == requirement.sourceTypeIdentifier
+                    && $0.timeBasis == requirement.timeBasis
+            }
             let window: ResolvedCollectionWindow
             if let retained {
                 guard retained.count == 1, let value = retained.first,
                       value.includeWorkoutRoutes == requirement.includeWorkoutRoutes else { throw Self.missingScope }
                 window = value.window
             } else {
-                guard requirement.measurementWindow == nil, !requirement.includeWorkoutRoutes else { throw Self.missingScope }
+                guard requirement.measurementWindow == nil, !requirement.includeWorkoutRoutes, requirement.providerRegistrationID == nil,
+                      requirement.sourceTypeIdentifier == nil, requirement.timeBasis == nil else {
+                    throw Self.missingScope
+                }
                 window = .init(start: nil, end: nil)
             }
             try Self.validate(window, for: requirement, acceptedAt: acceptedAt)
@@ -157,6 +209,9 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
             return .init(
                 profile: requirement.profile,
                 sourceKind: requirement.sourceKind,
+                providerRegistrationID: requirement.providerRegistrationID,
+                sourceTypeIdentifier: requirement.sourceTypeIdentifier,
+                timeBasis: requirement.timeBasis,
                 start: lower,
                 end: upper.map { max(lower, $0) },
                 includeWorkoutRoutes: requirement.includeWorkoutRoutes
@@ -174,20 +229,32 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         effectiveAt: Date,
         consentAcceptedAt: Date,
         effectiveEnd: Date? = nil,
+        preciseBounds: ClinicalMeasurementBounds? = nil,
         scope: AcceptedCollectionScope? = nil,
         adoptionEnd: Date? = nil,
-        requiresWorkoutRoute: Bool = false
+        requiresWorkoutRoute: Bool = false,
+        providerRegistrationID: UUID? = nil,
+        sourceTypeIdentifier: String? = nil,
+        timeBasis: CollectionTimeBasis = .measurementTime
     ) -> Bool {
         // The profile determines its temporal shape; an interval end cannot be dropped.
         guard let capability = CollectionObservationProfile(rawValue: profile),
-              capability.isInterval == (effectiveEnd != nil) else {
+              capability.permitsEffectiveTime(hasEnd: effectiveEnd != nil) else {
             return false
         }
         guard let requirements = try? resolvedRequirements(
             studyID: studyID, revision: revision, acceptedAt: consentAcceptedAt, scope: scope, adoptionEnd: adoptionEnd
-        ) else { return false }
+        ) else {
+            return false
+        }
         return requirements.contains {
-            $0.profile == profile && $0.sourceKind == sourceKind && $0.contains(effectiveAt, through: effectiveEnd)
+            $0.profile == profile && $0.sourceKind == sourceKind && $0.providerRegistrationID == providerRegistrationID
+                && ($0.timeBasis ?? .measurementTime) == timeBasis
+                && capability.matchesSource(
+                    expected: $0.sourceTypeIdentifier, actual: sourceTypeIdentifier, requiresWorkoutRoute: requiresWorkoutRoute
+                )
+                && ((try? (preciseBounds ?? ClinicalMeasurementBounds(start: effectiveAt, end: effectiveEnd))
+                    .includes(windowStart: $0.start, windowEnd: $0.end)) == true)
                 && (!requiresWorkoutRoute || $0.includeWorkoutRoutes)
         }
     }

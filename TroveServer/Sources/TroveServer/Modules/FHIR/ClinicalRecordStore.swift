@@ -83,11 +83,16 @@ struct ClinicalRecordStore: Sendable {
     ) async throws {
         try await sql.raw("""
             INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at, effective_end,
-                value_kind, quantity_value, quantity_system, quantity_code, value_code_system, value_code, code_system, code)
+                effective_seconds, effective_fraction, effective_end_seconds, effective_end_fraction,
+                value_kind, quantity_value, quantity_system, quantity_code, value_code_system, value_code, code_system, code,
+                source_type_identifier, source_repository_kind)
             VALUES (\(bind: nodeID), \(bind: receipt.sourceID), \(bind: receipt.eventID), \(bind: recordID), \(bind: bindingID),
                 \(bind: output.profile), \(bind: output.effectiveAt), \(bind: output.effectiveEnd),
+                \(bind: output.measurementBounds.start.seconds), \(bind: output.measurementBounds.start.fraction),
+                \(bind: output.measurementBounds.end?.seconds), \(bind: output.measurementBounds.end?.fraction),
                 \(bind: output.value.kind), \(bind: output.value.quantityValue), \(bind: output.value.quantitySystem), \(bind: output.value.quantityCode),
-                \(bind: output.value.codingSystem), \(bind: output.value.codingCode), \(bind: output.codeSystem), \(bind: output.code))
+                \(bind: output.value.codingSystem), \(bind: output.value.codingCode), \(bind: output.codeSystem), \(bind: output.code),
+                \(bind: output.sourceTypeIdentifier), \(bind: output.sourceRepositoryKind?.rawValue))
             """)
             .run()
     }

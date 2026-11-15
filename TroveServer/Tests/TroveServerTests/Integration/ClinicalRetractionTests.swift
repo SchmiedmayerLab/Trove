@@ -20,7 +20,7 @@ struct ClinicalRetractionTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let sourceID = fixture.source.id, proof = fixture.installation
-            let events = [
+            let events = try [
                 ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1"),
                 ClinicalRecordStoreTests.event(source: fixture.source, sequence: 2, version: "2"),
                 Self.retraction(source: fixture.source)
@@ -66,8 +66,8 @@ struct ClinicalRetractionTests {
                     registrationID: otherInstallationID, repositoryKind: .sensorKit
                 )
                 let store = ClinicalEventStore(database: app.db)
-                let first = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
-                let second = ClinicalRecordStoreTests.event(source: other, sequence: 1, version: "1")
+                let first = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
+                let second = try ClinicalRecordStoreTests.event(source: other, sequence: 1, version: "1")
                 _ = try await store.accept(
                     first, sourceID: fixture.source.id, targets: fixture.targets(for: first), installation: fixture.installation
                 )
@@ -87,8 +87,8 @@ struct ClinicalRetractionTests {
     func retractionDoesNotReserveAnotherRecordsOutputIdentity(retractionFirst: Bool) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let active = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
-            let retraction = Self.retraction(source: fixture.source)
+            let active = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
+            let retraction = try Self.retraction(source: fixture.source)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 _ = try await store.accept(
@@ -143,7 +143,7 @@ struct ClinicalRetractionTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let active = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
+                let active = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", record: "contradiction")
                 async let first = Self.attempt(
                     store, event: active, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
                 )
@@ -288,8 +288,8 @@ extension ClinicalRetractionTests {
         }
     }
 
-    static func retraction(source: SourceBinding, sequence: Int = 3) -> ValidatedExchangeEvent {
-        let base = ClinicalRecordStoreTests.event(source: source, sequence: sequence, version: nil, writer: nil)
+    static func retraction(source: SourceBinding, sequence: Int = 3) throws -> ValidatedExchangeEvent {
+        let base = try ClinicalRecordStoreTests.event(source: source, sequence: sequence, version: nil, writer: nil)
         let system = base.eventIdentifierSystem.replacingOccurrences(of: "grove-record-version-v0", with: "grove-record-retraction-v0")
         return .init(
             rawBytes: base.rawBytes,

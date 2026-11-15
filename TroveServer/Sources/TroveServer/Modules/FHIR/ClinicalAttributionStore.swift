@@ -58,7 +58,8 @@ struct ClinicalAttributionStore: Sendable {
             throw ServerError.notFound("Clinical event not found")
         }
         let rows = try await sql.raw("""
-            SELECT f.node_id, n.full_url, f.profile, f.effective_at, f.effective_end, f.code_system, f.code
+            SELECT f.node_id, n.full_url, f.profile, f.effective_seconds, f.effective_fraction,
+                f.effective_end_seconds, f.effective_end_fraction, f.code_system, f.code, f.source_type_identifier
             FROM clinical_point_facts f JOIN clinical_event_nodes n ON n.id = f.node_id
             WHERE f.event_id = \(bind: eventID) AND f.source_id = \(bind: sourceID)
             """)
@@ -67,10 +68,10 @@ struct ClinicalAttributionStore: Sendable {
             try ClinicalGrantStore.Output(
                 fullURL: $0.decode(column: "full_url", as: String.self),
                 profile: $0.decode(column: "profile", as: String.self),
-                effectiveAt: $0.decode(column: "effective_at", as: Date.self),
-                effectiveEnd: $0.decode(column: "effective_end", as: Date?.self),
+                measurementBounds: ClinicalMeasurementBounds(row: $0),
                 codeSystem: $0.decode(column: "code_system", as: String.self),
-                code: $0.decode(column: "code", as: String.self)
+                code: $0.decode(column: "code", as: String.self),
+                sourceTypeIdentifier: $0.decode(column: "source_type_identifier", as: String?.self)
             )
         }
         let authorities = try await grants.authorities(outputs: outputs, intent: intent, requireCustodyCoverage: false)
@@ -96,7 +97,7 @@ struct ClinicalAttributionStore: Sendable {
             """)
             .run()
         try await AuditRepository.recordMutation(.init(
-            context: grants.context.auditContext,
+            context: grants.auditContext,
             action: .clinicalEventAttributed,
             scope: .participantSource(participantID: grants.source.participantID, sourceBindingID: sourceID),
             target: .init(id: commandID)

@@ -49,7 +49,7 @@ struct WorkoutRoutePolicyTests {
             requiresWorkoutRoute: true
         ) == includesRoutes)
         let wire = Components.Schemas.CollectionRequirement(requirement)
-        #expect(CollectionRequirement(wire) == requirement)
+        #expect(try CollectionRequirement(wire) == requirement)
     }
 
     @Test

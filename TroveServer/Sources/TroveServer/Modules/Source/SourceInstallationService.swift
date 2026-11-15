@@ -37,6 +37,7 @@ final class SourceInstallationService: Module, Sendable {
         registrationID: UUID, repositoryKind: SourceRepositoryKind, credential: SourceInstallationCredential
     ) async throws -> Registration {
         let context = try AuthContext.checkIsParticipant()
+        guard repositoryKind == .healthKit || repositoryKind == .sensorKit else { throw ServerError.forbidden }
         return try await database.transaction { transaction in
             let participantID = try await SourceBindingService.lockParticipant(context, on: transaction)
             let sql = try Self.sql(transaction)

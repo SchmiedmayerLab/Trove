@@ -10,7 +10,7 @@ import Foundation
 import GroveFHIRContract
 
 
-/// Measurement bounds derived from every row, without retaining the route in memory.
+/// Measurement bounds derived from every row, without retaining the recording in memory.
 struct RecordingRouteBounds: Sendable {
     private(set) var first: Date?
     private(set) var last: Date?
@@ -29,11 +29,24 @@ struct RecordingRouteBounds: Sendable {
         self.last = last
     }
 
-    mutating func include(_ row: RecordingCSVReader.Row) throws {
-        guard let instant = try row.timestamp("timestamp"), CollectionMeasurementWindow.valid(instant) else {
+    mutating func include(_ row: RecordingCSVReader.Row, format: RegisteredRecordingFormat = .locationTrackSamples) throws {
+        let lower: Date?, upper: Date?
+        switch format {
+        case .pedometerSamples, .odometerSamples:
+            lower = try row.timestamp("start")
+            upper = try row.timestamp("end")
+        default:
+            lower = try row.timestamp("timestamp")
+            upper = lower
+        }
+        guard let lower, let upper, CollectionMeasurementWindow.valid(lower), CollectionMeasurementWindow.valid(upper), lower <= upper else {
             throw FHIRValidationClient.invalid
         }
-        first = first.map { min($0, instant) } ?? instant
-        last = last.map { max($0, instant) } ?? instant
+        if format == .beatIntervalSeries {
+            guard let gap = try row.integer("precededByGap"), (0...1).contains(gap),
+                  last.map({ lower >= $0 }) ?? true else { throw FHIRValidationClient.invalid }
+        }
+        first = first.map { min($0, lower) } ?? lower
+        last = last.map { max($0, upper) } ?? upper
     }
 }

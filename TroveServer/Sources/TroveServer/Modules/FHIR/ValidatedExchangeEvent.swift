@@ -48,8 +48,10 @@ struct ValidatedExchangeEvent: Sendable {
     struct Output: Sendable {
         let fullURL: String
         let profile: String
-        let effectiveAt: Date
-        var effectiveEnd: Date?
+        var measurementBounds: ClinicalMeasurementBounds
+
+        var effectiveAt: Date { measurementBounds.startDate }
+        var effectiveEnd: Date? { measurementBounds.endDate }
         let sourceRecordIdentifier: Identifier
         let sourceOutputIdentifier: Identifier
         let writerIdentifier: Identifier?
@@ -57,6 +59,8 @@ struct ValidatedExchangeEvent: Sendable {
         let value: ClinicalOutputValue
         let codeSystem: String
         let code: String
+        var sourceTypeIdentifier: String?
+        var sourceRepositoryKind: SourceRepositoryKind?
     }
 
     struct Retraction: Sendable {
@@ -78,6 +82,17 @@ struct ValidatedExchangeEvent: Sendable {
         let target: Target
     }
 
+    struct OutputDependency: Sendable, Hashable {
+        enum Relation: String, Sendable {
+            case derivedFrom
+            case related
+        }
+
+        let outputFullURL: String
+        let targetFullURL: String
+        let relation: Relation
+    }
+
     let rawBytes: Data
     var recorded: RecordedInstant
     let validatorIdentity: String
@@ -93,6 +108,8 @@ struct ValidatedExchangeEvent: Sendable {
     var recordings: [ClinicalRecordingAttachment] = []
     var questionnaireContexts: [QuestionnaireContext] = []
     var derivations: [Derivation] = []
+    /// Producer graph dependencies preserve lineage but grant no access to the companion output.
+    var outputDependencies: [OutputDependency] = []
 }
 
 
@@ -102,10 +119,10 @@ extension ValidatedExchangeEvent {
             .init(
                 fullURL: $0.fullURL,
                 profile: $0.profile,
-                effectiveAt: $0.effectiveAt,
-                effectiveEnd: $0.effectiveEnd,
+                measurementBounds: $0.measurementBounds,
                 codeSystem: $0.codeSystem,
-                code: $0.code
+                code: $0.code,
+                sourceTypeIdentifier: $0.sourceTypeIdentifier
             )
         }
     }

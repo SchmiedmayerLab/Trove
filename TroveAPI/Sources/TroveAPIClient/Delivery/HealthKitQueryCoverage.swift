@@ -30,7 +30,7 @@ struct HealthKitQueryCoverage {
     }
 
     func includes(_ definition: HealthKitQueryDefinition) -> Bool {
-        definition.stream == stream && ranges.contains {
+        definition.hasCurrentSemantics && definition.stream == stream && ranges.contains {
             $0.lowerBound < (definition.end ?? Date(timeIntervalSince1970: .infinity)) && $0.upperBound > definition.start
         }
     }
@@ -38,7 +38,7 @@ struct HealthKitQueryCoverage {
     func missing(before cutoff: Date, queries: [HealthKitQueryDefinition]) -> [Range<Date>] {
         let desired = ranges.compactMap { Self.intersection($0, Date(timeIntervalSince1970: -.infinity)..<cutoff) }
         let predicates = Self.union(queries.compactMap { query -> Range<Date>? in
-            guard query.stream == stream else {
+            guard query.hasCurrentSemantics, query.stream == stream else {
                 return nil
             }
             let upper = min(query.end ?? cutoff, cutoff)

@@ -31,12 +31,16 @@ extension RecordingTransferService {
               Set(try bindings.map { try $0.transferId.requireId() }).count == bindings.count,
               Set(try bindings.map { try $0.artifactId.requireId() }).count == bindings.count else { throw FHIRValidationClient.invalid }
         guard let graph = try? ExchangeGraph(validating: bytes, kind: .active) else { throw FHIRValidationClient.invalid }
+        let (_, resources) = try FHIRPointProjection.index(graph.bundle.entry ?? [])
         let authorization = Authorization(sourceID: source.id, installation: installation, context: try AuthContext.checkIsParticipant())
         var result: [ClinicalRecordingAttachment] = []
         for binding in bindings {
             let (reference, declaration) = try await resolve(binding, source: source)
             guard let entry = graph.bundle.entry?.first(where: { $0.fullUrl?.value?.url.absoluteString == declaration.output.fullURL }),
                   case .documentReference(let document)? = entry.resource else { throw FHIRValidationClient.invalid }
+            let period = try FHIRRecordingSourcePeriod.period(
+                document, fullURL: declaration.output.fullURL, resources: resources
+            )
             try ClinicalRecordingAttachment.validate(document: document, declaration: declaration)
             let selected = targets.compactMap { target -> ClinicalEventTarget? in
                 target.outputFullURLs.contains(declaration.output.fullURL)
@@ -51,7 +55,7 @@ extension RecordingTransferService {
             let body = try await recordingBody(reference)
             let content = try await RecordingContentVerification.verify(body, declaration: declaration, maximumWindowByteCount: 8 * 1024 * 1024)
             let attachment = ClinicalRecordingAttachment(reference: reference, declaration: declaration, content: content)
-            _ = try FHIRRecordingProjection.routeBounds(document, external: attachment)
+            _ = try FHIRRecordingProjection.project(document, external: attachment, selectionPeriod: period)
             result.append(attachment)
         }
         return result

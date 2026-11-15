@@ -52,14 +52,14 @@ enum FHIRWorkoutProjection {
         }
     }
 
-    private static func bounds(_ observation: Observation) throws -> (Date, Date) {
+    private static func bounds(_ observation: Observation) throws -> (RecordedInstant, RecordedInstant) {
         guard case .period(let period)? = observation.effective,
               let start = period.start?.value, let end = period.end?.value,
               start.time != nil, start.timeZone != nil, end.time != nil, end.timeZone != nil else {
             throw FHIRValidationClient.invalid
         }
-        let lower = try start.asNSDate(), upper = try end.asNSDate()
-        guard CollectionMeasurementWindow.valid(lower), CollectionMeasurementWindow.valid(upper), lower <= upper else {
+        let lower = try FHIRMeasurementInstant.exact(start), upper = try FHIRMeasurementInstant.exact(end)
+        guard lower <= upper else {
             throw FHIRValidationClient.invalid
         }
         return (lower, upper)
@@ -74,12 +74,19 @@ enum FHIRWorkoutProjection {
             return outputs
         }
         guard sessions.count == 1, sessions.count + segments.count == outputs.count,
-              let session = sessions.first, let end = session.effectiveEnd else { throw FHIRValidationClient.invalid }
-        guard segments.allSatisfy({ $0.effectiveAt >= session.effectiveAt && $0.effectiveEnd.map { $0 <= end } == true }) else {
+              let session = sessions.first, let end = session.measurementBounds.end else { throw FHIRValidationClient.invalid }
+        guard segments.allSatisfy({
+            $0.measurementBounds.start >= session.measurementBounds.start && $0.measurementBounds.end.map { $0 <= end } == true
+        }) else {
             throw FHIRValidationClient.invalid
         }
         return outputs.map {
-            .init(fullURL: $0.fullURL, profile: session.profile, effectiveAt: session.effectiveAt, effectiveEnd: end)
+            .init(
+                fullURL: $0.fullURL,
+                profile: session.profile,
+                measurementBounds: session.measurementBounds,
+                sourceTypeIdentifier: session.sourceTypeIdentifier
+            )
         }
     }
 

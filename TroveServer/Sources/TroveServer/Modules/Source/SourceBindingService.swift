@@ -53,7 +53,9 @@ final class SourceBindingService: Module, Sendable {
             """)
             .first()
         guard let row else { throw ServerError.notFound("Source binding not found") }
-        return try SourceBinding(row: row)
+        let source = try SourceBinding(row: row)
+        guard source.kind == .participantApp else { throw ServerError.notFound("Native source binding not found") }
+        return source
     }
 
     private func sql(on database: any Database) throws -> any SQLDatabase {

@@ -32,7 +32,7 @@ extension HealthKitAcquisition {
     /// options change; application and host facts also affect the conversion Provenance.
     static func conversionConfiguration(application: ApplicationDevice, host: HostDevice) throws -> Data {
         try JSONEncoder().encode([
-            "trove-healthkit-record-v3-file-recordings", application.name, application.bundleIdentifier,
+            "trove-healthkit-record-v4-source-document-dates", application.name, application.bundleIdentifier,
             application.version, application.build, host.operatingSystemName, host.operatingSystemVersion,
             host.operatingSystemBuild, host.productType, host.model, host.name, host.manufacturer
         ])
@@ -93,6 +93,9 @@ extension HealthKitAcquisition {
         stream: HealthKitQueryDefinition.Stream
     ) async throws -> PreparedPage {
         guard Set(delta.added.map(\.uuid)).count == delta.added.count else { throw AcquisitionError.unsupportedDelta }
+        if stream.profile == .food {
+            return try await prepareFood(delta, exporter: exporter, snapshot: snapshot, timing: timing, stream: stream)
+        }
         var nativeConsents: [UUID: Set<UUID>] = [:]
         let samples = try delta.added.filter { sample in
             let consents = try Set(consentIDs(for: sample, stream: stream, snapshot: snapshot))
@@ -136,6 +139,13 @@ extension HealthKitAcquisition {
     private static func inputRecord(
         _ sample: HKSample, stream: HealthKitQueryDefinition.Stream, delta: Delta
     ) async throws -> HealthKitFHIRExporter.Record {
+        if stream.timeBasis != .measurementTime {
+            return .fileRecording(try await delta.readDocument(sample))
+        }
+        if stream.profile == .healthKitRecording {
+            guard let series = sample as? HKHeartbeatSeriesSample else { throw AcquisitionError.unsupportedDelta }
+            return .fileRecording(try await delta.readHeartbeatSeries(series))
+        }
         guard stream == .workoutRoute else {
             return .sample(sample)
         }
@@ -144,10 +154,10 @@ extension HealthKitAcquisition {
         return .fileRecording(try await delta.readRoute(route))
     }
 
-    private static func retractions(
+    static func retractions(
         _ delta: Delta, timing: ConversionTiming, stream: HealthKitQueryDefinition.Stream
     ) throws -> [HealthKitFHIRExporter.Deletion] {
-        guard let type = HealthKitSourceType(rawValue: sampleType(for: stream).identifier) else { throw AcquisitionError.unsupportedDelta }
+        guard let type = HealthKitSourceType(rawValue: try sampleType(for: stream).identifier) else { throw AcquisitionError.unsupportedDelta }
         return try delta.deletedIDs.map { id in
             guard let detectedAt = timing.deletions[id] else { throw AcquisitionError.unsupportedDelta }
             return .init(uuid: id, sourceType: type, deletedAfter: nil, detectedAt: detectedAt)
@@ -163,12 +173,14 @@ extension HealthKitAcquisition {
     static func consentIDs(
         for sample: HKSample, stream: HealthKitQueryDefinition.Stream, snapshot: ParticipantCollectionSnapshot
     ) throws -> [UUID] {
-        guard sample.sampleType == sampleType(for: stream) else { throw AcquisitionError.unsupportedDelta }
+        guard sample.sampleType == (try sampleType(for: stream)) else { throw AcquisitionError.unsupportedDelta }
         return try snapshot.consentIDs(
             profile: stream.profile,
             start: sample.startDate,
-            end: stream.profile.isInterval ? sample.endDate : nil,
-            requiresWorkoutRoute: stream == .workoutRoute
+            end: stream.profile.permitsEffectiveTime(hasEnd: true) ? sample.endDate : nil,
+            requiresWorkoutRoute: stream == .workoutRoute,
+            sourceTypeIdentifier: stream.sourceTypeIdentifier,
+            timeBasis: stream.timeBasis
         )
     }
 
@@ -192,16 +204,16 @@ extension HealthKitAcquisition {
         return observation
     }
 
-    private static func payload(
+    static func payload(
         for record: ExchangeRecord,
         stream: HealthKitQueryDefinition.Stream,
         snapshot: ParticipantCollectionSnapshot,
         nativeConsents: Set<UUID>,
         recording: HealthKitRecordingFile?
     ) throws -> (payload: EventDeliveryJournal.Payload, declarations: [Components.Schemas.RecordingTransferDeclaration])? {
-        if stream == .workoutRoute {
+        if stream == .workoutRoute || stream.profile == .healthKitRecording || stream.profile == .clinicalDocument {
             guard let recording else { throw AcquisitionError.unsupportedDelta }
-            return try routePayload(for: record, recording: recording, snapshot: snapshot, nativeConsents: nativeConsents).map {
+            return try recordingPayload(for: record, recording: recording, stream: stream, snapshot: snapshot, nativeConsents: nativeConsents).map {
                 ($0.payload, [$0.declaration])
             }
         }
@@ -216,13 +228,17 @@ extension HealthKitAcquisition {
         // Native and canonical wire timestamps must both be covered. Rounding must
         // never move a sample across an accepted measurement boundary.
         let wireConsents: [UUID]
-        switch (profile, observation.effective) {
-        case (.heartRate, .dateTime(let effective)):
+        switch observation.effective {
+        case .dateTime(let effective):
             guard let date = effective.value else { throw AcquisitionError.unsupportedDelta }
-            wireConsents = try snapshot.consentIDs(forHeartRateAt: date.asNSDate())
-        case (.sleepStage, .period(let period)), (.workout, .period(let period)):
+            wireConsents = try snapshot.consentIDs(
+                profile: profile, start: date.asNSDate(), end: nil, sourceTypeIdentifier: stream.sourceTypeIdentifier
+            )
+        case .period(let period):
             guard let start = period.start?.value, let end = period.end?.value else { throw AcquisitionError.unsupportedDelta }
-            wireConsents = try snapshot.consentIDs(profile: profile, start: start.asNSDate(), end: end.asNSDate())
+            wireConsents = try snapshot.consentIDs(
+                profile: profile, start: start.asNSDate(), end: end.asNSDate(), sourceTypeIdentifier: stream.sourceTypeIdentifier
+            )
         default:
             throw AcquisitionError.unsupportedDelta
         }
@@ -251,7 +267,8 @@ extension HealthKitAcquisition {
         let instant = try await journal.conversionInstant(from: checkpoint)
         let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: instant)
         var records: [UUID: Date] = [:]
-        let groups = try Dictionary(grouping: eligible) { try Self.recordConfiguration(for: $0, converter: configuration) }
+        let conversionSamples = try Self.conversionSamples(eligible, stream: definition.stream, snapshot: snapshot)
+        let groups = try Dictionary(grouping: conversionSamples) { try Self.recordConfiguration(for: $0, converter: configuration) }
         for (context, samples) in groups {
             let saved = try await journal.healthKitConversionInstants(
                 for: samples.map(\.uuid), configuration: context, from: checkpoint, at: instant

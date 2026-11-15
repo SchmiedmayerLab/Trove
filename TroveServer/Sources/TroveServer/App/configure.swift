@@ -53,7 +53,8 @@ private func configureDevelopmentCORS(for app: Application) {
             allowedHeaders: [
                 .accept, .authorization, .contentType, .origin, .xRequestedWith, .ifMatch,
                 "Trove-Delegation-ID", "Trove-Source-Installation-ID", "Trove-Source-Credential"
-            ]
+            ],
+            exposedHeaders: [.contentDisposition, "X-Recording-Content-Type"]
         )),
         at: .beginning
     )
@@ -189,12 +190,14 @@ func configureServices(
     let storage = ObjectStorageService(provider: storageProvider)
     let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
     let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
+    let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
+    let studies = StudyRepository(database: app.db(.psql))
     await app.grove.configure {
         storage
         recordings
         downloads
 
-        AuthorizationService(grantorAuthority: grantorAuthority)
+        authorization
         DelegationService(clientPolicy: clientPolicy)
         GroupService()
         StudyService(exportLimits: collectionCapacity.export)
@@ -213,7 +216,7 @@ func configureServices(
         ConsentService()
 
         GroupRepository(database: app.db(.psql))
-        StudyRepository(database: app.db(.psql))
+        studies
         ComponentRepository(database: app.db(.psql))
         ComponentScheduleRepository(database: app.db(.psql))
         InvitationCodeRepository(database: app.db(.psql))

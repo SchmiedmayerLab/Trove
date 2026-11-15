@@ -18,6 +18,31 @@ security:
   - bearerAuth: []
 
 paths:
+  /collection-capabilities:
+    get:
+      operationId: getCollectionCapabilities
+      tags:
+        - Studies
+      summary: List implemented native collection capabilities
+      description: >-
+        Describes the native acquisition and receiver capabilities enabled by this deployment.
+        Guide inventory membership alone does not enable collection. Provider capabilities are
+        separately qualified by an approved provider registration; this list grants no authority.
+      responses:
+        '200':
+          description: Native collection capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 512
+                items:
+                  $ref: '#/components/schemas/CollectionCapability'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /groups:
     get:
       tags:
@@ -348,8 +373,8 @@ paths:
         selection exclude withdrawn and retracted data. The server checks authority
         before storage access and again after preparing the complete verified file,
         then commits disclosure intent before returning any bytes. The response is
-        the original decoded CSV, matching the FHIR attachment hash and size even
-        when the stored transport representation is compressed. Transfer expiry does
+        the original decoded source bytes in binary transport, matching its FHIR hash and size even
+        when the stored transport representation is compressed. X-Recording-Content-Type preserves the validated original attachment media type. Transfer expiry does
         not expire retained clinical custody. Storage, integrity or configured
         capacity failures return no partial successful response and can be retried.
       parameters:
@@ -377,8 +402,21 @@ paths:
               required: true
               schema:
                 type: string
+            X-Recording-Content-Type:
+              required: true
+              description: Original attachment media type validated against its registered Grove recording format, URI-component encoded by the OpenAPI simple header representation. Decode exactly once before interpreting the media type. The response body uses binary transport to preserve source bytes.
+              schema:
+                type: string
+                enum:
+                  - text/csv
+                  - application/json
+                  - application/octet-stream
+                  - application/fhir+json
+                  - 'application/fhir+json; fhirVersion=1.0'
+                  - 'application/fhir+json; fhirVersion=4.0'
+                  - application/hl7-cda+xml
           content:
-            text/csv:
+            application/octet-stream:
               schema:
                 type: string
                 format: binary
@@ -1735,7 +1773,7 @@ paths:
         Changed clinical resource tokens, a changed body under a retained snapshot key, or different
         consent/output intent under an existing version identity is a conflict. The receipt records
         acceptance, not current permission to access study data. Initially supports
-        immutable, single-participant heart-rate point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR
+        immutable, single-participant heart-rate and body-weight point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR
         shapes are rejected explicitly. No clinical payload is returned. The JSON
         envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes
         to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server
@@ -2819,10 +2857,14 @@ components:
         profile:
           type: string
           description: Supported recording-document profile, independently checked against collection authority.
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
         format:
           type: string
-          description: Registered Grove recording-format code. Current collection admission supports HealthKit location-track
-            samples.
+          description: Registered Grove recording-format code, checked with the exact source token and output profile.
         effectiveAt:
           type: string
           format: date-time
@@ -3197,7 +3239,7 @@ components:
           description: Next consent adoption time, if any. This does not change the retained historical measurement starts.
         requirements:
           type: array
-          maxItems: 3
+          maxItems: 512
           items:
             $ref: '#/components/schemas/CollectionPlanRequirement'
 
@@ -3251,6 +3293,11 @@ components:
           type: string
           format: date-time
 
+    CollectionTimeBasis:
+      type: string
+      enum: [measurement-time, clinical-record-download, cda-source-document-period]
+      description: Time basis used by the retained collection window. Omission means measurement-time for existing measurement scopes. Clinical and CDA document requirements must explicitly preserve their source-date basis; embedded care dates are not inferred or used for selection.
+
     CollectionPlanRequirement:
       type: object
       additionalProperties: false
@@ -3264,9 +3311,18 @@ components:
         profile:
           type: string
           format: uri
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+        providerRegistrationId:
+          type: string
+          format: uuid
+          description: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
         sourceKind:
           type: string
-          enum: [participant-app]
+          enum: [participant-app, server-worker]
         start:
           type: string
           format: date-time
@@ -3276,12 +3332,67 @@ components:
           format: date-time
           description: Exclusive window end, bounded by the next adoption when applicable. Overlapping sleep records may end after this boundary.
 
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
+
+    CollectionCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - profile
+        - repositoryKind
+        - sourceTypeIdentifier
+        - displayNameEnglish
+        - displayNameGerman
+        - effectiveTime
+        - supportsWorkoutRoutes
+      properties:
+        profile:
+          type: string
+          format: uri
+        repositoryKind:
+          type: string
+          enum: [healthkit, sensorkit]
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        displayNameEnglish:
+          type: string
+          minLength: 1
+          maxLength: 256
+        displayNameGerman:
+          type: string
+          minLength: 1
+          maxLength: 256
+        effectiveTime:
+          type: string
+          enum: [point, interval, point-or-interval]
+          description: Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+        supportsWorkoutRoutes:
+          type: boolean
+          description: Whether precise workout route collection can be opted into independently for this measurement.
+        isOriginalRecording:
+          type: boolean
+          description: This output includes an original source recording, separately selected from structured summaries.
+        requiredCompanionProfiles:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            format: uri
+          description: Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
+
     CollectionRequirement:
       type: object
       additionalProperties: false
       description: >
         Explicit backend collection permission, independent of native HealthKit
-        components. The receiver supports Grove Mobile heart-rate point quantities
+        components. The receiver supports Grove Mobile heart-rate and body-weight point quantities
         and sleep-stage intervals and workout sessions from participant-app streams. A point must be
         inside the accepted half-open measurement window. A sleep interval or workout session is
         collected in full if it overlaps that window, including all workout segments and statistics; touching a boundary alone
@@ -3302,10 +3413,24 @@ components:
           format: uri
           examples:
             - https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate
+            - https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-body-weight
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+        providerRegistrationId:
+          type: string
+          format: uuid
+          description: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
         sourceKind:
           type: string
           enum:
             - participant-app
+            - server-worker
+
+        timeBasis:
+          $ref: '#/components/schemas/CollectionTimeBasis'
 
     NativeSourceRepository:
       type: string
@@ -3694,7 +3819,7 @@ components:
           $ref: '#/components/schemas/EnrollmentPeriod'
         collectionRequirements:
           type: array
-          maxItems: 3
+          maxItems: 512
           uniqueItems: true
           description: Empty disables backend collection in the next publication; existing publications are unchanged.
           items:
@@ -3748,7 +3873,7 @@ components:
           description: Opaque revision of the complete editable study draft.
         collectionRequirements:
           type: array
-          maxItems: 3
+          maxItems: 512
           uniqueItems: true
           items:
             $ref: '#/components/schemas/CollectionRequirement'

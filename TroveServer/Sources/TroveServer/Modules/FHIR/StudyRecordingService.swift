@@ -11,11 +11,11 @@ import OpenAPIRuntime
 
 
 extension StudyService {
-    func recording(studyID: UUID, grantID: UUID, versions: StudyDataQuery.Versions) async throws -> HTTPBody {
+    func recording(studyID: UUID, grantID: UUID, versions: StudyDataQuery.Versions) async throws -> StudyRecordingDownload {
         let actor = try AuthContext.checkIsResearcher()
         _ = try await authorizationService.checkResearcherHasStudyDataAccess(studyID, actor: actor, on: repository.database)
         guard !repository.database.inTransaction else { throw AuditError.disclosureInsideTransaction }
-        let (candidate, attachment) = try await repository.database.transaction { transaction in
+        let (candidate, attachment, media) = try await repository.database.transaction { transaction in
             let query = StudyDataQuery(database: transaction)
             let candidate = try await query.recording(grantID: grantID, studyID: studyID, versions: versions)
             let fence = try await query.fence(candidate, studyID: studyID, versions: versions)
@@ -28,7 +28,8 @@ extension StudyService {
             guard let attachment = event.recordings.first(where: { $0.declaration.output.fullURL == output.fullURL }) else {
                 throw ServerError.notFound("Study recording not found")
             }
-            return (candidate, attachment)
+            let media = try StudyRecordingMedia(event: event, outputFullURL: output.fullURL)
+            return (candidate, attachment, media)
         }
         // Do not hold participant/enrollment locks during object reads and complete byte verification.
         let file = try await recordingDownloads.prepare(attachment)
@@ -46,6 +47,6 @@ extension StudyService {
                 target: .init(id: grantID, version: versions == .current ? "current" : "history")
             ), on: transaction)
         }
-        return RecordingDownloadBody(file: file).body
+        return .init(body: RecordingDownloadBody(file: file).body, media: media)
     }
 }

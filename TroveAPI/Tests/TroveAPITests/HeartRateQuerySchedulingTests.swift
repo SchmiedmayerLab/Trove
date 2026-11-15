@@ -73,7 +73,7 @@ struct HeartRateQuerySchedulingTests {
     }
 
     @Test
-    func sampleSpanningTheSplitIsKeptExactlyInTheHistoricalPartition() throws {
+    func overlappingIntervalIsSelectedByBothPredicatesForStableRecordDeduplication() throws {
         let split = HeartRatePlannerFixture.liveStart
         let sample = HKQuantitySample(
             type: HKQuantityType(.heartRate),
@@ -86,8 +86,8 @@ struct HeartRateQuerySchedulingTests {
         let history = try HealthKitQueryDefinition(profile: .heartRate, kind: .historical, start: split.addingTimeInterval(-10), end: split)
         let live = try HealthKitQueryDefinition(profile: .heartRate, kind: .live, start: split)
         #expect(try HealthKitAcquisition.partition(delta, definition: history).added.map(\.uuid) == [sample.uuid])
-        #expect(try HealthKitAcquisition.partition(delta, definition: live).added.map(\.uuid) == [atSplit.uuid])
-        let predicate = HKQuery.predicateForSamples(withStart: history.start, end: history.end, options: [.strictStartDate])
+        #expect(try HealthKitAcquisition.partition(delta, definition: live).added.map(\.uuid) == [sample.uuid, atSplit.uuid])
+        let predicate = HKQuery.predicateForSamples(withStart: history.start, end: history.end, options: [])
         #expect(predicate.evaluate(with: sample))
         #expect(!predicate.evaluate(with: atSplit))
     }

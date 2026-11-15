@@ -20,7 +20,7 @@ struct FHIRRecordingProjectionTests {
         let graph = try ExchangeGraph(validating: bytes, kind: .active)
         let document = try #require(graph.bundle.entry?.compactMap { $0.resource?.get(if: DocumentReference.self) }.first)
         let bounds = try #require(try? FHIRRecordingProjection.routeBounds(document), "Route measurement bounds")
-        #expect(bounds.0 == Date(timeIntervalSince1970: 1_787_005_800))
+        #expect(bounds.startDate == Date(timeIntervalSince1970: 1_787_005_800))
         try #require((try? FHIRPointSupportBoundary.validateExtensionLocations(in: bytes)) != nil, "Supported extension locations")
         let (_, resources) = try FHIRPointProjection.index(#require(graph.bundle.entry))
         try #require((try? FHIRPointSupportBoundary.validate(resources: resources)) != nil, "Supported resource references")

@@ -34,14 +34,18 @@ The endpoint requires explicit clinical-data access and committed disclosure aud
 See [study data access](../TroveServer/README.md#study-data-access) for the full
 contract, limits and live-page semantics.
 
-The generated `getStudyRecording` operation downloads the original CSV for an exact
+The generated `getStudyRecording` operation downloads the original registered source bytes for an exact
 study grant. Derived recording attachments contain authenticated, origin-relative
 download locations. Pass the same current/history selection when using the operation
 directly. The server verifies the complete recording and commits disclosure intent
 before returning its `HTTPBody`; consume that body incrementally into a bounded
 destination. Default `OpenAPIURLSession` transport streams on Apple platforms but
 buffers on Linux, so incremental application reads alone do not establish bounded
-Linux transport memory.
+Linux transport memory. The body uses
+`application/octet-stream` to preserve source bytes without JSON decoding. The
+required `X-Recording-Content-Type` (URI-component encoded; decode exactly once) header retains the original registered media
+type, including the FHIR release parameter when present. Clients verify it against
+the attachment and save a media-appropriate suffix without rendering a preview.
 
 ## Local Verification
 
@@ -98,8 +102,8 @@ recording.
 clinical Bundle. Each member carries the relative attachment path and exact
 transfer/artifact IDs separately from its immutable FHIR bytes. After an uncertain
 clinical response, receipt lookup precedes any recording upload; only verified
-clinical custody permits file reclamation. The HealthKit acquisition adapter still
-requires integration with file-backed staging and transfer declaration preparation.
+clinical custody permits file reclamation. HealthKit recordings use the same atomic
+file staging and retained transfer declarations before advancing their source cursor.
 
 ## Source Registration
 
@@ -173,10 +177,23 @@ admission; a stale client state cannot authorize a revoked installation.
 ## HealthKit Acquisition
 
 The optional Apple-platform `TroveHealthKit` product connects Grove's anchored
-heart-rate, sleep, workout and optional workout-route queries and FHIR converter to the delivery journal. The server and
-cross-platform API client do not link this adapter. The app's
+quantity and category queries, blood pressure, audiograms, state of mind, GAD-7 and PHQ-9 assessments,
+workouts, food correlations, clinical documents, heartbeat series and optional workout routes to the delivery journal.
+The enabled collection capabilities expose only implemented producer and receiver paths.
+ECG acquisition requires its companion adapter. Heartbeat series stream
+into the registered beat-interval CSV format with original gap markers and a separate
+source-bound recording scope. Their complete files use the same bounded compression and
+resumable delivery path as workout routes. The server and cross-platform
+API client do not link this native acquisition adapter. The app's
 `makeHealthKitAcquisition` factory supplies the journal and captured-session validation;
 constructing it does not request HealthKit access or start collection.
+
+Each native source type remains an independent stream even when several sports or
+sensors use the same semantic FHIR profile. Accepted requirements, permission requests,
+query windows, cursors and consent selection retain the exact HealthKit type identifier.
+An ambiguous semantic profile alone cannot select a new native query. Type names and
+canonical units come from Grove; clinical profiles and temporal shapes come from its
+portable generated contract.
 
 The journal can retain several immutable query definitions for one registered source.
 `createQuery(for:queryID:definition:)` adds a separate cursor and pending conversion
@@ -212,6 +229,26 @@ HealthKit sample interval in `DocumentReference.context.period` and its location
 the registered CSV attachment. A route targets only consents that explicitly request
 routes; a study requesting workout summaries does not receive the recording.
 
+Clinical FHIR documents use the dates when HealthKit downloaded the record to the device;
+CDA documents use the document dates assigned by their creator. Accepted requirements retain
+that explicit `timeBasis`. Both carry those dates on the conversion Provenance source entity,
+never as `DocumentReference.context.period`. Selection retains complete overlapping documents,
+which may describe care outside the selected source-date window. Embedded clinical dates are
+not guessed or substituted. Original FHIR release, JSON numeric tokens and CDA XML bytes are
+preserved in file-backed attachments. HealthKit supplies one complete `Data` per document;
+subsequent hashing, optional compression and upload read the staged file in bounded chunks.
+
+CDA contents require a separate foreground review. Automatic passes skip their document-data
+queries and leave their cursors untouched; `catchUp(..., reviewDocuments: true)` runs the explicit
+HealthKit review flow after checking retained collection authority. Missing or denied document
+contents do not acknowledge a successful collection. Other streams continue their normal sweeps.
+
+Food entries and nutrients remain independent source records. A grouping retains logical
+membership references, while each nutrient needs its own exact source/profile/window permission.
+Unrequested nutrient payloads and conversion evidence are not retained or uploaded. Per-UUID
+conversion instants let an authorized nutrient collected through food deduplicate with the same
+sample collected independently. Deleting a grouping does not delete its nutrient samples.
+
 The adapter includes the original lowercase HealthKit sample UUID by default,
 using Grove's existing native-identifier option. Its clear identifier system is
 `<identifierRoot>/NamingSystem/healthkit-native-record`, separate from Grove's
@@ -222,12 +259,12 @@ Published collection consent describes this baseline disclosure. Original queued
 bytes remain unchanged; upgrading the adapter never rewrites a pending record.
 Native conversion regressions require the Apple verification lane.
 
-Ordinary queries request at most 64 additions; route queries request one recording
-per page. All pages retain the 128-change staging bound. The route reader verifies
-that every location was returned and bounds reads using the current event byte limit.
-The complete encoded record must fit that limit; larger recordings are refused without
-truncation or cursor advancement. File-backed transfer for larger recordings remains
-outside the current adapter. The journal persists one conversion instant for the pending checkpoint,
+Ordinary queries request at most 64 additions; recording, document and food queries request
+one source item per page. All pages retain the 128-output staging bound, including independently
+authorized food members. Route and heartbeat readers verify complete sample counts. Original
+files use the configured recording-byte limit, independent of the encoded record limit. Capacity
+failures preserve the source cursor and pending work without truncating content.
+The journal persists one conversion instant for the pending checkpoint,
 so Grove's stateless converter reproduces the same record version after interruption.
 Canonical record bytes, targets and the next anchor then commit together, clearing
 that pending instant. A failed member preserves the previous anchor, conversion
@@ -370,8 +407,9 @@ recently served pending query, with at most eight pages total. Page ordering and
 progress survive restart and observation-only authority refreshes. Only an empty
 raw HealthKit delta exhausts a query for that sweep; filtering every sample out of
 a page does not. Later sweeps revisit historical predicates for late imports and
-explicit deletions. Heart-rate predicates partition sample start dates into half-open
-ranges. Sleep and workout predicates include complete intervals overlapping the selected range.
+explicit deletions. Point-only profiles, including body weight, partition sample start
+dates into half-open ranges. Period and dual-shape profiles, including heart rate,
+sleep and workouts, include complete intervals overlapping the selected range.
 An interval can be observed by more than one query. The journal retains the first
 conversion time per native UUID and converter configuration across queries and
 restarts. An unchanged sample therefore reuses its record version and exact payload;
@@ -380,11 +418,17 @@ toward the configured journal byte limit. Capacity failure preserves existing cu
 Application build, host facts, writer revision, and export policy identify the converter configuration;
 a changed configuration records its own conversion time.
 
-Heart-rate points use half-open measurement windows. Sleep-stage and workout records are selected
-in full when their intervals overlap an accepted window, including records that cross
-a boundary. `ParticipantCollectionSnapshot` applies that same rule when selecting
+Point measurements use half-open windows. Interval records are selected in full when
+they overlap an accepted window, including heart-rate, sleep and workout records that
+cross a boundary. `ParticipantCollectionSnapshot` applies that same rule when selecting
 consent IDs and selects at most one consent per study. Query and source identity must
 not depend on clipping a record to a study window.
+
+Query definition version 7 applies these temporal rules to each exact native stream.
+Retained version 6 queries and anchors remain readable and immutable. A version 7
+query safely replays authorized history using a new cursor; shared native-record and
+conversion identities deduplicate unchanged samples across the transition. Pending
+version 6 delivery bytes are never reinterpreted or rewritten.
 
 Published collection-policy schema 4 includes the explicit enrollment period: an
 optional Gregorian calendar duration from enrollment, a fixed closing date, or

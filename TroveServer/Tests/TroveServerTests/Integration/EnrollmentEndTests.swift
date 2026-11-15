@@ -141,12 +141,12 @@ struct EnrollmentEndTests {
                 let snapshot = try ParticipantCollectionSnapshot(plans: [plan], enrollmentIDs: [fixture.enrollmentIDs[0]])
                 #expect(try snapshot.active().permitsHeartRateAcquisition == false)
                 #expect(plan.windows[0].requirements[0].end == end)
-                let before = ClinicalEventStoreTests.event(source: fixture.source, sequence: 1, effectiveAt: acceptedAt)
+                let before = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 1, effectiveAt: acceptedAt)
                 let store = ClinicalEventStore(database: app.db)
                 _ = try await store.accept(
                     before, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation
                 )
-                let boundary = ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: end)
+                let boundary = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: end)
                 await #expect {
                     try await store.accept(boundary, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 403 }

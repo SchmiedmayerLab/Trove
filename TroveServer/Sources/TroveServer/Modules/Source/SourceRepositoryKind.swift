@@ -14,6 +14,9 @@ import GroveFHIRContract
 enum SourceRepositoryKind: String, Codable, Sendable {
     case healthKit = "healthkit"
     case sensorKit = "sensorkit"
+    case withings
+    case oura
+    case googleHealthAPI = "google-health-api"
 }
 
 

@@ -21,7 +21,7 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let events = [
+                let events = try [
                     Self.event(source: fixture.source, sequence: 1, version: "9007199254740992"),
                     Self.event(source: fixture.source, sequence: 2, version: "9007199254740992"),
                     Self.event(source: fixture.source, sequence: 3, version: "18446744073709551616")
@@ -60,8 +60,8 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = Self.event(source: fixture.source, sequence: 1, version: "10")
-                let second = Self.event(
+                let first = try Self.event(source: fixture.source, sequence: 1, version: "10")
+                let second = try Self.event(
                     source: fixture.source,
                     sequence: 2,
                     version: kind == "missing" ? nil : kind == "equal" ? "10" : "999",
@@ -86,8 +86,8 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                var first = Self.event(source: fixture.source, sequence: 1, version: "10")
-                var second = Self.event(source: fixture.source, sequence: 2, version: ordering == "writer" ? "11" : "10")
+                var first = try Self.event(source: fixture.source, sequence: 1, version: "10")
+                var second = try Self.event(source: fixture.source, sequence: 2, version: ordering == "writer" ? "11" : "10")
                 first.recorded = .init(seconds: 100, fraction: "000000000000000001")
                 second.recorded = .init(
                     seconds: ordering == "writer" ? 99 : 100,
@@ -118,9 +118,9 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
-                let second = Self.event(source: fixture.source, sequence: 2, version: "10")
-                let third = Self.event(source: fixture.source, sequence: 3, version: "11", outputs: ["primary", "secondary"])
+                let first = try Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
+                let second = try Self.event(source: fixture.source, sequence: 2, version: "10")
+                let third = try Self.event(source: fixture.source, sequence: 3, version: "11", outputs: ["primary", "secondary"])
                 _ = try await store.accept(
                     first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]), installation: fixture.installation
                 )
@@ -148,8 +148,8 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                async let first = Self.attempt(store, event: Self.event(source: fixture.source, sequence: 1, version: "1"), fixture: fixture)
-                async let second = Self.attempt(
+                async let first = try Self.attempt(store, event: Self.event(source: fixture.source, sequence: 1, version: "1"), fixture: fixture)
+                async let second = try Self.attempt(
                     store, event: Self.event(source: fixture.source, sequence: 2, version: "2", record: "contradiction"), fixture: fixture
                 )
                 let outcomes = try await [first, second]
@@ -166,8 +166,8 @@ struct ClinicalRecordStoreTests {
     func reopenedDatabaseRetainsSelectionAndExactIndependentGrants() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let first = Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
-            let second = Self.event(source: fixture.source, sequence: 2, version: "10")
+            let first = try Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
+            let second = try Self.event(source: fixture.source, sequence: 2, version: "10")
             let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 _ = try await store.accept(
@@ -244,8 +244,8 @@ struct ClinicalRecordStoreTests {
 extension ClinicalRecordStoreTests {
     static func event(
         source: SourceBinding, sequence: Int, version: String?, writer: String? = "writer", record: String = "record", outputs: [String] = ["primary"]
-    ) -> ValidatedExchangeEvent {
-        let base = ClinicalEventStoreTests.event(source: source, sequence: sequence)
+    ) throws -> ValidatedExchangeEvent {
+        let base = try ClinicalEventStoreTests.event(source: source, sequence: sequence)
         let nodes = [base.nodes[0]] + outputs.enumerated().map {
             ValidatedExchangeEvent.Node(
                 ordinal: $0.offset + 1,
@@ -257,7 +257,7 @@ extension ClinicalRecordStoreTests {
             ValidatedExchangeEvent.Output(
                 fullURL: output == "primary" ? "urn:uuid:point" : "urn:point:" + output,
                 profile: CollectionRequirement.supportedProfile,
-                effectiveAt: Date(),
+                measurementBounds: base.outputs[0].measurementBounds,
                 sourceRecordIdentifier: .init(system: "urn:source-record", value: record),
                 sourceOutputIdentifier: .init(system: "urn:source-output", value: output),
                 writerIdentifier: writer.map { .init(system: "urn:writer-record", value: $0) },

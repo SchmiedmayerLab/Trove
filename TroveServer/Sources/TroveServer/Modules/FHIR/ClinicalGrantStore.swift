@@ -17,10 +17,17 @@ struct ClinicalGrantStore: Sendable {
     struct Output: Sendable {
         let fullURL: String
         let profile: String
-        let effectiveAt: Date
-        var effectiveEnd: Date?
+        var measurementBounds: ClinicalMeasurementBounds
+
+        var effectiveAt: Date { measurementBounds.startDate }
+        var effectiveEnd: Date? { measurementBounds.endDate }
         var codeSystem: String?
         var code: String?
+        var sourceTypeIdentifier: String?
+
+        var timeBasis: CollectionTimeBasis {
+            .required(profile: profile, sourceTypeIdentifier: sourceTypeIdentifier)
+        }
 
         var isWorkoutRoute: Bool {
             profile == FHIRRecordingProjection.profile && codeSystem == FHIRRecordingProjection.formatSystem
@@ -29,7 +36,7 @@ struct ClinicalGrantStore: Sendable {
 
         var collectionProfile: String? {
             if profile == FHIRRecordingProjection.profile {
-                isWorkoutRoute ? CollectionObservationProfile.workout.rawValue : nil
+                isWorkoutRoute ? CollectionObservationProfile.workout.rawValue : profile
             } else {
                 profile
             }
@@ -49,11 +56,31 @@ struct ClinicalGrantStore: Sendable {
 
     let database: any Database
     let source: SourceBinding
-    let context: AuthContext
+    let auditContext: AuditEvent.Context
     let acceptedAt: Date
+    let providerRegistrationID: UUID?
+
+    init(database: any Database, source: SourceBinding, context: AuthContext, acceptedAt: Date) {
+        self.init(database: database, source: source, auditContext: context.auditContext, acceptedAt: acceptedAt)
+    }
+
+    init(
+        database: any Database,
+        source: SourceBinding,
+        auditContext: AuditEvent.Context,
+        acceptedAt: Date,
+        providerRegistrationID: UUID? = nil
+    ) {
+        self.database = database
+        self.source = source
+        self.auditContext = auditContext
+        self.acceptedAt = acceptedAt
+        self.providerRegistrationID = providerRegistrationID
+    }
 
     func authorities(outputs: [Output], intent: ClinicalEventIntent, requireCustodyCoverage: Bool) async throws -> [Authority] {
         guard database.inTransaction else { throw ServerError.unexpectedError }
+        guard (source.kind == .serverWorker) == (providerRegistrationID != nil) else { throw ProviderFailure.fenced }
         var records: [(ClinicalEventTarget, EnrollmentConsent)] = []
         for target in intent.targets {
             // Do not read signatures or artifact metadata to resolve a collection target.
@@ -114,7 +141,7 @@ struct ClinicalGrantStore: Sendable {
             """)
             .run()
         try await AuditRepository.recordMutation(.init(
-            context: context.auditContext,
+            context: auditContext,
             action: .studyDataGranted,
             scope: .study(studyID: authority.studyID, groupID: authority.groupID),
             target: .init(id: id, version: String(authority.revision))
@@ -141,8 +168,7 @@ extension ClinicalGrantStore {
             guard let profile = output.collectionProfile else {
                 return false
             }
-            return output.effectiveAt <= acceptedAt
-                && (output.effectiveEnd.map { $0 <= acceptedAt } ?? true)
+            return (try? output.measurementBounds.ends(onOrBefore: acceptedAt)) == true
                 && publication.collectionPolicy.permits(
                     studyID: enrollment.$study.id,
                     revision: consent.revision,
@@ -151,9 +177,13 @@ extension ClinicalGrantStore {
                     effectiveAt: output.effectiveAt,
                     consentAcceptedAt: consent.acceptedAt,
                     effectiveEnd: output.effectiveEnd,
+                    preciseBounds: output.measurementBounds,
                     scope: consent.collectionScope,
                     adoptionEnd: interval.end,
-                    requiresWorkoutRoute: output.isWorkoutRoute
+                    requiresWorkoutRoute: output.isWorkoutRoute,
+                    providerRegistrationID: providerRegistrationID,
+                    sourceTypeIdentifier: output.sourceTypeIdentifier,
+                    timeBasis: output.timeBasis
                 )
         }
         .map(\.fullURL))

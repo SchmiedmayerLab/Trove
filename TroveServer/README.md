@@ -276,11 +276,16 @@ withdrawal/retraction state, current version, researcher access and token expiry
 and commits `study.recording.disclosure` before returning bytes. The audit target is
 the exact study grant and its version view. No database locks span storage reads.
 
-The response is the original CSV, matching the FHIR attachment's size and hash,
+The response contains the original registered source bytes, matching the FHIR attachment's size and hash,
 with `Cache-Control: no-store`. Retained files outlive transfer expiry. Failed
 verification, storage or capacity checks return HTTP 503 without a successful
 partial recording; changed eligibility and failed audit also prevent disclosure.
-Stream the response to a bounded destination rather than collecting it into memory.
+Stream the response to a bounded destination rather than collecting it into memory. Binary
+`application/octet-stream` transport preserves the payload without JSON re-encoding;
+`X-Recording-Content-Type` carries the validated original attachment media type,
+encoded as one URI component. Generated clients decode it automatically; direct
+HTTP clients decode it once before checking the registered media type.
+The filename suffix comes from that registered type.
 
 ## Study Audit Access
 

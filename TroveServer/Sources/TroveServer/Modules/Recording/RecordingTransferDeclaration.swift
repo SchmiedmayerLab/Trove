@@ -40,7 +40,8 @@ struct RecordingTransferDeclaration: Sendable {
         effectiveAt: Date,
         effectiveEnd: Date,
         content: Content,
-        targets: [ClinicalEventTarget]
+        targets: [ClinicalEventTarget],
+        sourceTypeIdentifier: String? = nil
     ) throws {
         let commitment: RecordingTransferCommitment
         do {
@@ -48,6 +49,7 @@ struct RecordingTransferDeclaration: Sendable {
                 attachmentPath: attachmentPath,
                 outputFullUrl: outputFullURL,
                 profile: profile,
+                sourceTypeIdentifier: sourceTypeIdentifier,
                 format: format.rawValue,
                 effectiveAt: effectiveAt,
                 effectiveEnd: effectiveEnd,
@@ -69,10 +71,10 @@ struct RecordingTransferDeclaration: Sendable {
         output = .init(
             fullURL: outputFullURL,
             profile: profile,
-            effectiveAt: commitment.declaration.effectiveAt,
-            effectiveEnd: commitment.declaration.effectiveEnd,
+            measurementBounds: try .init(start: commitment.declaration.effectiveAt, end: commitment.declaration.effectiveEnd),
             codeSystem: FHIRRecordingProjection.formatSystem,
-            code: format.rawValue
+            code: format.rawValue,
+            sourceTypeIdentifier: sourceTypeIdentifier
         )
         serialized = String(decoding: commitment.serialized, as: UTF8.self)
         sha256 = commitment.sha256

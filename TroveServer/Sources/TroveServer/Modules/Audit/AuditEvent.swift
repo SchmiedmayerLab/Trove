@@ -68,9 +68,28 @@ struct AuditEvent: Sendable {
         case studyAuditDisclosure = "study.audit.disclosure"
         case studyDataDisclosure = "study.data.disclosure"
         case studyRecordingDisclosure = "study.recording.disclosure"
+        case providerRegistrationDisclosure = "provider.registration.disclosure"
+        case providerRegistrationChanged = "provider.registration.changed"
+        case providerLinkStarted = "provider.link.started"
+        case providerLinkDispatched = "provider.link.dispatched"
+        case providerLinkCompleted = "provider.link.completed"
+        case providerConnectionDisconnected = "provider.connection.disconnected"
+        case providerRefreshDispatched = "provider.refresh.dispatched"
+        case providerCredentialRotated = "provider.credential.rotated"
+        case providerCredentialUncertain = "provider.credential.uncertain"
+        case providerCredentialRetired = "provider.credential.retired"
+        case providerFetchDispatched = "provider.fetch.dispatched"
+        case providerPageStaged = "provider.page.staged"
+        case providerPageAccepted = "provider.page.accepted"
+        case providerStatusDisclosure = "provider.status.disclosure"
 
         var scopeKind: Scope.Kind {
             switch self {
+            case .providerRegistrationChanged: .providerRegistration
+            case .providerRegistrationDisclosure, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted,
+                 .providerConnectionDisconnected, .providerRefreshDispatched, .providerCredentialRotated,
+                 .providerCredentialUncertain, .providerCredentialRetired, .providerFetchDispatched, .providerPageStaged, .providerPageAccepted,
+                 .providerStatusDisclosure: .participantProvider
             case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .sourceIdentityDisclosure,
@@ -86,6 +105,10 @@ struct AuditEvent: Sendable {
 
         var isDisclosure: Bool {
             switch self {
+            case .providerStatusDisclosure, .providerRegistrationDisclosure: true
+            case .providerRegistrationChanged, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted, .providerConnectionDisconnected,
+                 .providerRefreshDispatched, .providerCredentialRotated, .providerCredentialUncertain, .providerCredentialRetired,
+                 .providerFetchDispatched, .providerPageStaged, .providerPageAccepted: false
             case .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
                  .collectionPlanDisclosure, .studyBundleDisclosure,
                  .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
@@ -112,16 +135,22 @@ struct AuditEvent: Sendable {
     enum Scope: Sendable {
         case study(studyID: UUID, groupID: UUID? = nil)
         case participantSource(participantID: UUID, sourceBindingID: UUID)
+        case providerRegistration(registrationID: UUID)
+        case participantProvider(participantID: UUID, registrationID: UUID)
 
         enum Kind: String, Sendable {
             case study
             case participantSource = "participant_source"
+            case providerRegistration = "provider_registration"
+            case participantProvider = "participant_provider"
         }
 
         var kind: Kind {
             switch self {
             case .study: .study
             case .participantSource: .participantSource
+            case .providerRegistration: .providerRegistration
+            case .participantProvider: .participantProvider
             }
         }
     }

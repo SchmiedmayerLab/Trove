@@ -13,7 +13,7 @@ import Foundation
 struct GetStudyRecording: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "recording",
-        abstract: "Save one authorized recording as its original CSV bytes.",
+        abstract: "Save one authorized recording as its original source bytes.",
         discussion: "Use the study and grant IDs from the recording attachment URL in a study data Bundle. "
             + "Requires interactive researcher and group data-reader access. Existing files are never replaced."
     )

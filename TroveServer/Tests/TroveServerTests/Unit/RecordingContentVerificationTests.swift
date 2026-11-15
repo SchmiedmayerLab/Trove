@@ -10,6 +10,7 @@ import Crypto
 import Foundation
 import GroveFHIRContract
 import GroveFoundation
+import GroveHealthKit
 import struct ModelsR4.DocumentReference
 import OpenAPIRuntime
 import Testing
@@ -18,6 +19,25 @@ import TroveAPITypes
 
 
 struct RecordingContentVerificationTests {
+    @Test(arguments: [false, true], [10, 516, 619, 1010, 100_000, 999_999])
+    func fractionalRouteTimesSurviveCompleteContentVerification(compressed: Bool, microseconds: Int) async throws {
+        let dates = TroveDateTranscoder()
+        let lexeme = String(format: "2026-11-14T12:06:40.%06dZ", microseconds)
+        let date = try dates.decode(lexeme)
+        let source = try RecordingAttachmentFixture.retimedCSV(Self.source(), at: date)
+        let stored = try compressed ? Self.compressed(source) : source
+        var apiDeclaration = try Self.apiDeclaration(source: source, stored: stored, compressed: compressed)
+        apiDeclaration.effectiveAt = date
+        apiDeclaration.effectiveEnd = date
+        let declaration = try RecordingTransferDeclaration(apiDeclaration)
+        let result = try await RecordingContentVerification.verify(
+            Input(bytes: stored, chunkSize: 7).body, declaration: declaration, maximumWindowByteCount: 8 * 1024 * 1024
+        )
+        #expect(try dates.encode(#require(result.bounds.first)) == dates.encode(date))
+        #expect(try dates.encode(#require(result.bounds.last)) == dates.encode(date))
+        #expect(result.attachmentSHA1 == Data(Insecure.SHA1.hash(data: source)))
+    }
+
     @Test(arguments: [false, true], [1, 7, 64 * 1024])
     func completeRepresentationsHaveIdenticalSourceEvidence(compressed: Bool, chunkSize: Int) async throws {
         let source = try Self.source()
@@ -29,6 +49,34 @@ struct RecordingContentVerificationTests {
         #expect(result.bounds.last == Date(timeIntervalSince1970: 1_787_005_801))
         #expect(result.attachmentSHA1 == Data(Insecure.SHA1.hash(data: source)))
         #expect(await input.offset == stored.count)
+    }
+
+    @Test("Heartbeat recordings share the bounded compressed transfer verifier", arguments: [false, true])
+    func heartbeatRepresentationsPreserveRows(compressed: Bool) async throws {
+        let source = Data("timestamp,precededByGap\n1787005800,0\n1787005801,1\n".utf8)
+        let stored = try compressed ? Self.compressed(source) : source
+        let declaration = try RecordingTransferDeclaration(Self.apiDeclaration(
+            source: source, stored: stored, compressed: compressed, format: .beatIntervalSeries
+        ))
+        let input = Input(bytes: stored, chunkSize: 1)
+        let result = try await RecordingContentVerification.verify(input.body, declaration: declaration, maximumWindowByteCount: 8 * 1024 * 1024)
+        #expect(result.bounds.first == Date(timeIntervalSince1970: 1_787_005_800))
+        #expect(result.bounds.last == Date(timeIntervalSince1970: 1_787_005_801))
+        #expect(result.attachmentSHA1 == Data(Insecure.SHA1.hash(data: source)))
+        #expect(declaration.output.sourceTypeIdentifier == SampleType.heartbeatSeries.hkSampleType.identifier)
+    }
+
+    @Test("A valid digest cannot make a malformed heartbeat flag valid")
+    func refusesMalformedHeartbeatContent() async throws {
+        let source = Data("timestamp,precededByGap\n1787005800,2\n".utf8)
+        let declaration = try RecordingTransferDeclaration(Self.apiDeclaration(
+            source: source, stored: source, compressed: false, format: .beatIntervalSeries
+        ))
+        await #expect(throws: (any Error).self) {
+            try await RecordingContentVerification.verify(
+                Input(bytes: source, chunkSize: 1).body, declaration: declaration, maximumWindowByteCount: 8 * 1024 * 1024
+            )
+        }
     }
 
     @Test(arguments: ["stored-digest", "source-digest", "stored-short", "stored-long", "source-short", "source-long"])
@@ -131,14 +179,15 @@ extension RecordingContentVerificationTests {
     }
 
     private static func apiDeclaration(
-        source: Data, stored: Data, compressed: Bool
+        source: Data, stored: Data, compressed: Bool, format: RegisteredRecordingFormat = .locationTrackSamples
     ) throws -> Components.Schemas.RecordingTransferDeclaration {
         let output = "urn:uuid:fe604690-0681-4bb2-ad3c-d5b28c013143"
         return .init(
             attachmentPath: "recordings/route.csv",
             outputFullUrl: output,
             profile: FHIRRecordingProjection.profile,
-            format: RegisteredRecordingFormat.locationTrackSamples.rawValue,
+            sourceTypeIdentifier: format == .beatIntervalSeries ? SampleType.heartbeatSeries.hkSampleType.identifier : nil,
+            format: format.rawValue,
             effectiveAt: Date(timeIntervalSince1970: 1_787_005_800),
             effectiveEnd: Date(timeIntervalSince1970: 1_787_005_801),
             content: .init(

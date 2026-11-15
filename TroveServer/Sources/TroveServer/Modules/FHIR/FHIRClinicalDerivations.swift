@@ -23,12 +23,34 @@ enum FHIRClinicalDerivations {
                 ))
             case .observation(let observation):
                 for reference in observation.derivedFrom ?? [] {
-                    event.derivations.append(.init(outputFullURL: node.fullURL, target: try target(reference)))
+                    if let address = try outputTarget(reference, resources: resources) {
+                        event.outputDependencies.append(.init(outputFullURL: node.fullURL, targetFullURL: address, relation: .derivedFrom))
+                    } else {
+                        event.derivations.append(.init(outputFullURL: node.fullURL, target: try target(reference)))
+                    }
+                }
+            case .documentReference(let document):
+                for reference in document.context?.related ?? [] {
+                    if let address = try outputTarget(reference, resources: resources) {
+                        event.outputDependencies.append(.init(outputFullURL: node.fullURL, targetFullURL: address, relation: .related))
+                    }
                 }
             default: break
             }
         }
         try ClinicalGraphStore.validate(event)
+    }
+
+    static func outputTarget(_ reference: Reference, resources: [String: ResourceProxy]) throws -> String? {
+        guard let address = reference.reference?.value?.string,
+              let type = resources[address]?.resourceType, ["Observation", "DocumentReference"].contains(type) else {
+            return nil
+        }
+        guard reference.identifier == nil, reference.extension?.isEmpty != false,
+              reference.type == nil || reference.type?.value?.url.absoluteString == type else {
+            throw FHIRValidationClient.invalid
+        }
+        return address
     }
 
     static func target(_ reference: Reference) throws -> ValidatedExchangeEvent.Derivation.Target {

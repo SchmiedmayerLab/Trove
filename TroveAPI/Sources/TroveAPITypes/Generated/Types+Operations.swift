@@ -10,6 +10,170 @@ public import GroveHealthKit
 public import GroveStudyDefinition
 /// API operations, with input and output types, generated from `#/paths` in the OpenAPI document.
 public enum Operations {
+    /// List implemented native collection capabilities
+    ///
+    /// Describes the native acquisition and receiver capabilities enabled by this deployment. Guide inventory membership alone does not enable collection. Provider capabilities are separately qualified by an approved provider registration; this list grants no authority.
+    ///
+    /// - Remark: HTTP `GET /collection-capabilities`.
+    /// - Remark: Generated from `#/paths//collection-capabilities/get(getCollectionCapabilities)`.
+    public enum GetCollectionCapabilities {
+        public static let id: Swift.String = "getCollectionCapabilities"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/collection-capabilities/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCollectionCapabilities.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCollectionCapabilities.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetCollectionCapabilities.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetCollectionCapabilities.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/collection-capabilities/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/collection-capabilities/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.CollectionCapability])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.CollectionCapability] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetCollectionCapabilities.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetCollectionCapabilities.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Native collection capabilities
+            ///
+            /// - Remark: Generated from `#/paths//collection-capabilities/get(getCollectionCapabilities)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetCollectionCapabilities.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetCollectionCapabilities.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//collection-capabilities/get(getCollectionCapabilities)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//collection-capabilities/get(getCollectionCapabilities)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// List all groups (synced from Keycloak)
     ///
     /// - Remark: HTTP `GET /groups`.
@@ -2369,7 +2533,7 @@ public enum Operations {
     }
     /// Download an authorized recording's original source bytes
     ///
-    /// Requires the same interactive researcher membership and explicit data-reader capability as study data pages. The grant identifier is an exact study grant from export Provenance, not an authorization token. Current and history selection exclude withdrawn and retracted data. The server checks authority before storage access and again after preparing the complete verified file, then commits disclosure intent before returning any bytes. The response is the original decoded CSV, matching the FHIR attachment hash and size even when the stored transport representation is compressed. Transfer expiry does not expire retained clinical custody. Storage, integrity or configured capacity failures return no partial successful response and can be retried.
+    /// Requires the same interactive researcher membership and explicit data-reader capability as study data pages. The grant identifier is an exact study grant from export Provenance, not an authorization token. Current and history selection exclude withdrawn and retracted data. The server checks authority before storage access and again after preparing the complete verified file, then commits disclosure intent before returning any bytes. The response is the original decoded source bytes in binary transport, matching its FHIR hash and size even when the stored transport representation is compressed. X-Recording-Content-Type preserves the validated original attachment media type. Transfer expiry does not expire retained clinical custody. Storage, integrity or configured capacity failures return no partial successful response and can be retried.
     ///
     ///
     /// - Remark: HTTP `GET /studies/{studyId}/data/recordings/{grantId}`.
@@ -2450,33 +2614,50 @@ public enum Operations {
                     public var cacheControl: Operations.GetStudyRecording.Output.Ok.Headers.CacheControlPayload
                     /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/Content-Disposition`.
                     public var contentDisposition: Swift.String
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/X-Recording-Content-Type`.
+                    @frozen public enum XRecordingContentTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case textCsv = "text/csv"
+                        case applicationJson = "application/json"
+                        case applicationOctetStream = "application/octet-stream"
+                        case applicationFhirJson = "application/fhir+json"
+                        case applicationFhirJson_semi_FhirVersion_equals_1_0 = "application/fhir+json; fhirVersion=1.0"
+                        case applicationFhirJson_semi_FhirVersion_equals_4_0 = "application/fhir+json; fhirVersion=4.0"
+                        case applicationHl7CdaXml = "application/hl7-cda+xml"
+                    }
+                    /// Original attachment media type validated against its registered Grove recording format, URI-component encoded by the OpenAPI simple header representation. Decode exactly once before interpreting the media type. The response body uses binary transport to preserve source bytes.
+                    ///
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/X-Recording-Content-Type`.
+                    public var xRecordingContentType: Operations.GetStudyRecording.Output.Ok.Headers.XRecordingContentTypePayload
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
                     ///   - cacheControl:
                     ///   - contentDisposition:
+                    ///   - xRecordingContentType: Original attachment media type validated against its registered Grove recording format, URI-component encoded by the OpenAPI simple header representation. Decode exactly once before interpreting the media type. The response body uses binary transport to preserve source bytes.
                     public init(
                         cacheControl: Operations.GetStudyRecording.Output.Ok.Headers.CacheControlPayload,
-                        contentDisposition: Swift.String
+                        contentDisposition: Swift.String,
+                        xRecordingContentType: Operations.GetStudyRecording.Output.Ok.Headers.XRecordingContentTypePayload
                     ) {
                         self.cacheControl = cacheControl
                         self.contentDisposition = contentDisposition
+                        self.xRecordingContentType = xRecordingContentType
                     }
                 }
                 /// Received HTTP response headers
                 public var headers: Operations.GetStudyRecording.Output.Ok.Headers
                 /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/content/text\/csv`.
-                    case csv(OpenAPIRuntime.HTTPBody)
-                    /// The associated value of the enum case if `self` is `.csv`.
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/content/application\/octet-stream`.
+                    case binary(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.binary`.
                     ///
-                    /// - Throws: An error if `self` is not `.csv`.
-                    /// - SeeAlso: `.csv`.
-                    public var csv: OpenAPIRuntime.HTTPBody {
+                    /// - Throws: An error if `self` is not `.binary`.
+                    /// - SeeAlso: `.binary`.
+                    public var binary: OpenAPIRuntime.HTTPBody {
                         get throws {
                             switch self {
-                            case let .csv(body):
+                            case let .binary(body):
                                 return body
                             }
                         }
@@ -2545,13 +2726,13 @@ public enum Operations {
             }
         }
         @frozen public enum AcceptableContentType: AcceptableProtocol {
-            case csv
+            case binary
             case applicationProblemJson
             case other(Swift.String)
             public init?(rawValue: Swift.String) {
                 switch rawValue.lowercased() {
-                case "text/csv":
-                    self = .csv
+                case "application/octet-stream":
+                    self = .binary
                 case "application/problem+json":
                     self = .applicationProblemJson
                 default:
@@ -2562,15 +2743,15 @@ public enum Operations {
                 switch self {
                 case let .other(string):
                     return string
-                case .csv:
-                    return "text/csv"
+                case .binary:
+                    return "application/octet-stream"
                 case .applicationProblemJson:
                     return "application/problem+json"
                 }
             }
             public static var allCases: [Self] {
                 [
-                    .csv,
+                    .binary,
                     .applicationProblemJson
                 ]
             }
@@ -12654,7 +12835,7 @@ public enum Operations {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant heart-rate point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant heart-rate and body-weight point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.

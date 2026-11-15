@@ -27,13 +27,25 @@ enum CollectionScopePresentation {
         for requirement in requirements {
             let sleep = requirement.profile == CollectionObservationProfile.sleepStage.rawValue
             let workout = requirement.profile == CollectionObservationProfile.workout.rawValue
-            let label = workout ? (german ? "- Trainingseinheiten" : "- Workouts")
-                : sleep ? (german ? "- Schlafphasen" : "- Sleep stages") : (german ? "- Herzfrequenz" : "- Heart rate")
-            lines.append(label)
-            lines.append(german
-                ? "- Die ursprüngliche HealthKit-Kennung (UUID) wird zusammen mit jeder Messung und ihrer Löschmeldung gespeichert."
-                : "- The original HealthKit sample identifier (UUID) is retained with each measurement and its deletion notice.")
-            lines += try bounds(requirement.measurementWindow, german: german)
+            lines.append("- " + (try displayName(requirement.profile, german: german, sourceTypeIdentifier: requirement.sourceTypeIdentifier)))
+            if requirement.sourceKind == .participantApp,
+               CollectionObservationProfile(rawValue: requirement.profile)?.nativeSources.isEmpty == false || workout {
+                lines.append(german
+                    ? "- Die ursprüngliche HealthKit-Kennung (UUID) wird zusammen mit jeder Messung und ihrer Löschmeldung gespeichert."
+                    : "- The original HealthKit sample identifier (UUID) is retained with each measurement and its deletion notice.")
+            }
+            if requirement.profile == CollectionObservationProfile.food.rawValue {
+                lines.append(german
+                    ? "- Einträge zu Mahlzeiten enthalten Verweise auf ihre Nährstoffaufzeichnungen. "
+                        + "Nährstoffmessungen werden für diese Studie nur mit separat ausgewählter Berechtigung erfasst."
+                    : "- Food entries retain links to their nutrient records. "
+                        + "Nutrient measurements are collected for this study only when separately selected and authorized.")
+            }
+            lines += try bounds(requirement.measurementWindow, german: german, timeBasis: requirement.timeBasis ?? .measurementTime)
+            if let disclosure = documentDisclosure(requirement.timeBasis, german: german) {
+                lines.append(disclosure)
+                continue
+            }
             if workout {
                 lines.append(requirement.includeWorkoutRoutes
                     ? (german ? "- Genaue Standortverläufe der Trainingseinheiten werden für diese Studie erfasst."
@@ -46,17 +58,72 @@ enum CollectionScopePresentation {
                     : "- Workouts include all segments and statistics when the session overlaps the collection window. "
                         + "They may start before it or end after it.")
             }
-            if sleep {
-                lines.append(german
-                    ? "- Schlafaufzeichnungen werden vollständig erfasst, wenn sie den Erfassungszeitraum überlappen. "
-                        + "Sie können davor beginnen oder danach enden."
-                    : "- Sleep records are collected in full when they overlap the collection window. They may start before it or end after it.")
+            if !workout, let profile = CollectionObservationProfile(rawValue: requirement.profile), profile.permitsEffectiveTime(hasEnd: true) {
+                lines.append(wholeRecordOverlap(german: german, sleep: sleep))
             }
         }
         return lines.joined(separator: "\n")
     }
 
-    private static func bounds(_ window: CollectionMeasurementWindow?, german: Bool) throws -> [String] {
+    static func displayName(_ rawProfile: String, german: Bool, sourceTypeIdentifier: String? = nil) throws -> String {
+        guard let profile = CollectionObservationProfile(rawValue: rawProfile) else {
+            throw ServerError.badRequest("Unsupported collection profile")
+        }
+        return switch profile {
+        case .heartRate: german ? "Herzfrequenz" : "Heart rate"
+        case .bodyWeight: german ? "Körpergewicht" : "Body weight"
+        case .sleepStage: german ? "Schlafphasen" : "Sleep stages"
+        case .workout: german ? "Trainingseinheiten" : "Workouts"
+        case .onWrist: german ? "Tragezustand der Uhr" : "Watch wear state"
+        default:
+            if let title = profile.localizedNativeTitle(language: german ? "de" : "en", sourceTypeIdentifier: sourceTypeIdentifier) {
+                title
+            } else if let title = SensorKitCollectionPresentation.title(
+                profile: profile, sourceTypeIdentifier: sourceTypeIdentifier, german: german
+            ) {
+                title
+            } else if let id = profile.measurement?.id, let title = ProviderCollectionPresentation.title(measurementID: id, german: german) {
+                title
+            } else {
+                throw ServerError.badRequest("Collection scope translation is unavailable for this measurement")
+            }
+        }
+    }
+
+    private static func wholeRecordOverlap(german: Bool, sleep: Bool) -> String {
+        if sleep {
+            return german
+                ? "- Schlafaufzeichnungen werden vollständig erfasst, wenn sie den Erfassungszeitraum überlappen. "
+                    + "Sie können davor beginnen oder danach enden."
+                : "- Sleep records are collected in full when they overlap the collection window. They may start before it or end after it."
+        }
+        return german
+            ? "- Zeitlich ausgedehnte Aufzeichnungen werden vollständig erfasst, wenn sie den Erfassungszeitraum überlappen. "
+                + "Sie können davor beginnen oder danach enden."
+            : "- Interval records are collected in full when they overlap the collection window. They may start before it or end after it."
+    }
+
+    private static func documentDisclosure(_ basis: CollectionTimeBasis?, german: Bool) -> String? {
+        switch basis {
+        case .clinicalRecordDownload:
+            german
+                ? "- Der Zeitraum bezieht sich darauf, wann HealthKit das Dokument auf dieses Gerät heruntergeladen hat. "
+                    + "Das vollständige Originaldokument wird erfasst und kann Behandlungen außerhalb dieses Zeitraums beschreiben."
+                : "- The window refers to when HealthKit downloaded the document to this device. "
+                    + "The complete original document is collected and may describe care outside this window."
+        case .cdaSourceDocumentPeriod:
+            german
+                ? "- Der Zeitraum bezieht sich auf die vom Ersteller zugewiesenen Dokumentdaten, nicht auf Behandlungs- oder Downloaddaten. "
+                    + "Das vollständige CDA-Originaldokument wird nach der separaten Dokumentfreigabe erfasst."
+                : "- The window refers to document dates assigned by the creator, not care or download dates. "
+                    + "The complete original CDA document is collected after its separate document authorization."
+        default: nil
+        }
+    }
+
+    private static func bounds(
+        _ window: CollectionMeasurementWindow?, german: Bool, timeBasis: CollectionTimeBasis
+    ) throws -> [String] {
         var lines: [String] = []
         switch window?.start {
         case .none:
@@ -81,6 +148,12 @@ enum CollectionScopePresentation {
             try lines.append((german ? "- Messungen vor (ausschließlich): " : "- Measurements before (exclusive): ") + instant(end))
         } else {
             lines.append(german ? "- Weitere Messungen während der Teilnahme." : "- Continuing measurements during enrollment.")
+        }
+        if timeBasis != .measurementTime {
+            return lines.map {
+                $0.replacingOccurrences(of: german ? "Messungen" : "Measurements", with: german ? "Dokumentdaten" : "Source document dates")
+                    .replacingOccurrences(of: "measurements", with: "source document dates")
+            }
         }
         return lines
     }

@@ -135,6 +135,9 @@ extension AuthIntegrationTests {
         let base = apiBasePath
 
         return [
+            AuthEndpoint(
+                method: .GET, path: "\(base)/collection-capabilities", body: nil, contentType: nil, role: .authenticated, successStatus: .ok
+            ),
             // Groups
             researcher(.GET, "\(base)/groups", successStatus: .ok, requiresGroupAccess: false),
             researcher(.GET, "\(base)/groups/\(groupId)", successStatus: .ok),

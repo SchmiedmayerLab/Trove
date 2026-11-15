@@ -17,6 +17,7 @@ enum AuthEndpointRole: Sendable {
     case auditReader
     case dataReader
     case participant
+    case authenticated
 }
 
 
@@ -36,11 +37,18 @@ struct AuthEndpoint: Sendable {
         return false
     }
 
+    var requiresAuthenticationOnly: Bool {
+        if case .authenticated = role {
+            return true
+        }
+        return false
+    }
+
     var requiresGroupAccess: Bool {
         switch role {
         case .researcher(_, let required): required
         case .auditReader, .dataReader: true
-        case .participant: false
+        case .participant, .authenticated: false
         }
     }
 
@@ -48,7 +56,7 @@ struct AuthEndpoint: Sendable {
         switch role {
         case .researcher(let role, _): role
         case .auditReader: .admin
-        case .participant, .dataReader: .researcher
+        case .participant, .dataReader, .authenticated: .researcher
         }
     }
 

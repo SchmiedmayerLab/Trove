@@ -20,7 +20,8 @@ struct RecordedInstant: Sendable, Equatable {
 
 extension RecordedInstant {
     init(_ instant: Instant) throws {
-        guard let original = instant.time.originalSecondsString, original.utf8.count <= 4096 else {
+        guard let original = instant.time.originalSecondsString, original.utf8.count <= 4096,
+              instant.originalTimeZoneString != "-00:00", (1...9999).contains(instant.date.year) else {
             throw FHIRValidationClient.invalid
         }
         let parts = original.split(separator: ".", omittingEmptySubsequences: false)
@@ -34,8 +35,14 @@ extension RecordedInstant {
         while digits.last == "0" { digits.removeLast() }
         var integral = instant
         integral.time.second = Decimal(whole)
-        let timestamp = try integral.asNSDate().timeIntervalSince1970
-        guard let seconds = Int64(exactly: timestamp) else { throw FHIRValidationClient.invalid }
+        let date = try integral.asNSDate()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = instant.timeZone
+        let components = calendar.dateComponents([.era, .year, .month, .day, .hour, .minute, .second], from: date)
+        guard components.era == 1, components.year == instant.date.year,
+              components.month == Int(instant.date.month), components.day == Int(instant.date.day),
+              components.hour == Int(instant.time.hour), components.minute == Int(instant.time.minute), components.second == whole,
+              let seconds = Int64(exactly: date.timeIntervalSince1970) else { throw FHIRValidationClient.invalid }
         self.init(seconds: seconds, fraction: digits)
     }
 

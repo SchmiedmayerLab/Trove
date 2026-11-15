@@ -24,16 +24,16 @@ struct ClinicalAttributionTests {
             let collectedAt = try #require(old.createdAt)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let first = ClinicalEventStoreTests.event(source: fixture.source, effectiveAt: collectedAt)
+                let first = try ClinicalEventStoreTests.event(source: fixture.source, effectiveAt: collectedAt)
                 _ = try await store.accept(first, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation)
                 try await Self.publishNextRevision(fixture, on: app)
                 // Publication alone does not change which consent governs collection.
-                let delayed = ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: collectedAt)
+                let delayed = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: collectedAt)
                 let adopted = try await ClinicalEventStoreTests.acceptConsent(enrollmentID: fixture.enrollmentIDs[0], on: app, revision: 2)
                 try #require(try #require(adopted.createdAt) > collectedAt)
                 _ = try await store.accept(delayed, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0], currentOnly: false) == 2)
-                let current = ClinicalEventStoreTests.event(source: fixture.source, sequence: 3, effectiveAt: try #require(adopted.createdAt))
+                let current = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 3, effectiveAt: try #require(adopted.createdAt))
                 await #expect {
                     try await store.accept(current, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 403 }
@@ -50,7 +50,7 @@ struct ClinicalAttributionTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let sourceID = fixture.source.id, proof = fixture.installation
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let event = ClinicalEventStoreTests.event(source: fixture.source)
+                let event = try ClinicalEventStoreTests.event(source: fixture.source)
                 let receipt = try await ClinicalEventStore(database: app.db).accept(
                     event, sourceID: sourceID, targets: [fixture.targets[0]], installation: proof
                 )
@@ -86,7 +86,7 @@ struct ClinicalAttributionTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app, consentCount: 1)
             let consent = try #require(try await EnrollmentConsent.find(fixture.consentIDs[0], on: app.db))
-            let event = ClinicalEventStoreTests.event(source: fixture.source, effectiveAt: try #require(consent.createdAt))
+            let event = try ClinicalEventStoreTests.event(source: fixture.source, effectiveAt: try #require(consent.createdAt))
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let receipt = try await ClinicalEventStore(database: app.db).accept(
                     event, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation
@@ -112,7 +112,7 @@ struct ClinicalAttributionTests {
     func onlySelectedOutputsReceiveGrantsAndLateAttributionCanSelectACompanion() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
+            let event = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "secondary"])
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 let receipt = try await store.accept(
@@ -136,7 +136,7 @@ struct ClinicalAttributionTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let event = ClinicalEventStoreTests.event(source: fixture.source)
+                let event = try ClinicalEventStoreTests.event(source: fixture.source)
                 let receipt = try await ClinicalEventStore(database: app.db).accept(
                     event, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation
                 )

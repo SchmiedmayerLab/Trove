@@ -48,16 +48,7 @@ enum StudyPointProjection {
             )
             guard record.kind == .active, !outputs.isEmpty, Set(recordingURLs.keys).isSubset(of: outputs),
                   outputs.isSubset(of: Set(point.outputs.map(\.fullURL))) else { throw FHIRValidationClient.invalid }
-            try FHIRWorkoutProjection.requireCompleteSelection(outputs, outputs: point.outputs.map {
-                .init(
-                    fullURL: $0.fullURL,
-                    profile: $0.profile,
-                    effectiveAt: $0.effectiveAt,
-                    effectiveEnd: $0.effectiveEnd,
-                    codeSystem: $0.codeSystem,
-                    code: $0.code
-                )
-            })
+            try FHIRWorkoutProjection.requireCompleteSelection(outputs, outputs: point.collectionOutputs)
             let resources = try index(StudyProjectionJSON.read(record))
             let transform = StudyPointResourceProjection(resources: resources, subject: subject, outputs: outputs, recordingURLs: recordingURLs)
             let selected = try closure(outputs: outputs, provenance: record.version.fullURL, transform: transform)
