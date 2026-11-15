@@ -108,8 +108,11 @@ extension ClinicalEventRepresentationStore {
         // A new representation is new custody, even though its clinical version is retained.
         // Producer enrollment snapshots confer no authority and cannot refresh existing grants.
         let grants = ClinicalGrantStore(
-            database: database, source: source, auditContext: auditContext,
-            acceptedAt: receivedAt, providerRegistrationID: providerRegistrationID
+            database: database,
+            source: source,
+            auditContext: auditContext,
+            acceptedAt: receivedAt,
+            providerRegistrationID: providerRegistrationID
         )
         _ = try await grants.authorities(
             outputs: event.collectionOutputs,
