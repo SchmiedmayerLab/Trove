@@ -621,7 +621,7 @@ journal format requires a fresh development journal.
 ## Grove Development Dependency
 
 API, server and iOS pin Grove commit
-`7193096b38960ea71af54b28c3a49369ddb37b21`, the top of Grove's unreleased collection stack
+`cc42583ff63e44b5507829db4aadbd42076b4dcb`, the top of Grove's unreleased collection stack
 (branch `provider-converters`), which builds on
 [Grove #144](https://github.com/SchmiedmayerLab/Grove/pull/144). It
 provides typed source metadata, recording-device mappings, complete recording periods,

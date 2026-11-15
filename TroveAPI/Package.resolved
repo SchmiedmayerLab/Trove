@@ -1,5 +1,5 @@
 {
-  "originHash" : "5c34b1a90a42d838e3388ff3ca2ec82260bea891503d6d4db43293a3eb39d5eb",
+  "originHash" : "99c5a8c669065ff82ceead0d95931a3eed505f112bb94937c3c6ea5ecaebe673",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -96,7 +96,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/SchmiedmayerLab/Grove.git",
       "state" : {
-        "revision" : "7193096b38960ea71af54b28c3a49369ddb37b21"
+        "revision" : "cc42583ff63e44b5507829db4aadbd42076b4dcb"
       }
     },
     {

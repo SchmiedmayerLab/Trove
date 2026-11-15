@@ -138,8 +138,8 @@ Authentication is required to verify signed streaming chunks. Its health probe
 checks that the S3 listener rejects an unsigned request. The test fixture uses only
 the synthetic `trove_test` credentials and loopback connections.
 
-For an isolated memory measurement, run the large-storage test alone in a fresh
-test process with a disposable authenticated S3 service:
+For a focused memory measurement, run the large-storage test alone with a disposable
+authenticated S3 service:
 
 ```sh
 TROVE_TEST_S3_PORT=18333 swift test --package-path TroveServer \
@@ -147,9 +147,13 @@ TROVE_TEST_S3_PORT=18333 swift test --package-path TroveServer \
 ```
 
 It generates 96 MiB plus one byte in 64 KiB chunks, uploads and verifies the complete
-object, and deletes it. On Linux it records process peak resident memory and requires
-less than 64 MiB additional peak memory. This is storage-transport evidence, not a
-measurement of the complete mobile collection and durable-queue pipeline.
+object, and deletes it. A 1 MiB warm-up upload through the same path runs first. The
+test then samples the process's resident memory throughout the large upload on Linux
+and requires its peak to stay less than 64 MiB above the value after the warm-up.
+Earlier tests' peak memory does not count; concurrent tests in the same process
+would, so measure with `--no-parallel` or alone. This is
+storage-transport evidence, not a measurement of the complete mobile collection and
+durable-queue pipeline.
 
 `RecordingTransferStreamingTests.largeHTTPUploadStreamsToStorageAndRecoversItsReceipt`
 adds a real HTTP listener and streamed client request to the same 96 MiB workload.
