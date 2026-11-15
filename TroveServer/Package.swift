@@ -103,8 +103,7 @@ let package = Package(
             exclude: [
                 "Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license",
                 "Resources/HealthKitSleepEvent.json.license", "Resources/HealthKitWorkoutEvent.json.license",
-                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license",
-                "Resources/HealthKitComponentEvents.license"
+                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license"
             ],
             resources: [
                 .copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json"),
