@@ -6,26 +6,46 @@
 // SPDX-License-Identifier: MIT
 //
 
+import AsyncHTTPClient
 import Foundation
+import NIOCore
 import OpenAPIRuntime
 import SotoS3
 import Vapor
 
 
+/// Streams objects to and from S3-compatible storage.
+///
+/// An upload holds a bounded amount of its body in memory, independent of the object size: the 64 KiB chunk being
+/// signed, the chunks the storage connection has accepted up to its write-buffer limit, and at most
+/// ``EventLoopPacedBody/window`` body chunks queued ahead of that connection. Reads use the HTTP client's response
+/// backpressure.
 final class S3ObjectStorageProvider: ObjectStorageProvider, Sendable {
+    private let httpClient: HTTPClient
+    private let eventLoop: any EventLoop
     private let client: AWSClient
     private let s3: S3
     private let bucket: String
 
     init(application: Application, config: S3ObjectStorageConfiguration) throws {
         try application.outboundTransport.validateEndpoint(config.endpoint)
+        // Every storage connection runs on this one event loop, so an upload can pace its body against it. The client
+        // shares the application's transport configuration.
+        let eventLoop = application.eventLoopGroup.next()
+        let httpClient = HTTPClient(
+            eventLoopGroup: eventLoop,
+            configuration: application.http.client.configuration,
+            backgroundActivityLogger: application.logger
+        )
         let client = AWSClient(
             credentialProvider: .static(
                 accessKeyId: config.accessKeyId,
                 secretAccessKey: config.secretAccessKey
             ),
-            httpClient: application.http.client.shared
+            httpClient: httpClient
         )
+        self.httpClient = httpClient
+        self.eventLoop = eventLoop
         self.client = client
         self.s3 = S3(client: client, region: .init(rawValue: config.region), endpoint: config.endpoint)
         self.bucket = config.bucket
@@ -37,7 +57,7 @@ final class S3ObjectStorageProvider: ObjectStorageProvider, Sendable {
         }
         try Task.checkCancellation()
         let request = S3.PutObjectRequest(
-            body: .init(asyncSequence: body, length: byteCount),
+            body: .init(asyncSequence: EventLoopPacedBody(base: body, eventLoop: eventLoop), length: byteCount),
             bucket: bucket,
             contentType: contentType,
             key: key
@@ -77,5 +97,6 @@ final class S3ObjectStorageProvider: ObjectStorageProvider, Sendable {
 
     func shutdown() async throws {
         try await client.shutdown()
+        try await httpClient.shutdown()
     }
 }
