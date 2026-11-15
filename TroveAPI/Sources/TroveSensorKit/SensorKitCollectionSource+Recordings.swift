@@ -25,12 +25,23 @@ extension SensorKitCollectionSource {
         case .ambientPressure: Sensor.ambientPressure
         case .heartRate: Sensor.heartRate
         case .pedometer: Sensor.pedometer
-        case .headphoneMotion:
-            if #available(iOS 27, *) { Sensor.headphoneMotion } else { nil }
-        case .headphoneSettings:
-            if #available(iOS 27, *) { Sensor.headphoneSettings } else { nil }
+        case .headphoneMotion, .headphoneSettings: headphoneSensor
         default: nil
         }
+    }
+
+    /// The headphone sensors exist only from the iOS 27 SDK on; earlier SDKs build without them.
+    private var headphoneSensor: (any AnySensor)? {
+        #if compiler(>=6.4)
+        if #available(iOS 27, *) {
+            switch self {
+            case .headphoneMotion: return Sensor.headphoneMotion
+            case .headphoneSettings: return Sensor.headphoneSettings
+            default: return nil
+            }
+        }
+        #endif
+        return nil
     }
 
     func catchUpRecording(
@@ -47,21 +58,29 @@ extension SensorKitCollectionSource {
             try await acquisition.catchUpTabular(Sensor.heartRate, localID: localID, sensorKit: sensorKit, application: application, host: host)
         case .pedometer:
             try await acquisition.catchUpTabular(Sensor.pedometer, localID: localID, sensorKit: sensorKit, application: application, host: host)
-        case .headphoneMotion:
-            if #available(iOS 27, *) {
-                try await acquisition.catchUpTabular(
-                    Sensor.headphoneMotion, localID: localID, sensorKit: sensorKit, application: application, host: host
-                )
-            } else { throw SensorKitAcquisition.AcquisitionError.invalidBatch }
-        case .headphoneSettings:
-            if #available(iOS 27, *) {
-                try await acquisition.catchUpTabular(
-                    Sensor.headphoneSettings, localID: localID, sensorKit: sensorKit, application: application, host: host
-                )
-            } else { throw SensorKitAcquisition.AcquisitionError.invalidBatch }
+        case .headphoneMotion, .headphoneSettings:
+            try await catchUpHeadphones(acquisition: acquisition, localID: localID, sensorKit: sensorKit, application: application, host: host)
         default:
             try await catchUpHybrid(acquisition: acquisition, localID: localID, sensorKit: sensorKit, application: application, host: host)
         }
+    }
+
+    private func catchUpHeadphones(
+        acquisition: SensorKitAcquisition, localID: UUID, sensorKit: GroveSensorKit.SensorKit, application: ApplicationDevice, host: HostDevice
+    ) async throws -> Bool {
+        #if compiler(>=6.4)
+        if #available(iOS 27, *) {
+            if self == .headphoneMotion {
+                return try await acquisition.catchUpTabular(
+                    Sensor.headphoneMotion, localID: localID, sensorKit: sensorKit, application: application, host: host
+                )
+            }
+            return try await acquisition.catchUpTabular(
+                Sensor.headphoneSettings, localID: localID, sensorKit: sensorKit, application: application, host: host
+            )
+        }
+        #endif
+        throw SensorKitAcquisition.AcquisitionError.invalidBatch
     }
 
     private func catchUpHybrid(
