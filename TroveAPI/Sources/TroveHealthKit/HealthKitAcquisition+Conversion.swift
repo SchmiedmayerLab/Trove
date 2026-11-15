@@ -66,6 +66,8 @@ extension HealthKitAcquisition {
         var options = HealthKitFHIRExporter.Options()
         options.route = stream == .workoutRoute ? .authorized : .omit
         options.nativeIdentifier = .authorized(system: try source.nativeRecordIdentifierSystem())
+        // Trove preserves all source metadata, identifying and custom keys included; no study narrows it.
+        options.metadata = .all
         return try HealthKitFHIRExporter(
             producer: producer,
             repositoryScope: BusinessIdentifier(
