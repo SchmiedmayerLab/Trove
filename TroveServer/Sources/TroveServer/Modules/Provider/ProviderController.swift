@@ -50,7 +50,9 @@ extension Controller {
     func getParticipantProviderConnections(
         _ input: Operations.GetParticipantProviderConnections.Input
     ) async throws -> Operations.GetParticipantProviderConnections.Output {
-        let values = try await providerRequest { try await providerConnections().statuses() }
+        _ = try AuthContext.checkIsParticipant()
+        // A deployment without provider integration offers no connections; that is an empty list, not a failure.
+        let values = try await providerRequest { try await providerRuntime.connections?.statuses() ?? [] }
         return .ok(.init(headers: .init(cacheControl: "no-store"), body: .json(values.map(Components.Schemas.ProviderConnection.init))))
     }
 

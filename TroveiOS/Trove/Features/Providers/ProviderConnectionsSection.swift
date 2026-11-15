@@ -26,6 +26,12 @@ struct ProviderConnectionsSection: View {
     @State private var disconnecting: Components.Schemas.ProviderConnection?
 
     var body: some View {
+        if model.offersWearableServices {
+            section
+        }
+    }
+
+    private var section: some View {
         Section {
             if model.isBusy { ProgressView("Updating wearable connections…") }
             ForEach(model.connections, id: \.id) { connection in
@@ -63,7 +69,6 @@ struct ProviderConnectionsSection: View {
         .task(id: model.sessionSnapshot) {
             selection = nil
             disconnecting = nil
-            await model.refresh()
         }
         .task(id: selection) {
             guard let selection, selection.session == model.sessionSnapshot else {
