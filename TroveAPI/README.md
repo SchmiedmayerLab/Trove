@@ -672,12 +672,14 @@ journal format requires a fresh development journal.
 ## Grove Development Dependency
 
 API, server and iOS pin Grove commit
-`cc42583ff63e44b5507829db4aadbd42076b4dcb`, the top of Grove's unreleased collection stack
+`833850907283712ea4dcf987fb8edf6d721fc4fc`, the top of Grove's unreleased collection stack
 (branch `provider-converters`), which builds on
 [Grove #144](https://github.com/SchmiedmayerLab/Grove/pull/144). It
 provides typed source metadata, recording-device mappings, complete recording periods,
 file-backed recordings, the collection catalog and the provider and SensorKit converters
-for the stateless Bundle exchange. `GroveConsent` supplies the shared consent
+for the stateless Bundle exchange. Trove sets the HealthKit exporter's metadata policy
+to `.all`: every supported source metadata key, identifying and custom keys included, is
+preserved, and no study narrows it. `GroveConsent` supplies the shared consent
 document format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation
 and simulator checks are separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
