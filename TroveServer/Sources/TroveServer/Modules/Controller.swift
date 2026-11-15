@@ -25,6 +25,10 @@ struct Controller: APIProtocol {
 // MARK: - Services
 
 extension Controller {
+    var providerRuntime: ProviderRuntime {
+        grove[ProviderRuntime.self]
+    }
+
     var delegationService: DelegationService {
         grove[DelegationService.self]
     }

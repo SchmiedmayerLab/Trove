@@ -406,6 +406,24 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/consents/{consentId}/pdf`.
     /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/consents/{consentId}/pdf/get`.
     func getParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf(_ input: Operations.GetParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf.Input) async throws -> Operations.GetParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf.Output
+    /// - Remark: HTTP `GET /participant/provider-registrations`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)`.
+    func getParticipantProviderRegistrations(_ input: Operations.GetParticipantProviderRegistrations.Input) async throws -> Operations.GetParticipantProviderRegistrations.Output
+    /// - Remark: HTTP `GET /studies/{studyId}/collection-provider-capabilities`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)`.
+    func getStudyCollectionProviderCapabilities(_ input: Operations.GetStudyCollectionProviderCapabilities.Input) async throws -> Operations.GetStudyCollectionProviderCapabilities.Output
+    /// - Remark: HTTP `POST /participant/provider-registrations/{registrationId}/link-intents`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)`.
+    func startParticipantProviderLink(_ input: Operations.StartParticipantProviderLink.Input) async throws -> Operations.StartParticipantProviderLink.Output
+    /// - Remark: HTTP `POST /participant/provider-link-intents/{intentId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)`.
+    func completeParticipantProviderLink(_ input: Operations.CompleteParticipantProviderLink.Input) async throws -> Operations.CompleteParticipantProviderLink.Output
+    /// - Remark: HTTP `GET /participant/provider-connections`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)`.
+    func getParticipantProviderConnections(_ input: Operations.GetParticipantProviderConnections.Input) async throws -> Operations.GetParticipantProviderConnections.Output
+    /// - Remark: HTTP `POST /participant/provider-connections/{connectionId}/disconnect`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)`.
+    func disconnectParticipantProviderConnection(_ input: Operations.DisconnectParticipantProviderConnection.Input) async throws -> Operations.DisconnectParticipantProviderConnection.Output
 }
 
 /// Convenience overloads for operation inputs.
@@ -1346,6 +1364,64 @@ extension APIProtocol {
         headers: Operations.GetParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf.Input.Headers = .init()
     ) async throws -> Operations.GetParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf.Output {
         try await getParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf(Operations.GetParticipantEnrollmentsEnrollmentIdConsentsConsentIdPdf.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `GET /participant/provider-registrations`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)`.
+    public func getParticipantProviderRegistrations(headers: Operations.GetParticipantProviderRegistrations.Input.Headers = .init()) async throws -> Operations.GetParticipantProviderRegistrations.Output {
+        try await getParticipantProviderRegistrations(Operations.GetParticipantProviderRegistrations.Input(headers: headers))
+    }
+    /// - Remark: HTTP `GET /studies/{studyId}/collection-provider-capabilities`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)`.
+    public func getStudyCollectionProviderCapabilities(
+        path: Operations.GetStudyCollectionProviderCapabilities.Input.Path,
+        headers: Operations.GetStudyCollectionProviderCapabilities.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyCollectionProviderCapabilities.Output {
+        try await getStudyCollectionProviderCapabilities(Operations.GetStudyCollectionProviderCapabilities.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `POST /participant/provider-registrations/{registrationId}/link-intents`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)`.
+    public func startParticipantProviderLink(
+        path: Operations.StartParticipantProviderLink.Input.Path,
+        headers: Operations.StartParticipantProviderLink.Input.Headers = .init(),
+        body: Operations.StartParticipantProviderLink.Input.Body
+    ) async throws -> Operations.StartParticipantProviderLink.Output {
+        try await startParticipantProviderLink(Operations.StartParticipantProviderLink.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `POST /participant/provider-link-intents/{intentId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)`.
+    public func completeParticipantProviderLink(
+        path: Operations.CompleteParticipantProviderLink.Input.Path,
+        headers: Operations.CompleteParticipantProviderLink.Input.Headers = .init(),
+        body: Operations.CompleteParticipantProviderLink.Input.Body
+    ) async throws -> Operations.CompleteParticipantProviderLink.Output {
+        try await completeParticipantProviderLink(Operations.CompleteParticipantProviderLink.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `GET /participant/provider-connections`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)`.
+    public func getParticipantProviderConnections(headers: Operations.GetParticipantProviderConnections.Input.Headers = .init()) async throws -> Operations.GetParticipantProviderConnections.Output {
+        try await getParticipantProviderConnections(Operations.GetParticipantProviderConnections.Input(headers: headers))
+    }
+    /// - Remark: HTTP `POST /participant/provider-connections/{connectionId}/disconnect`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)`.
+    public func disconnectParticipantProviderConnection(
+        path: Operations.DisconnectParticipantProviderConnection.Input.Path,
+        headers: Operations.DisconnectParticipantProviderConnection.Input.Headers = .init()
+    ) async throws -> Operations.DisconnectParticipantProviderConnection.Output {
+        try await disconnectParticipantProviderConnection(Operations.DisconnectParticipantProviderConnection.Input(
             path: path,
             headers: headers
         ))

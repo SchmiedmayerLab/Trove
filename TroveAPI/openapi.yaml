@@ -2326,6 +2326,181 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /participant/provider-registrations:
+    get:
+      operationId: getParticipantProviderRegistrations
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderRegistration"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+  /studies/{studyId}/collection-provider-capabilities:
+    get:
+      operationId: getStudyCollectionProviderCapabilities
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderRegistration"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      parameters:
+        - name: studyId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-registrations/{registrationId}/link-intents:
+    post:
+      operationId: startParticipantProviderLink
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLinkIntent"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderLinkRequest"
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-link-intents/{intentId}/complete:
+    post:
+      operationId: completeParticipantProviderLink
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConnection"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderLinkCompletion"
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+  /participant/provider-connections:
+    get:
+      operationId: getParticipantProviderConnections
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderConnection"
+                minItems: 0
+                maxItems: 128
+        default:
+          $ref: "#/components/responses/OperationFailure"
+  /participant/provider-connections/{connectionId}/disconnect:
+    post:
+      operationId: disconnectParticipantProviderConnection
+      tags:
+        - Providers
+      responses:
+        "200":
+          description: Authenticated, authorized result.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Always no-store.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderConnection"
+        default:
+          $ref: "#/components/responses/OperationFailure"
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 36
+            format: uuid
+
 components:
   parameters:
     SourceInstallationID:
@@ -2480,6 +2655,241 @@ components:
       bearerFormat: JWT
       description: Keycloak-issued JWT access token
   schemas:
+    ProviderRedirect:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - uri
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        uri:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+    ProviderCollectionMeasurement:
+      type: object
+      additionalProperties: false
+      required:
+        - profile
+        - displayNameEnglish
+        - displayNameGerman
+      properties:
+        profile:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+        displayNameEnglish:
+          type: string
+          minLength: 1
+          maxLength: 512
+        displayNameGerman:
+          type: string
+          minLength: 1
+          maxLength: 512
+    ProviderCollectionCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceTypeIdentifier
+        - measurements
+        - effectiveTime
+      properties:
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        measurements:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderCollectionMeasurement"
+          minItems: 1
+          maxItems: 32
+        effectiveTime:
+          type: string
+          enum:
+            - point
+            - interval
+            - point-or-interval
+    ProviderRegistration:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - provider
+        - displayName
+        - controller
+        - region
+        - redirects
+        - capabilities
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        provider:
+          type: string
+          enum:
+            - withings
+            - oura
+            - google-health-api
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        controller:
+          type: string
+          minLength: 1
+          maxLength: 255
+        region:
+          type: string
+          minLength: 1
+          maxLength: 255
+        redirects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderRedirect"
+          minItems: 1
+          maxItems: 8
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderCollectionCapability"
+          minItems: 1
+          maxItems: 512
+    ProviderLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - redirectId
+      properties:
+        redirectId:
+          type: string
+          minLength: 1
+          maxLength: 64
+    ProviderLinkIntent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - authorizationUrl
+        - redirectUri
+        - expiresAt
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        authorizationUrl:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          format: uri
+        redirectUri:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    ProviderLinkCompletion:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - code
+      properties:
+        state:
+          type: string
+          minLength: 32
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_-]{32,128}$
+        code:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    ProviderConnection:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - registrationId
+        - sourceId
+        - state
+        - generation
+        - requiresReauthorization
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        registrationId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        sourceId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          format: uuid
+        state:
+          type: string
+          enum:
+            - active
+            - disconnected
+            - reauthorization-required
+        generation:
+          type: integer
+          format: int64
+          minimum: 1
+        lastAttempt:
+          type: string
+          format: date-time
+        lastSuccessfulFetch:
+          type: string
+          format: date-time
+        acceptedThrough:
+          type: string
+          format: date-time
+        requiresReauthorization:
+          type: boolean
+        collectionAttempt:
+          $ref: '#/components/schemas/ProviderCollectionAttempt'
+    ProviderCollectionAttempt:
+      type: object
+      additionalProperties: false
+      description: Most recent collection attempt for one exact source. This is not a completeness claim for every source on the connected account.
+      required: [sourceTypeIdentifier, outcome, nextAttempt]
+      properties:
+        sourceTypeIdentifier:
+          type: string
+          minLength: 1
+          maxLength: 256
+        outcome:
+          type: string
+          enum:
+          - scheduled
+          - deferred
+          - accepted
+          - no-current-demand
+          - transient-failure
+          - capacity-blocked
+          - source-blocked
+          - authorization-changed
+        nextAttempt:
+          type: string
+          format: date-time
+
     # ── Shared ────────────────────────────────────────────────────────────
 
     ProblemDetails:

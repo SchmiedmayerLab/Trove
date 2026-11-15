@@ -57,6 +57,36 @@ struct ClinicalEventStore: Sendable {
         }
     }
 
+    /// The worker's checkpoint, source and connection fences share the custody transaction.
+    func accept(
+        _ event: ValidatedExchangeEvent, commandID: UUID, worker: ProviderWorkerAuthority, on transaction: any Database
+    ) async throws -> ClinicalEventReceipt {
+        let authorization = try await worker.lock(on: transaction)
+        guard event.retraction == nil, !event.outputs.isEmpty,
+              event.outputs.allSatisfy({ $0.sourceTypeIdentifier == worker.sourceToken }) else { throw ProviderFailure.scopeLost }
+        try validateSource(event, source: authorization.source)
+        let targets = try ProviderDemandStore.targets(for: event.collectionOutputs, demands: authorization.demands)
+        let sql = try sql(on: transaction)
+        if let retained = try await sql.raw("""
+            SELECT * FROM clinical_events WHERE identifier_system = \(bind: event.eventIdentifierSystem)
+                AND identifier_value = \(bind: event.eventIdentifierValue) AND source_id = \(bind: authorization.source.id)
+            """).first() {
+            let eventID = try retained.decode(column: "id", as: UUID.self)
+            let bytes = try retained.decode(column: "raw_bytes", as: Data.self)
+            guard try ClinicalRecordEquivalence.accepts(event.rawBytes, asRepresentationOf: bytes) else {
+                throw ServerError.conflict("Provider record version conflicts with retained content")
+            }
+            _ = try await ClinicalAttributionStore(database: transaction).attribute(
+                eventID: eventID, commandID: commandID, targets: targets, authorization: authorization, sourceToken: worker.sourceToken
+            )
+            return try ClinicalEventReceipt(row: retained)
+        }
+        return try await acceptAuthorized(
+            event, source: authorization.source, targets: targets, auditContext: authorization.audit,
+            providerRegistrationID: authorization.registrationID, on: transaction
+        )
+    }
+
     private func acceptAuthorized(
         _ event: ValidatedExchangeEvent, source: SourceBinding, targets: [ClinicalEventTarget],
         auditContext: AuditEvent.Context, providerRegistrationID: UUID? = nil, on transaction: any Database

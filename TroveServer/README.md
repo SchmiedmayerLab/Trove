@@ -10,6 +10,9 @@ SPDX-License-Identifier: MIT
 
 The Vapor backend: a REST API for studies, components, schedules, and enrollments. It conforms to the generated `APIProtocol` from [`TroveAPI/`](../TroveAPI), takes its study configuration types from `GroveStudyDefinition`, and exposes Grove's module system to route handlers through the local `GroveVapor` target.
 
+For approved account integrations, configuration and durable collection behavior, see
+[Provider collection](../docs/Provider-Collection.md).
+
 ## Getting started
 
 Use the single [local infrastructure setup](../TroveInfrastructure/docker/README.md)

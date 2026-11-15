@@ -731,6 +731,72 @@ extension APIProtocol {
             method: .get,
             path: server.apiPathComponentsWithServerPrefix("/participant/enrollments/{enrollmentId}/consents/{consentId}/pdf")
         )
+        try transport.register(
+            {
+                try await server.getParticipantProviderRegistrations(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/participant/provider-registrations")
+        )
+        try transport.register(
+            {
+                try await server.getStudyCollectionProviderCapabilities(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/collection-provider-capabilities")
+        )
+        try transport.register(
+            {
+                try await server.startParticipantProviderLink(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/provider-registrations/{registrationId}/link-intents")
+        )
+        try transport.register(
+            {
+                try await server.completeParticipantProviderLink(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/provider-link-intents/{intentId}/complete")
+        )
+        try transport.register(
+            {
+                try await server.getParticipantProviderConnections(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/participant/provider-connections")
+        )
+        try transport.register(
+            {
+                try await server.disconnectParticipantProviderConnection(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/provider-connections/{connectionId}/disconnect")
+        )
     }
 }
 
@@ -10521,6 +10587,476 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     return (response, body)
                 case let .undocumented(statusCode, _):
                     return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `GET /participant/provider-registrations`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)`.
+    func getParticipantProviderRegistrations(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetParticipantProviderRegistrations.id,
+            using: {
+                APIHandler.getParticipantProviderRegistrations($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let headers: Operations.GetParticipantProviderRegistrations.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetParticipantProviderRegistrations.Input(headers: headers)
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `GET /studies/{studyId}/collection-provider-capabilities`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)`.
+    func getStudyCollectionProviderCapabilities(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetStudyCollectionProviderCapabilities.id,
+            using: {
+                APIHandler.getStudyCollectionProviderCapabilities($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetStudyCollectionProviderCapabilities.Input.Path = .init(studyId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "studyId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.GetStudyCollectionProviderCapabilities.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetStudyCollectionProviderCapabilities.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `POST /participant/provider-registrations/{registrationId}/link-intents`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)`.
+    func startParticipantProviderLink(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.StartParticipantProviderLink.id,
+            using: {
+                APIHandler.startParticipantProviderLink($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.StartParticipantProviderLink.Input.Path = .init(registrationId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "registrationId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.StartParticipantProviderLink.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.StartParticipantProviderLink.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.ProviderLinkRequest.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.StartParticipantProviderLink.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `POST /participant/provider-link-intents/{intentId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)`.
+    func completeParticipantProviderLink(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.CompleteParticipantProviderLink.id,
+            using: {
+                APIHandler.completeParticipantProviderLink($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.CompleteParticipantProviderLink.Input.Path = .init(intentId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "intentId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.CompleteParticipantProviderLink.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.CompleteParticipantProviderLink.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.ProviderLinkCompletion.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.CompleteParticipantProviderLink.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `GET /participant/provider-connections`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)`.
+    func getParticipantProviderConnections(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetParticipantProviderConnections.id,
+            using: {
+                APIHandler.getParticipantProviderConnections($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let headers: Operations.GetParticipantProviderConnections.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetParticipantProviderConnections.Input(headers: headers)
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// - Remark: HTTP `POST /participant/provider-connections/{connectionId}/disconnect`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)`.
+    func disconnectParticipantProviderConnection(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.DisconnectParticipantProviderConnection.id,
+            using: {
+                APIHandler.disconnectParticipantProviderConnection($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.DisconnectParticipantProviderConnection.Input.Path = .init(connectionId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "connectionId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.DisconnectParticipantProviderConnection.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.DisconnectParticipantProviderConnection.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
                 }
             }
         )

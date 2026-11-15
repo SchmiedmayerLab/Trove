@@ -21,7 +21,7 @@ struct CreateSourceBindings: AsyncMigration {
                 .field("key_epoch", .string, .required)
                 .field("repository_kind", .string, .required)
                 .field("kind", .string, .required)
-                .field("provider_registration_id", .uuid)
+                .field("provider_registration_id", .uuid, .references("provider_registrations", "id", onDelete: .restrict))
                 .field("identifier_root", .string, .required)
                 .field("event_identifier_system", .string, .required)
                 .field("participant_identifier_system", .string, .required)

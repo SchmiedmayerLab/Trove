@@ -44,6 +44,7 @@ class TroveAppDelegate: GroveAppDelegate {
             healthKit
             sensorKit
             healthData
+            ProviderConnectionsModel()
             AccountConfiguration(
                 service: keycloak,
                 storageProvider: TroveAccountStorage(),

@@ -11,6 +11,564 @@ public import GroveStudyDefinition
 extension Components {
     /// Types generated from the `#/components/schemas` section of the OpenAPI document.
     public enum Schemas {
+        /// - Remark: Generated from `#/components/schemas/ProviderRedirect`.
+        public struct ProviderRedirect: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderRedirect/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRedirect/uri`.
+            public var uri: Swift.String
+            /// Creates a new `ProviderRedirect`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - uri:
+            public init(
+                id: Swift.String,
+                uri: Swift.String
+            ) {
+                self.id = id
+                self.uri = uri
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case uri
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.uri = try container.decode(
+                    Swift.String.self,
+                    forKey: .uri
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "uri"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement`.
+        public struct ProviderCollectionMeasurement: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/displayNameEnglish`.
+            public var displayNameEnglish: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionMeasurement/displayNameGerman`.
+            public var displayNameGerman: Swift.String
+            /// Creates a new `ProviderCollectionMeasurement`.
+            ///
+            /// - Parameters:
+            ///   - profile:
+            ///   - displayNameEnglish:
+            ///   - displayNameGerman:
+            public init(
+                profile: Swift.String,
+                displayNameEnglish: Swift.String,
+                displayNameGerman: Swift.String
+            ) {
+                self.profile = profile
+                self.displayNameEnglish = displayNameEnglish
+                self.displayNameGerman = displayNameGerman
+            }
+            public enum CodingKeys: String, CodingKey {
+                case profile
+                case displayNameEnglish
+                case displayNameGerman
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.displayNameEnglish = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameEnglish
+                )
+                self.displayNameGerman = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameGerman
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "profile",
+                    "displayNameEnglish",
+                    "displayNameGerman"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability`.
+        public struct ProviderCollectionCapability: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/measurements`.
+            public var measurements: [Components.Schemas.ProviderCollectionMeasurement]
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/effectiveTime`.
+            @frozen public enum EffectiveTimePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case point = "point"
+                case interval = "interval"
+                case pointOrInterval = "point-or-interval"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionCapability/effectiveTime`.
+            public var effectiveTime: Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload
+            /// Creates a new `ProviderCollectionCapability`.
+            ///
+            /// - Parameters:
+            ///   - sourceTypeIdentifier:
+            ///   - measurements:
+            ///   - effectiveTime:
+            public init(
+                sourceTypeIdentifier: Swift.String,
+                measurements: [Components.Schemas.ProviderCollectionMeasurement],
+                effectiveTime: Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload
+            ) {
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.measurements = measurements
+                self.effectiveTime = effectiveTime
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceTypeIdentifier
+                case measurements
+                case effectiveTime
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.measurements = try container.decode(
+                    [Components.Schemas.ProviderCollectionMeasurement].self,
+                    forKey: .measurements
+                )
+                self.effectiveTime = try container.decode(
+                    Components.Schemas.ProviderCollectionCapability.EffectiveTimePayload.self,
+                    forKey: .effectiveTime
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceTypeIdentifier",
+                    "measurements",
+                    "effectiveTime"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderRegistration`.
+        public struct ProviderRegistration: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/provider`.
+            @frozen public enum ProviderPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case withings = "withings"
+                case oura = "oura"
+                case googleHealthApi = "google-health-api"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/provider`.
+            public var provider: Components.Schemas.ProviderRegistration.ProviderPayload
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/displayName`.
+            public var displayName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/controller`.
+            public var controller: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/region`.
+            public var region: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/redirects`.
+            public var redirects: [Components.Schemas.ProviderRedirect]
+            /// - Remark: Generated from `#/components/schemas/ProviderRegistration/capabilities`.
+            public var capabilities: [Components.Schemas.ProviderCollectionCapability]
+            /// Creates a new `ProviderRegistration`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - provider:
+            ///   - displayName:
+            ///   - controller:
+            ///   - region:
+            ///   - redirects:
+            ///   - capabilities:
+            public init(
+                id: Swift.String,
+                provider: Components.Schemas.ProviderRegistration.ProviderPayload,
+                displayName: Swift.String,
+                controller: Swift.String,
+                region: Swift.String,
+                redirects: [Components.Schemas.ProviderRedirect],
+                capabilities: [Components.Schemas.ProviderCollectionCapability]
+            ) {
+                self.id = id
+                self.provider = provider
+                self.displayName = displayName
+                self.controller = controller
+                self.region = region
+                self.redirects = redirects
+                self.capabilities = capabilities
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case provider
+                case displayName
+                case controller
+                case region
+                case redirects
+                case capabilities
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.provider = try container.decode(
+                    Components.Schemas.ProviderRegistration.ProviderPayload.self,
+                    forKey: .provider
+                )
+                self.displayName = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayName
+                )
+                self.controller = try container.decode(
+                    Swift.String.self,
+                    forKey: .controller
+                )
+                self.region = try container.decode(
+                    Swift.String.self,
+                    forKey: .region
+                )
+                self.redirects = try container.decode(
+                    [Components.Schemas.ProviderRedirect].self,
+                    forKey: .redirects
+                )
+                self.capabilities = try container.decode(
+                    [Components.Schemas.ProviderCollectionCapability].self,
+                    forKey: .capabilities
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "provider",
+                    "displayName",
+                    "controller",
+                    "region",
+                    "redirects",
+                    "capabilities"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkRequest`.
+        public struct ProviderLinkRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkRequest/redirectId`.
+            public var redirectId: Swift.String
+            /// Creates a new `ProviderLinkRequest`.
+            ///
+            /// - Parameters:
+            ///   - redirectId:
+            public init(redirectId: Swift.String) {
+                self.redirectId = redirectId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case redirectId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.redirectId = try container.decode(
+                    Swift.String.self,
+                    forKey: .redirectId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "redirectId"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent`.
+        public struct ProviderLinkIntent: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/authorizationUrl`.
+            public var authorizationUrl: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/redirectUri`.
+            public var redirectUri: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkIntent/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `ProviderLinkIntent`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - authorizationUrl:
+            ///   - redirectUri:
+            ///   - expiresAt:
+            public init(
+                id: Swift.String,
+                authorizationUrl: Swift.String,
+                redirectUri: Swift.String,
+                expiresAt: Foundation.Date
+            ) {
+                self.id = id
+                self.authorizationUrl = authorizationUrl
+                self.redirectUri = redirectUri
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case authorizationUrl
+                case redirectUri
+                case expiresAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.authorizationUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .authorizationUrl
+                )
+                self.redirectUri = try container.decode(
+                    Swift.String.self,
+                    forKey: .redirectUri
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "authorizationUrl",
+                    "redirectUri",
+                    "expiresAt"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion`.
+        public struct ProviderLinkCompletion: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion/state`.
+            public var state: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderLinkCompletion/code`.
+            public var code: Swift.String
+            /// Creates a new `ProviderLinkCompletion`.
+            ///
+            /// - Parameters:
+            ///   - state:
+            ///   - code:
+            public init(
+                state: Swift.String,
+                code: Swift.String
+            ) {
+                self.state = state
+                self.code = code
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case code
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.state = try container.decode(
+                    Swift.String.self,
+                    forKey: .state
+                )
+                self.code = try container.decode(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "state",
+                    "code"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ProviderConnection`.
+        public struct ProviderConnection: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/registrationId`.
+            public var registrationId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case active = "active"
+                case disconnected = "disconnected"
+                case reauthorizationRequired = "reauthorization-required"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/state`.
+            public var state: Components.Schemas.ProviderConnection.StatePayload
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/generation`.
+            public var generation: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/lastAttempt`.
+            public var lastAttempt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/lastSuccessfulFetch`.
+            public var lastSuccessfulFetch: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/acceptedThrough`.
+            public var acceptedThrough: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/requiresReauthorization`.
+            public var requiresReauthorization: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ProviderConnection/collectionAttempt`.
+            public var collectionAttempt: Components.Schemas.ProviderCollectionAttempt?
+            /// Creates a new `ProviderConnection`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - registrationId:
+            ///   - sourceId:
+            ///   - state:
+            ///   - generation:
+            ///   - lastAttempt:
+            ///   - lastSuccessfulFetch:
+            ///   - acceptedThrough:
+            ///   - requiresReauthorization:
+            ///   - collectionAttempt:
+            public init(
+                id: Swift.String,
+                registrationId: Swift.String,
+                sourceId: Swift.String,
+                state: Components.Schemas.ProviderConnection.StatePayload,
+                generation: Swift.Int64,
+                lastAttempt: Foundation.Date? = nil,
+                lastSuccessfulFetch: Foundation.Date? = nil,
+                acceptedThrough: Foundation.Date? = nil,
+                requiresReauthorization: Swift.Bool,
+                collectionAttempt: Components.Schemas.ProviderCollectionAttempt? = nil
+            ) {
+                self.id = id
+                self.registrationId = registrationId
+                self.sourceId = sourceId
+                self.state = state
+                self.generation = generation
+                self.lastAttempt = lastAttempt
+                self.lastSuccessfulFetch = lastSuccessfulFetch
+                self.acceptedThrough = acceptedThrough
+                self.requiresReauthorization = requiresReauthorization
+                self.collectionAttempt = collectionAttempt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case registrationId
+                case sourceId
+                case state
+                case generation
+                case lastAttempt
+                case lastSuccessfulFetch
+                case acceptedThrough
+                case requiresReauthorization
+                case collectionAttempt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.registrationId = try container.decode(
+                    Swift.String.self,
+                    forKey: .registrationId
+                )
+                self.sourceId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceId
+                )
+                self.state = try container.decode(
+                    Components.Schemas.ProviderConnection.StatePayload.self,
+                    forKey: .state
+                )
+                self.generation = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .generation
+                )
+                self.lastAttempt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .lastAttempt
+                )
+                self.lastSuccessfulFetch = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .lastSuccessfulFetch
+                )
+                self.acceptedThrough = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .acceptedThrough
+                )
+                self.requiresReauthorization = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .requiresReauthorization
+                )
+                self.collectionAttempt = try container.decodeIfPresent(
+                    Components.Schemas.ProviderCollectionAttempt.self,
+                    forKey: .collectionAttempt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "registrationId",
+                    "sourceId",
+                    "state",
+                    "generation",
+                    "lastAttempt",
+                    "lastSuccessfulFetch",
+                    "acceptedThrough",
+                    "requiresReauthorization",
+                    "collectionAttempt"
+                ])
+            }
+        }
+        /// Most recent collection attempt for one exact source. This is not a completeness claim for every source on the connected account.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt`.
+        public struct ProviderCollectionAttempt: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case scheduled = "scheduled"
+                case deferred = "deferred"
+                case accepted = "accepted"
+                case noCurrentDemand = "no-current-demand"
+                case transientFailure = "transient-failure"
+                case capacityBlocked = "capacity-blocked"
+                case sourceBlocked = "source-blocked"
+                case authorizationChanged = "authorization-changed"
+            }
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/outcome`.
+            public var outcome: Components.Schemas.ProviderCollectionAttempt.OutcomePayload
+            /// - Remark: Generated from `#/components/schemas/ProviderCollectionAttempt/nextAttempt`.
+            public var nextAttempt: Foundation.Date
+            /// Creates a new `ProviderCollectionAttempt`.
+            ///
+            /// - Parameters:
+            ///   - sourceTypeIdentifier:
+            ///   - outcome:
+            ///   - nextAttempt:
+            public init(
+                sourceTypeIdentifier: Swift.String,
+                outcome: Components.Schemas.ProviderCollectionAttempt.OutcomePayload,
+                nextAttempt: Foundation.Date
+            ) {
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.outcome = outcome
+                self.nextAttempt = nextAttempt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceTypeIdentifier
+                case outcome
+                case nextAttempt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.outcome = try container.decode(
+                    Components.Schemas.ProviderCollectionAttempt.OutcomePayload.self,
+                    forKey: .outcome
+                )
+                self.nextAttempt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .nextAttempt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sourceTypeIdentifier",
+                    "outcome",
+                    "nextAttempt"
+                ])
+            }
+        }
         /// RFC 7807 Problem Details for HTTP APIs
         ///
         /// - Remark: Generated from `#/components/schemas/ProblemDetails`.

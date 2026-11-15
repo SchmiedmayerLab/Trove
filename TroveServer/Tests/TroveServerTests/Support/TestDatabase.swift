@@ -39,6 +39,7 @@ enum TestDatabase {
             CreatePublishedStudies().name,
             CreateStudyPublicationCandidates().name,
             CreateParticipants().name,
+            CreateProviderRegistrations().name,
             CreateSourceBindings().name,
             CreateSourceIdentityKeys().name,
             CreateSourceInstallations().name,
@@ -47,7 +48,8 @@ enum TestDatabase {
             CreateEnrollmentConsents().name,
             CreateAuditEvents().name,
             CreateClinicalEvents().name,
-            CreateRecordingTransfers().name
+            CreateRecordingTransfers().name,
+            CreateProviderConnections().name
         ].sorted()
     }
 

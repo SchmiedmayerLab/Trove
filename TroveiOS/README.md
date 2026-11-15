@@ -30,6 +30,45 @@ closed without one. This scenario does not establish FHIR validation or clinical
 event admission. The separate validator and receiver checks cover those paths.
 
 
+## Wearable service authorization
+
+Health Data lists deployment-approved wearable services and participant connection
+status. A connection uses a server-created, expiring authorization intent; the app
+opens the provider in the system authentication browser and returns its code and
+state to Trove using the same captured participant session. Provider access and
+refresh tokens remain on the server. Account changes, cancelled browser sessions,
+expired intents and callbacks outside the approved HTTPS location cannot complete
+an authorization under a replacement session.
+
+The app uses the system HTTPS callback API. A deployment enabling provider linking
+must configure all of the following together:
+
+- Register the exact HTTPS callback URI with the provider and in the approved
+  Trove provider registration. Use a dedicated path without query or fragment.
+- Set `TROVE_PROVIDER_REDIRECT_URI` to that URI and
+  `TROVE_PROVIDER_AUTH_DOMAIN` to its host in the app's build configuration.
+- Select `CODE_SIGN_ENTITLEMENTS=TroveProvider.entitlements` and sign with a
+  provisioning profile supporting Associated Domains. This configuration includes
+  the native HealthKit and SensorKit entitlements as well as the provider callback domain.
+- Host the `apple-app-site-association` file on that domain with a `webcredentials`
+  association for the signed application's team and bundle identifier
+  (`org.troveplatform.app` by default). The app and association file must use the
+  same signing identity and domain.
+
+Keep the callback path free of analytics, referrer forwarding and query-string
+access logging. If served as a browser fallback, return a minimal page without
+embedding the code or state and use `Cache-Control: no-store` and
+`Referrer-Policy: no-referrer`.
+
+Without a configured callback, the app explains why connecting a new wearable
+service is unavailable; it still exposes the connection status and disconnect
+controls supported by the server. Provider connection availability is separate
+from consent: only the exact registration, source stream and output profiles in
+accepted study settings authorize acquisition. Native simulator checks verify
+callback parsing and session fencing; deployment association and real provider
+credential exchange require their configured integration checks.
+
+
 ## SensorKit deployment
 
 Native SensorKit acquisition uses the same participant journal and delivery queue

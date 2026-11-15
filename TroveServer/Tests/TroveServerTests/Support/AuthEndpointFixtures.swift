@@ -146,6 +146,7 @@ extension AuthIntegrationTests {
             researcher(.GET, "\(base)/groups/\(groupId)/studies", successStatus: .ok),
             researcher(.PATCH, "\(base)/studies/\(studyId)", body: jsonData(patchBody()), draftRevision: ids.draftRevision, successStatus: .ok),
             researcher(.POST, "\(base)/groups/\(groupId)/studies", body: jsonData(studyBody()), minRole: .admin, successStatus: .created),
+            researcher(.GET, "\(base)/studies/\(studyId)/collection-provider-capabilities", successStatus: .ok),
             // Invitation Codes
             researcher(.GET, "\(base)/studies/\(studyId)/invitation-codes", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/invitation-codes", body: jsonData(["count": 1] as [String: Any]), successStatus: .created),
@@ -301,6 +302,21 @@ extension AuthIntegrationTests {
                     targets: [.init(consentId: dummyId.uuidString, outputFullUrls: ["urn:uuid:point"])]
                 ))
             ),
+            participant(.GET, "\(base)/participant/provider-registrations", successStatus: .ok),
+            participant(.GET, "\(base)/participant/provider-connections", successStatus: .serviceUnavailable),
+            participant(
+                .POST,
+                "\(base)/participant/provider-registrations/\(dummyId)/link-intents",
+                successStatus: .serviceUnavailable,
+                body: jsonData(Components.Schemas.ProviderLinkRequest(redirectId: "native"))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/provider-link-intents/\(dummyId)/complete",
+                successStatus: .serviceUnavailable,
+                body: jsonData(Components.Schemas.ProviderLinkCompletion(state: String(repeating: "a", count: 43), code: "synthetic-code"))
+            ),
+            participant(.POST, "\(base)/participant/provider-connections/\(dummyId)/disconnect", successStatus: .serviceUnavailable),
             participant(.GET, "\(base)/participant/studies", successStatus: .ok),
             participant(.GET, "\(base)/participant/studies/\(studyId)/\(dummyRevision)/bundle", successStatus: .notFound),
             participant(.POST, "\(base)/participant/studies/\(studyId)/enrollments", successStatus: .notFound, body: jsonData([String: String]())),

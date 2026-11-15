@@ -5,6 +5,7 @@ import { z } from "zod";
 import type {
   CollectionCapability,
   CollectionRequirement,
+  ProviderRegistration,
 } from "@/lib/api/generated/types.gen";
 import {
   zAbsoluteStartDate,
@@ -59,6 +60,23 @@ export const measurementsFromCapabilities = (
     timeBasis: capability.timeBasis,
     requiredCompanionProfiles: capability.requiredCompanionProfiles,
   }));
+
+export const measurementsFromProviderRegistrations = (
+  registrations: ProviderRegistration[],
+): CollectionMeasurement[] =>
+  registrations.flatMap((registration) =>
+    registration.capabilities.flatMap((capability) =>
+      capability.measurements.map((measurement) => ({
+        profile: measurement.profile,
+        label: `${registration.displayName}: ${measurement.displayNameEnglish}`,
+        sourceKind: "server-worker" as const,
+        providerRegistrationId: registration.id,
+        sourceTypeIdentifier: capability.sourceTypeIdentifier,
+        effectiveTime: capability.effectiveTime,
+        supportsWorkoutRoutes: false,
+      })),
+    ),
+  );
 
 export const matchesCollectionMeasurement = (
   requirement: CollectionRequirement,

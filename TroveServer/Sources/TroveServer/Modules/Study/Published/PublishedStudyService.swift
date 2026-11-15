@@ -17,6 +17,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
     @Dependency(StudyRepository.self) var studyRepository
     @Dependency(StudyValidationService.self) var validationService
     @Dependency(ObjectStorageService.self) var storageService
+    @Dependency(ProviderRuntime.self) var providerRuntime
 
     private var artifacts: ArtifactStore { .init(database: repository.database, storage: storageService) }
 
@@ -60,6 +61,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
         _ candidate: StudyPublicationCandidate, context: AuditEvent.Context, on transaction: any Database
     ) async throws -> PublishedStudy {
         let snapshot = candidate.snapshot
+        try await providerRuntime.registrations.validate(requirements: snapshot.collectionPolicy.requirements, on: transaction)
         let publication = PublishedStudy(
             studyId: candidate.studyID,
             revision: candidate.publicationRevision,

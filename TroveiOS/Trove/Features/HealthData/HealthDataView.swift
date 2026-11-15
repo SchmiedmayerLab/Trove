@@ -18,6 +18,7 @@ struct HealthDataView: View {
         NavigationStack {
             Form {
                 healthKitSection
+                ProviderConnectionsSection()
                 SavedCollectionSection()
                 HealthDataExplanationView()
             }

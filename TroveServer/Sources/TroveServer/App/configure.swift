@@ -64,6 +64,7 @@ private func configureObjectStorage(
     for app: Application, ephemeral: Bool, keycloak: KeycloakClient, sourceKeyring: SourceIdentityKeyring
 ) async throws {
     let collectionCapacity = try CollectionCapacityConfiguration(environment: ProcessInfo.processInfo.environment)
+    let providerConfiguration = try ProviderRuntimeConfiguration.load(environment: ProcessInfo.processInfo.environment)
     let recordingLimits = try RecordingTransferService.Limits(
         storedBytes: Environment.get("RECORDING_MAX_STORED_BYTES"),
         sourceBytes: Environment.get("RECORDING_MAX_SOURCE_BYTES"),
@@ -80,7 +81,8 @@ private func configureObjectStorage(
             clientPolicy: keycloak.config.clientPolicy,
             recordingLimits: recordingLimits,
             recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
-            collectionCapacity: collectionCapacity
+            collectionCapacity: collectionCapacity,
+            providerConfiguration: providerConfiguration
         )
         return
     }
@@ -97,7 +99,8 @@ private func configureObjectStorage(
         clientPolicy: keycloak.config.clientPolicy,
         recordingLimits: recordingLimits,
         recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
-        collectionCapacity: collectionCapacity
+        collectionCapacity: collectionCapacity,
+        providerConfiguration: providerConfiguration
     )
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
@@ -185,14 +188,20 @@ func configureServices(
     clientPolicy: KeycloakClientPolicy = .production,
     recordingLimits: RecordingTransferService.Limits = .standard,
     recordingDownloadByteLimit: String? = nil,
-    collectionCapacity: CollectionCapacityConfiguration = .standard
+    collectionCapacity: CollectionCapacityConfiguration = .standard,
+    providerConfiguration: ProviderRuntimeConfiguration? = nil
 ) async throws {
     let storage = ObjectStorageService(provider: storageProvider)
     let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
     let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
     let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
     let studies = StudyRepository(database: app.db(.psql))
+    let providers = try await ProviderRuntime.configured(
+        application: app, configuration: providerConfiguration, sourceKeyring: sourceKeyring,
+        authorization: authorization, studies: studies, limits: collectionCapacity.admission, validator: validator
+    )
     await app.grove.configure {
+        providers
         storage
         recordings
         downloads

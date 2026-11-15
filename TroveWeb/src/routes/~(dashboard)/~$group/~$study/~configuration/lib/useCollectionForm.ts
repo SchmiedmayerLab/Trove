@@ -3,19 +3,29 @@
 
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
-import { getCollectionCapabilitiesOptions } from "@/lib/api/generated/@tanstack/react-query.gen";
+import {
+  getCollectionCapabilitiesOptions,
+  getStudyCollectionProviderCapabilitiesOptions,
+} from "@/lib/api/generated/@tanstack/react-query.gen";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
 import {
   canEditCollection,
   makeCollectionFormSchema,
   measurementsFromCapabilities,
+  measurementsFromProviderRegistrations,
 } from "./collectionForm";
 
 export const useCollectionForm = (studyId: string) => {
   const query = useQuery(studyResponseQueryOptions({ studyId }));
   const capabilities = useQuery(getCollectionCapabilitiesOptions());
-  const measurements = measurementsFromCapabilities(capabilities.data ?? []);
+  const providers = useQuery(
+    getStudyCollectionProviderCapabilitiesOptions({ path: { studyId } }),
+  );
+  const measurements = [
+    ...measurementsFromCapabilities(capabilities.data ?? []),
+    ...measurementsFromProviderRegistrations(providers.data ?? []),
+  ];
   const form = useForm({
     formSchema: makeCollectionFormSchema(measurements),
     defaultValues: { collectionRequirements: [] },
@@ -31,10 +41,12 @@ export const useCollectionForm = (studyId: string) => {
     form,
     query,
     capabilities,
+    providers,
     measurements,
     isSupported:
       !!query.data &&
       !!capabilities.data &&
+      !!providers.data &&
       canEditCollection(query.data.collectionRequirements, measurements),
     getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
   };

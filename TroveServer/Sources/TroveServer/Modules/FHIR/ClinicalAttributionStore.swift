@@ -47,6 +47,40 @@ struct ClinicalAttributionStore: Sendable {
         }
     }
 
+    /// Reuses retained provider custody after an exact current-demand check in the worker transaction.
+    func attribute(
+        eventID: UUID,
+        commandID: UUID,
+        targets: [ClinicalEventTarget],
+        authorization: ProviderWorkerAuthority.Authorized,
+        sourceToken: String
+    ) async throws -> ClinicalAttributionReceipt {
+        guard database.inTransaction, authorization.source.kind == .serverWorker, !targets.isEmpty else {
+            throw ProviderFailure.fenced
+        }
+        let intent = try ClinicalEventIntent(targets: targets)
+        let sql = try ProviderSQL.sql(database)
+        let rows = try await sql.raw("""
+            SELECT source_type_identifier FROM clinical_point_facts
+            WHERE event_id = \(bind: eventID) AND source_id = \(bind: authorization.source.id)
+            """)
+            .all()
+        guard !rows.isEmpty, try rows.allSatisfy({ try $0.decode(column: "source_type_identifier", as: String?.self) == sourceToken }) else {
+            throw ProviderFailure.scopeLost
+        }
+        if let receipt = try await replay(
+            commandID: commandID, sourceID: authorization.source.id, eventID: eventID, intent: intent, on: sql
+        ) { return receipt }
+        let grants = ClinicalGrantStore(
+            database: database,
+            source: authorization.source,
+            auditContext: authorization.audit,
+            acceptedAt: Date(),
+            providerRegistrationID: authorization.registrationID
+        )
+        return try await insert(commandID: commandID, eventID: eventID, intent: intent, grants: grants)
+    }
+
     private func insert(
         commandID: UUID, eventID: UUID, intent: ClinicalEventIntent, grants: ClinicalGrantStore
     ) async throws -> ClinicalAttributionReceipt {
