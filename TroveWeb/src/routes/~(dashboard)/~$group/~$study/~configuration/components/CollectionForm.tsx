@@ -7,7 +7,7 @@ import {
   Input,
   RadioGroup,
 } from "@schmiedmayerlab/grove-design-system";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import type {
   CollectionMeasurementWindow,
@@ -15,7 +15,9 @@ import type {
 } from "@/lib/api/generated/types.gen";
 import {
   collectionSummary,
-  collectionMeasurements,
+  foodSourceTypeIdentifier,
+  matchesCollectionMeasurement,
+  type CollectionMeasurement,
   setCollectionRequirement,
   sleepStageProfile,
   workoutProfile,
@@ -23,15 +25,18 @@ import {
 import type { CollectionForm as CollectionFormType } from "../lib/useCollectionForm";
 
 interface CollectionControlsProps {
+  measurements: readonly CollectionMeasurement[];
   requirements: CollectionRequirement[];
   onChange: (value: CollectionRequirement[]) => void;
 }
 
 const MeasurementControls = ({
   requirement,
+  supportsWorkoutRoutes,
   onChange,
 }: {
   requirement: CollectionRequirement;
+  supportsWorkoutRoutes: boolean;
   onChange: (value: CollectionRequirement) => void;
 }) => {
   const id = useId();
@@ -45,7 +50,7 @@ const MeasurementControls = ({
   };
   return (
     <div className="flex flex-col gap-6">
-      {requirement.profile === workoutProfile && (
+      {supportsWorkoutRoutes && (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <Checkbox
@@ -210,18 +215,54 @@ const MeasurementControls = ({
 };
 
 const CollectionControls = ({
+  measurements,
   requirements,
   onChange,
 }: CollectionControlsProps) => {
   const id = useId();
+  const [search, setSearch] = useState("");
+  const visible = measurements.filter((measurement) =>
+    measurement.label
+      .toLocaleLowerCase()
+      .includes(search.trim().toLocaleLowerCase()),
+  );
   return (
     <div className="flex flex-col gap-6">
-      {collectionMeasurements.map(({ profile, label }, index) => {
-        const requirement = requirements.find(
-          (item) => item.profile === profile,
+      <div className="space-y-2">
+        <label htmlFor={`${id}-search`}>
+          Find a measurement or wearable service
+        </label>
+        <Input
+          id={`${id}-search`}
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <p className="text-text-tertiary text-sm" role="status">
+          Showing {visible.length} of {measurements.length} measurements.
+        </p>
+      </div>
+      {visible.map((measurement, index) => {
+        const {
+          profile,
+          label,
+          sourceTypeIdentifier,
+          sourceKind = "participant-app",
+          providerRegistrationId,
+        } = measurement;
+        const requirement = requirements.find((item) =>
+          matchesCollectionMeasurement(item, measurement),
         );
         return (
-          <fieldset key={profile} className="space-y-4 rounded-lg border p-4">
+          <fieldset
+            key={JSON.stringify([
+              profile,
+              sourceKind,
+              providerRegistrationId,
+              sourceTypeIdentifier,
+            ])}
+            className="space-y-4 rounded-lg border p-4"
+          >
             <legend className="px-2 font-medium">{label}</legend>
             <div className="flex items-center gap-3">
               <Checkbox
@@ -233,8 +274,16 @@ const CollectionControls = ({
                       requirements,
                       profile,
                       checked === true ?
-                        { profile, sourceKind: "participant-app" }
+                        {
+                          profile,
+                          sourceKind,
+                          providerRegistrationId,
+                          sourceTypeIdentifier,
+                          timeBasis: measurement.timeBasis,
+                        }
                       : undefined,
+                      sourceTypeIdentifier,
+                      measurement,
                     ),
                   )
                 }
@@ -243,7 +292,57 @@ const CollectionControls = ({
                 Collect {label.toLowerCase()}
               </label>
             </div>
-            {profile === workoutProfile && (
+            {sourceTypeIdentifier === foodSourceTypeIdentifier && (
+              <p className="text-text-tertiary text-sm">
+                Food entries retain links to their nutrient records. Select each
+                nutrient stream separately to collect its measurements for this
+                study. The same nutrient sample keeps its identity when
+                collected independently.
+              </p>
+            )}
+            {measurement.timeBasis === "clinical-record-download" && (
+              <p className="text-text-tertiary text-sm">
+                Select by when HealthKit downloaded each document to the device.
+                The complete original document may describe care outside this
+                window.
+              </p>
+            )}
+            {measurement.timeBasis === "cda-source-document-period" && (
+              <p className="text-text-tertiary text-sm">
+                Select by the document dates assigned by its creator, not care
+                or download dates. Participants review and authorize each
+                complete CDA document in HealthKit.
+              </p>
+            )}
+            {measurement.isOriginalRecording && (
+              <p className="text-text-tertiary text-sm">
+                Includes the complete original source recording, not only a
+                structured summary. Participants see this choice when they
+                accept the published version.
+              </p>
+            )}
+            {!!measurement.requiredCompanionProfiles?.length && (
+              <p className="text-text-tertiary text-sm">
+                Collecting this source also needs participant permission for:{" "}
+                {measurement.requiredCompanionProfiles
+                  .map(
+                    (companion) =>
+                      measurements.find(
+                        (item) =>
+                          item.profile === companion &&
+                          item.sourceTypeIdentifier === sourceTypeIdentifier &&
+                          (item.sourceKind ?? "participant-app") ===
+                            sourceKind &&
+                          item.providerRegistrationId ===
+                            providerRegistrationId,
+                      )?.label ?? "a companion output",
+                  )
+                  .join(", ")}
+                . Each output must be selected explicitly. Selecting this output
+                does not give this study access to its companions.
+              </p>
+            )}
+            {profile === workoutProfile && sourceKind === "participant-app" && (
               <p className="text-text-tertiary text-sm">
                 Complete workouts include all segments and statistics when the
                 session overlaps the selected window. They may start before it
@@ -259,9 +358,18 @@ const CollectionControls = ({
             {requirement && (
               <MeasurementControls
                 requirement={requirement}
+                supportsWorkoutRoutes={
+                  measurement.supportsWorkoutRoutes === true
+                }
                 onChange={(updated) =>
                   onChange(
-                    setCollectionRequirement(requirements, profile, updated),
+                    setCollectionRequirement(
+                      requirements,
+                      profile,
+                      { ...updated, sourceTypeIdentifier },
+                      sourceTypeIdentifier,
+                      measurement,
+                    ),
                   )
                 }
               />
@@ -275,7 +383,7 @@ const CollectionControls = ({
         aria-live="polite"
       >
         <h3 className="mb-2 font-medium">Collection scope</h3>
-        <p>{collectionSummary(requirements)}</p>
+        <p>{collectionSummary(requirements, measurements)}</p>
         <p className="text-text-tertiary mt-2 text-sm">
           Saving updates the draft. Participants must accept the published
           version before its scope applies.
@@ -286,10 +394,12 @@ const CollectionControls = ({
 };
 
 export const CollectionForm = ({
+  measurements,
   form,
   onSubmit,
   disabled,
 }: {
+  measurements: readonly CollectionMeasurement[];
   form: CollectionFormType;
   onSubmit: () => void;
   disabled: boolean;
@@ -311,6 +421,7 @@ export const CollectionForm = ({
               aria-errormessage={field["aria-errormessage"]}
             >
               <CollectionControls
+                measurements={measurements}
                 requirements={field.value}
                 onChange={field.onChange}
               />

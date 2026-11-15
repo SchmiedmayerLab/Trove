@@ -7,6 +7,12 @@ import type {
   StudyDataVersions,
 } from "../api/generated/types.gen";
 import { studyBundleBytes } from "./studyData";
+import {
+  recordingContentTypeSchema,
+  recordingFormatSchema,
+  recordingFormatSystem,
+  recordingMediaMatchesFormat,
+} from "./studyRecordingFormats";
 
 const uuid =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
@@ -14,12 +20,19 @@ const recordingLocation = new RegExp(
   `^/api/v0/studies/(${uuid})/data/recordings/(${uuid})\\?versions=(current|history)$`,
 );
 
-export const studyRecordingSchema = z.object({
-  studyId: z.uuid(),
-  grantId: z.uuid(),
-  versions: z.enum(["current", "history"]),
-  byteCount: z.number().int().min(1).max(2_147_483_647),
-});
+export const studyRecordingSchema = z
+  .object({
+    studyId: z.uuid(),
+    grantId: z.uuid(),
+    versions: z.enum(["current", "history"]),
+    byteCount: z.number().int().min(1).max(2_147_483_647),
+    format: recordingFormatSchema,
+    contentType: recordingContentTypeSchema,
+  })
+  .refine(
+    (value) => recordingMediaMatchesFormat(value.format, value.contentType),
+    "Recording format and media type disagree",
+  );
 
 export type StudyRecording = z.infer<typeof studyRecordingSchema>;
 
@@ -34,10 +47,14 @@ const documentSchema = z.object({
   content: z
     .array(
       z.object({
+        format: z.object({
+          system: z.literal(recordingFormatSystem),
+          code: recordingFormatSchema,
+        }),
         attachment: z.object({
           url: z.string().optional(),
           data: z.string().optional(),
-          contentType: z.literal("text/csv"),
+          contentType: recordingContentTypeSchema,
           size: z.number().int().min(1).max(2_147_483_647),
         }),
       }),
@@ -65,7 +82,10 @@ export const studyRecordings = (
       .object({ resourceType: z.string() })
       .parse(entry.resource);
     if (resource.resourceType !== "DocumentReference") continue;
-    const { attachment } = documentSchema.parse(entry.resource).content[0];
+    const { attachment, format } = documentSchema.parse(entry.resource)
+      .content[0];
+    if (!recordingMediaMatchesFormat(format.code, attachment.contentType))
+      throw new Error("Recording format and media type disagree");
     // Inline recordings remain complete in the downloaded FHIR Bundle.
     if (attachment.url === undefined && attachment.data !== undefined) continue;
     const location = attachment.url?.match(recordingLocation);
@@ -82,6 +102,8 @@ export const studyRecordings = (
       grantId: location[2],
       versions,
       byteCount: attachment.size,
+      format: format.code,
+      contentType: attachment.contentType,
     });
     if (
       recordings.some(

@@ -12,8 +12,14 @@ import { useCollectionForm } from "./lib/useCollectionForm";
 
 const CollectionRoute = () => {
   const { study } = Route.useParams();
-  const { form, query, isSupported, getDraftHeaders } =
-    useCollectionForm(study);
+  const {
+    form,
+    query,
+    capabilities,
+    measurements,
+    isSupported,
+    getDraftHeaders,
+  } = useCollectionForm(study);
   const updateStudy = useUpdateStudyMutation();
   const disabled = !isSupported || updateStudy.isPending;
   const handleSubmit = form.handleSubmit((data) => {
@@ -35,11 +41,16 @@ const CollectionRoute = () => {
     [handleSubmit],
   );
   let content = (
-    <CollectionForm form={form} onSubmit={handleSubmit} disabled={disabled} />
+    <CollectionForm
+      measurements={measurements}
+      form={form}
+      onSubmit={handleSubmit}
+      disabled={disabled}
+    />
   );
-  if (query.isPending)
+  if (query.isPending || capabilities.isPending)
     content = <p role="status">Loading collection settings…</p>;
-  else if (query.isError)
+  else if (query.isError || capabilities.isError)
     content = (
       <p role="alert">
         Collection settings could not be loaded. Reload to try again.

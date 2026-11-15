@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 import type { CollectionMeasurementWindow } from "@/lib/api/generated/types.gen";
 import {
   canEditCollection,
+  makeCollectionFormSchema,
+  measurementsFromCapabilities,
+  bodyWeightProfile,
+  collectionMeasurements,
   collectionFormSchema,
   collectionSummary,
   newHeartRateRequirement,
@@ -20,6 +24,34 @@ const parseWindow = (measurementWindow: CollectionMeasurementWindow) =>
   });
 
 describe("collection authoring", () => {
+  it("authors body weight independently with point-window language and all four measurements", () => {
+    const weight = { ...requirement, profile: bodyWeightProfile };
+    expect(
+      collectionFormSchema.parse({ collectionRequirements: [weight] })
+        .collectionRequirements,
+    ).toEqual([weight]);
+    expect(collectionSummary([weight])).toContain("Body weight.");
+    expect(collectionSummary([weight])).not.toContain("overlap");
+    const all = collectionMeasurements.map(({ profile }) => ({
+      ...requirement,
+      profile,
+    }));
+    expect(canEditCollection(all)).toBe(true);
+    expect(canEditCollection([...all, weight])).toBe(false);
+    expect(canEditCollection([{ ...weight, includeWorkoutRoutes: true }])).toBe(
+      false,
+    );
+    const updated = setCollectionRequirement(
+      [requirement],
+      bodyWeightProfile,
+      weight,
+    );
+    expect(updated).toEqual([requirement, weight]);
+    expect(setCollectionRequirement(updated, bodyWeightProfile)).toEqual([
+      requirement,
+    ]);
+  });
+
   it("keeps omitted history consent-forward and does not insert defaults", () => {
     expect(
       collectionFormSchema.parse({ collectionRequirements: [requirement] }),
@@ -259,4 +291,167 @@ describe("workout route scope", () => {
       }).success,
     ).toBe(false);
   });
+});
+
+describe("server-described collection streams", () => {
+  const profile = "https://example.test/recording-profile";
+  const choices = [
+    {
+      profile,
+      label: "First recording",
+      sourceTypeIdentifier: "first-stream",
+      effectiveTime: "interval" as const,
+    },
+    {
+      profile,
+      label: "Second recording",
+      sourceTypeIdentifier: "second-stream",
+      effectiveTime: "interval" as const,
+    },
+  ];
+  const schema = makeCollectionFormSchema(choices);
+  const first = {
+    profile,
+    sourceKind: "participant-app" as const,
+    sourceTypeIdentifier: "first-stream",
+  };
+  const second = { ...first, sourceTypeIdentifier: "second-stream" };
+
+  it("preserves separate source-bound requirements sharing a profile", () => {
+    const value = { collectionRequirements: [first, second] };
+    expect(schema.parse(value)).toEqual(value);
+    expect(
+      setCollectionRequirement(
+        [first, second],
+        profile,
+        undefined,
+        "first-stream",
+      ),
+    ).toEqual([second]);
+    expect(
+      schema.safeParse({ collectionRequirements: [first, first] }).success,
+    ).toBe(false);
+    expect(collectionSummary([first], choices)).toContain(
+      "Complete interval records",
+    );
+    expect(collectionSummary([second], choices)).toContain("Second recording.");
+    expect(collectionSummary([second], choices)).not.toContain(
+      "First recording.",
+    );
+  });
+
+  it("does not infer a source or accept an unadvertised stream or provider registration", () => {
+    for (const requirement of [
+      { profile, sourceKind: "participant-app" },
+      { ...first, sourceTypeIdentifier: "other-stream" },
+      {
+        ...first,
+        sourceKind: "server-worker",
+        providerRegistrationId: "10000000-0000-4000-8000-000000000001",
+      },
+    ])
+      expect(
+        schema.safeParse({ collectionRequirements: [requirement] }).success,
+      ).toBe(false);
+    expect(
+      makeCollectionFormSchema([]).safeParse({
+        collectionRequirements: [first],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("original recording selection", () => {
+  it("keeps mandatory producer companions explicit and does not grant them automatically", () => {
+    const source = "SRSensor.accelerometer";
+    const summary = "https://example.test/summary";
+    const recording = "https://example.test/recording";
+    const measurements = measurementsFromCapabilities([
+      {
+        profile: summary,
+        repositoryKind: "sensorkit",
+        sourceTypeIdentifier: source,
+        displayNameEnglish: "Acceleration summary",
+        displayNameGerman: "Zusammenfassung der Beschleunigung",
+        effectiveTime: "interval",
+        supportsWorkoutRoutes: false,
+        isOriginalRecording: false,
+        requiredCompanionProfiles: [recording],
+      },
+      {
+        profile: recording,
+        repositoryKind: "sensorkit",
+        sourceTypeIdentifier: source,
+        displayNameEnglish: "Original acceleration recording",
+        displayNameGerman: "Originalaufzeichnung der Beschleunigung",
+        effectiveTime: "interval",
+        supportsWorkoutRoutes: false,
+        isOriginalRecording: true,
+        requiredCompanionProfiles: [summary],
+      },
+    ]);
+    expect(measurements[0]?.requiredCompanionProfiles).toEqual([recording]);
+    expect(measurements[1]?.isOriginalRecording).toBe(true);
+    const selected = setCollectionRequirement(
+      [],
+      summary,
+      {
+        profile: summary,
+        sourceKind: "participant-app",
+        sourceTypeIdentifier: source,
+      },
+      source,
+      measurements[0],
+    );
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.profile).toBe(summary);
+    expect(selected.some((item) => item.profile === recording)).toBe(false);
+    expect(
+      makeCollectionFormSchema(measurements).safeParse({
+        collectionRequirements: selected,
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("document source dates", () => {
+  it.each(["clinical-record-download", "cda-source-document-period"] as const)(
+    "requires and preserves the accepted %s basis",
+    (timeBasis) => {
+      const profile = "https://example.test/document";
+      const sourceTypeIdentifier = "exact-document-source";
+      const measurements = measurementsFromCapabilities([
+        {
+          profile,
+          sourceTypeIdentifier,
+          repositoryKind: "healthkit",
+          displayNameEnglish: "Original document",
+          displayNameGerman: "Originaldokument",
+          effectiveTime: "interval",
+          supportsWorkoutRoutes: false,
+          isOriginalRecording: true,
+          timeBasis,
+        },
+      ]);
+      expect(measurements[0]?.timeBasis).toBe(timeBasis);
+      const requirement = {
+        profile,
+        sourceTypeIdentifier,
+        sourceKind: "participant-app" as const,
+        timeBasis,
+      };
+      const schema = makeCollectionFormSchema(measurements);
+      expect(
+        schema.parse({ collectionRequirements: [requirement] })
+          .collectionRequirements,
+      ).toEqual([requirement]);
+      for (const wrongBasis of [undefined, "measurement-time"] as const) {
+        expect(
+          schema.safeParse({
+            collectionRequirements: [{ ...requirement, timeBasis: wrongBasis }],
+          }).success,
+        ).toBe(false);
+      }
+    },
+  );
 });

@@ -4,6 +4,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StudyDataRecord } from "../api/generated/types.gen";
 import { studyBundleBytes } from "./studyData";
+import {
+  recordingFormatSystem,
+  recordingMediaTypes,
+} from "./studyRecordingFormats";
 import { studyRecordings } from "./studyRecordings";
 
 vi.mock("../env", () => ({
@@ -17,10 +21,11 @@ const fullUrl = `urn:uuid:${grant}`;
 const record = (
   attachment: Record<string, unknown>,
   includeOutput = true,
+  format = "location-track-samples",
 ): StudyDataRecord => ({
   id: grant,
   bundleBase64: Buffer.from(
-    `{"resourceType":"Bundle","entry":[{"fullUrl":"${fullUrl}","resource":{"resourceType":"DocumentReference","content":[{"attachment":${JSON.stringify({ contentType: "text/csv", size: 42, ...attachment })}}]}},{"fullUrl":"urn:uuid:observation","resource":{"resourceType":"Observation","valueQuantity":{"value":12345678901234567890.123456789}}}]}`,
+    `{"resourceType":"Bundle","entry":[{"fullUrl":"${fullUrl}","resource":{"resourceType":"DocumentReference","content":[{"format":{"system":"${recordingFormatSystem}","code":"${format}"},"attachment":${JSON.stringify({ contentType: "text/csv", size: 42, ...attachment })}}]}},{"fullUrl":"urn:uuid:observation","resource":{"resourceType":"Observation","valueQuantity":{"value":12345678901234567890.123456789}}}]}`,
   ).toString("base64"),
   outputs:
     includeOutput ? [{ fullUrl, isCurrent: true, sourceProfiles: [] }] : [],
@@ -31,7 +36,14 @@ describe("study recording attachment selection", () => {
     const input = record({ url: location });
     const original = studyBundleBytes(input.bundleBase64);
     expect(studyRecordings(input, study, "current")).toEqual([
-      { studyId: study, grantId: grant, versions: "current", byteCount: 42 },
+      {
+        studyId: study,
+        grantId: grant,
+        versions: "current",
+        byteCount: 42,
+        format: "location-track-samples",
+        contentType: "text/csv",
+      },
     ]);
     expect(studyBundleBytes(input.bundleBase64)).toEqual(original);
     expect(new TextDecoder().decode(original)).toContain(
@@ -91,4 +103,42 @@ describe("study recording attachment selection", () => {
       ),
     ).toEqual([]);
   });
+});
+
+describe("recording representations", () => {
+  it.each(
+    Object.entries(recordingMediaTypes).flatMap(([format, types]) =>
+      types.map((contentType) => ({ format, contentType })),
+    ),
+  )(
+    "preserves the registered $format / $contentType pair without reading payloads",
+    ({ format, contentType }) => {
+      expect(
+        studyRecordings(
+          record({ url: location, contentType }, true, format),
+          study,
+          "current",
+        )[0],
+      ).toMatchObject({ format, contentType });
+    },
+  );
+  it.each([
+    ["native-recording", "text/csv"],
+    ["unknown", "text/csv"],
+    ["fhir-resource", "application/fhir+json"],
+    ["fhir-resource", "application/fhir+json; fhirVersion=3.0"],
+    ["clinical-document", "text/html"],
+    ["photoplethysmogram-samples", "application/json"],
+  ])(
+    "refuses unsupported format/media combinations %s / %s",
+    (format, contentType) => {
+      expect(() =>
+        studyRecordings(
+          record({ url: location, contentType }, true, format),
+          study,
+          "current",
+        ),
+      ).toThrow();
+    },
+  );
 });
