@@ -13,7 +13,8 @@ import TroveAPITypes
 
 /// A HealthKit ECG is one source record: its waveform and the average heart rate derived from it are selected together.
 /// Correlated symptoms are separate source records that the waveform names by output identity; naming one grants nothing.
-/// Complete FHIR validation precedes this receiver capability check.
+/// When a present symptoms status could not read them, the waveform carries one member that states only the data-absent
+/// reason `unknown`; it names nothing and grants nothing. Complete FHIR validation precedes this receiver capability check.
 enum FHIRHealthKitECGBoundary {
     static let waveformProfiles = Set(
         [Profile.groveSensorEcgObservation, Profile.healthkitEcgObservation].compactMap { $0.value?.url.absoluteString }
@@ -23,9 +24,11 @@ enum FHIRHealthKitECGBoundary {
     static let leadCode = "131329"
     static let classificationSystem = Canonicals.root + "/healthkit/CodeSystem/healthkit-ecg-classification"
     static let algorithmVersionSystem = Canonicals.root + "/healthkit/CodeSystem/healthkit-ecg-algorithm-version"
+    static let dataAbsentReasonURL = Canonicals.dataAbsentReason.value?.url.absoluteString ?? ""
+    static let unreadableSymptomsCode = "unknown"
 
     /// The waveform: one lead of millivolt samples, one classification, at most one algorithm version, and symptoms
-    /// named only by identity. Its effective Period is checked with the other temporal facts.
+    /// named only by identity or stated unreadable. Its effective Period is checked with the other temporal facts.
     static func validateWaveform(_ observation: Observation) throws {
         let profiles = (observation.meta?.profile ?? []).compactMap { $0.value?.url.absoluteString }
         guard profiles.count == waveformProfiles.count, Set(profiles) == waveformProfiles,
@@ -42,7 +45,35 @@ enum FHIRHealthKitECGBoundary {
         if let method = observation.method {
             _ = try coding(method, system: algorithmVersionSystem)
         }
-        try FHIRFoodProjection.independentMembers(observation.hasMember ?? [])
+        try symptomMembers(observation)
+    }
+
+    /// Symptoms named only by identity, each once, or, for a present symptoms status whose symptoms could not be read,
+    /// exactly one member that carries nothing but the data-absent reason `unknown`.
+    static func symptomMembers(_ observation: Observation) throws {
+        let members = observation.hasMember ?? []
+        guard members.contains(where: { $0.extension?.isEmpty == false }) else {
+            try FHIRFoodProjection.independentMembers(members)
+            return
+        }
+        guard members.count == 1, let member = members.first,
+              member.id == nil, member.reference == nil, member.type == nil, member.identifier == nil, member.display == nil,
+              let reasons = member.extension, reasons.count == 1, let reason = reasons.first,
+              reason.id == nil, reason.extension?.isEmpty != false,
+              reason.url.value?.url.absoluteString == dataAbsentReasonURL,
+              case .code(let code)? = reason.value, code.value?.string == unreadableSymptomsCode,
+              symptomsStatus(observation) == "present" else {
+            throw FHIRValidationClient.invalid
+        }
+    }
+
+    private static func symptomsStatus(_ observation: Observation) -> String? {
+        let url = Canonicals.healthKitECGSymptomsStatusExtension.value?.url.absoluteString
+        let statuses = (observation.extension ?? []).filter { $0.url.value?.url.absoluteString == url }
+        guard statuses.count == 1, case .code(let code)? = statuses.first?.value else {
+            return nil
+        }
+        return code.value?.string
     }
 
     /// The waveform's symptoms status and source period. Full validation establishes their values; the location walk
