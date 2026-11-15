@@ -114,7 +114,7 @@ extension FHIRRecordingProjectionTests {
     }
 
     /// The writer-record identity and its version as Grove states them on a heartbeat series' primary document.
-    private static func goldenWriterRevision() throws -> (identifier: [String: Any], version: [String: Any]) {
+    static func goldenWriterRevision() throws -> (identifier: [String: Any], version: [String: Any]) {
         let url = try #require(Bundle.module.url(forResource: "HealthKitHeartbeatSeriesWriterRecordEvent", withExtension: "json"))
         let bundle = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         let entries = try #require(bundle["entry"] as? [[String: Any]])
