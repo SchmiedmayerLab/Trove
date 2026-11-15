@@ -79,7 +79,7 @@ extension Components.Schemas.StudyAuditAction {
         case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure,
              .recordingArtifactDiscardScheduled, .sourceRegistered, .sourceRevoked,
              .sourceInstallationRegistered, .sourceInstallationRevoked, .sourceIdentityDisclosure,
-             .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure,
+             .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .clinicalEventReceiptDisclosure,
              .providerRegistrationDisclosure, .providerRegistrationChanged, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted,
              .providerConnectionDisconnected, .providerRefreshDispatched, .providerCredentialRotated, .providerCredentialUncertain,
                  .providerCredentialRetired,

@@ -65,6 +65,7 @@ struct AuditEvent: Sendable {
         case sourceIdentityDisclosure = "source.identity.disclosure"
         case clinicalEventAccepted = "clinical.event.accepted"
         case clinicalEventAttributed = "clinical.event.attributed"
+        case clinicalRetractionReversed = "clinical.retraction.reversed"
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
         case studyDataGranted = "study.data.granted"
         case studyAuditDisclosure = "study.audit.disclosure"
@@ -95,7 +96,7 @@ struct AuditEvent: Sendable {
             case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .sourceIdentityDisclosure,
-                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
@@ -120,7 +121,7 @@ struct AuditEvent: Sendable {
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
-                 .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
             }
         }

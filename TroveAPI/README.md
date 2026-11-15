@@ -313,6 +313,19 @@ record nor creates study grants. Other source records remain unaffected. Repeate
 reports use the same record-retraction identity; the first accepted report keeps
 its lifecycle effect, while additional accepted bytes have their own custody receipts.
 
+A HealthKit record is stored once for the participant's source and shared by every
+study and installation, so a retraction applies to all of them. The rule is
+therefore narrow:
+
+- A retraction is minted only for an object HealthKit itself reports as deleted in
+  an anchored query, by its native UUID. A sample that is absent from a query, a
+  page or a newly installed phone produces no event.
+- The receiver accepts a retraction only from the authenticated owner, through an
+  active installation of that participant's HealthKit source. Any installation of
+  the source may report the deletion; other repositories cannot retract.
+- A retraction is a tombstone. The record's bytes, versions and grants stay in
+  custody, and an operator can reverse the tombstone (see the server README).
+
 Direct QuestionnaireResponse derivations may remain pending until one exact
 source-scoped context is known and independently authorized for the same enrollment.
 Ambiguous identity or another study's grant cannot supply access. This internal

@@ -558,7 +558,18 @@ It then selects the latest exact `Provenance.recorded`; equal instants use the
 bytewise-greater record-version identifier value, then system. Selection preserves
 complete output membership and never carries an earlier study grant forward.
 Retractions suppress every output version of that source record, including later
-arrivals, without reserving unrelated output identities. Other clinical profiles
+arrivals, without reserving unrelated output identities. Because a source record is
+shared by all of the participant's studies and installations, a retraction is
+admitted only as HealthKit's deletion report: from the authenticated owner, through
+an active installation of the participant's HealthKit source. Retractions from any
+other repository are refused, and no server process derives one from missing data.
+A retraction is a tombstone over retained custody; no event, fact or grant is
+removed. `reverse-retraction --event <retraction event ID>` is the operator command
+that lifts one tombstone by appending to `clinical_retraction_reversals`, with a
+mandatory `clinical.retraction.reversed` audit event. It is idempotent, rewrites no
+history, and is not reachable through HTTP. The retraction of a source record has
+one identity, so a repeated report of the same deletion replays the retained
+receipt and does not suppress a reversed record again. Other clinical profiles
 and arbitrary supporting reference shapes remain unsupported.
 Unsupported input is refused,
 even when it is otherwise valid FHIR. A study must explicitly publish the matching collection

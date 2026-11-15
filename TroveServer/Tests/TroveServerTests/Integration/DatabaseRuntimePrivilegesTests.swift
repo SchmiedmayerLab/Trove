@@ -83,7 +83,7 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM clinical_point_facts WHERE false", "TRUNCATE clinical_point_facts",
         "UPDATE study_data_grants SET consent_id = consent_id WHERE false", "DELETE FROM study_data_grants WHERE false", "TRUNCATE study_data_grants",
         "UPDATE clinical_source_records SET identifier_value = identifier_value WHERE false",
-        "DELETE FROM clinical_record_events WHERE false", "TRUNCATE clinical_output_bindings",
+        "DELETE FROM clinical_record_events WHERE false", "TRUNCATE clinical_output_bindings", "DELETE FROM clinical_retraction_reversals",
         "UPDATE clinical_record_retractions SET kind = kind WHERE false", "TRUNCATE clinical_record_retractions",
         "DELETE FROM clinical_questionnaire_contexts WHERE false", "TRUNCATE clinical_point_derivations",
         "UPDATE clinical_attribution_commands SET target_intent = target_intent WHERE false",
@@ -186,7 +186,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (raw_sha256) ON public.clinical_events", "UPDATE (ordinal) ON public.clinical_event_nodes",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "UPDATE (consent_id) ON public.study_data_grants",
         "UPDATE (identifier_value) ON public.clinical_source_records", "DELETE ON public.clinical_record_events",
-        "UPDATE ON public.clinical_attribution_commands",
+        "UPDATE ON public.clinical_attribution_commands", "DELETE ON public.clinical_retraction_reversals",
         "TRUNCATE ON public.clinical_output_bindings", "UPDATE ON public.clinical_record_retractions",
         "UPDATE ON public.clinical_questionnaire_contexts", "DELETE ON public.clinical_point_derivations"
     ])
@@ -212,7 +212,7 @@ struct DatabaseRuntimePrivilegesTests {
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
         "SELECT (quantity_value) ON public.clinical_point_facts", "INSERT (consent_id) ON public.study_data_grants",
         "INSERT ON public.clinical_source_records", "SELECT ON public.clinical_record_events", "INSERT ON public.clinical_output_bindings",
-        "INSERT ON public.clinical_record_retractions",
+        "INSERT ON public.clinical_record_retractions", "INSERT ON public.clinical_retraction_reversals",
         "INSERT ON public.clinical_questionnaire_contexts", "INSERT ON public.clinical_point_derivations",
         "INSERT ON public.clinical_attribution_commands"
     ])
@@ -291,7 +291,7 @@ extension DatabaseRuntimePrivilegesTests {
         "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
-        "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
+        "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
         "public.clinical_attribution_commands"
     ])
     func absentProtectedTablesFailClosed(table: String) async throws {
@@ -374,9 +374,9 @@ extension DatabaseRuntimePrivilegesTests {
                 public.clinical_events, public.clinical_event_representations,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
-                public.clinical_record_retractions, public.clinical_questionnaire_contexts, public.clinical_point_derivations,
-                public.clinical_attribution_commands, public.recording_transfers, public.recording_transfer_attempts,
-                public.recording_transfer_receipts, public.clinical_recording_attachments TO \(ident: role)
+                public.clinical_record_retractions, public.clinical_retraction_reversals, public.clinical_questionnaire_contexts,
+                public.clinical_point_derivations, public.clinical_attribution_commands, public.recording_transfers,
+                public.recording_transfer_attempts, public.recording_transfer_receipts, public.clinical_recording_attachments TO \(ident: role)
             """)
             .run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()

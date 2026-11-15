@@ -24,7 +24,7 @@ struct ProviderRetainedSelection {
             JOIN clinical_record_events r ON r.event_id = f.event_id AND r.source_id = f.source_id
             WHERE f.source_id = \(bind: connection.sourceID) AND f.source_type_identifier = \(bind: sourceToken)
                 AND f.profile = \(bind: demand.profile) AND \(bounds) AND \(current)
-                AND NOT EXISTS (SELECT 1 FROM clinical_record_retractions deleted WHERE deleted.record_id = f.record_id)
+                AND NOT \(ClinicalRecordStore.retracted("f.record_id"))
                 AND NOT EXISTS (SELECT 1 FROM study_data_grants granted
                     WHERE granted.node_id = f.node_id AND granted.consent_id = \(bind: demand.consentID))
                 AND EXISTS (

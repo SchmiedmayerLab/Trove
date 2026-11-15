@@ -62,6 +62,19 @@ enum ClinicalRecordSchema {
                 name: "clinical_retraction_event_fk"
             )
             .create()
+        // Appended to lift one tombstone; the retraction and every record version stay in custody.
+        try await database.schema("clinical_retraction_reversals")
+            .field("retraction_event_id", .uuid, .required)
+            .compositeIdentifier(over: "retraction_event_id")
+            .field("reversed_at", .datetime, .required)
+            .foreignKey(
+                "retraction_event_id",
+                references: "clinical_record_retractions",
+                "event_id",
+                onDelete: .restrict,
+                name: "clinical_retraction_reversal_fk"
+            )
+            .create()
     }
 
     private static func createRecordEvents(on database: any Database) async throws {

@@ -133,6 +133,7 @@ public func configure(_ app: Application) async throws {
     let auditConfiguration = try AuditConfiguration(applicationRevision: Environment.get("APPLICATION_REVISION"))
     try configureTransports(for: app)
     app.asyncCommands.use(CleanupArtifactsCommand(auditConfiguration: auditConfiguration), as: "cleanup-artifacts")
+    app.asyncCommands.use(ReverseRetractionCommand(auditConfiguration: auditConfiguration), as: "reverse-retraction")
     let logger = app.logger
     let usesEphemeralServices = usesEphemeralUITestServices(app)
     let sourceKeyring = try configuredSourceIdentityKeyring(app, ephemeral: usesEphemeralServices)
