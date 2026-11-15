@@ -367,8 +367,7 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
-            GRANT SELECT, INSERT ON public.audit_events, public.published_studies,
-                public.study_delegations, public.study_publication_candidates,
+            GRANT SELECT, INSERT ON public.audit_events, public.published_studies, public.study_delegations, public.study_publication_candidates,
                 public.enrollment_consents, public.source_bindings, public.source_installations,
                 public.source_identity_keys, public.source_identity_key_envelopes,
                 public.clinical_events, public.clinical_event_representations,
@@ -382,6 +381,7 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
+        try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 
     /// SQL-role capability fixture, not a bypass of the production receiver's validation/authority checks.

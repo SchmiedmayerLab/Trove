@@ -53,6 +53,28 @@ struct FHIRClinicalDocumentTests {
         #expect(try HealthKitDocumentSelectionTime(entities: entities, expectedBasis: basis).period == input.period)
     }
 
+    @Test("A clinical document states its writer revision like an Observation", arguments: fixtures)
+    func admitsTheWriterRevisionOnTheDocument(_ fixture: String) async throws {
+        let input = try Fixture(fixture)
+        let pair = try FHIRRecordingProjectionTests.goldenWriterRevision()
+        var bundle = try #require(JSONSerialization.jsonObject(with: input.bytes) as? [String: Any])
+        var entries = try #require(bundle["entry"] as? [[String: Any]])
+        let index = try #require(entries.firstIndex { $0["fullUrl"] as? String == input.address })
+        var document = try #require(entries[index]["resource"] as? [String: Any])
+        document["identifier"] = try #require(document["identifier"] as? [Any]) + [pair.identifier]
+        document["extension"] = (document["extension"] as? [Any] ?? []) + [pair.version]
+        entries[index]["resource"] = document
+        bundle["entry"] = entries
+        let bytes = try JSONSerialization.data(withJSONObject: bundle)
+        let event = try FHIRPointProjection.project(
+            validatedBytes: bytes, validatorIdentity: "synthetic-receiver", recordings: [try await input.attachment()]
+        )
+        let output = try #require(event.outputs.first)
+        #expect(event.outputs.count == 1 && output.value == .recording)
+        #expect(output.writerIdentifier?.value == pair.identifier["value"] as? String)
+        #expect(output.writerVersion == pair.version["valueString"] as? String)
+    }
+
     @Test(arguments: fixtures)
     func clinicalCarePeriodDoesNotReplaceSourceSelectionClock(_ fixture: String) async throws {
         let input = try Fixture(fixture)
