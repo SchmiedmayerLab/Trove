@@ -31,7 +31,7 @@ struct RootView: View {
                     }
                 }
                 .id(api.sessionSnapshot)
-            } else if api.sessionSnapshot != nil {
+            } else if hasAccountIdentity {
                 TabView {
                     Tab("Account Setup", systemImage: "person.crop.circle") { OnboardingView() }
                     Tab("Health Data", systemImage: "heart.text.square") { HealthDataView() }
@@ -51,9 +51,18 @@ struct RootView: View {
         .handlesErrors()
     }
 
-    private var isAccountSetupComplete: Bool {
+    /// The session snapshot exists before sign-in publishes the account. Replacing the onboarding
+    /// hierarchy at that point would cancel the sign-in task that its button owns.
+    private var hasAccountIdentity: Bool {
         guard let account, account.signedIn, let details = account.details,
-              let session = api.sessionSnapshot, session.subject == details.accountId else {
+              let session = api.sessionSnapshot else {
+            return false
+        }
+        return session.subject == details.accountId
+    }
+
+    private var isAccountSetupComplete: Bool {
+        guard hasAccountIdentity, let details = account?.details else {
             return false
         }
         return !details.isIncomplete && details.hasRequiredProfileFields

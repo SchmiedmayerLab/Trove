@@ -8,6 +8,8 @@ path = [
     "TroveServer/tools/bruno/**",
     "TroveAPI/Package.resolved",
     "TroveServer/Package.resolved",
+    "TroveServer/Tests/TroveServerTests/Resources/HealthKitClinicalDocuments/**",
+    "TroveServer/Tests/TroveServerTests/Resources/HealthKitComponentEvents/**",
     "docs/images/**/*.png",
     "documentation/requirements.txt",
 ]
