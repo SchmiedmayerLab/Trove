@@ -63,7 +63,7 @@ struct FHIRSensorKitRecordingTests {
         let bundle = try JSONDecoder().decode(ModelsR4.Bundle.self, from: bytes)
         var document = try #require(bundle.entry?.compactMap { $0.resource?.get() as? DocumentReference }.first)
         let other = try Self.source(.pedometerSamples)
-        document.extension = [Extension(url: Canonicals.sensorKitSourceTypeExtension, value: .code(FHIRPrimitive(FHIRString(other.sourceTypeCode))))]
+        document.extension = [Extension(url: SensorKitContract.sourceTypeExtensionURI, value: .code(FHIRPrimitive(FHIRString(other.sourceTypeCode))))]
         #expect(throws: (any Error).self) { try FHIRRecordingProjection.project(document) }
     }
 }

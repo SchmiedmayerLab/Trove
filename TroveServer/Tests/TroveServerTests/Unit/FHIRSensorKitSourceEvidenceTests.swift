@@ -18,7 +18,7 @@ struct FHIRSensorKitSourceEvidenceTests {
         SensorKitCatalog.current.entries.map { ($0.sourceTypeCode, $0.sourceToken) }
     )
     func canonicalNativeStream(_ code: String, _ token: String) throws {
-        let marker = Extension(url: Canonicals.sensorKitSourceTypeExtension, value: .code(FHIRPrimitive(FHIRString(code))))
+        let marker = Extension(url: SensorKitContract.sourceTypeExtensionURI, value: .code(FHIRPrimitive(FHIRString(code))))
         let evidence = try #require(try FHIRSourceTypeEvidence.extract([marker]))
         #expect(evidence.repository == .sensorKit)
         #expect(evidence.identifier == token)
@@ -28,7 +28,7 @@ struct FHIRSensorKitSourceEvidenceTests {
         "unregistered-source", "SRSensor.onWristState"
     ])
     func rejectsUnknownCode(_ code: String) {
-        let marker = Extension(url: Canonicals.sensorKitSourceTypeExtension, value: .code(FHIRPrimitive(FHIRString(code))))
+        let marker = Extension(url: SensorKitContract.sourceTypeExtensionURI, value: .code(FHIRPrimitive(FHIRString(code))))
         #expect(throws: (any Error).self) { try FHIRSourceTypeEvidence.extract([marker]) }
     }
 }
