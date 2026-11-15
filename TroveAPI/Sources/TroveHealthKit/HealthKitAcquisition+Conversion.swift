@@ -155,7 +155,7 @@ extension HealthKitAcquisition {
             let record = try await inputRecord(sample, stream: stream, delta: delta)
             switch record {
             case .fileRecording(let recording): input.recordings[sample.uuid] = recording
-            case .electrocardiogram(_, _, let symptoms): input.companions.formUnion(symptoms.map(\.uuid))
+            case .electrocardiogram(_, _, let symptoms): input.companions.formUnion((symptoms ?? []).map(\.uuid))
             default: break
             }
             input.records.append(record)
