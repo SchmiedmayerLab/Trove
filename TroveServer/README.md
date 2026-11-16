@@ -306,6 +306,34 @@ isolated pinned validator setup. Neither lane simulates an OS-process crash or a
 mobile collector. Linux test builds require `pkg-config` and `libsqlite3-dev` for
 the client journal; the shared entry point checks this before compiling.
 
+### Required full-validator CI lane
+
+The real-store job in `swift-package.yml` runs the full server suite with the
+checksum-pinned offline validator and the separately pinned receiver lifecycle
+corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the six named clinical test groups
+to execute; missing or skipped groups fail verification. The parameterized
+receiver group covers all 35 declared sequences, and the retraction group covers
+both arrival orders. Test-function counts are not parameter-case counts.
+
+To reproduce with disposable loopback PostgreSQL and S3 services, prepare the
+validator context with `--include-lifecycle-corpus`, run its image on an isolated
+internal network, and set:
+
+```sh
+export TROVE_TEST_POSTGRES_PORT=15432 TROVE_TEST_S3_PORT=18333
+export TROVE_TEST_VALIDATOR_ASSETS=/absolute/path/to/context/assets
+export TROVE_TEST_LIFECYCLE_CORPUS=/absolute/path/to/context/corpus/Conformance/corpora/receiver-lifecycle
+export FHIR_VALIDATOR_URL=http://127.0.0.1:18080/validate
+export FHIR_VALIDATOR_IDENTITY=sha256:$(shasum -a 256 TroveInfrastructure/validator/manifest.json | cut -d ' ' -f 1)
+TROVE_REQUIRE_FULL_VALIDATOR=1 bash scripts/check swift TroveServer
+```
+
+Use the workflow's pinned service images, loopback bindings and validator resource
+restrictions. Each application owns and removes its test database. Retain the
+raw logs, Swift Testing XML, validator image identity and both input manifests.
+This lane exercises application recreation and durable journal recovery; separate
+process-crash, simulator acquisition and physical-device acceptance remain distinct.
+
 ## Bruno
 
 Request collections live in `tools/bruno/`, for the [Bruno](https://www.usebruno.com) API client. Select the **Trove** environment to load the variables. The **Seed** request bootstraps a working dataset — it logs in through Keycloak, fetches groups, creates a study, and adds sample components, passing IDs between requests through post-response scripts.

@@ -44,6 +44,14 @@ case "${1:-}" in
         require_tool tee
         require_tool python3
         require_tool mktemp
+        report_args=()
+        if [[ "${TROVE_REQUIRE_FULL_VALIDATOR:-0}" == 1 ]]; then
+            [[ "$package" == TroveServer ]] || { echo "Full validation requires TroveServer." >&2; exit 2; }
+            for variable in TROVE_TEST_VALIDATOR_ASSETS TROVE_TEST_LIFECYCLE_CORPUS TROVE_TEST_POSTGRES_PORT TROVE_TEST_S3_PORT FHIR_VALIDATOR_URL FHIR_VALIDATOR_IDENTITY; do
+                [[ -n "${!variable:-}" ]] || { echo "Full validation requires $variable." >&2; exit 2; }
+            done
+            report_args+=(--require-full-validator)
+        fi
         swift_version="$(swift --version)"
         echo "$swift_version"
         if [[ ! "$swift_version" =~ Swift\ version\ 6\.4(\.[0-9]+)?[[:space:]] ]]; then
@@ -96,6 +104,7 @@ case "${1:-}" in
         swift package describe --type json > "$execution_reports/package.json"
         python3 "$repository_root/scripts/check-swift-test-report.py" "$execution_reports/tests-swift-testing.xml" \
             --package-description "$execution_reports/package.json" --binary-path "$binary_path" \
+            ${report_args[@]+"${report_args[@]}"} \
             > "$execution_reports/coverage-objects.txt"
         shopt -s nullglob
         profiles=("$binary_path"/codecov/*.profdata)

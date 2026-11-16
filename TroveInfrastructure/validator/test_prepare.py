@@ -17,6 +17,30 @@ import prepare
 
 
 class PrepareTests(unittest.TestCase):
+    def test_lifecycle_corpus_requires_the_locked_archive_and_acceptance_matrix(self):
+        for changed, count in ((False, 35), (True, 35), (False, 34)):
+            with self.subTest(changed=changed, count=count), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                archive = io.BytesIO()
+                content = json.dumps({"schemaVersion": 0, "sequences": list(range(count))}).encode()
+                with tarfile.open(fileobj=archive, mode="w") as tar:
+                    header = tarfile.TarInfo("corpus/revision-sequences.json")
+                    header.size = len(content)
+                    tar.addfile(header, io.BytesIO(content))
+                raw = archive.getvalue()
+                lock = {"revision": "reviewed-corpus", "path": "corpus", "sequences": 35,
+                        "archiveSHA256": hashlib.sha256(b"different" if changed else raw).hexdigest()}
+                (root / "lifecycle-corpus.json").write_text(json.dumps(lock))
+                with patch.object(prepare, "HERE", root), \
+                     patch.object(prepare.subprocess, "run", return_value=SimpleNamespace(stdout=raw)) as run:
+                    if changed or count != 35:
+                        with self.assertRaises(ValueError):
+                            prepare.prepare_lifecycle_corpus(root / "source", root / "output")
+                    else:
+                        prepare.prepare_lifecycle_corpus(root / "source", root / "output")
+                        self.assertEqual(json.loads((root / "output/identity.json").read_text()), lock)
+                    self.assertEqual(run.call_args.args[0][-2:], ["reviewed-corpus", "corpus"])
+
     def test_default_and_explicit_jars_are_verified_without_changing_the_cache(self):
         for explicit, changed in ((False, False), (True, False), (True, True)):
             with self.subTest(explicit=explicit, changed=changed), tempfile.TemporaryDirectory() as directory:

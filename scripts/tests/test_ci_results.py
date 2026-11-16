@@ -158,6 +158,21 @@ class CIResultTests(unittest.TestCase):
                 self.assertIn("python3", installs[0].split())
                 self.assertIn("libsqlite3-dev", installs[0].split())
 
+    def test_real_store_lane_requires_full_validator_execution_and_isolation(self) -> None:
+        workflow = yaml.safe_load((ROOT / ".github/workflows/swift-package.yml").read_text())
+        steps = workflow["jobs"]["postgres"]["steps"]
+        commands = "\n".join(step.get("run", "") for step in steps)
+        for required in ("--include-lifecycle-corpus", "--env TROVE_REQUIRE_FULL_VALIDATOR=1",
+                         "--env TROVE_TEST_VALIDATOR_ASSETS=", "--env TROVE_TEST_LIFECYCLE_CORPUS=",
+                         "--env FHIR_VALIDATOR_URL=", "--env FHIR_VALIDATOR_IDENTITY",
+                         "docker network create --internal", "--publish 127.0.0.1:18080:8080",
+                         "--read-only", "--cap-drop ALL", "--security-opt no-new-privileges"):
+            self.assertIn(required, commands)
+        cleanup = steps[-1]
+        self.assertEqual(cleanup["if"], "always()")
+        self.assertIn('"$VALIDATOR_CONTAINER"', cleanup["run"])
+        self.assertIn('docker network rm "$VALIDATOR_NETWORK"', cleanup["run"])
+
     def test_ruleset_requires_the_aggregate_not_conditionally_skipped_components(self) -> None:
         ruleset = json.loads((ROOT / ".github/rulesets/main.json").read_text())
         rule = next(rule for rule in ruleset["rules"] if rule["type"] == "required_status_checks")

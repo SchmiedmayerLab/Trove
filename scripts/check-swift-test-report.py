@@ -16,6 +16,16 @@ import sys
 import xml.etree.ElementTree as ET
 
 
+FULL_VALIDATOR_TESTS = {
+    ("TroveServerTests.ClinicalEventBatchHTTPTests", "fullValidatorAdmitsAndReplaysAroundARejectedMember()"),
+    ("TroveServerTests.ClientDeliveryRecoveryTests", "fullValidatorClientAndReceiverRecovery()"),
+    ("TroveServerTests.ClinicalEventHTTPIntegrationTests", "oneEventTwoStudiesSafeRetriesWithdrawalAndApplicationRestart()"),
+    ("TroveServerTests.ClinicalRetractionHTTPTests", "fullValidationRetractionInBothArrivalOrdersAndReceiptRecovery(retractionFirst:)"),
+    ("TroveServerTests.FHIRClinicalDerivationTests", "pinnedPendingAndTargetKeepTheirReferenceSemantics()"),
+    ("TroveServerTests.ReceiverRevisionCorpusTests", "completeRevisionSequenceAndRestart(index:)"),
+}
+
+
 def count(suite: ET.Element, name: str) -> int:
     value = suite.get(name)
     if value is None or re.fullmatch(r"[0-9]+", value) is None:
@@ -46,7 +56,7 @@ def verify_suite(suite: ET.Element) -> tuple[int, int]:
     return executed, skipped
 
 
-def verify(path: Path, expected_targets: set[str] | None = None) -> tuple[int, int]:
+def verify(path: Path, expected_targets: set[str] | None = None, *, require_full_validator: bool = False) -> tuple[int, int]:
     root = ET.parse(path).getroot()
     if root.tag != "testsuites" or not len(root) or any(suite.tag != "testsuite" for suite in root):
         raise ValueError("Expected Swift Testing results suites")
@@ -55,6 +65,10 @@ def verify(path: Path, expected_targets: set[str] | None = None) -> tuple[int, i
     identities = [(case.get("classname"), case.get("name")) for case in cases]
     if len(set(identities)) != len(identities):
         raise ValueError("Duplicate test identities across result suites")
+    if require_full_validator:
+        executed = {(case.get("classname"), case.get("name")) for case in cases if case.find("skipped") is None}
+        if missing := FULL_VALIDATOR_TESTS - executed:
+            raise ValueError("Required full-validator tests missing or skipped: " + ", ".join(name for _, name in sorted(missing)))
     if expected_targets is not None:
         observed = {case.attrib["classname"].split(".", 1)[0] for case in cases}
         executed_targets = {case.attrib["classname"].split(".", 1)[0]
@@ -96,12 +110,13 @@ def main() -> int:
     parser.add_argument("report", type=Path)
     parser.add_argument("--package-description", type=Path)
     parser.add_argument("--binary-path", type=Path)
+    parser.add_argument("--require-full-validator", action="store_true")
     arguments = parser.parse_args()
     if bool(arguments.package_description) != bool(arguments.binary_path):
         parser.error("Package description and binary path must be supplied together")
     try:
         package, targets = package_targets(arguments.package_description) if arguments.package_description else (None, None)
-        executed, skipped = verify(arguments.report, targets)
+        executed, skipped = verify(arguments.report, targets, require_full_validator=arguments.require_full_validator)
         if package is not None and targets is not None:
             for binary in coverage_objects(arguments.binary_path, package, targets):
                 print(binary)

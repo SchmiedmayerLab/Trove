@@ -52,6 +52,27 @@ class SwiftTestReportTests(unittest.TestCase):
             with self.subTest(content=content), self.assertRaisesRegex(ValueError, "No tests executed"):
                 self.check(content)
 
+    def test_full_validator_gate_requires_every_named_test_to_execute(self) -> None:
+        cases = [ET.Element("testcase", classname=target, name=name)
+                 for target, name in sorted(REPORT.FULL_VALIDATOR_TESTS)]
+        def write(selected):
+            skipped = sum(case.find("skipped") is not None for case in selected)
+            self.path.write_text(document("".join(ET.tostring(case, encoding="unicode") for case in selected),
+                                          tests=str(len(selected) - skipped), skipped=str(skipped)))
+        write(cases)
+        self.assertEqual(REPORT.verify(self.path, require_full_validator=True), (6, 0))
+        for index in range(len(cases)):
+            with self.subTest(missing=index):
+                write(cases[:index] + cases[index + 1:])
+                with self.assertRaisesRegex(ValueError, "missing or skipped"):
+                    REPORT.verify(self.path, require_full_validator=True)
+            with self.subTest(skipped=index):
+                ET.SubElement(cases[index], "skipped")
+                write(cases)
+                with self.assertRaisesRegex(ValueError, "missing or skipped"):
+                    REPORT.verify(self.path, require_full_validator=True)
+                cases[index].remove(cases[index][0])
+
     def test_missing_and_malformed_reports_fail(self) -> None:
         with self.assertRaises(OSError):
             REPORT.verify(self.path)
