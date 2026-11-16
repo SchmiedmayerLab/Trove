@@ -1,5 +1,5 @@
 {
-  "originHash" : "727deb48ab32b760a195ec228d935cd827cb90b9c1ad70cbdb076d4951051a48",
+  "originHash" : "79d1167eabf4631c8aa82cec333f8cec46e6d020e76b75a71a8221aa1ac31b36",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -437,8 +437,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "da9d28d69ebe3894b18376c8f2395c2f37b8448f",
-        "version" : "4.5.2"
+        "revision" : "f8fad2f95ad67b45f6340c0960e2396094d67e07",
+        "version" : "5.1.1"
       }
     },
     {
