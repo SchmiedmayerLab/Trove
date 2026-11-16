@@ -22,13 +22,13 @@ flowchart TB
     W["Researcher dashboard<br/>React, TypeScript"] --> S
     C["Researcher CLI<br/>Swift"] --> S
     I["Participant app<br/>Swift, SwiftUI"] --> S
-    S["Trove server<br/>HTTPS API · Swift, Vapor"]
+    S["Trove server and HTTPS API<br/>Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
     S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]
 ```
 
-The diagram also appears in the [repository README](https://github.com/SchmiedmayerLab/Trove#how-it-fits-together).
+The diagram also appears in the [repository README](https://github.com/SchmiedmayerLab/Trove#architecture).
 OpenAPI defines the shared server interface and generated client types.
 All clients use the server's authorization checks; none receives direct database
 or object-store credentials. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md)

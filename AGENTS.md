@@ -98,8 +98,7 @@ upstream source changes; verify those separately before release.
 Image candidates use `scripts/release-artifact.py` to package and verify the exact
 tested Docker archives. Do not rebuild in the publication job or replace missing
 platform evidence with another architecture's result. Dirty-source packages are
-never publishable. See [candidate publication](README.md#verified-image-candidates)
-for the independent approval boundary and remaining deployment gates.
+never publishable.
 
 The server defaults to isolated SQLite tests. The real-store lane uses disposable
 loopback services selected by `TROVE_TEST_POSTGRES_PORT` and `TROVE_TEST_S3_PORT`;
@@ -112,15 +111,29 @@ For iOS, use the selected scheme, test and stack setup from
 simulator, xcbeautify and coverage tools before building. Preserve exit status with
 `set -o pipefail`, retain raw output with `tee`, and format Xcode output with
 `xcbeautify`. Keep the `.xcresult` and verify actual test counts. A simulator result
-does not establish physical-device background delivery or data-protection behavior.
-Simulator verification is the accepted client boundary for the current M1/M2
-iteration; physical-device acceptance is deferred and must not be reported as passed.
+does not establish physical-device background delivery or data-protection behavior;
+do not report physical-device acceptance as passed from simulator results.
 
 Lint explicit source files with the owning repository's configuration; do not
 traverse build caches or apply Trove's rules to ignored dependency checkouts.
 Keep test inputs unchanged during execution. Record commands, source/dependency
 identity, executed/skipped counts and evidence locations. Reuse valid evidence for
 unchanged components; do not present editable dependencies as a released build.
+
+## Workflows and Repository Settings
+
+- Keep GitHub's default CodeQL setup disabled; `static-analysis.yml` and
+  `codeql.yml` upload the scans, and a second setup produces conflicting uploads.
+- `.github/rulesets/main.json` records the required checks and review rules but
+  does not apply them. When it changes, report that the hosted `main` ruleset must
+  be updated to match. Updating it is a repository-administration step.
+- Review workflow changes and the code that will execute before approving a fork
+  run; runner selection is not an isolation boundary. Never give self-hosted
+  runners or untrusted pull requests production credentials, signing material or
+  access to study data.
+
+See [continuous integration](docs/Engineering-and-Verification.md#continuous-integration)
+for the job selection and required checks.
 
 ## Safe Handoff
 

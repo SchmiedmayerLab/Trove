@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 
 # API
 
-The shared OpenAPI contract (`openapi.yaml`) and the Swift libraries generated from it: `TroveAPITypes`, `TroveAPIClient`, and `TroveAPIServer`. It is the single source of truth consumed by the server, the iOS app, and — through a generated TypeScript client — the web portal.
+The shared OpenAPI contract (`openapi.yaml`) and the Swift libraries generated from it: `TroveAPITypes`, `TroveAPIClient`, and `TroveAPIServer`. It is the single source of truth consumed by the server, the iOS app, and, through a generated TypeScript client, the web portal.
 
 ## Code generation
 
@@ -718,7 +718,7 @@ for the stateless Bundle exchange. Trove sets the HealthKit exporter's metadata 
 to `.all`: every supported source metadata key, identifying and custom keys included, is
 preserved, and no study narrows it. `GroveConsent` supplies the shared consent
 document format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation
-and simulator checks are separate verification gates.
+and simulator tests are verified separately.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
 

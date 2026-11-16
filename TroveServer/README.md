@@ -387,8 +387,7 @@ restart the server after renewal and verify a fresh connection's certificate.
 The application owns HTTP connection lifecycle for identity, storage and validation;
 storage shutdown releases its credentials without shutting down another service's
 HTTP connections. Ingress must verify the backend's certificate and hostname.
-Network isolation and certificate issuance remain deployment responsibilities. Development fixtures do not establish
-production readiness.
+Network isolation and certificate issuance are deployment responsibilities.
 
 ## Participant Data Sources
 
@@ -658,8 +657,8 @@ endpoint. The first retraction keeps its lifecycle effect.
 Withdrawal makes only that enrollment's grant ineffective; it does not rewrite the
 event or another study's decision. The receipt contains
 the server record ID, source ID, original producer identifier, SHA-256 of the exact
-accepted bytes, normalized target-intent digest, receipt time and node count—not
-samples or current study access. Clients must match the source, complete producer
+accepted bytes, normalized target-intent digest, receipt time and node count. It
+contains no samples or current study access. Clients must match the source, complete producer
 identifier and both digests to their
 staged event before retiring it; HTTP success alone does not identify accepted work. No participant
 observation-list or general clinical-query endpoint is exposed.
@@ -721,8 +720,8 @@ entry point from the repository root for the same build, test and coverage steps
 Each helper-created application uses one shared event loop and up to two PostgreSQL
 data connections plus one setup/cleanup connection. This bounds per-application pools
 independently of host CPU count while preserving concurrent transaction tests. The shared
-entry point still runs suites sequentially; a dedicated test exercises eight isolated
-applications concurrently. Full-suite parallel resource scheduling remains a separate gate.
+entry point runs suites sequentially; a dedicated test exercises eight isolated
+applications concurrently.
 
 Client recovery tests connect the real SQLite journal and generated Swift client to
 the authenticated router. They lose a partially accepted batch response, withdraw
@@ -767,7 +766,7 @@ process-crash, simulator acquisition and physical-device acceptance remain disti
 
 ## Bruno
 
-Request collections live in `tools/bruno/`, for the [Bruno](https://www.usebruno.com) API client. Select the **Trove** environment to load the variables. The **Seed** request bootstraps a working dataset — it logs in through Keycloak, fetches groups, creates a study, and adds sample components, passing IDs between requests through post-response scripts.
+Request collections live in `tools/bruno/`, for the [Bruno](https://www.usebruno.com) API client. Select the **Trove** environment to load the variables. The **Seed** request bootstraps a working dataset: it logs in through Keycloak, fetches groups, creates a study, and adds sample components, passing IDs between requests through post-response scripts.
 
 ## Architecture
 

@@ -1,5 +1,5 @@
 ---
-title: Trove — Digital Health Studies
+title: Overview
 hide:
   - navigation
   - toc
@@ -14,16 +14,14 @@ SPDX-License-Identifier: MIT
 
 <div class="trove-hero" markdown>
 
-# Study management for digital health research
+# Trove
 
 Configure studies in the web dashboard, publish reviewed revisions, and enroll
 participants through the iOS app. Trove supports study information, consent,
 and health-data collection, with a Swift server and command-line client.
 
 [Explore the Platform](Platform-Tour.md){ .md-button .md-button--primary }
-[Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#running-it-locally){ .md-button }
-
-<p class="trove-caption">Built with Swift and Grove · FHIR-aligned exchange · MIT licensed</p>
+[Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#local-development){ .md-button }
 
 </div>
 
@@ -69,8 +67,9 @@ in the native app before authorizing collection.
 ## Participant App
 
 Discover published studies, review the details, and provide consent in the iOS app.
-Collection continues offline under the accepted study settings. Study-specific apps
-can integrate through the API rather than adopting Trove's participant interface.
+HealthKit collection, and SensorKit collection where a deployment enables it,
+continues offline under the accepted study settings. Study-specific apps
+can integrate through the same API with their own participant interface.
 
 <div class="trove-phones">
   <figure><picture><source media="(prefers-color-scheme: dark)" srcset="images/mobile/studies~dark.png"><img src="images/mobile/studies.png" alt="Study discovery in the Trove iOS app" loading="lazy" width="260"></picture><figcaption>Discover a study</figcaption></figure>
@@ -97,10 +96,9 @@ define the exchange contracts.
 
 <section class="trove-section" markdown>
 
-## Beta Release
+## Contributing
 
-Trove is in beta and is being actively tested and used at Stanford.
-The [tour](Platform-Tour.md) documents the current interfaces.
+The source code, issues and contribution guidelines are on GitHub.
 
 [Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button .md-button--primary }
 

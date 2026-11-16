@@ -3,7 +3,7 @@
 
 [project]
 site_name = "Trove"
-site_description = "Open-source study management: study authoring, enrollment, consent, and health-data collection. Built with Swift and Grove."
+site_description = "Open-source study management software for study authoring, enrollment, consent and health-data collection, built with Swift and Grove."
 site_url = "https://troveplatform.org/"
 repo_url = "https://github.com/SchmiedmayerLab/Trove"
 repo_name = "SchmiedmayerLab/Trove"
@@ -29,7 +29,6 @@ nav = [
     { "Documentation Site" = "Documentation-Site.md" },
     { "Reproduce the Screenshots" = "images/README.md" },
   ] },
-  { "Milestones" = "https://github.com/SchmiedmayerLab/Trove/milestones" },
 ]
 
 [project.validation]
