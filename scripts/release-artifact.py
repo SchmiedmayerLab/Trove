@@ -193,6 +193,17 @@ def verify_set(root: Path, revision: str, run: str, attempt: str) -> dict[str, o
                                     for index, arch in enumerate(ARCHITECTURES)} for component in COMPONENTS}}
 
 
+def identified_reviewer(entry: object) -> bool:
+    if not isinstance(entry, dict) or entry.get("type") not in ("User", "Team"):
+        return False
+    reviewer = entry.get("reviewer")
+    if not isinstance(reviewer, dict):
+        return False
+    identity = reviewer.get("id")
+    name = reviewer.get("login" if entry["type"] == "User" else "slug")
+    return (isinstance(identity, int) and not isinstance(identity, bool)) or (isinstance(name, str) and name.strip() != "")
+
+
 def approval_environment(path: Path) -> None:
     environment = object_file(path)
     if environment.get("name") != "candidate-publication":
@@ -201,8 +212,7 @@ def approval_environment(path: Path) -> None:
     if not isinstance(rules, list) or not any(
         isinstance(rule, dict) and rule.get("type") == "required_reviewers"
         and isinstance(rule.get("reviewers"), list) and len(rule["reviewers"]) > 0
-        and all(isinstance(reviewer, dict) and reviewer.get("type") in ("User", "Team")
-                and isinstance(reviewer.get("reviewer"), dict) for reviewer in rule["reviewers"])
+        and all(identified_reviewer(reviewer) for reviewer in rule["reviewers"])
         for rule in rules
     ):
         raise ValueError("Environment review must be configured")

@@ -24,20 +24,16 @@ screens, and the [capture guide](../docs/images/README.md) to reproduce them.
 
 Use Node.js 26, matching the container, workflows, and shared verification command.
 TypeScript 7 supplies `tsc`; the `typescript` dependency aliases the official
-TypeScript 6 compatibility package because OpenAPI generation and typed ESLint
-still require its compiler API. See the [upstream migration guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/).
+TypeScript 6 compatibility package, whose compiler API OpenAPI generation and typed
+ESLint use.
 
-Keep TanStack Table on version 8 until Grove's published `DataTable` accepts the
-version 9 column definitions. The Grove design-system Zod override shares the
-app's schema implementation with its form helpers; installing two incompatible
-schema type graphs breaks form inference and can exhaust the lint heap. Check
-generation, typed lint, build, and tests together when changing these dependencies.
-
-The version-scoped `glob` and `minimatch` overrides select patched releases while
-the lint and coverage tools still request vulnerable major versions. Keep
-`eslint-plugin-import-x` at 4.18.1 or later for minimatch 11 compatibility. Remove
-the overrides when the upstream dependency ranges select patched versions, and
-rerun the shared web and dependency vulnerability checks.
+TanStack Table stays on version 8, the version Grove's `DataTable` column
+definitions use. The Grove design-system Zod override makes Grove's form helpers
+use the app's Zod package, so form inference and typed lint see one schema type
+graph. The version-scoped `glob` and `minimatch` overrides select patched releases
+for the lint and coverage tools; `eslint-plugin-import-x` 4.18.1 and later work with
+minimatch 11. Check generation, typed lint, build, tests and the dependency
+vulnerability check together when changing these dependencies.
 
 ## Health collection authoring
 

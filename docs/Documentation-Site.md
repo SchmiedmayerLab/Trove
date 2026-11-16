@@ -33,10 +33,10 @@ HTML images that Markdown validation may not cover. Repository files outside
 ## Publishing
 
 The [Documentation workflow](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/documentation.yml)
-builds and checks the site for pull requests and for changes on `main`. Publishing
-a stable GitHub release deploys the documentation of that release to
-`https://troveplatform.org/` through GitHub Pages. A manual run of the workflow on
-the latest release's tag deploys it again.
+builds and checks the site for pull requests and for changes on `main`. The latest
+stable GitHub release whose commit is on `main` deploys the documentation of its tag
+to `https://troveplatform.org/` through GitHub Pages. A manual run of the workflow
+on that release's tag deploys it again.
 
 ## Maintaining Content
 
@@ -44,6 +44,9 @@ the latest release's tag deploys it again.
   in the design pages. Describe what exists; do not record project status, plans,
   history or issue tracking in the documentation.
   Keep API instructions aligned with the documented revision.
+- Keep published URLs working. When a page is renamed or removed, keep a static
+  HTML file at its old path in `docs/` that is excluded from indexing and forwards
+  to the replacement, as `Roadmap-and-Engineering-Principles.html` does.
 - Keep the component diagrams in the root README and architecture page identical.
 - Use only synthetic study and participant data. Follow the
   [capture instructions](images/README.md) when refreshing screenshots.

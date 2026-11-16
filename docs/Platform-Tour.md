@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 Trove connects researcher-authored study definitions with participant identity,
 enrollment, reviewed consent and health-data collection. These screenshots show
-the beta application with a fictional **Daily Activity Study** and synthetic accounts.
+the application with a fictional **Daily Activity Study** and synthetic accounts.
 [Capture details and reproduction](images/README.md).
 
 ## Study Authoring

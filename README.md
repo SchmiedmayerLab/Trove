@@ -25,8 +25,8 @@ enrollment, consent and health-data collection into one platform.
   published as a numbered revision.
 - **Health-data collection.** The iOS app collects HealthKit data, and SensorKit data
   where a deployment enables it, and continues collecting offline. Deployments with
-  approved provider registrations also collect data from participants' linked
-  wearable accounts.
+  an approved Withings registration also collect measurements from participants'
+  linked Withings accounts.
 - **FHIR exchange.** Health data follows the
   [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/).
   The [event-admission contract](TroveServer/README.md#event-admission) lists the
@@ -126,9 +126,8 @@ with Docker Compose on a fresh development database.
 
 ## Documentation
 
-The [Trove documentation](https://troveplatform.org) contains the platform tour,
-the study model, the data architecture and the integration contracts, and the
-contributor guides for engineering, verification and collection acceptance.
+The [Trove documentation](https://troveplatform.org) describes the platform and
+its architecture and includes the contributor guides.
 
 ## Contributing
 

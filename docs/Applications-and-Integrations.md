@@ -107,7 +107,7 @@ implemented, but a deployment collects from a provider only after an operator
 configures approved registrations, secrets and an HTTPS callback. Without that
 configuration, provider capability lists are empty and the app explains that
 connecting is unavailable. [Provider collection](Provider-Collection.md)
-describes the configuration and the currently qualified acquisition client.
+describes the configuration and the qualified acquisition client.
 
 ## Other Research Systems
 
