@@ -21,7 +21,7 @@ participants through the iOS app. Trove supports study information, consent,
 and health-data collection, with a Swift server and command-line client.
 
 [Explore the Platform](Platform-Tour.md){ .md-button .md-button--primary }
-[Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#running-it-locally){ .md-button }
+[Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#local-development){ .md-button }
 
 <p class="trove-caption">Built with Swift and Grove · FHIR-aligned exchange · MIT licensed</p>
 
@@ -69,7 +69,8 @@ in the native app before authorizing collection.
 ## Participant App
 
 Discover published studies, review the details, and provide consent in the iOS app.
-Collection continues offline under the accepted study settings. Study-specific apps
+HealthKit collection, and SensorKit collection where a deployment enables it,
+continues offline under the accepted study settings. Study-specific apps
 can integrate through the API rather than adopting Trove's participant interface.
 
 <div class="trove-phones">
