@@ -99,13 +99,14 @@ export const bindKeycloakSession = (
     if (disposed) return;
     if (ended) {
       // Keycloak can complete an old refresh after clearToken().
-      if (keycloak.token) keycloak.clearToken();
+      if (keycloak.token) void keycloak.clearToken();
       return;
     }
     ended = true;
     accepted = undefined;
     setAccessTokenProvider(undefined);
-    keycloak.clearToken();
+    // Keycloak clears its token asynchronously; requests already lost access.
+    void keycloak.clearToken();
     callbacks.onUser(null);
     callbacks.onEnded();
     callbacks.clearCache();
