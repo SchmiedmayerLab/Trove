@@ -12,7 +12,7 @@ description = "Public Keycloak release archive checksum, verified before extract
 targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''(?:^|/)(?:\.github/workflows/build-and-test\.yml|TroveInfrastructure/validator/verify_process_restart\.py)$''']
-regexes = ['''^f3ce596dcf772ae145581ef338f9c3937ee37c74d7c1793e563c61519baaaafc$''']
+regexes = ['''^9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a$''']
 
 [[allowlists]]
 description = "Public development-only Vault token; never used by production overlays"

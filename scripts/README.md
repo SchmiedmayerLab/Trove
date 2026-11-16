@@ -18,7 +18,7 @@ bash scripts/check tooling
 bash scripts/check validator-pin
 ```
 
-Swift checks require Swift 6.4.x and its matching `llvm-cov` (via `xcrun` on macOS). Linux CI uses the digest-pinned Swift 6.4.0 image in `.github/workflows/swift-package.yml`; a macOS result does not replace Linux evidence. Web checks require Node.js 24 and npm. Tooling checks require actionlint, ShellCheck, Python 3, awk and kubectl. Install `TroveInfrastructure/tools/requirements.txt` in the Python environment for the rendered deployment checks; CI installs the same pinned dependency. Missing tools or mismatched compiler/runtime versions fail before builds start.
+Swift checks require Swift 6.4.x and its matching `llvm-cov` (via `xcrun` on macOS). Linux CI uses the digest-pinned Swift 6.4.0 image in `.github/workflows/swift-package.yml`; a macOS result does not replace Linux evidence. Web checks require Node.js 26 and npm. Tooling checks require actionlint, ShellCheck, Python 3, awk and kubectl. Install `TroveInfrastructure/tools/requirements.txt` in the Python environment for the rendered deployment checks; CI installs the same pinned dependency. Missing tools or mismatched compiler/runtime versions fail before builds start.
 
 Swift checks also reject compiler-plugin `Internal Error` and `LLVM Profile Error` diagnostics when SwiftPM exits zero. Raw build/test logs remain in `.build/verification`; ordinary warnings remain visible. Fix the dependency/toolchain problem rather than filtering its output or disabling coverage.
 

@@ -111,7 +111,7 @@ python3 -B TroveServer/Benchmarks/authenticated.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.6.1.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
   --events 6 --concurrency 2
 ```

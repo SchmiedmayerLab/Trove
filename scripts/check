@@ -129,8 +129,8 @@ case "${1:-}" in
         require_tool npm
         node --version
         npm --version
-        if [[ "$(node -p 'process.versions.node.split(".")[0]')" != 24 ]]; then
-            echo "CI parity requires Node.js 24, as declared in TroveWeb/package.json." >&2
+        if [[ "$(node -p 'process.versions.node.split(".")[0]')" != 26 ]]; then
+            echo "CI parity requires Node.js 26, as declared in TroveWeb/package.json." >&2
             exit 1
         fi
         cd TroveWeb

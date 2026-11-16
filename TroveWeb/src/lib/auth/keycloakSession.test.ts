@@ -253,7 +253,7 @@ describe("Keycloak session lifetime", () => {
       announce();
       return response;
     });
-    const pending = cache.fetchQuery({
+    const pending = cache.query({
       queryKey: ["private"],
       queryFn: async () => {
         try {

@@ -17,7 +17,10 @@ import { studyListQueryOptions } from "@/lib/queries/study";
  */
 export const Route = createFileRoute("/(dashboard)/")({
   beforeLoad: async ({ context: { queryClient } }) => {
-    const groups = await queryClient.ensureQueryData(groupListQueryOptions());
+    const groups = await queryClient.query({
+      ...groupListQueryOptions(),
+      staleTime: "static",
+    });
 
     const firstGroup = groups.at(0);
 
@@ -25,7 +28,7 @@ export const Route = createFileRoute("/(dashboard)/")({
       throw redirect({ to: "/onboarding" });
     }
 
-    const studies = await queryClient.fetchQuery(
+    const studies = await queryClient.query(
       studyListQueryOptions({ groupId: firstGroup.id }),
     );
     const firstStudy = studies.at(0);
