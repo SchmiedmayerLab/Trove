@@ -1,5 +1,5 @@
 ---
-title: Trove — Digital Health Studies
+title: "Trove: Digital Health Studies"
 hide:
   - navigation
   - toc
@@ -23,7 +23,7 @@ and health-data collection, with a Swift server and command-line client.
 [Explore the Platform](Platform-Tour.md){ .md-button .md-button--primary }
 [Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#local-development){ .md-button }
 
-<p class="trove-caption">Built with Swift and Grove · FHIR-aligned exchange · MIT licensed</p>
+<p class="trove-caption">Open source under the MIT License and built with Swift and Grove.</p>
 
 </div>
 
