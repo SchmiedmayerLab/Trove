@@ -198,7 +198,7 @@ struct ClinicalEventStore: Sendable {
             let nativeSystem = try Components.Schemas.ParticipantSource(source).nativeRecordIdentifierSystem().rawValue
             nativeIdentifiersMatch = event.nativeRecordIdentifiers.allSatisfy { $0.system == nativeSystem }
         case .serverWorker:
-            nativeIdentifiersMatch = event.nativeRecordIdentifiers.isEmpty
+            nativeIdentifiersMatch = event.nativeRecordIdentifiers.isEmpty && event.syncRecordIdentifiers.isEmpty
         }
         // A shared record is retracted only on HealthKit's own deletion report for it. No other repository reports
         // deletions, and a sample that is merely absent on one installation produces no event at all.

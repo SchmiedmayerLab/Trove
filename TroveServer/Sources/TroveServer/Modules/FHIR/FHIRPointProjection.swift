@@ -19,6 +19,7 @@ enum FHIRPointProjection {
         let participants: Set<Identity>
         let outputs: [ValidatedExchangeEvent.Output]
         let nativeIdentifiers: [Identity]
+        let syncIdentifiers: [Identity]
     }
 
     private struct Header: Decodable {
@@ -65,17 +66,23 @@ enum FHIRPointProjection {
         try validateOutputs(
             clinical.outputs, participants: clinical.participants, nativeIdentifiers: clinical.nativeIdentifiers, recordings: recordings
         )
+        let deploymentIdentifiers = try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes)
+        // One readable sync identifier at most, only where a primary admitted it, never under a Grove identity system.
+        let identitySystems = deploymentIdentifiers.systems.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        guard clinical.syncIdentifiers.count <= 1, try FHIRSyncRecordIdentifier.count(in: bytes) == clinical.syncIdentifiers.count,
+              clinical.syncIdentifiers.allSatisfy({ !identitySystems.contains($0.system) }) else { throw FHIRValidationClient.invalid }
         var result = ValidatedExchangeEvent(
             rawBytes: bytes,
             recorded: try RecordedInstant.extract(from: resources),
             validatorIdentity: validatorIdentity,
             eventIdentifierSystem: record.version.identifier.identifier.system.rawValue,
             eventIdentifierValue: record.version.identifier.identifier.value,
-            deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
+            deploymentIdentifiers: deploymentIdentifiers,
             participants: clinical.participants,
             nodes: nodes,
             outputs: clinical.outputs,
             nativeRecordIdentifiers: clinical.nativeIdentifiers,
+            syncRecordIdentifiers: clinical.syncIdentifiers,
             recordings: recordings
         )
         _ = try ClinicalRecordRevision(result)
@@ -93,24 +100,27 @@ enum FHIRPointProjection {
         var participants: Set<Identity> = []
         var outputs: [ValidatedExchangeEvent.Output] = []
         var nativeIdentifiers: [ValidatedExchangeEvent.Identifier] = []
+        var syncIdentifiers: [ValidatedExchangeEvent.Identifier] = []
         for node in nodes {
             guard let resource = resources[node.fullURL] else { throw FHIRValidationClient.invalid }
             participants.formUnion(try participantIdentifiers(resource, resources: resources))
             if case .observation(let observation) = resource {
-                let identifiers = try FHIRNativeRecordIdentifiers.output(observation.identifier ?? [])
+                let identifiers = try FHIRNativeRecordIdentifiers.output(observation.identifier ?? [], extensions: observation.extension ?? [])
                 nativeIdentifiers.append(contentsOf: identifiers.native)
+                syncIdentifiers.append(contentsOf: identifiers.sync)
                 outputs.append(try output(
                     observation, identifiers: identifiers.roles, fullURL: node.fullURL, quantityText: quantities[node.ordinal]
                 ))
             } else if case .documentReference(let document) = resource {
-                let identifiers = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [])
+                let identifiers = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [], extensions: document.extension ?? [])
                 nativeIdentifiers.append(contentsOf: identifiers.native)
+                syncIdentifiers.append(contentsOf: identifiers.sync)
                 outputs.append(try recording(
                     document, identifiers: identifiers.roles, fullURL: node.fullURL, recordings: recordings, resources: resources
                 ))
             }
         }
-        return .init(participants: participants, outputs: outputs, nativeIdentifiers: nativeIdentifiers)
+        return .init(participants: participants, outputs: outputs, nativeIdentifiers: nativeIdentifiers, syncIdentifiers: syncIdentifiers)
     }
 
     private static func validateOutputs(

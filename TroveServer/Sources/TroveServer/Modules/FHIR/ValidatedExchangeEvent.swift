@@ -107,6 +107,9 @@ struct ValidatedExchangeEvent: Sendable {
     var retraction: Retraction?
     /// Informative native UUID evidence, never a source authority or deduplication key.
     var nativeRecordIdentifiers: [Identifier] = []
+    /// The readable HealthKit sync identifier, verbatim: informative evidence like the native UUID, never an identity,
+    /// entry key, deduplication key, version selector, receipt or retraction target.
+    var syncRecordIdentifiers: [Identifier] = []
     var recordings: [ClinicalRecordingAttachment] = []
     var questionnaireContexts: [QuestionnaireContext] = []
     var derivations: [Derivation] = []
