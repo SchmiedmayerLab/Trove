@@ -74,7 +74,8 @@ struct RecordingTransferDeclaration: Sendable {
             measurementBounds: try .init(start: commitment.declaration.effectiveAt, end: commitment.declaration.effectiveEnd),
             codeSystem: FHIRRecordingProjection.formatSystem,
             code: format.rawValue,
-            sourceTypeIdentifier: sourceTypeIdentifier
+            sourceTypeIdentifier: sourceTypeIdentifier,
+            awaitsContentVerification: true
         )
         serialized = String(decoding: commitment.serialized, as: UTF8.self)
         sha256 = commitment.sha256

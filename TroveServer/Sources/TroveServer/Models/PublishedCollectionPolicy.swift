@@ -235,7 +235,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         requiresWorkoutRoute: Bool = false,
         providerRegistrationID: UUID? = nil,
         sourceTypeIdentifier: String? = nil,
-        timeBasis: CollectionTimeBasis = .measurementTime
+        timeBasis: CollectionTimeBasis = .measurementTime,
+        rowExtent: RecordingRowExtent? = nil
     ) -> Bool {
         // The profile determines its temporal shape; an interval end cannot be dropped.
         guard let capability = CollectionObservationProfile(rawValue: profile),
@@ -247,15 +248,17 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         ) else {
             return false
         }
-        return requirements.contains {
-            $0.profile == profile && $0.sourceKind == sourceKind && $0.providerRegistrationID == providerRegistrationID
-                && ($0.timeBasis ?? .measurementTime) == timeBasis
+        return requirements.contains { requirement in
+            requirement.profile == profile && requirement.sourceKind == sourceKind && requirement.providerRegistrationID == providerRegistrationID
+                && (requirement.timeBasis ?? .measurementTime) == timeBasis
                 && capability.matchesSource(
-                    expected: $0.sourceTypeIdentifier, actual: sourceTypeIdentifier, requiresWorkoutRoute: requiresWorkoutRoute
+                    expected: requirement.sourceTypeIdentifier, actual: sourceTypeIdentifier, requiresWorkoutRoute: requiresWorkoutRoute
                 )
                 && ((try? (preciseBounds ?? ClinicalMeasurementBounds(start: effectiveAt, end: effectiveEnd))
-                    .includes(windowStart: $0.start, windowEnd: $0.end)) == true)
-                && (!requiresWorkoutRoute || $0.includeWorkoutRoutes)
+                    .includes(windowStart: requirement.start, windowEnd: requirement.end)) == true)
+                // A query-created batch has independent rows: the same window must select each of them.
+                && (rowExtent.map { (try? $0.isSelected(windowStart: requirement.start, windowEnd: requirement.end)) == true } ?? true)
+                && (!requiresWorkoutRoute || requirement.includeWorkoutRoutes)
         }
     }
 }

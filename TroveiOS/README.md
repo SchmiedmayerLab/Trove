@@ -93,8 +93,9 @@ SensorKit is disabled in the default build configuration. Before enabling it:
 The sleep-session adapter retains the native identifier and exact supplied bounds,
 but it is not included in the deployment sensor list: the exact managed entitlement
 and usage-description keys require confirmation for that sensor. Do not substitute
-a guessed signing token. Additional raw and hybrid adapters are not advertised as
-available until their acquisition and receiver paths are implemented and verified.
+a guessed signing token. The raw and hybrid adapters, including photoplethysmogram,
+are not part of the default deployment sensor list either; a deployment adds them
+together with its approved entitlement and usage descriptions.
 
 Apple documents the managed entitlement and usage descriptions in
 [Configuring your project for sensor reading](https://developer.apple.com/documentation/sensorkit/configuring-your-project-for-sensor-reading).

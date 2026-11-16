@@ -24,24 +24,31 @@ struct TabularSliceContext<Row: SensorKitTabularSample> {
     func prepare(
         covered: [SensorKitRecordingSlice], usesSlices: Bool, original: SensorKitAcquisition.Input, state: ParticipantCollectionState
     ) throws -> SensorKitAcquisition.SlicePreparation {
+        // Evaluate each row once; a row's authority is the exact consent set per required output.
+        let profiles = try SensorKitAcquisition.requiredProfiles(for: entry)
+        let authorities = try batch.samples.map {
+            try SensorKitSliceSelection.authority(
+                for: $0.timeRange, profiles: profiles, sourceTypeIdentifier: entry.sourceToken, snapshot: snapshot
+            )
+        }
+        let authority: (Int) -> SensorKitSliceSelection.Authority? = { authorities[$0] }
         let ranges: [Range<Int>]
         if usesSlices {
             ranges = try SensorKitSliceSelection.ranges(
-                count: batch.samples.count, retained: covered, maximumSlices: limits.maximumRecordingFiles, authorized: authorized
+                count: batch.samples.count, retained: covered, maximumSlices: limits.maximumRecordingFiles, authority: authority
             )
         } else {
-            ranges = try batch.samples.indices.allSatisfy(authorized) && !batch.samples.isEmpty ? [batch.samples.indices] : []
+            let rows = batch.samples.indices
+            ranges = try SensorKitSliceSelection.sharedAuthority(rows, authority: authority) == nil ? [] : [rows]
         }
         var selected: [SensorKitAcquisition.Input] = []
         var slices: [SensorKitRecordingSlice] = []
         var retainedFileBytes = original.recordings.reduce(0) { $0 + $1.file.byteCount }
         for range in ranges {
             var input = try input(range: range, sliceIdentity: usesSlices)
-            var permissions: [CollectionObservationProfile: Set<UUID>] = [:]
-            for sample in batch.samples[range] {
-                let row = try rowConsents(sample.timeRange)
-                guard !row.isEmpty else { throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized }
-                for (profile, consents) in row { permissions[profile, default: []].formUnion(consents) }
+            // Only a consent whose window selects every row may receive this slice.
+            guard let permissions = try SensorKitSliceSelection.sharedAuthority(range, authority: authority) else {
+                throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized
             }
             input.rowAuthorization = .init(consents: permissions)
             let bytes = input.recordings.reduce(0) { $0 + $1.file.byteCount }
@@ -75,27 +82,6 @@ struct TabularSliceContext<Row: SensorKitTabularSample> {
             recordOrdinal: 0
         )
         return try SensorKitAcquisition.tabularInput(file, entry: entry, sourceID: identity, title: title)
-    }
-
-    private func authorized(_ index: Int) throws -> Bool {
-        try !rowConsents(batch.samples[index].timeRange).isEmpty
-    }
-
-    private func rowConsents(_ interval: Range<Date>) throws -> [CollectionObservationProfile: Set<UUID>] {
-        var result: [CollectionObservationProfile: Set<UUID>] = [:]
-        for profile in try SensorKitAcquisition.requiredProfiles(for: entry) {
-            let consents = try snapshot.sensorKitRowConsentIDs(
-                profile: profile,
-                sourceTypeIdentifier: entry.sourceToken,
-                start: interval.lowerBound,
-                end: interval.isEmpty ? nil : interval.upperBound
-            )
-            guard !consents.isEmpty else {
-                return [:]
-            }
-            result[profile] = Set(consents)
-        }
-        return result
     }
 }
 #endif

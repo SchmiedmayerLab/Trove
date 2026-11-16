@@ -21,10 +21,13 @@ extension StudyService {
             let fence = try await query.fence(candidate, studyID: studyID, versions: versions)
             let study = try await self.repository.lockStudy(id: studyID, on: transaction)
             try await self.authorizationService.checkResearcherHasStudyDataAccess(study, actor: actor, on: transaction)
-            guard fence.grants.contains(where: { $0.id == grantID }), let output = candidate.outputs.first else {
+            guard let grant = fence.grants.first(where: { $0.id == grantID }), let output = candidate.outputs.first else {
                 throw ServerError.notFound("Study recording not found")
             }
             let event = try await StudyDataExportStore(database: transaction).retainedEvent(id: output.eventID)
+            try await query.requireEveryRowSelected(
+                event, output: output, grant: grant, studyID: studyID, otherwise: .notFound("Study recording not found")
+            )
             guard let attachment = event.recordings.first(where: { $0.declaration.output.fullURL == output.fullURL }) else {
                 throw ServerError.notFound("Study recording not found")
             }

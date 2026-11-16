@@ -19,7 +19,7 @@ public enum SensorKitCollectionCapabilities {
     /// Only acquisition families with corresponding closed receiver contracts belong here.
     public static let sources: [SensorKitOutputDefinition] = SensorKitCatalog.current.entries.compactMap { entry in
         switch entry.structuredContract {
-        case .onWrist, .visit, .messagesUsage, .phoneUsage, .sleepSession, .accelerometer, .electrocardiogram, .deviceUsage, .wristTemperature:
+        case .onWrist, .visit, .messagesUsage, .phoneUsage, .sleepSession, .accelerometer, .electrocardiogram, .deviceUsage, .wristTemperature, .ppg:
             return entry.implementedOutput
         default:
             guard entry.structuredContract == nil, let format = entry.soleRawFormat,

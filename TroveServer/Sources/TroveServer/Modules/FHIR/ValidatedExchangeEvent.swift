@@ -61,6 +61,8 @@ struct ValidatedExchangeEvent: Sendable {
         let code: String
         var sourceTypeIdentifier: String?
         var sourceRepositoryKind: SourceRepositoryKind?
+        /// Row extremes of a query-created recording batch, verified against its complete content.
+        var rowExtent: RecordingRowExtent?
     }
 
     struct Retraction: Sendable {
@@ -115,14 +117,18 @@ struct ValidatedExchangeEvent: Sendable {
 
 extension ValidatedExchangeEvent {
     var collectionOutputs: [ClinicalGrantStore.Output] {
-        outputs.map {
+        // A summary derived from a query-created batch describes every row of its companion recording.
+        let batchRows = outputs.compactMap(\.rowExtent)
+        let sharedRows = batchRows.count == 1 && Set(outputs.map(\.sourceRecordIdentifier)).count == 1 ? batchRows.first : nil
+        return outputs.map {
             .init(
                 fullURL: $0.fullURL,
                 profile: $0.profile,
                 measurementBounds: $0.measurementBounds,
                 codeSystem: $0.codeSystem,
                 code: $0.code,
-                sourceTypeIdentifier: $0.sourceTypeIdentifier
+                sourceTypeIdentifier: $0.sourceTypeIdentifier,
+                rowExtent: $0.rowExtent ?? sharedRows
             )
         }
     }

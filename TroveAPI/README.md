@@ -47,6 +47,42 @@ required `X-Recording-Content-Type` (URI-component encoded; decode exactly once)
 type, including the FHIR release parameter when present. Clients verify it against
 the attachment and save a media-appropriate suffix without rendering a preview.
 
+## SensorKit Acquisition
+
+The optional iOS `TroveSensorKit` product stages Grove's anchored SensorKit batches in
+the same delivery journal. `SensorKitCollectionCapabilities` lists the sources with an
+implemented acquisition and receiver path; guide inventory alone enables nothing.
+Structured sources and native sessions (on-wrist state, visits, usage reports, sleep
+sessions, electrocardiograms, device usage, wrist temperature, photoplethysmogram
+samples) select whole overlapping records. Each native photoplethysmogram sample is
+retained in Grove's registered binary format beside a coverage summary; the two
+outputs are consented separately.
+
+Keyboard metrics, face metrics, media events, odometer, rotation rate and the Siri
+and telephony speech metrics are not collected. Grove's FHIR converter accepts
+caller-built records for them, but it has no bridge from the SensorKit values to a
+registered payload for keyboard, face, media and speech metrics or to the odometer
+rows, and its rotation-rate series requires exactly uniform sample timing. Acoustic
+settings are deferred in the guide.
+
+Acceleration, ambient light, ambient pressure, heart rate, pedometer and headphone
+recordings arrive as query batches of independent rows. The client divides a retained
+batch into immutable row slices: each uncovered run of rows with one exact set of
+authorizing consents becomes a slice, so a boundary between two study windows always
+starts a new one. A slice's source identifier derives from the retained batch
+coordinate, source, device and row bounds through Grove's
+`SensorKitSourceRecordID.derivedSlice`; study policy is not part of it. Slice
+coverage and content digests are committed with the delivery payloads before the
+native batch is acknowledged, and a replay that produces different bytes for a
+retained slice fails.
+
+A study is a target of a slice only when its accepted window selects every row.
+When accepted scopes expand, the retained batch is replayed: existing slices keep
+their identifier and bytes and are attributed to the new study only if it covers
+them completely, and rows not uploaded before become additional slices. Rows of a
+retained slice that only partly lies inside a later study's window are not delivered
+to that study. The receiver enforces the same rule independently.
+
 ## Local Verification
 
 Run `bash scripts/check swift TroveAPI` from the repository root with Swift 6.4.x.

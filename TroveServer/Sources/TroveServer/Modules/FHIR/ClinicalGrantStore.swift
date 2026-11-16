@@ -8,6 +8,7 @@
 
 import Fluent
 import Foundation
+import GroveFHIRContract
 import SQLKit
 import TroveAPITypes
 
@@ -24,6 +25,19 @@ struct ClinicalGrantStore: Sendable {
         var codeSystem: String?
         var code: String?
         var sourceTypeIdentifier: String?
+        /// Verified row extremes of a query-created batch. A window must select every row, not merely overlap.
+        var rowExtent: RecordingRowExtent?
+        /// A transfer declaration precedes its bytes; clinical admission repeats authorization with verified rows.
+        var awaitsContentVerification = false
+
+        /// A query-created recording without verified row evidence can never enter custody or be attributed.
+        var lacksRowEvidence: Bool {
+            guard rowExtent == nil, !awaitsContentVerification, codeSystem == FHIRRecordingProjection.formatSystem,
+                  let format = code.flatMap(RegisteredRecordingFormat.init(rawValue:)) else {
+                return false
+            }
+            return RecordingRowExtent.applies(to: format)
+        }
 
         var timeBasis: CollectionTimeBasis {
             .required(profile: profile, sourceTypeIdentifier: sourceTypeIdentifier)
@@ -168,7 +182,8 @@ extension ClinicalGrantStore {
             guard let profile = output.collectionProfile else {
                 return false
             }
-            return (try? output.measurementBounds.ends(onOrBefore: acceptedAt)) == true
+            return !output.lacksRowEvidence
+                && (try? output.measurementBounds.ends(onOrBefore: acceptedAt)) == true
                 && publication.collectionPolicy.permits(
                     studyID: enrollment.$study.id,
                     revision: consent.revision,
@@ -183,7 +198,8 @@ extension ClinicalGrantStore {
                     requiresWorkoutRoute: output.isWorkoutRoute,
                     providerRegistrationID: providerRegistrationID,
                     sourceTypeIdentifier: output.sourceTypeIdentifier,
-                    timeBasis: output.timeBasis
+                    timeBasis: output.timeBasis,
+                    rowExtent: output.rowExtent
                 )
         }
         .map(\.fullURL))

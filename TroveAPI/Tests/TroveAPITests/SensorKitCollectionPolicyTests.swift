@@ -13,7 +13,7 @@ struct SensorKitCollectionPolicyTests {
     @Test
     func closedRosterUsesGeneratedProfilesAndRequiresExplicitOriginalRecordingScopes() throws {
         let sources = SensorKitCollectionCapabilities.sources
-        #expect(sources.count == 15 && Set(sources.map(\.sourceToken)).count == sources.count)
+        #expect(sources.count == 16 && Set(sources.map(\.sourceToken)).count == sources.count)
         #expect(SensorKitCollectionCapabilities.outputs(for: "unknown-sensor").isEmpty)
         for source in sources {
             let entry = try #require(SensorKitCatalog.current.entry(sourceToken: source.sourceToken))
@@ -28,7 +28,7 @@ struct SensorKitCollectionPolicyTests {
             }
         }
         let recording = try #require(CollectionObservationProfile(rawValue: SensorKitContract.recordingDocumentProfile))
-        #expect(recording.nativeSourceTypeIdentifier == nil && recording.sensorKitSources.count == 10)
+        #expect(recording.nativeSourceTypeIdentifier == nil && recording.sensorKitSources.count == 11)
     }
 
     @Test(arguments: SensorKitCollectionCapabilities.sources.map(\.sourceToken))

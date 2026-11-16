@@ -19,6 +19,7 @@ extension SensorKitCollectionSource {
         case .electrocardiogram: Sensor.ecg
         case .deviceUsage: Sensor.deviceUsage
         case .wristTemperature: Sensor.wristTemperature
+        case .photoplethysmogram: Sensor.ppg
         case .accelerometer: Sensor.accelerometer
         case .ambientLight: Sensor.ambientLight
         case .ambientPressure: Sensor.ambientPressure
@@ -92,6 +93,8 @@ extension SensorKitCollectionSource {
             try await acquisition.catchUpDeviceUsage(localID: localID, sensorKit: sensorKit, application: application, host: host)
         case .wristTemperature:
             try await acquisition.catchUpWristTemperature(localID: localID, sensorKit: sensorKit, application: application, host: host)
+        case .photoplethysmogram:
+            try await acquisition.catchUpPhotoplethysmogram(localID: localID, sensorKit: sensorKit, application: application, host: host)
         default: throw SensorKitAcquisition.AcquisitionError.invalidBatch
         }
     }

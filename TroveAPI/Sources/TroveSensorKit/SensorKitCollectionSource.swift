@@ -33,6 +33,7 @@ public enum SensorKitCollectionSource: String, CaseIterable, Hashable, Sendable 
     case pedometer
     case headphoneMotion
     case headphoneSettings
+    case photoplethysmogram
 
     public var sensor: (any AnySensor)? {
         switch self {

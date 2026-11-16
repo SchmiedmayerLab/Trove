@@ -31,10 +31,18 @@ enum SensorKitCollectionPresentation {
         case .messagesUsage: german ? "Nutzung von Nachrichtendiensten" : "Messages usage"
         case .phoneUsage: german ? "Telefonnutzung" : "Phone usage"
         case .sleepSession: german ? "Schlafepisoden" : "Sleep sessions"
+        default: hybridTitle(contract, german: german)
+        }
+    }
+
+    /// Summaries that are retained together with their original recording.
+    private static func hybridTitle(_ contract: SensorKitStructuredContract, german: Bool) -> String? {
+        switch contract {
         case .electrocardiogram: german ? "Elektrokardiogramm" : "Electrocardiogram"
         case .deviceUsage: german ? "Zusammenfassung der Gerätenutzung" : "Device usage summary"
         case .wristTemperature: german ? "Temperatur am Handgelenk" : "Wrist temperature"
         case .accelerometer: german ? "Zusammenfassung der Beschleunigung" : "Acceleration summary"
+        case .ppg: german ? "Zusammenfassung des Photoplethysmogramms" : "Photoplethysmogram summary"
         default: nil
         }
     }
@@ -53,6 +61,7 @@ enum SensorKitCollectionPresentation {
     private static func recordingTitle(_ format: RegisteredRecordingFormat, german: Bool) -> String? {
         switch format {
         case .wristTemperatureSamples: german ? "Originalaufzeichnung der Handgelenktemperatur" : "Original wrist temperature recording"
+        case .photoplethysmogramSamples: german ? "Originalaufzeichnung des Photoplethysmogramms" : "Original photoplethysmogram recording"
         case .triaxialAccelerationSamples: german ? "Originalaufzeichnung der Beschleunigung" : "Original acceleration recording"
         case .ambientLightSamples: german ? "Originalaufzeichnung des Umgebungslichts" : "Original ambient light recording"
         case .ambientPressureSamples: german ? "Originalaufzeichnung des Umgebungsdrucks" : "Original ambient pressure recording"
