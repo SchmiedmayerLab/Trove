@@ -98,15 +98,17 @@ export const bindKeycloakSession = (
   const end = () => {
     if (disposed) return;
     if (ended) {
-      // Keycloak can complete an old refresh after clearToken().
-      if (keycloak.token) void keycloak.clearToken();
+      // Keycloak can complete an old refresh after clearToken(). Access is
+      // already detached, so a failed clear leaves nothing to handle here.
+      if (keycloak.token) keycloak.clearToken().catch(() => undefined);
       return;
     }
     ended = true;
     accepted = undefined;
     setAccessTokenProvider(undefined);
-    // Keycloak clears its token asynchronously; requests already lost access.
-    void keycloak.clearToken();
+    // Keycloak clears its token asynchronously; requests already lost access,
+    // so a failed clear must not surface as an unhandled rejection.
+    keycloak.clearToken().catch(() => undefined);
     callbacks.onUser(null);
     callbacks.onEnded();
     callbacks.clearCache();
