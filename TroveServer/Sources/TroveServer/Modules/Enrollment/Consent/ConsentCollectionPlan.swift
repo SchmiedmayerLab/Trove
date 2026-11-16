@@ -61,14 +61,20 @@ extension ConsentService {
                   publication.$study.id == studyID, publication.revision == consent.revision else {
                 throw ServerError.internalServerError("Exact collection policy is unavailable")
             }
-            let requirements = try publication.collectionPolicy.validatedRequirements(studyID: studyID, revision: consent.revision)
+            let requirements = try publication.collectionPolicy.resolvedRequirements(
+                studyID: studyID,
+                revision: consent.revision,
+                acceptedAt: consent.acceptedAt,
+                scope: consent.collectionScope,
+                adoptionEnd: window.end
+            )
             return .init(
                 consentId: consent.consentID.uuidString.lowercased(),
                 publicationId: consent.publicationID.uuidString.lowercased(),
                 revision: consent.revision,
                 start: consent.acceptedAt,
                 end: window.end,
-                requirements: requirements.map(Components.Schemas.CollectionRequirement.init)
+                requirements: requirements.map { .init(profile: $0.profile, sourceKind: .participantApp, start: $0.start, end: $0.end) }
             )
         }
     }

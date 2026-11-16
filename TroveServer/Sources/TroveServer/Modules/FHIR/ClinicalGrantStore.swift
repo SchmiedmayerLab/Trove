@@ -120,14 +120,16 @@ extension ClinicalGrantStore {
             throw ServerError.forbidden("Exact reviewed publication is required for study data")
         }
         let permitted = Set(outputs.filter { output in
-            output.effectiveAt <= acceptedAt && (interval.end.map { output.effectiveAt < $0 } ?? true)
+            output.effectiveAt <= acceptedAt
                 && publication.collectionPolicy.permits(
                     studyID: enrollment.$study.id,
                     revision: consent.revision,
                     profile: output.profile,
                     sourceKind: source.kind,
                     effectiveAt: output.effectiveAt,
-                    consentAcceptedAt: consent.acceptedAt
+                    consentAcceptedAt: consent.acceptedAt,
+                    scope: consent.collectionScope,
+                    adoptionEnd: interval.end
                 )
         }
         .map(\.fullURL))

@@ -18,6 +18,7 @@ enum ConsentCollectionTimeline {
         let revision: Int
         let stateVersion: Int64
         let acceptedAt: Date
+        var collectionScope: AcceptedCollectionScope?
     }
 
     struct Window: Sendable {
@@ -38,6 +39,7 @@ enum ConsentCollectionTimeline {
             .field(\.$acceptedEnrollmentVersion)
             .field(\.$createdAt)
             .field(\.$presentationProof)
+            .field(\.$collectionScope)
             .sort(\.$acceptedEnrollmentVersion, .ascending)
             .range(..<(maximumAcceptances + 1))
             .all()
@@ -48,7 +50,8 @@ enum ConsentCollectionTimeline {
                 publicationID: record.presentationProof.presentationID,
                 revision: record.revision,
                 stateVersion: record.acceptedEnrollmentVersion,
-                acceptedAt: acceptedAt
+                acceptedAt: acceptedAt,
+                collectionScope: record.collectionScope
             )
         }
         return try windows(acceptances, currentRevision: enrollment.currentRevision, stateVersion: enrollment.stateVersion, asOf: asOf)

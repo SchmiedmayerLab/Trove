@@ -45,6 +45,7 @@ struct FHIRValidationClient: Sendable {
         let purpose: Purpose?
     }
 
+    static let contractVersion = "0.8.0"
     static let contractRevision = "cde0cdb92e4f63e96b463085f2a5765a77f5211f"
     static let maximumBytes = EventSubmissionLimits.maximumEventBytes
     static let unavailable = ServerError(status: .serviceUnavailable, title: "Validation Unavailable", detail: "Try again later")

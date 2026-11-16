@@ -52,7 +52,7 @@ struct ConsentCollectionPlanTests {
             #expect(plan.windows.count == 1)
             #expect(window.consentId == fixture.consentIDs[0].uuidString.lowercased())
             #expect(window.revision == 1 && window.end == nil && window.start <= plan.asOf)
-            #expect(window.requirements == [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)])
+            #expect(window.requirements == [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp, start: window.start)])
             let sql = try Self.sql(app)
             let audit = try #require(try await sql.raw("""
                 SELECT actor_subject, study_id, group_id, target_id, outcome FROM audit_events WHERE action = 'collection.plan.disclosure'
@@ -151,7 +151,7 @@ struct ConsentCollectionPlanTests {
         }
     }
     @Test
-    func unknownRetainedPolicyNeverProducesAPartialPlan() async throws {
+    func unknownPolicyCannotBeAcceptedOrDisclosed() async throws {
         try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
             let participant = try await ParticipantFixtures.createParticipant(on: app.db)
             let group = try await GroupFixtures.createGroup(on: app.db)
@@ -165,9 +165,20 @@ struct ConsentCollectionPlanTests {
             try await publication.save(on: app.db)
             let enrollment = Enrollment(participantId: try participant.requireID(), studyId: try study.requireID(), currentRevision: 1)
             try await enrollment.save(on: app.db)
-            _ = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                try await ClinicalEventStoreTests.acceptConsent(enrollmentID: enrollment.requireID(), on: app)
+            await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                await #expect(throws: ServerError.self) {
+                    try await ClinicalEventStoreTests.acceptConsent(enrollmentID: enrollment.requireID(), on: app)
+                }
             }
+            #expect(try await EnrollmentConsent.query(on: app.db).count() == 0)
+            // Simulate retained evidence from an unsupported historical contract, without changing protected rows.
+            let retained = try await RetainedRecordFixtures.consent(on: app.db, enrollmentID: enrollment.requireID())
+            retained.presentationProof = .init(
+                presentationID: try publication.requireID(), locale: "en-US", digest: retained.presentationProof.digest
+            )
+            try await retained.save(on: app.db)
+            enrollment.stateVersion = 2
+            try await enrollment.save(on: app.db)
             try await app.test(.GET, Self.path(enrollment.requireID()), beforeRequest: { $0.bearerAuth(token) }) { response in
                 #expect(response.status == .internalServerError)
                 #expect(!response.body.string.contains("windows"))

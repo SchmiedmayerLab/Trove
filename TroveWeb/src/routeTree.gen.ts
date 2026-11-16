@@ -28,6 +28,7 @@ import { Route as dashboardGroupStudyLayoutRouteImport } from './routes/~(dashbo
 import { Route as dashboardGroupStudyIndexRouteImport } from './routes/~(dashboard)/~$group/~$study/~index'
 import { Route as dashboardGroupStudyParticipantsRouteImport } from './routes/~(dashboard)/~$group/~$study/~participants'
 import { Route as dashboardGroupStudyConfigurationIndexRouteImport } from './routes/~(dashboard)/~$group/~$study/~configuration/~index'
+import { Route as dashboardGroupStudyConfigurationCollectionRouteImport } from './routes/~(dashboard)/~$group/~$study/~configuration/~collection'
 import { Route as dashboardGroupStudyConfigurationConsentRouteImport } from './routes/~(dashboard)/~$group/~$study/~configuration/~consent'
 import { Route as dashboardGroupStudyConfigurationEnrollmentRouteImport } from './routes/~(dashboard)/~$group/~$study/~configuration/~enrollment'
 import { Route as dashboardGroupStudyConfigurationGeneralRouteImport } from './routes/~(dashboard)/~$group/~$study/~configuration/~general'
@@ -84,6 +85,12 @@ const dashboardGroupStudyConfigurationIndexRoute =
     path: '/configuration/',
     getParentRoute: () => dashboardGroupStudyLayoutRoute,
   } as any)
+const dashboardGroupStudyConfigurationCollectionRoute =
+  dashboardGroupStudyConfigurationCollectionRouteImport.update({
+    id: '/configuration/collection',
+    path: '/configuration/collection',
+    getParentRoute: () => dashboardGroupStudyLayoutRoute,
+  } as any)
 const dashboardGroupStudyConfigurationConsentRoute =
   dashboardGroupStudyConfigurationConsentRouteImport.update({
     id: '/configuration/consent',
@@ -138,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/$group/$study/': typeof dashboardGroupStudyIndexRoute
   '/$group/$study/participants': typeof dashboardGroupStudyParticipantsRoute
   '/$group/$study/configuration/': typeof dashboardGroupStudyConfigurationIndexRoute
+  '/$group/$study/configuration/collection': typeof dashboardGroupStudyConfigurationCollectionRoute
   '/$group/$study/configuration/consent': typeof dashboardGroupStudyConfigurationConsentRoute
   '/$group/$study/configuration/enrollment': typeof dashboardGroupStudyConfigurationEnrollmentRoute
   '/$group/$study/configuration/general': typeof dashboardGroupStudyConfigurationGeneralRoute
@@ -154,6 +162,7 @@ export interface FileRoutesByTo {
   '/$group/$study': typeof dashboardGroupStudyIndexRoute
   '/$group/$study/participants': typeof dashboardGroupStudyParticipantsRoute
   '/$group/$study/configuration': typeof dashboardGroupStudyConfigurationIndexRoute
+  '/$group/$study/configuration/collection': typeof dashboardGroupStudyConfigurationCollectionRoute
   '/$group/$study/configuration/consent': typeof dashboardGroupStudyConfigurationConsentRoute
   '/$group/$study/configuration/enrollment': typeof dashboardGroupStudyConfigurationEnrollmentRoute
   '/$group/$study/configuration/general': typeof dashboardGroupStudyConfigurationGeneralRoute
@@ -173,6 +182,7 @@ export interface FileRoutesById {
   '/(dashboard)/$group/$study/': typeof dashboardGroupStudyIndexRoute
   '/(dashboard)/$group/$study/participants': typeof dashboardGroupStudyParticipantsRoute
   '/(dashboard)/$group/$study/configuration/': typeof dashboardGroupStudyConfigurationIndexRoute
+  '/(dashboard)/$group/$study/configuration/collection': typeof dashboardGroupStudyConfigurationCollectionRoute
   '/(dashboard)/$group/$study/configuration/consent': typeof dashboardGroupStudyConfigurationConsentRoute
   '/(dashboard)/$group/$study/configuration/enrollment': typeof dashboardGroupStudyConfigurationEnrollmentRoute
   '/(dashboard)/$group/$study/configuration/general': typeof dashboardGroupStudyConfigurationGeneralRoute
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/$group/$study/'
     | '/$group/$study/participants'
     | '/$group/$study/configuration/'
+    | '/$group/$study/configuration/collection'
     | '/$group/$study/configuration/consent'
     | '/$group/$study/configuration/enrollment'
     | '/$group/$study/configuration/general'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/$group/$study'
     | '/$group/$study/participants'
     | '/$group/$study/configuration'
+    | '/$group/$study/configuration/collection'
     | '/$group/$study/configuration/consent'
     | '/$group/$study/configuration/enrollment'
     | '/$group/$study/configuration/general'
@@ -226,6 +238,7 @@ export interface FileRouteTypes {
     | '/(dashboard)/$group/$study/'
     | '/(dashboard)/$group/$study/participants'
     | '/(dashboard)/$group/$study/configuration/'
+    | '/(dashboard)/$group/$study/configuration/collection'
     | '/(dashboard)/$group/$study/configuration/consent'
     | '/(dashboard)/$group/$study/configuration/enrollment'
     | '/(dashboard)/$group/$study/configuration/general'
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardGroupStudyConfigurationIndexRouteImport
       parentRoute: typeof dashboardGroupStudyLayoutRoute
     }
+    '/(dashboard)/$group/$study/configuration/collection': {
+      id: '/(dashboard)/$group/$study/configuration/collection'
+      path: '/configuration/collection'
+      fullPath: '/$group/$study/configuration/collection'
+      preLoaderRoute: typeof dashboardGroupStudyConfigurationCollectionRouteImport
+      parentRoute: typeof dashboardGroupStudyLayoutRoute
+    }
     '/(dashboard)/$group/$study/configuration/consent': {
       id: '/(dashboard)/$group/$study/configuration/consent'
       path: '/configuration/consent'
@@ -361,6 +381,7 @@ interface dashboardGroupStudyLayoutRouteChildren {
   dashboardGroupStudyIndexRoute: typeof dashboardGroupStudyIndexRoute
   dashboardGroupStudyParticipantsRoute: typeof dashboardGroupStudyParticipantsRoute
   dashboardGroupStudyConfigurationIndexRoute: typeof dashboardGroupStudyConfigurationIndexRoute
+  dashboardGroupStudyConfigurationCollectionRoute: typeof dashboardGroupStudyConfigurationCollectionRoute
   dashboardGroupStudyConfigurationConsentRoute: typeof dashboardGroupStudyConfigurationConsentRoute
   dashboardGroupStudyConfigurationEnrollmentRoute: typeof dashboardGroupStudyConfigurationEnrollmentRoute
   dashboardGroupStudyConfigurationGeneralRoute: typeof dashboardGroupStudyConfigurationGeneralRoute
@@ -376,6 +397,8 @@ const dashboardGroupStudyLayoutRouteChildren: dashboardGroupStudyLayoutRouteChil
     dashboardGroupStudyParticipantsRoute: dashboardGroupStudyParticipantsRoute,
     dashboardGroupStudyConfigurationIndexRoute:
       dashboardGroupStudyConfigurationIndexRoute,
+    dashboardGroupStudyConfigurationCollectionRoute:
+      dashboardGroupStudyConfigurationCollectionRoute,
     dashboardGroupStudyConfigurationConsentRoute:
       dashboardGroupStudyConfigurationConsentRoute,
     dashboardGroupStudyConfigurationEnrollmentRoute:

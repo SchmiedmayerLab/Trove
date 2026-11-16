@@ -101,10 +101,12 @@ querying and again before staging. Changed authority, malformed plans or session
 loss stops the pass. The receiver still independently authorizes each upload.
 
 `ParticipantCollectionSnapshot` validates the complete requested set of plans and
-selects exact half-open consent windows. One converted Observation can target
-several consents without duplicating its event. Both the native measurement time
-and Grove's millisecond-normalized wire time must be inside the selected consent,
-so rounding cannot admit a pre-consent sample.
+selects exact half-open measurement windows, which may precede consent adoption
+when historical collection was explicitly accepted. One converted Observation can
+target multiple studies without duplicating its record. Overlapping historical
+revisions select the newest eligible consent per enrollment. Both the native
+measurement time and Grove's millisecond-normalized wire time must be inside that
+scope, so rounding cannot widen the accepted measurement range.
 
 The query requests at most 64 additions and retains a hard 128-change staging
 bound. The journal persists one conversion instant for the pending checkpoint,
@@ -124,7 +126,7 @@ Source registration assigns an immutable `identifierRoot`; Grove derives the ful
 namespace set using the retained registration ID and key epoch. Record-version
 and retraction identifiers replace producer-instance event sequences; queue ordering
 is local to the journal. The receiver authenticates ownership and checks the assigned
-namespace for each lifecycle kind. Journal schema 7 and query definition 3 reject earlier local formats
+namespace for each lifecycle kind. Journal schema 9 and query definition 3 reject earlier local formats
 without removing queued work; this development change includes no data migration.
 
 This acquisition path is not enabled automatically. App lifecycle and permission UI remain
@@ -163,6 +165,11 @@ been removed, including its generated client types.
 
 `GET /participant/enrollments/{enrollmentId}/collection-plan` returns only the
 owned enrollment's exact consent/publication windows and collection requirements.
+The outer window's `start`/`end` describe adoption chronology. Each resolved
+requirement has its own inclusive measurement `start` and optional exclusive `end`;
+historical starts can precede adoption. These resolved values are retained at
+acceptance. A later publication does not broaden them. Do not infer measurement
+bounds from the outer adoption window or recompute relative history on a device.
 The audited response includes an enrollment state version and server observation
 time, uses `Cache-Control: no-store`, and contains no signatures or samples.
 Publishing alone does not change these windows; participant adoption does.

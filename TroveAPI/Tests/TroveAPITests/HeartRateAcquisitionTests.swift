@@ -454,7 +454,7 @@ extension HeartRateAcquisitionTests {
                         publicationId: UUID().uuidString.lowercased(),
                         revision: 1,
                         start: start,
-                        requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp)]
+                        requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
                     )
                 ])
             }
@@ -466,7 +466,10 @@ extension HeartRateAcquisitionTests {
         }
 
         func setConsentStart(_ start: Date) {
-            for index in plans.indices { plans[index].windows[0].start = start }
+            for index in plans.indices {
+                plans[index].windows[0].start = start
+                plans[index].windows[0].requirements[0].start = start
+            }
         }
 
         func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String) async throws -> (HTTPResponse, HTTPBody?) {

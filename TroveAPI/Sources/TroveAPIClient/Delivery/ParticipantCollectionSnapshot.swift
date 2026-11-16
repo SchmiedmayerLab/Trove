@@ -34,9 +34,9 @@ public struct ParticipantCollectionSnapshot: Sendable {
         }
         return plans
             .flatMap(\.windows)
-            .filter { window in
-                window.requirements.contains { $0.profile == Self.heartRateProfile }
-                    && (window.end.map { $0 > window.start } ?? true)
+            .flatMap(\.requirements)
+            .filter { requirement in
+                requirement.profile == Self.heartRateProfile && (requirement.end.map { $0 > requirement.start } ?? true)
             }
             .map(\.start)
             .min()
@@ -58,13 +58,15 @@ public struct ParticipantCollectionSnapshot: Sendable {
     /// Uses exact half-open measurement windows. A point may be attributable to several studies.
     public func consentIDs(forHeartRateAt instant: Date) throws -> [UUID] {
         guard Self.validDate(instant) else { throw CollectionError.invalidPlan }
-        return try plans.flatMap { plan in
-            try plan.windows.compactMap { window in
-                guard instant >= window.start, window.end.map({ instant < $0 }) ?? true,
-                      window.requirements.contains(where: { $0.profile == Self.heartRateProfile }) else { return nil }
-                guard let id = UUID(uuidString: window.consentId) else { throw CollectionError.invalidPlan }
-                return id
-            }
+        // A broader adopted revision may authorize the same past point. Select one grant per enrollment.
+        return try plans.compactMap { plan in
+            guard let window = plan.windows.reversed().first(where: { window in
+                window.requirements.contains {
+                    $0.profile == Self.heartRateProfile && instant >= $0.start && ($0.end.map { instant < $0 } ?? true)
+                }
+            }) else { return nil }
+            guard let id = UUID(uuidString: window.consentId) else { throw CollectionError.invalidPlan }
+            return id
         }
     }
 
@@ -103,12 +105,23 @@ extension ParticipantCollectionSnapshot {
             guard window.requirements.allSatisfy({ $0.profile == heartRateProfile && $0.sourceKind == .participantApp }) else {
                 throw CollectionError.unsupportedRequirement
             }
+            try validateRequirements(window)
             previous = window
         }
         guard previous?.end == nil else { throw CollectionError.invalidPlan }
     }
 
+    private static func validateRequirements(_ window: Components.Schemas.ConsentCollectionWindow) throws {
+        for requirement in window.requirements {
+            guard validDate(requirement.start),
+                  requirement.end.map({ validDate($0) && $0 >= requirement.start }) ?? true else { throw CollectionError.invalidPlan }
+            if let end = window.end {
+                guard let upper = requirement.end, upper <= end || upper == requirement.start else { throw CollectionError.invalidPlan }
+            }
+        }
+    }
+
     private static func validDate(_ date: Date) -> Bool {
-        (0...253_402_300_799).contains(date.timeIntervalSince1970)
+        (-62_135_596_800...253_402_300_799).contains(date.timeIntervalSince1970)
     }
 }

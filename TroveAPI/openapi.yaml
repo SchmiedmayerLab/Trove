@@ -2636,16 +2636,61 @@ components:
         start:
           type: string
           format: date-time
-          description: Inclusive measurement-time boundary at exact consent acceptance.
+          description: Consent adoption time; measurement boundaries are carried by each resolved requirement.
         end:
           type: string
           format: date-time
-          description: Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+          description: Next consent adoption time, if any. This does not change the retained historical measurement starts.
         requirements:
           type: array
           maxItems: 1
           items:
-            $ref: '#/components/schemas/CollectionRequirement'
+            $ref: '#/components/schemas/CollectionPlanRequirement'
+
+    CollectionMeasurementWindow:
+      type: object
+      additionalProperties: false
+      description: >
+        Measurement scope resolved once when this publication is accepted, not
+        when a device starts a query. Omitted start means consent adoption;
+        oldestSample authorizes all available history. Relative components must
+        be nonnegative and at least one must be positive. An end is exclusive.
+      required: [calendar, timeZone]
+      properties:
+        calendar:
+          type: string
+          enum: [gregorian]
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: IANA time-zone identifier, or UTC; never the device's implicit current zone.
+        start:
+          $ref: '#/components/schemas/ExportSessionStartDate'
+        end:
+          type: string
+          format: date-time
+
+    CollectionPlanRequirement:
+      type: object
+      additionalProperties: false
+      description: Exact measurement scope retained for an accepted publication.
+      required: [profile, sourceKind, start]
+      properties:
+        profile:
+          type: string
+          format: uri
+        sourceKind:
+          type: string
+          enum: [participant-app]
+        start:
+          type: string
+          format: date-time
+          description: Inclusive measurement boundary; may precede consent adoption.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive measurement boundary, bounded by the next adoption when applicable.
 
     CollectionRequirement:
       type: object
@@ -2654,12 +2699,14 @@ components:
         Explicit backend collection permission, independent of native HealthKit
         components. The current receiver supports the Grove Mobile heart-rate
         profile as immutable point quantities from participant-app streams,
-        measured at or after the exact consent acceptance. This does not attest
-        the source device or authorize historical data.
+        within the explicitly accepted measurement window. Omitting the window
+        retains consent-forward collection. This does not attest the source device.
       required:
         - profile
         - sourceKind
       properties:
+        measurementWindow:
+          $ref: '#/components/schemas/CollectionMeasurementWindow'
         profile:
           type: string
           format: uri

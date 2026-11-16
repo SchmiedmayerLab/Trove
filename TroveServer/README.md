@@ -298,14 +298,14 @@ It then selects the latest exact `Provenance.recorded`; equal instants use the
 bytewise-greater record-version identifier value, then system. Selection preserves
 complete output membership and never carries an earlier study grant forward.
 Retractions suppress every output version of that source record, including later
-arrivals, without reserving unrelated output identities. Other clinical profiles,
-pre-consent collection and arbitrary supporting reference shapes remain unsupported.
+arrivals, without reserving unrelated output identities. Other clinical profiles
+and arbitrary supporting reference shapes remain unsupported.
 Unsupported input is refused,
 even when it is otherwise valid FHIR. A study must explicitly publish the matching collection
 requirement; a native HealthKit component alone grants no backend collection permission.
 
 Within one database transaction, the server rechecks source ownership and revocation,
-each named consent, and its exact publication's consent-forward collection policy.
+each named consent, and its exact publication's retained measurement scope.
 An accepted consent governs measurement time until the participant adopts another
 revision, not until a researcher publishes one. Delayed delivery can use that earlier
 consent while enrollment and source remain active. Earlier grants do not disappear
@@ -314,6 +314,30 @@ consent; only explicitly selected outputs receive a read grant for that study.
 The server stores the original event once, node addresses and lossless quantity text,
 independent study grants, and audit records. Composite foreign keys prevent grants from
 crossing participant, study, enrollment, consent, or publication identities.
+
+A requirement may declare `measurementWindow` with the Gregorian calendar, an
+explicit IANA time zone (or UTC), an existing `ExportSessionStartDate` strategy,
+and an optional exclusive end. For example, `last` with `components: {month: 6}`
+uses six calendar months before acceptance, including month-end and daylight-saving
+rules; it is not a 180-day interval. An omitted start retains consent-forward
+collection. `oldestSample` authorizes all available history; an absolute start and
+end define a fixed measurement range.
+
+Acceptance resolves relative bounds once and stores them atomically in the
+append-only consent record. Later uploads and plan reads use those literal bounds,
+not the current draft, device time zone or a newly computed lookback. A historical
+scope can grant an already retained eligible measurement to another study through
+late attribution without copying or uploading the event again. The published
+policy archive uses schema version 2 and RFC 3339 dates at API microsecond precision;
+unknown or older policy contracts fail explicitly.
+
+The selected scope is included in the retained consent markdown and therefore its
+presentation digest and exported document. Collection summaries currently support
+English and German; another requested consent locale fails publication instead of
+silently substituting a language. This server support does not complete historical
+acquisition: durable backfill alongside live cursors, offline plans and broader
+collection authoring remain separate work. The web editor exposes the current
+heart-rate measurement-window settings through the shared draft API.
 
 For the authenticated owner of an active source, an exact-byte retry with the same study
 targets returns the original receipt without adding grants. Revoked sources cannot retry.

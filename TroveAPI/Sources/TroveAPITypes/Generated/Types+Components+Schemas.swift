@@ -1352,24 +1352,24 @@ extension Components {
             public var publicationId: Swift.String
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/revision`.
             public var revision: Swift.Int
-            /// Inclusive measurement-time boundary at exact consent acceptance.
+            /// Consent adoption time; measurement boundaries are carried by each resolved requirement.
             ///
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/start`.
             public var start: Foundation.Date
-            /// Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+            /// Next consent adoption time, if any. This does not change the retained historical measurement starts.
             ///
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/end`.
             public var end: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/ConsentCollectionWindow/requirements`.
-            public var requirements: [Components.Schemas.CollectionRequirement]
+            public var requirements: [Components.Schemas.CollectionPlanRequirement]
             /// Creates a new `ConsentCollectionWindow`.
             ///
             /// - Parameters:
             ///   - consentId:
             ///   - publicationId:
             ///   - revision:
-            ///   - start: Inclusive measurement-time boundary at exact consent acceptance.
-            ///   - end: Exclusive next-adoption boundary. Equal to start means an empty interval; omitted means no later adoption.
+            ///   - start: Consent adoption time; measurement boundaries are carried by each resolved requirement.
+            ///   - end: Next consent adoption time, if any. This does not change the retained historical measurement starts.
             ///   - requirements:
             public init(
                 consentId: Swift.String,
@@ -1377,7 +1377,7 @@ extension Components {
                 revision: Swift.Int,
                 start: Foundation.Date,
                 end: Foundation.Date? = nil,
-                requirements: [Components.Schemas.CollectionRequirement]
+                requirements: [Components.Schemas.CollectionPlanRequirement]
             ) {
                 self.consentId = consentId
                 self.publicationId = publicationId
@@ -1417,7 +1417,7 @@ extension Components {
                     forKey: .end
                 )
                 self.requirements = try container.decode(
-                    [Components.Schemas.CollectionRequirement].self,
+                    [Components.Schemas.CollectionPlanRequirement].self,
                     forKey: .requirements
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -1430,11 +1430,152 @@ extension Components {
                 ])
             }
         }
-        /// Explicit backend collection permission, independent of native HealthKit components. The current receiver supports the Grove Mobile heart-rate profile as immutable point quantities from participant-app streams, measured at or after the exact consent acceptance. This does not attest the source device or authorize historical data.
+        /// Measurement scope resolved once when this publication is accepted, not when a device starts a query. Omitted start means consent adoption; oldestSample authorizes all available history. Relative components must be nonnegative and at least one must be positive. An end is exclusive.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow`.
+        public struct CollectionMeasurementWindow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/calendar`.
+            @frozen public enum CalendarPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case gregorian = "gregorian"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/calendar`.
+            public var calendar: Components.Schemas.CollectionMeasurementWindow.CalendarPayload
+            /// IANA time-zone identifier, or UTC; never the device's implicit current zone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/timeZone`.
+            public var timeZone: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/start`.
+            public var start: Components.Schemas.ExportSessionStartDate?
+            /// - Remark: Generated from `#/components/schemas/CollectionMeasurementWindow/end`.
+            public var end: Foundation.Date?
+            /// Creates a new `CollectionMeasurementWindow`.
+            ///
+            /// - Parameters:
+            ///   - calendar:
+            ///   - timeZone: IANA time-zone identifier, or UTC; never the device's implicit current zone.
+            ///   - start:
+            ///   - end:
+            public init(
+                calendar: Components.Schemas.CollectionMeasurementWindow.CalendarPayload,
+                timeZone: Swift.String,
+                start: Components.Schemas.ExportSessionStartDate? = nil,
+                end: Foundation.Date? = nil
+            ) {
+                self.calendar = calendar
+                self.timeZone = timeZone
+                self.start = start
+                self.end = end
+            }
+            public enum CodingKeys: String, CodingKey {
+                case calendar
+                case timeZone
+                case start
+                case end
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.calendar = try container.decode(
+                    Components.Schemas.CollectionMeasurementWindow.CalendarPayload.self,
+                    forKey: .calendar
+                )
+                self.timeZone = try container.decode(
+                    Swift.String.self,
+                    forKey: .timeZone
+                )
+                self.start = try container.decodeIfPresent(
+                    Components.Schemas.ExportSessionStartDate.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "calendar",
+                    "timeZone",
+                    "start",
+                    "end"
+                ])
+            }
+        }
+        /// Exact measurement scope retained for an accepted publication.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement`.
+        public struct CollectionPlanRequirement: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
+            @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case participantApp = "participant-app"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
+            public var sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload
+            /// Inclusive measurement boundary; may precede consent adoption.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/start`.
+            public var start: Foundation.Date
+            /// Exclusive measurement boundary, bounded by the next adoption when applicable.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/end`.
+            public var end: Foundation.Date?
+            /// Creates a new `CollectionPlanRequirement`.
+            ///
+            /// - Parameters:
+            ///   - profile:
+            ///   - sourceKind:
+            ///   - start: Inclusive measurement boundary; may precede consent adoption.
+            ///   - end: Exclusive measurement boundary, bounded by the next adoption when applicable.
+            public init(
+                profile: Swift.String,
+                sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload,
+                start: Foundation.Date,
+                end: Foundation.Date? = nil
+            ) {
+                self.profile = profile
+                self.sourceKind = sourceKind
+                self.start = start
+                self.end = end
+            }
+            public enum CodingKeys: String, CodingKey {
+                case profile
+                case sourceKind
+                case start
+                case end
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceKind = try container.decode(
+                    Components.Schemas.CollectionPlanRequirement.SourceKindPayload.self,
+                    forKey: .sourceKind
+                )
+                self.start = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "profile",
+                    "sourceKind",
+                    "start",
+                    "end"
+                ])
+            }
+        }
+        /// Explicit backend collection permission, independent of native HealthKit components. The current receiver supports the Grove Mobile heart-rate profile as immutable point quantities from participant-app streams, within the explicitly accepted measurement window. Omitting the window retains consent-forward collection. This does not attest the source device.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/CollectionRequirement`.
         public struct CollectionRequirement: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/measurementWindow`.
+            public var measurementWindow: Components.Schemas.CollectionMeasurementWindow?
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/profile`.
             public var profile: Swift.String
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
@@ -1446,21 +1587,29 @@ extension Components {
             /// Creates a new `CollectionRequirement`.
             ///
             /// - Parameters:
+            ///   - measurementWindow:
             ///   - profile:
             ///   - sourceKind:
             public init(
+                measurementWindow: Components.Schemas.CollectionMeasurementWindow? = nil,
                 profile: Swift.String,
                 sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
             ) {
+                self.measurementWindow = measurementWindow
                 self.profile = profile
                 self.sourceKind = sourceKind
             }
             public enum CodingKeys: String, CodingKey {
+                case measurementWindow
                 case profile
                 case sourceKind
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.measurementWindow = try container.decodeIfPresent(
+                    Components.Schemas.CollectionMeasurementWindow.self,
+                    forKey: .measurementWindow
+                )
                 self.profile = try container.decode(
                     Swift.String.self,
                     forKey: .profile
@@ -1470,6 +1619,7 @@ extension Components {
                     forKey: .sourceKind
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "measurementWindow",
                     "profile",
                     "sourceKind"
                 ])

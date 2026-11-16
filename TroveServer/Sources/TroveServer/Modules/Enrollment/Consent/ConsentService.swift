@@ -154,9 +154,10 @@ final class ConsentService: Module, @unchecked Sendable {
         }
     }
 
+    @discardableResult
     private func validateTarget(
         _ command: ConsentCommand, enrollment: Enrollment, participant: Participant, on transaction: any Database
-    ) async throws {
+    ) async throws -> PublishedStudy {
         guard let published = try await publishedStudyRepository.find(
             studyId: enrollment.$study.id, revision: command.reviewedRevision, on: transaction
         ) else {
@@ -185,6 +186,7 @@ final class ConsentService: Module, @unchecked Sendable {
                 throw ServerError.forbidden("The reviewed revision requires retained invitation evidence")
             }
         }
+        return published
     }
 
     private func accept(
@@ -208,7 +210,10 @@ final class ConsentService: Module, @unchecked Sendable {
                     throw ServerError.conflict("Consent already exists for this enrollment revision")
                 }
                 try command.validateNewSubmission(for: enrollment)
-                try await self.validateTarget(command, enrollment: enrollment, participant: participant, on: transaction)
+                let publication = try await self.validateTarget(
+                    command, enrollment: enrollment, participant: participant, on: transaction
+                )
+                try record.resolveCollectionScope(from: publication)
                 record.acceptedEnrollmentVersion = try await self.repository.adoptRevision(
                     id: command.enrollmentID, expectedVersion: command.expectedVersion, revision: command.reviewedRevision, on: transaction
                 )

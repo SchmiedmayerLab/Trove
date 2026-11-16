@@ -67,6 +67,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
         var consentMarkdown = LocalizationsDictionary<String>()
         for (locale, content) in study.consent {
             let markdown = ConsentPresentation.markdown(content: content)
+                + (try CollectionScopePresentation.markdown(requirements: collectionPolicy.requirements, locale: locale.description))
             do {
                 _ = try ConsentResponseRequirements(markdown: markdown)
             } catch {
@@ -344,9 +345,7 @@ extension StudyBundleService {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
         let policyURL = tempDir.appendingPathComponent(PublishedCollectionPolicy.filename)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        try encoder.encode(collectionPolicy).write(to: policyURL, options: .atomic)
+        try collectionPolicy.archiveBytes().write(to: policyURL, options: .atomic)
         let policyFile = StudyBundle.FileResourceInput(pathInBundle: PublishedCollectionPolicy.filename, contentsOf: policyURL)
 
         let bundle: StudyBundle
