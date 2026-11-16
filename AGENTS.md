@@ -27,15 +27,29 @@ SPDX-License-Identifier: MIT
   migrations or silently recreate a participant's queued data. Unsupported queued
   formats must fail explicitly without deleting work.
 
-## Verification
+## Localization and Accessibility
 
-For M3 Questionnaire work, follow the
-[localization contract](docs/Study-Model-and-Research-Workflows.md#localization-sites-and-accessibility):
-one multilingual FHIR JSON per instrument version, not locale-specific files.
-Keep standalone translated documents separate. Preserve translation extensions
-and answer identities, bind administration language to the session, and test
-bilingual round-trips with the pinned IG/renderer fixtures. Draft translation is
-not approval; required wording must not silently fall back.
+- Every user-facing workflow supports assistive technology, text scaling and
+  right-to-left layout, and formats dates, numbers, contact details and time zones
+  for the user's locale. Keep source measurements and canonical units separate from
+  display formatting.
+- User-interface language, approved administration language, site jurisdiction and
+  processing region are separate attributes. A device locale or network location
+  does not decide which consent or instrument applies.
+- A questionnaire is one versioned multilingual FHIR JSON resource per instrument
+  version, not locale-specific files. Study titles and descriptions are
+  language-keyed values with an explicit source language; standalone Markdown, PDF
+  and media are separate language-tagged artifacts linked to the source version.
+- Preserve translation extensions and answer identities. Bind the administration
+  language to the session and record it with the exact instrument; a UI-language
+  change does not switch an active instrument.
+- Ordinary interface text may fall back to another language. Required consent or
+  instrument wording never falls back silently: a missing approved variant blocks
+  that path. Draft or assisted translation is not approval.
+- Test bilingual import, edit, validation, publication, administration and export
+  round-trips with the pinned IG and renderer fixtures.
+
+## Verification
 
 Start with focused regressions, then run the affected component's shared CI command
 once the implementation is stable. Follow dependency edges: API changes can affect

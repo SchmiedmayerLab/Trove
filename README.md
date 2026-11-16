@@ -19,13 +19,15 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally)
 
 ## For Research Teams
 
 Set up eligibility and enrollment, edit consent documents, and add study components.
 Preview what participants will see before publishing. Each published revision keeps
 the study definition and consent terms together, separate from later draft edits.
+Choose the health measurements and history a study collects, then retrieve its
+authorized data and recordings from the results page or the [CLI](TroveAPI/CLI.md).
 
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details.png#gh-light-mode-only)
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details~dark.png#gh-dark-mode-only)
@@ -33,7 +35,8 @@ the study definition and consent terms together, separate from later draft edits
 ## For Participants
 
 Discover a study, review its requirements, and enroll. Review and sign its consent
-document before authorizing health-data collection.
+document before authorizing health-data collection. Collection continues offline
+under the accepted study settings, and withdrawal stops it on the device at once.
 
 <table>
   <tr>
@@ -51,8 +54,7 @@ document before authorizing health-data collection.
 Trove is in beta and is being actively tested and used at Stanford.
 These screenshots use a fictional Daily Activity
 Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
-current flows; [GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
-track planned features and implementation status.
+current flows.
 
 Health-data exchange follows the Grove FHIR implementation guide. See the
 [event-admission contract](TroveServer/README.md#event-admission) for supported data
@@ -70,7 +72,7 @@ flowchart TB
     S["Trove server<br/>HTTPS API · Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
-    S --> OS[("S3-compatible storage<br/>Bundles and consent PDFs")]
+    S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]
 ```
 
 [`TroveAPI/openapi.yaml`](TroveAPI/openapi.yaml) defines the HTTP contract.
@@ -86,8 +88,8 @@ for storage, authorization and synchronization details.
 |------|-----------|-------|
 | [`TroveAPI/`](TroveAPI) | The shared OpenAPI contract and the Swift libraries generated from it | Swift, swift-openapi-generator |
 | [`TroveServer/`](TroveServer) | Study lifecycle, enrolment, consent, and clinical data authority | Swift, Vapor, Fluent |
-| [`TroveWeb/`](TroveWeb) | The researcher portal for composing and publishing studies | React, TypeScript, Vite |
-| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrolment | Swift, SwiftUI |
+| [`TroveWeb/`](TroveWeb) | The researcher portal for composing and publishing studies and retrieving study data | React, TypeScript, Vite |
+| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrolment, consent and health-data collection | Swift, SwiftUI |
 | [`TroveInfrastructure/`](TroveInfrastructure) | GitOps deployment onto Kubernetes | Kustomize, ArgoCD, OpenTofu |
 
 ## Studies and revisions
@@ -99,7 +101,7 @@ A study is a set of components a researcher configures and combines: information
 One **PostgreSQL database with TimescaleDB** owns study definitions, enrolments, consent,
 audit and the clinical data boundary. Repositories participating in one accepted operation
 share its explicit transaction; two separate database pools cannot provide that guarantee.
-**S3-compatible object storage** holds immutable study bundles and signed consent PDFs.
+**S3-compatible object storage** holds immutable study bundles, collected recordings and signed consent PDFs.
 
 During the beta, schema changes target fresh development databases, with no upgrade
 or legacy-data import path. Recreate disposable development databases when their schema
@@ -130,10 +132,11 @@ full matrix of its upstream Grove repository.
 | Job | Runs when |
 |----------|-------------|
 | API | `TroveAPI/**` |
-| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit acquisition tests that Linux cannot build |
+| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit and SensorKit acquisition tests that Linux cannot build |
 | Server | `TroveServer/**`, `TroveAPI/**` |
 | Web | `TroveWeb/**`, `TroveAPI/openapi.yaml` |
 | iOS | `TroveiOS/**`, `TroveAPI/**` |
+| iOS Real Stack UI | `TroveiOS/**`, `TroveAPI/**`, `TroveServer/**` |
 | Infrastructure | `TroveInfrastructure/**` |
 | Dev Stack | `TroveServer/**`, `TroveWeb/**`, `TroveInfrastructure/**` |
 | Secret Scan | Every run, including documentation-only changes |
@@ -159,7 +162,7 @@ branch protection automatically; keep the hosted `main` ruleset synchronized wit
 
 Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
 use GitHub-hosted Xcode 27 runners. Swift CodeQL uses hosted macOS 26 with Xcode
-26.6 until its [build tracer supports Xcode 27](https://github.com/github/codeql/issues/22742).
+26.6 because its [build tracer does not support Xcode 27](https://github.com/github/codeql/issues/22742).
 All external contributors' runs require maintainer approval.
 Before approving a fork, review workflow changes and the code that will execute:
 runner selection in a pull request is not an isolation boundary. Self-hosted
@@ -204,9 +207,7 @@ successful candidate record and does not deploy them.
 ## Design Documentation
 
 The [design documentation](docs/Vision.md) explains the architecture, study model
-and integration contracts. [Milestones](https://github.com/SchmiedmayerLab/Trove/milestones)
-define delivery scope; the [project board](https://github.com/orgs/SchmiedmayerLab/projects/4)
-tracks implementation. The documentation does not maintain a separate roadmap.
+and integration contracts.
 
 ## Contributing
 

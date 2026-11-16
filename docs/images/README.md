@@ -37,7 +37,7 @@ TROVE_DOCUMENTATION_FIXTURE=disposable npx playwright test --config documentatio
 
 The fixture requires an empty development group. It creates the study and participant
 through authenticated APIs, edits and publishes through the dashboard, then captures
-eight researcher views in both light and dark appearances (16 PNGs). Rerun against a fresh backend; the fixture deliberately refuses
+nine researcher views in both light and dark appearances (18 PNGs). The health-collection view shows unsaved example settings; the draft is not changed. Rerun against a fresh backend; the fixture deliberately refuses
 to delete or reuse existing studies. It does not contain a Questionnaire, so no capture
 depends on bypassing FHIR validation.
 The capture backend still needs `FHIR_VALIDATOR_IDENTITY` set to `sha256:` followed
@@ -51,7 +51,7 @@ and dashboard use that port; the empty-group safeguard still applies. Keycloak s
 on 8180. Stop only the extra backend when capture finishes.
 
 The capture configuration starts with a 1440 × 960 viewport, English and Pacific time.
-Long enrollment and consent forms increase the actual viewport height before capture,
+Long enrollment, consent and health-collection forms increase the actual viewport height before capture,
 so the sidebar footer remains at the bottom of the browser window. The capture test
 checks that alignment in both appearances; it does not stretch or reposition the sidebar.
 Each view is captured in the application's actual light and dark appearances;
@@ -82,10 +82,10 @@ First run the web-capture workflow above against the same development stack.
 It seeds and publishes the synthetic Daily Activity Study used by the mobile
 captures. A fresh UI-test stack alone does not contain that published study.
 
-Build and install the same revision of the iOS app on a dedicated iPhone 17 Pro
-Simulator. Use the CI build settings and `xcbeautify`; do not take screenshots while
-automated tests own the simulator. Sign in as the synthetic Alice participant from
-the development realm. Open RocketSim's live preview for visual review.
+Build and install the same revision of the iOS app on a dedicated iPhone 18 Pro
+Simulator with iOS 27.2. Use the CI build settings and `xcbeautify`; do not take
+screenshots while automated tests own the simulator. Sign in as the synthetic Alice
+participant from the development realm. Open RocketSim's live preview for visual review.
 
 Explicitly install the built `Trove.app` with `xcrun simctl install` after tests.
 Do not assume that launching the ordinary app uses the test build: Xcode's test
@@ -108,9 +108,11 @@ For each state, run from the repository root:
 bash TroveiOS/scripts/capture-documentation.sh SIMULATOR_UDID consent
 ```
 
-Replace `consent` with the corresponding capture name. RocketSim supplies the device
-bezel; the script captures light and dark appearances, uses a consistent status bar,
-and checks that both outputs decode before replacing existing files. Review every
+Replace `consent` with the corresponding capture name. The script refuses any other
+device or runtime. RocketSim supplies its default Black iPhone 18 Pro frame on a
+transparent background; the images are direct captures without compositing. The
+script captures light and dark appearances, uses a consistent status bar, and checks
+that both outputs are 1350 × 2760 PNGs before replacing existing files. Review every
 image for the expected content, visible errors, clipping and stale branding. A valid
 PNG is not proof that the app is on the correct screen.
 
@@ -121,7 +123,7 @@ device background delivery, HealthKit authorization, or data-protection behavior
 
 Review the [Platform Tour](../Platform-Tour.md) against the captures. Screenshots
 must show the documented revision, synthetic data and the named view without
-clipping or stale branding. Planned features should not appear as working UI.
+clipping or stale branding. Show only working UI.
 
 Record the source and dependency revisions with test results when updating images.
 Raw captures and temporary evidence stay outside the committed documentation.

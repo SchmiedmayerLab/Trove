@@ -12,7 +12,7 @@ This worker validates one exchange Bundle against the pinned Grove FHIR 0.8.0 co
 The runtime companion and published packages use the same release source revision
 `cde0cdb92e4f63e96b463085f2a5765a77f5211f`. Package hashes are checked against both the release
 asset digests and its build provenance. The release is an offline structural preview;
-canonical publication and online terminology verification remain separate upstream gates.
+it does not cover canonical publication or online terminology verification.
 The published QA reports contain errors in the SensorKit and provider guide builds;
 these reports are not evidence that every adapter passes validation. Trove must execute
 its supported producer and receiver fixtures against this exact package set.
@@ -180,7 +180,7 @@ python3 TroveInfrastructure/validator/verify_healthkit_acquisition.py \
   --image trove-fhir-validator:local \
   --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
-  --runtime com.apple.CoreSimulator.SimRuntime.iOS-26-5
+  --runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
 
 Select an installed runtime explicitly. Optional `--workspace` and `--derived-data`

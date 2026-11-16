@@ -8,13 +8,13 @@ SPDX-License-Identifier: MIT
 
 # Collection Acceptance
 
-[Issue #137](https://github.com/SchmiedmayerLab/Trove/issues/137) owns acceptance
-of record-based collection: heart rate, sleep, workouts, configurable routes,
+This guide covers acceptance of record-based collection: heart rate, sleep,
+workouts, configurable routes,
 source fidelity, historical/offline collection, stable participant identity,
 bounded delivery and study-scoped access. Record automated engineering results
 and physical-device results separately. A passing synthetic or simulator test
 does not establish HealthKit acquisition, background execution or device data
-protection. Physical-device acceptance has not been established by this guide.
+protection.
 
 Use the [shared checks](https://github.com/SchmiedmayerLab/Trove/blob/main/scripts/README.md),
 [API collection guide](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/README.md),
@@ -176,15 +176,10 @@ Mark each step passed, failed, blocked or not executed, with its evidence locati
 
 ## Completion boundaries
 
-Conversion Provenance is required; cryptographic Provenance signing is not
-implemented by the Trove receiver and remains optional future work in
-[issue #134](https://github.com/SchmiedmayerLab/Trove/issues/134). HMAC identity
-recovery is independent of signing. Do not describe unsigned data as signature-verified.
+Conversion Provenance is required; the Trove receiver does not verify
+cryptographic Provenance signatures. HMAC identity recovery is independent of
+signing. Do not describe unsigned data as signature-verified.
 
-Close engineering work only against its executed evidence. Closing #137 additionally
-requires its targeted physical-device evidence. The complete collection scope requires
-implemented and tested coverage of all admitted adapters in
-[issue #136](https://github.com/SchmiedmayerLab/Trove/issues/136). A coverage inventory
-or prioritized release slices alone do not complete those implementations. Dependency release/adoption,
-physical acceptance and field activation each retain their own recorded status;
-review-ready implementation does not authorize merging or deployment.
+Report engineering evidence, physical-device evidence and field activation
+separately. Passing engineering checks does not establish physical acceptance,
+and accepted evidence does not authorize merging or deployment.

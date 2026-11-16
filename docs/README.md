@@ -36,9 +36,11 @@ and health-data collection, with a Swift server and command-line client.
 
 ## Configure and Publish a Study
 
-Configure eligibility and enrollment, write consent documents, and organize study
-components. Review a publication candidate before making that exact revision
-available to participants. Later draft edits stay separate from published content.
+Configure eligibility and enrollment, choose the health data and history to
+collect, write consent documents, and organize study components. Review a
+publication candidate before making that exact revision available to participants.
+Later draft edits stay separate from published content. Authorized researchers
+retrieve study-scoped data and recordings from the results page or the CLI.
 
 [Study authoring walkthrough](Platform-Tour.md#study-authoring)
 
@@ -67,8 +69,8 @@ in the native app before authorizing collection.
 ## Participant App
 
 Discover published studies, review the details, and provide consent in the iOS app.
-Study-specific apps can integrate through the API rather than adopting Trove's
-participant interface.
+Collection continues offline under the accepted study settings. Study-specific apps
+can integrate through the API rather than adopting Trove's participant interface.
 
 <div class="trove-phones">
   <figure><picture><source media="(prefers-color-scheme: dark)" srcset="images/mobile/studies~dark.png"><img src="images/mobile/studies.png" alt="Study discovery in the Trove iOS app" loading="lazy" width="260"></picture><figcaption>Discover a study</figcaption></figure>
@@ -98,12 +100,9 @@ define the exchange contracts.
 ## Beta Release
 
 Trove is in beta and is being actively tested and used at Stanford.
-The [tour](Platform-Tour.md) documents the current interfaces. GitHub milestones
-track planned work and delivery status; issues contain the implementation details
-and acceptance criteria.
+The [tour](Platform-Tour.md) documents the current interfaces.
 
-[GitHub Milestones](https://github.com/SchmiedmayerLab/Trove/milestones){ .md-button .md-button--primary }
-[Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button }
+[Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button .md-button--primary }
 
 </section>
 
