@@ -277,7 +277,7 @@ ordinary tooling tests do not depend on it:
 
 ```sh
 python3 -m venv /private/tmp/trove-recovery-tools
-/private/tmp/trove-recovery-tools/bin/python -m pip install \
+/private/tmp/trove-recovery-tools/bin/python -m pip install --require-hashes \
   -r TroveInfrastructure/validator/recovery-requirements.txt
 /private/tmp/trove-recovery-tools/bin/python TroveInfrastructure/validator/verify_backup_restore.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \

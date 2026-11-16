@@ -24,7 +24,7 @@ jobs:
         shell: bash
         working-directory: TroveInfrastructure
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install kubeconform
         env:
           KUBECONFORM_RELEASE: v0.8.0
@@ -40,7 +40,7 @@ jobs:
       - name: Build and validate all overlays
         run: |
           python3 -m venv "$RUNNER_TEMP/manifest-tools"
-          "$RUNNER_TEMP/manifest-tools/bin/pip" install --requirement tools/requirements.txt
+          "$RUNNER_TEMP/manifest-tools/bin/pip" install --require-hashes --requirement tools/requirements.txt
           "$RUNNER_TEMP/manifest-tools/bin/python" tools/prepare-manifest-schemas.py "$RUNNER_TEMP/manifest-schemas"
           overlays="infrastructure/dev infrastructure/prod apps/dev apps/prod"
           overlays="$overlays bootstrap/dev bootstrap/prod argocd-apps/dev argocd-apps/prod"
@@ -73,7 +73,7 @@ jobs:
       run:
         working-directory: TroveInfrastructure/terraform
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
       - name: Check formatting
@@ -92,7 +92,7 @@ jobs:
       run:
         working-directory: TroveInfrastructure
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install KIND
         env:
           KIND_RELEASE: v0.33.0
@@ -106,9 +106,17 @@ jobs:
           printf '%s  %s\n' "$KIND_SHA256" "$binary" | sha256sum --check --strict
           sudo install -m 0755 "$binary" /usr/local/bin/kind
       - name: Install Helm
-        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
-        with:
-          version: v4.3.2
+        env:
+          HELM_RELEASE: v4.3.2
+          HELM_SHA256: d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/helm.tar.gz"
+          curl --fail --location --retry 3 --max-time 120 \
+            "https://get.helm.sh/helm-$HELM_RELEASE-linux-amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$HELM_SHA256" "$archive" | sha256sum --check --strict
+          sudo tar --extract --gzip --file "$archive" --directory /usr/local/bin --strip-components=1 linux-amd64/helm
       - name: Create KIND cluster
         run: kind create cluster --name trove --config tools/kind-config.yaml
       # The dev overlay runs the published images, which do not exist for an unmerged change.

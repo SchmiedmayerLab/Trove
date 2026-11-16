@@ -371,11 +371,13 @@ def main():
                         help="Prove that a backup predating later withdrawal and source revocation cannot activate")
     args = parser.parse_args()
     dependencies = {}
+    # Hashed pins: each package line is "name==version \", followed by indented hashes and comments.
     for line in Path(__file__).with_name("recovery-requirements.txt").read_text().splitlines():
-        if line and not line.startswith("#"):
-            name, expected = line.split("==")
+        if pin := re.match(r"([A-Za-z0-9_.-]+)==([^\s;\\]+)", line):
+            name, expected = pin.groups()
             dependencies[name] = version(name)
             require(dependencies[name] == expected, "Install the reviewed recovery verification requirements")
+    require(dependencies, "Install the reviewed recovery verification requirements")
     os.umask(0o077)
     checkpoint = RestoreCheckpoint(args)
     checkpoint.summary["verificationDependencies"] = dependencies

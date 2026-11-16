@@ -30,7 +30,7 @@ jobs:
     container:
       image: swift:6.4.2-noble@sha256:23d9b28ad97fb1cf1999edc3a0cb265ee915ed42299a9344e7173d5a6d2b05f4
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install verification and client journal build dependencies
         run: |
           apt-get update
@@ -42,14 +42,14 @@ jobs:
         run: bash scripts/check swift "$PACKAGE_PATH" "$ARTIFACT_NAME"
       - name: Upload package diagnostics
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ inputs.path }}-verification
           path: ${{ inputs.path }}/.build/verification/
           include-hidden-files: true
           if-no-files-found: warn
       - name: Upload coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ inputs.path }}/${{ inputs.artifact-name }}
@@ -72,11 +72,11 @@ jobs:
       SWIFT_IMAGE: swift:6.4.2-noble@sha256:23d9b28ad97fb1cf1999edc3a0cb265ee915ed42299a9344e7173d5a6d2b05f4
       STORAGE_IMAGE: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare hosted runner disk capacity
         run: bash scripts/prepare-hosted-disk.sh
       - name: Restore pinned public validator artifacts
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/validator-artifacts
           key: fhir-validator-artifacts-v1-${{ hashFiles('TroveInfrastructure/validator/manifest.json') }}
@@ -219,7 +219,7 @@ jobs:
           fi
       - name: Upload real-store test diagnostics
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: TroveServer-postgres-verification
           path: TroveServer/.build/verification/

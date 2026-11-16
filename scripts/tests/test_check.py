@@ -246,17 +246,47 @@ class VerificationInputTests(unittest.TestCase):
         job = workflow.split("  manifests:\n", 1)[1].split("\n  tofu-validate:\n", 1)[0]
         self.assertRegex(job, r"defaults:\n\s+run:\n\s+shell: bash\n")
 
+    def test_python_tool_requirements_are_hashed_and_installed_with_hashes(self):
+        for path in ("TroveInfrastructure/tools/requirements.txt",
+                     "TroveInfrastructure/validator/recovery-requirements.txt"):
+            with self.subTest(path=path):
+                text = (ROOT / path).read_text()
+                pins = re.findall(r"^([A-Za-z0-9_.-]+)==\S+", text, re.MULTILINE)
+                self.assertTrue(pins)
+                self.assertEqual(len(re.findall(r"^\S+==\S+.*\\\n\s+--hash=sha256:[0-9a-f]{64}", text, re.MULTILINE)), len(pins))
+                self.assertTrue((ROOT / path.replace(".txt", ".in")).is_file())
+        installs = [line for path in sorted((ROOT / ".github/workflows").glob("*.yml"))
+                    for line in path.read_text().splitlines() if "tools/requirements.txt" in line and "install" in line]
+        self.assertEqual(len(installs), 3)
+        for line in installs:
+            self.assertIn("--require-hashes", line)
+
+    def test_every_action_is_pinned_to_a_commit_with_its_release(self):
+        files = sorted((ROOT / ".github").rglob("*.yml"))
+        references = []
+        for path in files:
+            for line in path.read_text().splitlines():
+                match = re.match(r"\s*(?:-\s+)?uses:\s+(\S+)(.*)$", line)
+                if match and not match.group(1).startswith("./"):
+                    references.append((path.name, match.group(1), match.group(2)))
+        self.assertGreater(len(references), 50)
+        for name, reference, comment in references:
+            with self.subTest(file=name, reference=reference):
+                self.assertRegex(reference, r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}$")
+                self.assertRegex(comment, r"^ # v\d+\.\d+\.\d+$")
+
     def test_infrastructure_tools_are_pinned_and_checksum_verified(self):
         workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
         self.assertNotIn("/latest/", workflow)
+        self.assertNotIn("azure/setup-helm", workflow)
         for release, checksum in (("KUBECONFORM_RELEASE: v0.8.0", "KUBECONFORM_SHA256"),
-                                  ("KIND_RELEASE: v0.33.0", "KIND_SHA256")):
+                                  ("KIND_RELEASE: v0.33.0", "KIND_SHA256"),
+                                  ("HELM_RELEASE: v4.3.2", "HELM_SHA256")):
             with self.subTest(release=release):
                 step = workflow.split(release, 1)[1].split("- name:", 1)[0]
                 self.assertRegex(workflow, checksum + r": [0-9a-f]{64}\n")
                 self.assertIn(f'"${checksum}"', step)
                 self.assertLess(step.index("sha256sum --check --strict"), step.index("/usr/local/bin"))
-        self.assertRegex(workflow, r"azure/setup-helm@[0-9a-f]{40} # v[0-9.]+\n\s+with:\n\s+version: v4\.3\.2\n")
 
     def test_dev_stack_uses_declared_node_version(self):
         package = json.loads((ROOT / "TroveWeb/package.json").read_text())

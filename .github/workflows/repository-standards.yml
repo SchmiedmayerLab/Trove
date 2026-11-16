@@ -23,7 +23,7 @@ jobs:
     name: Verification Scripts
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify the locked FHIR validator release asset
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,7 +35,7 @@ jobs:
           shellcheck TroveInfrastructure/docker/verify-fhir-ingestion.sh TroveInfrastructure/docker/verify-timescale.sh
           shellcheck TroveInfrastructure/database-operator/grant-runtime.sh
           python3 -m venv "$RUNNER_TEMP/trove-tooling"
-          "$RUNNER_TEMP/trove-tooling/bin/python" -m pip install --requirement TroveInfrastructure/tools/requirements.txt
+          "$RUNNER_TEMP/trove-tooling/bin/python" -m pip install --require-hashes --requirement TroveInfrastructure/tools/requirements.txt
           export PATH="$RUNNER_TEMP/trove-tooling/bin:$PATH"
           python3 -B -m unittest discover -s scripts/tests -v
           python3 -B -m unittest discover -s TroveServer/Benchmarks -v
