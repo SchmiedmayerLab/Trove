@@ -12,6 +12,8 @@ updates:
     directory: "/documentation"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -20,6 +22,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -28,6 +32,8 @@ updates:
     directory: "/TroveAPI"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -36,6 +42,8 @@ updates:
     directory: "/TroveServer"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -44,6 +52,8 @@ updates:
     directory: "/TroveWeb"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     ignore:
       # grove-design-system's DataTable is built on react-table 8; remove once it supports 9.
       - dependency-name: "@tanstack/react-table"
@@ -56,6 +66,8 @@ updates:
     directory: "/TroveInfrastructure/tools"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -64,6 +76,8 @@ updates:
     directory: "/TroveInfrastructure/validator"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     ignore:
       # botocore requires python-dateutil<3.0.0; remove once botocore allows a newer major version.
       - dependency-name: "python-dateutil"
@@ -76,6 +90,8 @@ updates:
     directory: "/TroveServer"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -84,6 +100,8 @@ updates:
     directory: "/TroveWeb"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -92,6 +110,8 @@ updates:
     directory: "/TroveInfrastructure/docker"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -100,6 +120,8 @@ updates:
     directory: "/TroveInfrastructure/terraform"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
