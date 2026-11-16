@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   analyze:
+    # The name is a required status check; the job also analyzes Python and the workflows.
     name: Analyze (JavaScript/TypeScript)
     runs-on: ubuntu-24.04
     permissions:
@@ -38,6 +39,6 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: javascript-typescript
+          languages: javascript-typescript, python, actions
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

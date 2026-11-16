@@ -69,8 +69,8 @@ component. `Required Verification` passes only when every selected job succeeded
 The secret scan and the dependency vulnerability scan run on every change, and the
 [verification commands](https://github.com/SchmiedmayerLab/Trove/blob/main/AGENTS.md#verification) run the same checks locally.
 [Static Analysis](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/static-analysis.yml) runs SwiftLint and Swift
-CodeQL, and [CodeQL](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/codeql.yml) analyzes JavaScript and
-TypeScript. The workflows and
+CodeQL, and [CodeQL](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/codeql.yml) analyzes JavaScript,
+TypeScript, Python and the GitHub Actions workflows. The workflows and
 [`.github/rulesets/main.json`](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/rulesets/main.json) define the exact jobs,
 triggers and required checks.
 

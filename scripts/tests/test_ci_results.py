@@ -204,6 +204,9 @@ class CIResultTests(unittest.TestCase):
                 self.assertIn(f'{job["name"]} / {job["with"]["job_name"]}', contexts)
             else:
                 self.assertIn(job["name"], contexts)
+                init = next(step for step in job["steps"] if step.get("name") == "Initialize CodeQL")
+                languages = {value.strip() for value in init["with"]["languages"].split(",")}
+                self.assertEqual(languages, {"javascript-typescript", "python", "actions"})
 
     def test_fork_runner_routing_and_simulator_runtime_are_explicit(self) -> None:
         jobs = yaml.safe_load((ROOT / ".github/workflows/build-and-test.yml").read_text())["jobs"]
