@@ -8,6 +8,12 @@ import {
   recordingDownloadErrorMessage,
   recordingFallbackByteLimit,
 } from "./studyRecordingDownload";
+import {
+  recordingFileExtension,
+  recordingMediaTypes,
+  recordingResponseMediaMatches,
+  recordingOriginalMediaHeaderMatches,
+} from "./studyRecordingFormats";
 import type { StudyRecording } from "./studyRecordings";
 
 vi.mock("../env", () => ({
@@ -19,10 +25,13 @@ const recording: StudyRecording = {
   grantId: "22222222-2222-4222-8222-222222222222",
   versions: "current",
   byteCount: 4,
+  format: "location-track-samples",
+  contentType: "text/csv",
 };
 const bytes = new Uint8Array([97, 44, 98, 10]);
 const headers = {
-  "Content-Type": "text/csv; charset=utf-8",
+  "Content-Type": "application/octet-stream",
+  "X-Recording-Content-Type": "text%2Fcsv",
   "Cache-Control": "no-store",
 };
 const deferred = <T>() => {
@@ -45,7 +54,10 @@ const destination = (write?: (chunk: Uint8Array) => Promise<void> | void) => {
     abort,
   });
   const createWritable = vi.fn(() => Promise.resolve(stream));
-  const picker = vi.fn(() => Promise.resolve({ createWritable }));
+  const picker = vi.fn((options: unknown) => {
+    expect(options).toBeDefined();
+    return Promise.resolve({ createWritable });
+  });
   vi.stubGlobal("window", { showSaveFilePicker: picker });
   return { saved, close, abort, picker, createWritable };
 };
@@ -260,6 +272,155 @@ describe("recording download streaming", () => {
       });
       expect(fetch).toHaveBeenCalledOnce();
       expect(target.createWritable).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("opaque recording downloads", () => {
+  it.each(
+    Object.entries(recordingMediaTypes).flatMap(([format, types]) =>
+      types.map((contentType) => ({ format, contentType })),
+    ),
+  )(
+    "streams $format as $contentType without JSON decoding or content rewriting",
+    async ({ format, contentType }) => {
+      const target = destination();
+      vi.stubGlobal("fetch", () =>
+        Promise.resolve(
+          new Response(bytes, {
+            headers: {
+              ...headers,
+              "X-Recording-Content-Type": encodeURIComponent(contentType),
+            },
+          }),
+        ),
+      );
+      const selected = { ...recording, format, contentType } as StudyRecording;
+      await expect(
+        downloadStudyRecording(
+          selected,
+          new AbortController().signal,
+          () => undefined,
+        ),
+      ).resolves.toBe("saved");
+      expect(target.saved).toEqual([...bytes]);
+      expect(target.picker.mock.calls[0][0]).toMatchObject({
+        suggestedName: `recording-${recording.grantId}${recordingFileExtension(selected.contentType)}`,
+      });
+    },
+  );
+
+  it.each([
+    "application/fhir+json",
+    "application/fhir+json; fhirVersion=1.0",
+    "application/fhir+json; fhirVersion=4.0; fhirVersion=4.0",
+    "application/fhir+json; fhirVersion=4.0; charset=latin-1",
+    "application/fhir+json; fhirVersion=4.0; other=yes",
+  ])(
+    "rejects missing, changed, duplicate or unknown representation parameters: %s",
+    (actual) => {
+      expect(
+        recordingResponseMediaMatches(
+          actual,
+          "application/fhir+json; fhirVersion=4.0",
+        ),
+      ).toBe(false);
+    },
+  );
+  it("accepts HTTP media casing and UTF-8 while retaining the exact FHIR release", () => {
+    expect(
+      recordingResponseMediaMatches(
+        'Application/FHIR+JSON; charset="UTF-8"; fhirVersion="4.0"',
+        "application/fhir+json; fhirVersion=4.0",
+      ),
+    ).toBe(true);
+  });
+  it("uses the declared CDA media and safe XML suffix in bounded fallback downloads", async () => {
+    vi.stubGlobal("window", {});
+    const anchor = { href: "", download: "", click: vi.fn() };
+    vi.stubGlobal("document", { createElement: () => anchor });
+    const url = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:synthetic");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        new Response(bytes, {
+          headers: {
+            ...headers,
+            "X-Recording-Content-Type": encodeURIComponent(
+              "application/hl7-cda+xml",
+            ),
+          },
+        }),
+      ),
+    );
+    await expect(
+      downloadStudyRecording(
+        {
+          ...recording,
+          format: "clinical-document",
+          contentType: "application/hl7-cda+xml",
+        },
+        new AbortController().signal,
+        () => undefined,
+      ),
+    ).resolves.toBe("started");
+    const blob = url.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("application/hl7-cda+xml");
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
+    expect(anchor.download).toBe(`recording-${recording.grantId}.xml`);
+  });
+});
+
+describe("recording binary transport contract", () => {
+  it.each([
+    undefined,
+    "text/html",
+    "application/json",
+    "application/octet-stream",
+  ])(
+    "rejects a missing or changed original media header before opening the file: %s",
+    async (original) => {
+      const target = destination();
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "no-store",
+      };
+      if (original !== undefined)
+        responseHeaders["X-Recording-Content-Type"] = original;
+      vi.stubGlobal("fetch", () =>
+        Promise.resolve(new Response(bytes, { headers: responseHeaders })),
+      );
+      await expect(download()).rejects.toThrow("Invalid recording response");
+      expect(target.createWritable).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("original recording media header encoding", () => {
+  it.each(Object.values(recordingMediaTypes).flat())(
+    "decodes the generated URI representation for %s once",
+    (media) => {
+      expect(
+        recordingOriginalMediaHeaderMatches(encodeURIComponent(media), media),
+      ).toBe(true);
+    },
+  );
+  it.each([
+    "text%252Fcsv",
+    "text%2",
+    "text%ZZcsv",
+    "text%2Fcsv%0D%0A",
+    "%FF",
+    "text%2Fcsv%00",
+    "text%2Fcsv%3Bcharset%3Dutf-16",
+  ])(
+    "rejects malformed, repeated, control, or mismatched encoding %s",
+    (header) => {
+      expect(recordingOriginalMediaHeaderMatches(header, "text/csv")).toBe(
+        false,
+      );
     },
   );
 });

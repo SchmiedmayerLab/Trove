@@ -3,6 +3,11 @@
 
 import { ApiError, apiSessionSignal } from "../api/client";
 import { getStudyRecording } from "../api/generated/sdk.gen";
+import {
+  recordingFileExtension,
+  recordingOriginalMediaHeaderMatches,
+  type RecordingContentType,
+} from "./studyRecordingFormats";
 import { studyRecordingSchema, type StudyRecording } from "./studyRecordings";
 
 /** Browser fallback payload budget; native file writes stream independently of this limit. */
@@ -27,8 +32,9 @@ class RecordingCapacityError extends Error {}
 const startBlobDownload = (
   chunks: Array<Uint8Array<ArrayBuffer>>,
   name: string,
+  contentType: RecordingContentType,
 ) => {
-  const url = URL.createObjectURL(new Blob(chunks, { type: "text/csv" }));
+  const url = URL.createObjectURL(new Blob(chunks, { type: contentType }));
   try {
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -52,14 +58,18 @@ export const downloadStudyRecording = async (
   if (!picker && recording.byteCount > recordingFallbackByteLimit) {
     throw new RecordingCapacityError();
   }
-  const name = `recording-${recording.grantId.toLowerCase()}.csv`;
+  const suffix = recordingFileExtension(recording.contentType);
+  const name = `recording-${recording.grantId.toLowerCase()}${suffix}`;
   // The picker must be invoked synchronously from the user's click, before token refresh.
   const handle =
     picker ?
       await picker.call(window, {
         suggestedName: name,
         types: [
-          { description: "CSV recording", accept: { "text/csv": [".csv"] } },
+          {
+            description: "Original source recording",
+            accept: { [recording.contentType.split(";")[0]]: [suffix] },
+          },
         ],
       })
     : undefined;
@@ -78,11 +88,12 @@ export const downloadStudyRecording = async (
   try {
     active.throwIfAborted();
     if (
-      response.headers
-        .get("Content-Type")
-        ?.split(";")[0]
-        .trim()
-        .toLowerCase() !== "text/csv" ||
+      response.headers.get("Content-Type")?.trim().toLowerCase() !==
+        "application/octet-stream" ||
+      !recordingOriginalMediaHeaderMatches(
+        response.headers.get("X-Recording-Content-Type"),
+        recording.contentType,
+      ) ||
       response.headers.get("Cache-Control")?.toLowerCase() !== "no-store" ||
       !response.body
     ) {
@@ -121,7 +132,7 @@ export const downloadStudyRecording = async (
       .pipeThrough(bounded)
       .pipeTo(destination, { signal: active });
     active.throwIfAborted();
-    if (!handle) startBlobDownload(chunks, name);
+    if (!handle) startBlobDownload(chunks, name, recording.contentType);
     complete = true;
     return handle ? "saved" : "started";
   } finally {

@@ -298,7 +298,7 @@ export const StudyDataPanel = ({ studyId }: { studyId: string }) => {
                               onClick={() => void saveRecording(recording)}
                               aria-label={`Save recording ${recordingIndex + 1} for record ${index + 1}`}
                             >
-                              Save CSV (
+                              Save recording (
                               {(recording.byteCount / 1024 / 1024).toFixed(1)}{" "}
                               MiB)
                             </Button>
