@@ -76,7 +76,10 @@ FROM cgr.dev/chainguard/wolfi-base:latest@sha256:ae9575b121f5776e2f04e192064bc2c
 RUN apk upgrade --no-cache \
     && apk add --no-cache glibc libstdc++ libgcc jemalloc zlib ca-certificates tzdata \
     && addgroup -S -g 999 vapor \
-    && adduser -S -D -H -u 999 -G vapor -h /app vapor
+    && adduser -S -D -H -u 999 -G vapor -h /app vapor \
+    && mkdir -p /var/lib/trove/source-identity \
+    && chown vapor:vapor /var/lib/trove/source-identity \
+    && chmod 0700 /var/lib/trove/source-identity
 
 # Switch to the new home directory
 WORKDIR /app

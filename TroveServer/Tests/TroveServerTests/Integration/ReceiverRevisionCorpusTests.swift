@@ -45,7 +45,10 @@ struct ReceiverRevisionCorpusTests {
             let final = try #require(sequence.steps.last).expect
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await configureServices(
-                    for: reopened, storageProvider: InMemoryObjectStorageProvider(), validator: FHIRValidationClient(application: reopened)
+                    for: reopened,
+                    storageProvider: InMemoryObjectStorageProvider(),
+                    validator: FHIRValidationClient(application: reopened),
+                    sourceKeyring: TestApp.sourceKeyring()
                 )
                 _ = try await TestApp.configureTransport(for: reopened)
                 let assertion = ReceiverRevisionAssertions(fixture: fixture, prepared: prepared, receipts: accepted)
@@ -71,6 +74,7 @@ extension ReceiverRevisionCorpusTests {
         var receipt: Components.Schemas.EventReceipt?
         try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events", beforeRequest: {
             $0.bearerAuth(token)
+            $0.sourceInstallation(fixture.installationID)
             try $0.encodeJSONBody(Components.Schemas.EventSubmission(
                 eventBase64: try event.bytes.base64EncodedString(),
                 targets: [.init(consentId: fixture.consentIDs[0].uuidString, outputFullUrls: event.selected)]

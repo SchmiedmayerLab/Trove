@@ -70,6 +70,11 @@ enum ConsentRequestFixtures {
 
 
 extension TestingHTTPRequest {
+    mutating func sourceInstallation(_ registrationID: UUID) {
+        headers.replaceOrAdd(name: "Trove-Source-Installation-ID", value: registrationID.uuidString.lowercased())
+        headers.replaceOrAdd(name: "Trove-Source-Credential", value: SourceBindingFixture.credentialBase64(registrationID))
+    }
+
     mutating func bearerAuth(_ token: String?) {
         if let token {
             headers.bearerAuthorization = .init(token: token)

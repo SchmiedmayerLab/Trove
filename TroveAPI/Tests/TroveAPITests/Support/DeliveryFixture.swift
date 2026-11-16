@@ -11,6 +11,7 @@ import TroveAPIClient
 
 
 enum DeliveryFixture {
+    static let identityKey = Data(repeating: 0x42, count: 32)
     static let sourceID = UUID()
     static let consentID = UUID()
     static let epoch = UUID()
@@ -55,18 +56,27 @@ enum DeliveryFixture {
 
     static func register(_ journal: EventDeliveryJournal, sourceID: UUID, query: Data, localID: UUID = UUID()) async throws {
         let setup = try await journal.createSource(localID: localID, queryDefinition: query)
-        try await journal.confirmSource(binding(sourceID: sourceID, registrationID: localID), for: setup)
+        try await journal.confirmSource(binding(sourceID: sourceID, registrationID: localID), for: setup, identityKey: identityKey)
     }
 
-    static func binding(sourceID: UUID, registrationID: UUID) -> Components.Schemas.ParticipantSource {
-        .init(
-            id: sourceID.uuidString.lowercased(),
-            registrationID: registrationID.uuidString.lowercased(),
-            kind: .participantApp,
-            eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-record-version-v0/\(registrationID.uuidString.lowercased())/1",
-            identifierRoot: identifierRoot(sourceID),
-            participantIdentifier: .init(system: scope.issuer + "/trove/participants", value: consentID.uuidString.lowercased()),
-            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+    static func binding(sourceID: UUID, registrationID: UUID) -> Components.Schemas.ParticipantSourceRegistration {
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        return .init(
+            source: .init(
+                id: sourceID.uuidString.lowercased(),
+                keyID: registrationID.uuidString.lowercased(),
+                keyEpoch: "1",
+                repositoryKind: .healthkit,
+                repositoryScope: .init(system: identifierRoot(sourceID) + "/repository", value: "healthkit"),
+                kind: .participantApp,
+                eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-record-version-v0/\(registrationID.uuidString.lowercased())/1",
+                identifierRoot: identifierRoot(sourceID),
+                participantIdentifier: .init(system: scope.issuer + "/trove/participants", value: consentID.uuidString.lowercased()),
+                createdAt: createdAt
+            ),
+            installation: .init(
+                registrationID: registrationID.uuidString.lowercased(), sourceID: sourceID.uuidString.lowercased(), createdAt: createdAt
+            )
         )
     }
 

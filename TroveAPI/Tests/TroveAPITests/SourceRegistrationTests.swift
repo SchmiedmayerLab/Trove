@@ -13,7 +13,7 @@ import TroveAPIClient
 
 struct SourceRegistrationTests {
     @Test
-    func lostReplyRetriesTheSameRegistrationThenRefreshesBySourceID() async throws {
+    func lostReplyRetriesTheSameRegistrationThenRefreshesByInstallationID() async throws {
         try await DeliveryFixture.withJournal { journal, _ in
             let pending = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
             let binding = DeliveryFixture.binding(sourceID: UUID(), registrationID: pending.registrationID)
@@ -27,9 +27,12 @@ struct SourceRegistrationTests {
             #expect(try await Self.synchronize(journal, localID: pending.localID, transport: transport) == registered)
             let bodies = await transport.bodies
             #expect(bodies[0] == bodies[1])
-            #expect(try JSONDecoder().decode([String: String].self, from: bodies[0]) == ["registrationID": pending.localID.uuidString.lowercased()])
-            #expect(await transport.methods == ["POST", "POST", "GET"])
-            #expect(await transport.paths.last == "/participant/sources/\(binding.id)")
+            #expect(try JSONDecoder().decode([String: String].self, from: bodies[0]) == [
+                "registrationID": pending.localID.uuidString.lowercased(), "repositoryKind": "healthkit",
+                "credentialBase64": try await journal.installationCredential(for: pending.localID).base64EncodedString()
+            ])
+            #expect(await transport.methods == ["POST", "POST", "POST", "GET"])
+            #expect(await transport.paths.last == "/participant/source-installations/\(pending.localID.uuidString.lowercased())")
         }
     }
 
@@ -84,7 +87,7 @@ struct SourceRegistrationTests {
         try await DeliveryFixture.withJournal { journal, _ in
             let original = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var binding = try #require(original.binding)
-            binding.revokedAt = binding.createdAt
+            binding.source.revokedAt = binding.source.createdAt
             let transport = SourceRegistrationTransport(binding: binding)
             let revoked = try await Self.synchronize(journal, localID: original.localID, transport: transport)
             #expect(revoked.binding == binding)
@@ -102,13 +105,13 @@ struct SourceRegistrationTests {
             let transport = SourceRegistrationTransport(binding: binding)
             await transport.onReply {
                 var revoked = binding
-                revoked.revokedAt = revoked.createdAt
+                revoked.source.revokedAt = revoked.source.createdAt
                 try await journal.confirmSource(revoked, for: original)
             }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) {
                 try await Self.synchronize(journal, localID: original.localID, transport: transport)
             }
-            #expect(try await journal.sourceSetup(for: original.localID).binding?.revokedAt == binding.createdAt)
+            #expect(try await journal.sourceSetup(for: original.localID).binding?.source.revokedAt == binding.source.createdAt)
         }
     }
 

@@ -308,7 +308,7 @@ extension HeartRateAcquisitionTests {
         let checkpoint = try await journal.checkpoint(for: fixture.sourceID)
         let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
         let exporter = try await HeartRateAcquisition.exporter(
-            source: fixture.transport.binding,
+            source: fixture.transport.binding.source,
             privacy: journal.identityScope(for: fixture.sourceID),
             application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
             host: .init(operatingSystemVersion: "27.2")
@@ -414,10 +414,11 @@ extension HeartRateAcquisitionTests {
             let sourceID = UUID(), localID = UUID()
             let definition = try HeartRateAcquisition.queryDefinition(start: start)
             var binding = DeliveryFixture.binding(sourceID: sourceID, registrationID: localID)
-            binding.identifierRoot = identifierRoot ?? DeliveryFixture.identifierRoot(sourceID)
-            binding.eventIdentifierSystem = binding.identifierRoot + "/NamingSystem/grove-record-version-v0/\(localID.uuidString.lowercased())/1"
+            binding.source.identifierRoot = identifierRoot ?? DeliveryFixture.identifierRoot(sourceID)
+            binding.source.eventIdentifierSystem = binding.source.identifierRoot + "/NamingSystem/grove-record-version-v0/\(localID.uuidString.lowercased())/1"
+            binding.source.repositoryScope.system = binding.source.identifierRoot + "/repository"
             let setup = try await journal.createSource(localID: localID, queryDefinition: definition)
-            try await journal.confirmSource(binding, for: setup)
+            try await journal.confirmSource(binding, for: setup, identityKey: DeliveryFixture.identityKey)
             let enrollments = [UUID(), UUID()]
             let transport = Transport(binding: binding, enrollmentIDs: enrollments)
             let session = DeliveryTestSession()
@@ -441,10 +442,10 @@ extension HeartRateAcquisitionTests {
 
 extension HeartRateAcquisitionTests {
     private actor Transport: ClientTransport {
-        let binding: Components.Schemas.ParticipantSource
+        let binding: Components.Schemas.ParticipantSourceRegistration
         var plans: [Components.Schemas.ParticipantCollectionPlan]
 
-        init(binding: Components.Schemas.ParticipantSource, enrollmentIDs: [UUID]) {
+        init(binding: Components.Schemas.ParticipantSourceRegistration, enrollmentIDs: [UUID]) {
             self.binding = binding
             self.plans = enrollmentIDs.map { id in
                 .init(enrollmentId: id.uuidString.lowercased(), stateVersion: 2, asOf: start.addingTimeInterval(10), windows: [
@@ -480,7 +481,7 @@ extension HeartRateAcquisitionTests {
                 let plan = try #require(plans.first { request.path?.contains($0.enrollmentId) == true })
                 bytes = try encoder.encode(plan)
             } else {
-                #expect(operationID == "get/participant/sources/{sourceId}")
+                #expect(operationID == "getParticipantSourceInstallation")
                 bytes = try encoder.encode(binding)
             }
             return (.init(status: .ok, headerFields: [.contentType: "application/json"]), HTTPBody(bytes))

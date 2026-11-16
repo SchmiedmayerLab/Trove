@@ -40,6 +40,8 @@ enum TestDatabase {
             CreateStudyPublicationCandidates().name,
             CreateParticipants().name,
             CreateSourceBindings().name,
+            CreateSourceIdentityKeys().name,
+            CreateSourceInstallations().name,
             CreateInvitationCodes().name,
             CreateEnrollments().name,
             CreateEnrollmentConsents().name,

@@ -212,14 +212,35 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /participant/profile`.
     /// - Remark: Generated from `#/paths//participant/profile/put`.
     func putParticipantProfile(_ input: Operations.PutParticipantProfile.Input) async throws -> Operations.PutParticipantProfile.Output
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
     /// - Remark: Generated from `#/paths//participant/sources/post`.
     func postParticipantSources(_ input: Operations.PostParticipantSources.Input) async throws -> Operations.PostParticipantSources.Output
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    func getParticipantSourceInstallation(_ input: Operations.GetParticipantSourceInstallation.Input) async throws -> Operations.GetParticipantSourceInstallation.Output
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    func revokeParticipantSourceInstallation(_ input: Operations.RevokeParticipantSourceInstallation.Input) async throws -> Operations.RevokeParticipantSourceInstallation.Output
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    func recoverParticipantSourceIdentity(_ input: Operations.RecoverParticipantSourceIdentity.Input) async throws -> Operations.RecoverParticipantSourceIdentity.Output
     /// Get an app data stream owned by the authenticated participant
     ///
     /// - Remark: HTTP `GET /participant/sources/{sourceId}`.
@@ -243,7 +264,7 @@ public protocol APIProtocol: Sendable {
     func lookupParticipantEventReceipt(_ input: Operations.LookupParticipantEventReceipt.Input) async throws -> Operations.LookupParticipantEventReceipt.Output
     /// Authorize additional exact-version study outputs without copying the event
     ///
-    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment and source, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
+    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment, source and installation, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/{eventId}/attributions`.
@@ -251,7 +272,7 @@ public protocol APIProtocol: Sendable {
     func attributeParticipantEvent(_ input: Operations.AttributeParticipantEvent.Input) async throws -> Operations.AttributeParticipantEvent.Output
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source binding but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -861,9 +882,9 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
@@ -873,6 +894,53 @@ extension APIProtocol {
         body: Operations.PostParticipantSources.Input.Body
     ) async throws -> Operations.PostParticipantSources.Output {
         try await postParticipantSources(Operations.PostParticipantSources.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    public func getParticipantSourceInstallation(
+        path: Operations.GetParticipantSourceInstallation.Input.Path,
+        headers: Operations.GetParticipantSourceInstallation.Input.Headers = .init()
+    ) async throws -> Operations.GetParticipantSourceInstallation.Output {
+        try await getParticipantSourceInstallation(Operations.GetParticipantSourceInstallation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    public func revokeParticipantSourceInstallation(
+        path: Operations.RevokeParticipantSourceInstallation.Input.Path,
+        headers: Operations.RevokeParticipantSourceInstallation.Input.Headers = .init()
+    ) async throws -> Operations.RevokeParticipantSourceInstallation.Output {
+        try await revokeParticipantSourceInstallation(Operations.RevokeParticipantSourceInstallation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    public func recoverParticipantSourceIdentity(
+        path: Operations.RecoverParticipantSourceIdentity.Input.Path,
+        headers: Operations.RecoverParticipantSourceIdentity.Input.Headers = .init(),
+        body: Operations.RecoverParticipantSourceIdentity.Input.Body
+    ) async throws -> Operations.RecoverParticipantSourceIdentity.Output {
+        try await recoverParticipantSourceIdentity(Operations.RecoverParticipantSourceIdentity.Input(
+            path: path,
             headers: headers,
             body: body
         ))
@@ -926,14 +994,14 @@ extension APIProtocol {
     }
     /// Authorize additional exact-version study outputs without copying the event
     ///
-    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment and source, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
+    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment, source and installation, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/{eventId}/attributions`.
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/events/{eventId}/attributions/post(attributeParticipantEvent)`.
     public func attributeParticipantEvent(
         path: Operations.AttributeParticipantEvent.Input.Path,
-        headers: Operations.AttributeParticipantEvent.Input.Headers = .init(),
+        headers: Operations.AttributeParticipantEvent.Input.Headers,
         body: Operations.AttributeParticipantEvent.Input.Body
     ) async throws -> Operations.AttributeParticipantEvent.Output {
         try await attributeParticipantEvent(Operations.AttributeParticipantEvent.Input(
@@ -944,14 +1012,14 @@ extension APIProtocol {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source binding but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/events/post`.
     public func postParticipantSourcesSourceIdEvents(
         path: Operations.PostParticipantSourcesSourceIdEvents.Input.Path,
-        headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers = .init(),
+        headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers,
         body: Operations.PostParticipantSourcesSourceIdEvents.Input.Body
     ) async throws -> Operations.PostParticipantSourcesSourceIdEvents.Output {
         try await postParticipantSourcesSourceIdEvents(Operations.PostParticipantSourcesSourceIdEvents.Input(
@@ -969,7 +1037,7 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/events/batch/post(submitParticipantEventBatch)`.
     public func submitParticipantEventBatch(
         path: Operations.SubmitParticipantEventBatch.Input.Path,
-        headers: Operations.SubmitParticipantEventBatch.Input.Headers = .init(),
+        headers: Operations.SubmitParticipantEventBatch.Input.Headers,
         body: Operations.SubmitParticipantEventBatch.Input.Body
     ) async throws -> Operations.SubmitParticipantEventBatch.Output {
         try await submitParticipantEventBatch(Operations.SubmitParticipantEventBatch.Input(
@@ -987,7 +1055,7 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/record-bundles/post(submitParticipantRecordBundle)`.
     public func submitParticipantRecordBundle(
         path: Operations.SubmitParticipantRecordBundle.Input.Path,
-        headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(),
+        headers: Operations.SubmitParticipantRecordBundle.Input.Headers,
         body: Operations.SubmitParticipantRecordBundle.Input.Body
     ) async throws -> Operations.SubmitParticipantRecordBundle.Output {
         try await submitParticipantRecordBundle(Operations.SubmitParticipantRecordBundle.Input(

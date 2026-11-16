@@ -58,7 +58,7 @@ struct DeliveryConversionInstantTests {
             _ = try await journal.conversionInstant(from: checkpoint)
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var binding = try #require(setup.binding)
-            binding.revokedAt = binding.createdAt
+            binding.source.revokedAt = binding.source.createdAt
             try await journal.confirmSource(binding, for: setup)
             await #expect(throws: DeliveryJournalError.sourceRevoked) {
                 try await journal.conversionInstant(from: checkpoint)
@@ -94,7 +94,7 @@ struct DeliveryConversionInstantTests {
             }
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             var binding = try #require(setup.binding)
-            binding.revokedAt = binding.createdAt
+            binding.source.revokedAt = binding.source.createdAt
             try await journal.confirmSource(binding, for: setup)
             let connection = try DeliverySQLite(url: url)
             defer { connection.close() }

@@ -29,14 +29,20 @@ struct ClinicalRecordStoreTests {
                 var receipts: [Int: ClinicalEventReceipt] = [:]
                 for index in order {
                     receipts[index] = try await store.accept(
-                        events[index - 1], sourceID: fixture.source.id, targets: fixture.targets(for: events[index - 1])
+                        events[index - 1],
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets(for: events[index - 1]),
+                        installation: fixture.installation
                     )
                 }
                 let highest = try #require(receipts[3])
                 #expect(try await Self.current(on: app.db) == [highest.eventID])
                 for index in order {
                     let replay = try await store.accept(
-                        events[index - 1], sourceID: fixture.source.id, targets: fixture.targets(for: events[index - 1])
+                        events[index - 1],
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets(for: events[index - 1]),
+                        installation: fixture.installation
                     )
                     #expect(replay == receipts[index])
                 }
@@ -61,8 +67,12 @@ struct ClinicalRecordStoreTests {
                     version: kind == "missing" ? nil : kind == "equal" ? "10" : "999",
                     writer: kind == "missing" ? nil : kind == "different" ? "other" : "writer"
                 )
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first))
-                let selected = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second))
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first), installation: fixture.installation
+                )
+                let selected = try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second), installation: fixture.installation
+                )
                 #expect(try await Self.current(on: app.db) == [selected.eventID])
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
                 try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 4, facts: 2, grants: 4, on: app.db)
@@ -86,7 +96,9 @@ struct ClinicalRecordStoreTests {
                 let events = reverse ? [second, first] : [first, second]
                 var selected: ClinicalEventReceipt?
                 for event in events {
-                    let receipt = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event))
+                    let receipt = try await store.accept(
+                        event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation
+                    )
                     if event.eventIdentifierValue == second.eventIdentifierValue { selected = receipt }
                 }
                 let receipt = try #require(selected)
@@ -109,12 +121,18 @@ struct ClinicalRecordStoreTests {
                 let first = Self.event(source: fixture.source, sequence: 1, version: "9", outputs: ["primary", "secondary"])
                 let second = Self.event(source: fixture.source, sequence: 2, version: "10")
                 let third = Self.event(source: fixture.source, sequence: 3, version: "11", outputs: ["primary", "secondary"])
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]))
-                let next = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]), installation: fixture.installation
+                )
+                let next = try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                )
                 #expect(try await Self.current(on: app.db) == [next.eventID])
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
-                let last = try await store.accept(third, sourceID: fixture.source.id, targets: fixture.targets(for: third, studies: [0]))
+                let last = try await store.accept(
+                    third, sourceID: fixture.source.id, targets: fixture.targets(for: third, studies: [0]), installation: fixture.installation
+                )
                 #expect(try await Self.current(on: app.db) == [last.eventID])
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 2)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 0)
@@ -152,8 +170,12 @@ struct ClinicalRecordStoreTests {
             let second = Self.event(source: fixture.source, sequence: 2, version: "10")
             let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]))
-                return try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                _ = try await store.accept(
+                    first, sourceID: fixture.source.id, targets: fixture.targets(for: first, studies: [0]), installation: fixture.installation
+                )
+                return try await store.accept(
+                    second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                )
             }
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 let store = ClinicalEventStore(database: reopened.db)
@@ -161,7 +183,9 @@ struct ClinicalRecordStoreTests {
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
                 #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[1]) == 1)
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                    let retry = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]))
+                    let retry = try await store.accept(
+                        second, sourceID: fixture.source.id, targets: fixture.targets(for: second, studies: [1]), installation: fixture.installation
+                    )
                     #expect(retry == expected)
                 }
                 try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 5, facts: 3, grants: 3, on: reopened.db)
@@ -175,7 +199,10 @@ struct ClinicalRecordStoreTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 _ = try await ClinicalEventStore(database: app.db).accept(
-                    Self.event(source: fixture.source, sequence: 1, version: "1"), sourceID: fixture.source.id, targets: fixture.targets
+                    Self.event(source: fixture.source, sequence: 1, version: "1"),
+                    sourceID: fixture.source.id,
+                    targets: fixture.targets,
+                    installation: fixture.installation
                 )
             }
             let sql = try #require(app.db as? any SQLDatabase)
@@ -200,7 +227,8 @@ struct ClinicalRecordStoreTests {
                     try await ClinicalEventStore(database: app.db).accept(
                         Self.event(source: fixture.source, sequence: 1, version: "1"),
                         sourceID: fixture.source.id,
-                        targets: fixture.targets
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 }
             }
@@ -273,7 +301,7 @@ extension ClinicalRecordStoreTests {
         _ store: ClinicalEventStore, event: ValidatedExchangeEvent, fixture: ClinicalEventStoreTests.Fixture
     ) async throws -> Bool {
         do {
-            _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event))
+            _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation)
             return true
         } catch let error as ServerError where error.status.code == 409 {
             return false

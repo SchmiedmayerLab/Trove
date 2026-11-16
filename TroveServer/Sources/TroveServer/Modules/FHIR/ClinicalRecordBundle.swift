@@ -72,7 +72,7 @@ private enum ClinicalRecordBundle {
 
 extension ClinicalEventService {
     func acceptBundle(
-        _ submission: Components.Schemas.RecordBundleSubmission, sourceID: UUID
+        _ submission: Components.Schemas.RecordBundleSubmission, sourceID: UUID, installation: SourceInstallationProof
     ) async throws -> [Components.Schemas.EventBatchResult] {
         _ = try AuthContext.checkIsParticipant()
         guard (1...EventSubmissionLimits.maximumBatchEvents).contains(submission.records.count) else {
@@ -80,14 +80,14 @@ extension ClinicalEventService {
         }
         guard submission.bundleBase64.utf8.count <= EventSubmissionLimits.maximumBundleBase64Bytes else { throw FHIRValidationClient.tooLarge }
         let source = try await SourceBindingService(database: database).find(id: sourceID)
-        guard source.revokedAt == nil else { throw ServerError.conflict("Source binding is not active") }
+        _ = try await installation.validate(source: source, on: database)
         let records = try ClinicalRecordBundle.records(submission)
         var results: [Components.Schemas.EventBatchResult] = []
         for (member, record) in zip(submission.records, records) {
             try Task.checkCancellation()
             do {
                 let original = try ClinicalRecordBundle.restore(record, member: member, sourceID: sourceID)
-                let receipt = try await accept(submission: original, sourceID: sourceID)
+                let receipt = try await accept(submission: original, sourceID: sourceID, installation: installation)
                 results.append(.EventReceipt(receipt.apiRepresentation))
             } catch {
                 try Task.checkCancellation()

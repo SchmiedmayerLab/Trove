@@ -13,6 +13,7 @@ locals {
     "keycloak-db-credentials",
     "keycloak-admin-credentials",
     "server-credentials",
+    "source-identity-keyring",
   ])
 }
 

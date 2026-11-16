@@ -8888,9 +8888,9 @@ public enum Operations {
             }
         }
     }
-    /// Register a participant-owned app data stream
+    /// Register an installation against the participant's logical source
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
+    /// Requires a verified participant profile. Persist a fresh registrationID and random 256-bit installation credential before the first request. Retries with the same repository and credential return the retained registration, including revocation. Reusing a nonce with a different credential or repository is rejected. Authorized installations for the same participant and repository share one server-provisioned logical source, key ID, epoch and namespace. Registration grants no study access and does not attest the data origin. Missing or unverifiable retained identity state never creates replacement identifiers.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
@@ -8916,15 +8916,29 @@ public enum Operations {
                 public struct JsonPayload: Codable, Hashable, Sendable {
                     /// - Remark: Generated from `#/paths/participant/sources/POST/requestBody/json/registrationID`.
                     public var registrationID: Swift.String
+                    /// - Remark: Generated from `#/paths/participant/sources/POST/requestBody/json/repositoryKind`.
+                    public var repositoryKind: Components.Schemas.NativeSourceRepository
+                    /// - Remark: Generated from `#/paths/participant/sources/POST/requestBody/json/credentialBase64`.
+                    public var credentialBase64: Components.Schemas.SourceInstallationCredential
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - registrationID:
-                    public init(registrationID: Swift.String) {
+                    ///   - repositoryKind:
+                    ///   - credentialBase64:
+                    public init(
+                        registrationID: Swift.String,
+                        repositoryKind: Components.Schemas.NativeSourceRepository,
+                        credentialBase64: Components.Schemas.SourceInstallationCredential
+                    ) {
                         self.registrationID = registrationID
+                        self.repositoryKind = repositoryKind
+                        self.credentialBase64 = credentialBase64
                     }
                     public enum CodingKeys: String, CodingKey {
                         case registrationID
+                        case repositoryKind
+                        case credentialBase64
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -8932,8 +8946,18 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .registrationID
                         )
+                        self.repositoryKind = try container.decode(
+                            Components.Schemas.NativeSourceRepository.self,
+                            forKey: .repositoryKind
+                        )
+                        self.credentialBase64 = try container.decode(
+                            Components.Schemas.SourceInstallationCredential.self,
+                            forKey: .credentialBase64
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
-                            "registrationID"
+                            "registrationID",
+                            "repositoryKind",
+                            "credentialBase64"
                         ])
                     }
                 }
@@ -8959,12 +8983,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/participant/sources/POST/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/participant/sources/POST/responses/200/content/application\/json`.
-                    case json(Components.Schemas.ParticipantSource)
+                    case json(Components.Schemas.ParticipantSourceRegistration)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ParticipantSource {
+                    public var json: Components.Schemas.ParticipantSourceRegistration {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -8983,7 +9007,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The registered stream, or the original result of a retry
+            /// The logical source and independently revocable installation
             ///
             /// - Remark: Generated from `#/paths//participant/sources/post/responses/200`.
             ///
@@ -9093,6 +9117,835 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/post/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/post/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Restore an account-owned installation's public registration state
+    ///
+    /// - Remark: HTTP `GET /participant/source-installations/{registrationId}`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)`.
+    public enum GetParticipantSourceInstallation {
+        public static let id: Swift.String = "getParticipantSourceInstallation"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/GET/path/registrationId`.
+                public var registrationId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - registrationId:
+                public init(registrationId: Swift.String) {
+                    self.registrationId = registrationId
+                }
+            }
+            public var path: Operations.GetParticipantSourceInstallation.Input.Path
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantSourceInstallation.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantSourceInstallation.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetParticipantSourceInstallation.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.GetParticipantSourceInstallation.Input.Path,
+                headers: Operations.GetParticipantSourceInstallation.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ParticipantSourceRegistration)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ParticipantSourceRegistration {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetParticipantSourceInstallation.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetParticipantSourceInstallation.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Retained source and installation state, including revocation
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetParticipantSourceInstallation.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetParticipantSourceInstallation.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/get(getParticipantSourceInstallation)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Permanently revoke one account-owned installation
+    ///
+    /// Idempotent. The verified owner may revoke a lost installation without its credential. Other installations and the logical source remain active. This does not withdraw enrollment, retract source records or erase data.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/revoke`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)`.
+    public enum RevokeParticipantSourceInstallation {
+        public static let id: Swift.String = "revokeParticipantSourceInstallation"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/revoke/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/revoke/POST/path/registrationId`.
+                public var registrationId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - registrationId:
+                public init(registrationId: Swift.String) {
+                    self.registrationId = registrationId
+                }
+            }
+            public var path: Operations.RevokeParticipantSourceInstallation.Input.Path
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/revoke/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeParticipantSourceInstallation.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeParticipantSourceInstallation.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RevokeParticipantSourceInstallation.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RevokeParticipantSourceInstallation.Input.Path,
+                headers: Operations.RevokeParticipantSourceInstallation.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/revoke/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/revoke/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ParticipantSourceRegistration)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ParticipantSourceRegistration {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RevokeParticipantSourceInstallation.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RevokeParticipantSourceInstallation.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Retained source and revoked installation
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RevokeParticipantSourceInstallation.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RevokeParticipantSourceInstallation.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/revoke/post(revokeParticipantSourceInstallation)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Recover the complete logical-source identity for an active installation
+    ///
+    /// Requires both verified participant ownership and the installation credential. The server commits a disclosure-intent audit event before returning the source identity key. Keep the response out of logs, caches and exports. The derivation key is independent of installation credentials and optional signing keys. Unavailable key-encryption material or corrupt retained state returns an explicit failure without minting a replacement.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/source-installations/{registrationId}/identity`.
+    /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)`.
+    public enum RecoverParticipantSourceIdentity {
+        public static let id: Swift.String = "recoverParticipantSourceIdentity"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/path/registrationId`.
+                public var registrationId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - registrationId:
+                public init(registrationId: Swift.String) {
+                    self.registrationId = registrationId
+                }
+            }
+            public var path: Operations.RecoverParticipantSourceIdentity.Input.Path
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RecoverParticipantSourceIdentity.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RecoverParticipantSourceIdentity.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RecoverParticipantSourceIdentity.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/requestBody/json/credentialBase64`.
+                    public var credentialBase64: Components.Schemas.SourceInstallationCredential
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - credentialBase64:
+                    public init(credentialBase64: Components.Schemas.SourceInstallationCredential) {
+                        self.credentialBase64 = credentialBase64
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case credentialBase64
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.credentialBase64 = try container.decode(
+                            Components.Schemas.SourceInstallationCredential.self,
+                            forKey: .credentialBase64
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "credentialBase64"
+                        ])
+                    }
+                }
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/requestBody/content/application\/json`.
+                case json(Operations.RecoverParticipantSourceIdentity.Input.Body.JsonPayload)
+            }
+            public var body: Operations.RecoverParticipantSourceIdentity.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.RecoverParticipantSourceIdentity.Input.Path,
+                headers: Operations.RecoverParticipantSourceIdentity.Input.Headers = .init(),
+                body: Operations.RecoverParticipantSourceIdentity.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Swift.String) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RecoverParticipantSourceIdentity.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/source-installations/{registrationId}/identity/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ParticipantSourceIdentityRecovery)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ParticipantSourceIdentityRecovery {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RecoverParticipantSourceIdentity.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RecoverParticipantSourceIdentity.Output.Ok.Headers,
+                    body: Operations.RecoverParticipantSourceIdentity.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The retained registration and its participant identity key
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RecoverParticipantSourceIdentity.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RecoverParticipantSourceIdentity.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/source-installations/{registrationId}/identity/post(recoverParticipantSourceIdentity)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
                             response: self
                         )
                     }
@@ -9927,7 +10780,7 @@ public enum Operations {
     }
     /// Authorize additional exact-version study outputs without copying the event
     ///
-    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment and source, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
+    /// Requires participant source ownership and independently eligible exact consent targets. Never changes event bytes, original submission intent or current revision selection. New grants require active enrollment, source and installation, including for historical measurements. Pre-consent collection is not implicitly eligible. Each command is atomic and idempotent within its source. Exact command retries return the original outcome even after withdrawal or revocation; changed event or targets conflict. An unknown or foreign-owned event returns 404. No samples are returned. JSON requests are limited to 1 MiB.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/{eventId}/attributions`.
@@ -9957,12 +10810,29 @@ public enum Operations {
             public var path: Operations.AttributeParticipantEvent.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/{eventId}/attributions/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AttributeParticipantEvent.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -9981,7 +10851,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.AttributeParticipantEvent.Input.Path,
-                headers: Operations.AttributeParticipantEvent.Input.Headers = .init(),
+                headers: Operations.AttributeParticipantEvent.Input.Headers,
                 body: Operations.AttributeParticipantEvent.Input.Body
             ) {
                 self.path = path
@@ -10269,7 +11139,7 @@ public enum Operations {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source binding but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -10292,12 +11162,29 @@ public enum Operations {
             public var path: Operations.PostParticipantSourcesSourceIdEvents.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PostParticipantSourcesSourceIdEvents.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -10316,7 +11203,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.PostParticipantSourcesSourceIdEvents.Input.Path,
-                headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers = .init(),
+                headers: Operations.PostParticipantSourcesSourceIdEvents.Input.Headers,
                 body: Operations.PostParticipantSourcesSourceIdEvents.Input.Body
             ) {
                 self.path = path
@@ -10727,12 +11614,29 @@ public enum Operations {
             public var path: Operations.SubmitParticipantEventBatch.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/events/batch/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantEventBatch.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -10751,7 +11655,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.SubmitParticipantEventBatch.Input.Path,
-                headers: Operations.SubmitParticipantEventBatch.Input.Headers = .init(),
+                headers: Operations.SubmitParticipantEventBatch.Input.Headers,
                 body: Operations.SubmitParticipantEventBatch.Input.Body
             ) {
                 self.path = path
@@ -11062,12 +11966,29 @@ public enum Operations {
             public var path: Operations.SubmitParticipantRecordBundle.Input.Path
             /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/record-bundles/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SubmitParticipantRecordBundle.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
                     self.accept = accept
                 }
             }
@@ -11086,7 +12007,7 @@ public enum Operations {
             ///   - body:
             public init(
                 path: Operations.SubmitParticipantRecordBundle.Input.Path,
-                headers: Operations.SubmitParticipantRecordBundle.Input.Headers = .init(),
+                headers: Operations.SubmitParticipantRecordBundle.Input.Headers,
                 body: Operations.SubmitParticipantRecordBundle.Input.Body
             ) {
                 self.path = path

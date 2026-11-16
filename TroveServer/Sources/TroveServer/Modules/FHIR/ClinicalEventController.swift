@@ -17,7 +17,9 @@ extension Controller {
     ) async throws -> Operations.SubmitParticipantRecordBundle.Output {
         _ = try AuthContext.checkIsParticipant()
         guard case .json(let body) = input.body else { throw ServerError.invalidRequestBody }
-        let results = try await clinicalEventService.acceptBundle(body, sourceID: input.path.sourceId.requireId())
+        let results = try await clinicalEventService.acceptBundle(body, sourceID: input.path.sourceId.requireId(), installation: .init(
+            registrationID: input.headers.troveSourceInstallationID, credentialBase64: input.headers.troveSourceCredential
+        ))
         return .ok(.init(body: .json(results)))
     }
 
@@ -26,7 +28,9 @@ extension Controller {
     ) async throws -> Operations.PostParticipantSourcesSourceIdEvents.Output {
         _ = try AuthContext.checkIsParticipant()
         guard case .json(let body) = input.body else { throw ServerError.invalidRequestBody }
-        let receipt = try await clinicalEventService.accept(submission: body, sourceID: input.path.sourceId.requireId())
+        let receipt = try await clinicalEventService.accept(submission: body, sourceID: input.path.sourceId.requireId(), installation: .init(
+            registrationID: input.headers.troveSourceInstallationID, credentialBase64: input.headers.troveSourceCredential
+        ))
         return .ok(.init(body: .json(receipt.apiRepresentation)))
     }
 
@@ -35,7 +39,9 @@ extension Controller {
     ) async throws -> Operations.SubmitParticipantEventBatch.Output {
         _ = try AuthContext.checkIsParticipant()
         guard case .json(let body) = input.body else { throw ServerError.invalidRequestBody }
-        let results = try await clinicalEventService.acceptBatch(body.events, sourceID: input.path.sourceId.requireId())
+        let results = try await clinicalEventService.acceptBatch(body.events, sourceID: input.path.sourceId.requireId(), installation: .init(
+            registrationID: input.headers.troveSourceInstallationID, credentialBase64: input.headers.troveSourceCredential
+        ))
         return .ok(.init(body: .json(results)))
     }
 
@@ -64,7 +70,10 @@ extension Controller {
             eventID: input.path.eventId.requireId(),
             sourceID: input.path.sourceId.requireId(),
             commandID: body.commandId.requireId(),
-            targets: body.targets.map { try $0.domainTarget }
+            targets: body.targets.map { try $0.domainTarget },
+            installation: .init(
+                registrationID: input.headers.troveSourceInstallationID, credentialBase64: input.headers.troveSourceCredential
+            )
         )
         return .ok(.init(body: .json(.init(
             commandId: receipt.commandID.uuidString.lowercased(),

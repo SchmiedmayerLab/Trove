@@ -49,7 +49,9 @@ struct ClinicalEventStore: Sendable {
         return try row.decode(column: "count", as: Int.self)
     }
 
-    func accept(_ event: ValidatedExchangeEvent, sourceID: UUID, targets: [ClinicalEventTarget]) async throws -> ClinicalEventReceipt {
+    func accept(
+        _ event: ValidatedExchangeEvent, sourceID: UUID, targets: [ClinicalEventTarget], installation: SourceInstallationProof
+    ) async throws -> ClinicalEventReceipt {
         let context = try AuthContext.checkIsParticipant()
         try validateBounds(event)
         try ClinicalGraphStore.validate(event)
@@ -62,6 +64,7 @@ struct ClinicalEventStore: Sendable {
         do {
             return try await database.transaction { transaction in
                 let source = try await self.lockSourceOwner(sourceID: sourceID, context: context, on: transaction)
+                _ = try await installation.validate(source: source, on: transaction)
                 try self.validateSource(event, source: source)
                 let representations = ClinicalEventRepresentationStore(database: transaction, source: source, context: context)
                 if let receipt = try await representations.replay(event, intent: intent, digest: digest) {
@@ -137,7 +140,7 @@ struct ClinicalEventStore: Sendable {
 
     private func validateSource(_ event: ValidatedExchangeEvent, source: SourceBinding) throws {
         let participant = ValidatedExchangeEvent.Identifier(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)
-        let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+        let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID, epoch: source.keyEpoch)
         // Registered source ownership establishes authority; knowledge of an opaque version does not.
         let lifecycleSystem = event.retraction == nil ? namespaces.recordVersion : namespaces.recordRetraction
         guard event.eventIdentifierSystem == lifecycleSystem.rawValue,

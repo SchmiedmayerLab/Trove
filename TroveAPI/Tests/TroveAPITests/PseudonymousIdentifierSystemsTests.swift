@@ -15,7 +15,7 @@ import TroveAPITypes
 struct ParticipantSourceIdentifierTests {
     @Test
     func roundTripDerivesAllThirteenDistinctSystems() throws {
-        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
         let decoded = try JSONDecoder().decode(Components.Schemas.ParticipantSource.self, from: JSONEncoder().encode(source))
         let systems = try decoded.identifierSystems()
         #expect(systems == (try source.identifierSystems()))
@@ -29,21 +29,21 @@ struct ParticipantSourceIdentifierTests {
 
     @Test(arguments: ["", "/relative", "not a URI", "https://example.test/" + String(repeating: "a", count: 256)])
     func invalidRootCannotBecomeAConversionContext(root: String) {
-        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
         source.identifierRoot = root
         #expect(throws: ExchangeIdentityError.self) { try source.identifierSystems() }
     }
 
     @Test
     func inconsistentEventNamespaceIsRejected() {
-        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        var source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
         source.eventIdentifierSystem = "https://foreign.test/events"
         #expect(throws: ExchangeIdentityError.self) { try source.identifierSystems() }
     }
 
-    @Test(arguments: ["identifierRoot", "registrationID", "eventIdentifierSystem"])
+    @Test(arguments: ["identifierRoot", "keyID", "keyEpoch", "repositoryScope", "repositoryKind", "eventIdentifierSystem"])
     func incompleteResponseDoesNotSupplyDefaults(missing: String) throws {
-        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID())
+        let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
         let bytes = try JSONEncoder().encode(source)
         var object = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
         object.removeValue(forKey: missing)

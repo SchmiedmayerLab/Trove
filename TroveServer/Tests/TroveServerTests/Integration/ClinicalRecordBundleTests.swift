@@ -37,7 +37,7 @@ struct ClinicalRecordBundleTests {
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect {
                     try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
-                        .acceptBundle(request, sourceID: fixture.source.id)
+                        .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == expected }
             }
             try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -58,7 +58,7 @@ struct ClinicalRecordBundleTests {
             let request = try Self.bundle(submitted, sourceID: fixture.source.id)
             let outcomes = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
-                    .acceptBundle(request, sourceID: fixture.source.id)
+                    .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
             }
             try #require(outcomes.count == 3)
             guard case .EventReceipt(let first) = outcomes[0], case .EventReceipt = outcomes[2] else {
@@ -76,7 +76,7 @@ struct ClinicalRecordBundleTests {
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                     let regrouped = try Self.bundle([events[2], events[0]], sourceID: fixture.source.id, packedAt: Date().addingTimeInterval(100))
                     let replay = try await ClinicalEventService(database: reopened.db, validator: ClinicalEventBatchTests.validator())
-                        .acceptBundle(regrouped, sourceID: fixture.source.id)
+                        .acceptBundle(regrouped, sourceID: fixture.source.id, installation: fixture.installation)
                     #expect(replay == [outcomes[2], outcomes[0]])
                 }
             }
@@ -101,7 +101,7 @@ struct ClinicalRecordBundleTests {
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect {
                     try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
-                        .acceptBundle(request, sourceID: fixture.source.id)
+                        .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
             }
             try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -125,7 +125,7 @@ struct ClinicalRecordBundleTests {
             }
             let results = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
-                    .acceptBundle(request, sourceID: fixture.source.id)
+                    .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
             }
             #expect(results[0].problemStatus == 400)
             guard case .EventReceipt(let receipt) = results[1] else {

@@ -126,7 +126,8 @@ public struct HeartRateAcquisition: Sendable {
         query: @Sendable (Date, QueryAnchor) async throws -> Delta
     ) async throws -> Page {
         let source = try await synchronize(localID)
-        guard let binding = source.binding, binding.revokedAt == nil, let sourceID = UUID(uuidString: binding.id) else {
+        guard let registration = source.binding, !registration.isRevoked,
+              registration.source.repositoryKind == .healthkit, let sourceID = UUID(uuidString: registration.source.id) else {
             throw EventDeliveryJournal.JournalError.sourceRevoked
         }
         let checkpoint = try await journal.checkpoint(for: sourceID)
@@ -153,7 +154,7 @@ public struct HeartRateAcquisition: Sendable {
         let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
         let instant = try await journal.conversionInstant(from: checkpoint)
         let exporter = try Self.exporter(
-            source: binding, privacy: privacy, application: application, host: host
+            source: registration.source, privacy: privacy, application: application, host: host
         )
         let prepared = try await Self.prepare(delta, exporter: exporter, snapshot: after, detections: detections, instant: instant)
         let cursor = try JSONEncoder().encode(delta.nextAnchor)

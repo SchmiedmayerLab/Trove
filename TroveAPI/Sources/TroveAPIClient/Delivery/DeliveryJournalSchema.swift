@@ -32,7 +32,7 @@ enum DeliveryJournalSchema {
             SELECT
                 (SELECT coalesce(sum(coalesce(length(payload), 0) + length(targets)), 0) FROM delivery)
                 + (SELECT coalesce(sum(length(query_definition) + coalesce(length(cursor), 0)
-                    + length(privacy_key) + coalesce(length(binding), 0)), 0) FROM source_state)
+                    + coalesce(length(privacy_key), 0) + length(installation_credential) + coalesce(length(binding), 0)), 0) FROM source_state)
                 + (SELECT coalesce(sum(length(key) + length(value)), 0) FROM producer_ledger)
                 + (SELECT count(*) * 80 FROM deletion_detection)
             """) { sqlite3_column_int64($0, 0) }
@@ -83,7 +83,7 @@ enum DeliveryJournalSchema {
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
         if !create {
             let version = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard version == [8] else { throw DeliveryJournalError.unsupportedFormat }
+            guard version == [9] else { throw DeliveryJournalError.unsupportedFormat }
             let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
             guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
         }
@@ -114,7 +114,7 @@ enum DeliveryJournalSchema {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
-                try database.execute("PRAGMA user_version = 8")
+                try database.execute("PRAGMA user_version = 9")
             }
         }
     }
@@ -129,7 +129,8 @@ extension DeliveryJournalSchema {
             local_id TEXT PRIMARY KEY NOT NULL CHECK (length(local_id) = 36),
             source_id TEXT UNIQUE,
             producer_system TEXT,
-            privacy_key BLOB NOT NULL CHECK (length(privacy_key) = 32),
+            privacy_key BLOB CHECK (privacy_key IS NULL OR length(privacy_key) = 32),
+            installation_credential BLOB NOT NULL CHECK (length(installation_credential) = 32),
             binding BLOB CHECK (binding IS NULL OR length(binding) BETWEEN 1 AND 16384),
             next_sequence INTEGER NOT NULL CHECK (next_sequence > 0),
             query_definition BLOB NOT NULL CHECK (length(query_definition) BETWEEN 1 AND 16384),

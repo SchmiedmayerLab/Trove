@@ -28,11 +28,17 @@ struct RecordRepresentationConformanceTests {
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let service = try ClinicalEventService(database: app.db, validator: FHIRValidationClient(application: app))
                 for (payloads, intent) in [(active, targets), (retractions, [])] {
-                    let first = try await service.accept(body: HTTPBody(payloads[0]), sourceID: fixture.source.id, targets: intent)
-                    let second = try await service.accept(body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent)
+                    let first = try await service.accept(
+                        body: HTTPBody(payloads[0]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
+                    let second = try await service.accept(
+                        body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
                     #expect(first.eventID == second.eventID)
                     #expect(first.payloadSHA256 != second.payloadSHA256)
-                    let replay = try await service.accept(body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent)
+                    let replay = try await service.accept(
+                        body: HTTPBody(payloads[1]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation
+                    )
                     #expect(replay == second)
                 }
                 let store = ClinicalEventStore(database: app.db)
@@ -77,8 +83,7 @@ extension RecordRepresentationConformanceTests {
         let scope = try EventDeliveryJournal.Scope(backend: Servers.Server1.url().absoluteString, issuer: TestApp.issuer, subject: "test-participant")
         let journalURL = directory.appendingPathComponent("journal.sqlite")
         try await ClientDeliveryRecoveryTests.withJournal(url: journalURL, scope: scope, mode: .createNew) { journal in
-            let setup = try await journal.createSource(localID: fixture.source.registrationID, queryDefinition: Data([1]))
-            try await journal.confirmSource(.init(fixture.source), for: setup)
+            try await SourceBindingFixture.registerJournal(journal, source: fixture.source, query: Data([1]), receiver: (application, token))
             let payloads = try (active + retractions).map { bytes in
                 let projection = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "fixture")
                 let targets = projection.retraction == nil ? fixture.targets(for: projection) : []

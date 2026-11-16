@@ -1,0 +1,31 @@
+#
+# This source file is part of the Trove open-source project
+#
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: trove-source-identity-keyring
+  namespace: trove
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: secret-store
+    kind: ClusterSecretStore
+  target:
+    name: trove-source-identity-keyring
+    creationPolicy: Owner
+  data:
+    - secretKey: keyring.secret
+      remoteRef:
+        key: source-identity-keyring
+        conversionStrategy: Default
+        decodingStrategy: None
+        metadataPolicy: None

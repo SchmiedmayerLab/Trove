@@ -23,7 +23,7 @@ struct EventDeliverySourceSetupTests {
             #expect(pending.binding == nil)
             await #expect(throws: EventDeliveryJournal.JournalError.unknownSource) { try await journal.checkpoint(for: sourceID) }
             let connection = try DeliverySQLite(url: url)
-            let keySQL = "SELECT privacy_key FROM source_state WHERE local_id = ?"
+            let keySQL = "SELECT installation_credential FROM source_state WHERE local_id = ?"
             let keyBefore = try connection.query(keySQL, [.text(localID.uuidString.lowercased())]) {
                 try DeliverySQLite.blob($0, 0)
             }
@@ -33,7 +33,7 @@ struct EventDeliverySourceSetupTests {
             let restored = try await reopened.sourceSetup(for: localID)
             #expect(restored == pending)
             let response = DeliveryFixture.binding(sourceID: sourceID, registrationID: restored.registrationID)
-            let confirmed = try await reopened.confirmSource(response, for: restored)
+            let confirmed = try await reopened.confirmSource(response, for: restored, identityKey: DeliveryFixture.identityKey)
             #expect(try await reopened.confirmSource(response, for: pending) == confirmed)
             let identity = try await Self.recordIdentity(reopened, sourceID: sourceID)
             await reopened.close()
@@ -48,11 +48,11 @@ struct EventDeliverySourceSetupTests {
             let sourceID = UUID()
             var response = DeliveryFixture.binding(sourceID: sourceID, registrationID: setup.registrationID)
             switch field {
-            case "nonce": response.registrationID = UUID().uuidString
-            case "participant": response.participantIdentifier.system = "https://another.test/participants"
-            case "namespace": response.identifierRoot = "/relative"
-            case "event": response.eventIdentifierSystem = "https://foreign.test/events"
-            default: response.revokedAt = response.createdAt.addingTimeInterval(-1)
+            case "nonce": response.installation.registrationID = UUID().uuidString
+            case "participant": response.source.participantIdentifier.system = "https://another.test/participants"
+            case "namespace": response.source.identifierRoot = "/relative"
+            case "event": response.source.eventIdentifierSystem = "https://foreign.test/events"
+            default: response.source.revokedAt = response.source.createdAt.addingTimeInterval(-1)
             }
             await #expect(throws: EventDeliveryJournal.JournalError.invalidSourceBinding) { try await journal.confirmSource(response, for: setup) }
             #expect(try await journal.sourceSetup(for: setup.localID) == setup)
@@ -91,7 +91,7 @@ struct EventDeliverySourceSetupTests {
             let setup = try await journal.sourceSetup(for: DeliveryFixture.epoch)
             let active = try #require(setup.binding)
             var revoked = active
-            revoked.revokedAt = active.createdAt.addingTimeInterval(1)
+            revoked.source.revokedAt = active.source.createdAt.addingTimeInterval(1)
             try await journal.confirmSource(revoked, for: setup)
             await #expect(throws: EventDeliveryJournal.JournalError.sourceConflict) { try await journal.confirmSource(active, for: setup) }
             await #expect(throws: EventDeliveryJournal.JournalError.sourceRevoked) { try await journal.identityScope(for: DeliveryFixture.sourceID) }
@@ -154,7 +154,9 @@ struct EventDeliverySourceSetupTests {
             } else {
                 let pending = try await journal.createSource(localID: localID, queryDefinition: Data([1]))
                 let response = DeliveryFixture.binding(sourceID: UUID(), registrationID: localID)
-                await #expect(throws: EventDeliveryJournal.JournalError.capacityExceeded) { try await journal.confirmSource(response, for: pending) }
+                await #expect(throws: EventDeliveryJournal.JournalError.capacityExceeded) {
+                    try await journal.confirmSource(response, for: pending, identityKey: DeliveryFixture.identityKey)
+                }
                 #expect(try await journal.sourceSetup(for: localID) == pending)
             }
             await journal.close()
@@ -181,7 +183,7 @@ struct EventDeliverySourceSetupTests {
             let pending = try await journal.createSource(localID: UUID(), queryDefinition: Data([1]))
             let sourceID = UUID()
             var response = DeliveryFixture.binding(sourceID: sourceID, registrationID: pending.registrationID)
-            response.revokedAt = response.createdAt
+            response.source.revokedAt = response.source.createdAt
             let restored = try await journal.confirmSource(response, for: pending)
             #expect(restored.binding == response)
             await #expect(throws: EventDeliveryJournal.JournalError.sourceRevoked) { try await journal.identityScope(for: sourceID) }
@@ -208,7 +210,7 @@ extension EventDeliverySourceSetupTests {
         #expect(try await journal.sourceSetup(for: setup.localID) == setup)
         #expect(try await recordIdentity(journal, sourceID: sourceID) == identity)
         let connection = try DeliverySQLite(url: url)
-        let keySQL = "SELECT privacy_key FROM source_state WHERE local_id = ?"
+        let keySQL = "SELECT installation_credential FROM source_state WHERE local_id = ?"
         let restoredKey = try connection.query(keySQL, [.text(setup.localID.uuidString.lowercased())]) {
             try DeliverySQLite.blob($0, 0)
         }

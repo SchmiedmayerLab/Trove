@@ -47,28 +47,44 @@ for embedding an unescaped response in HTML.
 ## Source Registration
 
 Source setup is retained in `EventDeliveryJournal` before networking. Explicitly
-create a new local stream with `createSource(localID:queryDefinition:)`, then send
-its `registrationID` through the authenticated client. Restore existing setup with
-`sourceSetup(for:)`; never fall back to creation after a missing-state error.
-`confirmSource(_:for:)` persists the response, and `identityScope(for:)` restores
-the Grove conversion context without exposing key bytes. The former direct
-`registerSource` API is removed. Keys and queries cannot be replaced in place.
-Journal format 8 rejects earlier or unknown formats without migration or deletion.
+create a local stream with `createSource(localID:queryDefinition:)`. This persists
+an installation UUID and a random 256-bit installation credential, but creates no
+participant identity key. Restore existing setup with `sourceSetup(for:)`; never
+fall back to creation after a missing-state error.
 
-The private journal retains the 256-bit key under its OS/app storage protections;
+`SourceRegistration.synchronize` registers the retained installation UUID,
+credential and native repository through the captured-session client. A separate,
+audited recovery request returns the server's complete identity context and HMAC
+key. The journal atomically confirms that context and key. Once confirmed,
+synchronization reads the installation's current state without redistributing the
+key. Missing remote state, an unrecoverable key or conflicting identity fails
+explicitly; none generates replacement IDs.
+
+The logical source, key ID/epoch, identifier root and repository scope remain
+independent of the local installation UUID. Authorized installations recover the
+same conversion identity for the same native record ID while retaining independent
+credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
+Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
+identity metadata. Known source or installation revocation cannot be cleared by a
+later response. Journal format 9 rejects earlier or unknown formats without
+migration or deletion.
+
+The private journal retains both secrets under its OS/app storage protections;
 this does not provide independent at-rest encryption or resist same-user access.
-The app restores its streams with the bounded `sourceSetups()` snapshot rather
-than keeping a separate preferences index. Requests remain bound to the captured
-authenticated session. No HealthKit collector is enabled by these APIs.
-
-`SourceRegistration.synchronize` performs one captured-session operation over
-existing setup: registration by the retained nonce while pending, or a source-ID
-read after confirmation. It checks the journal's exact scope and revalidates the
-session around suspension points. Missing remote sources never trigger replacement
-registration. Failures retain setup and expose only a sanitized category/status;
-the caller decides when to retry. Permanent known revocation needs no refresh.
+Setup snapshots exclude secret bytes. The app restores streams with bounded
+`sourceSetups()` rather than a separate preferences index. Session checks surround
+network suspension points, and failures expose sanitized categories/statuses.
 The iOS `TroveAPIModule.synchronizeSource` wrapper supplies its existing Keycloak
-session-bound client. Successful synchronization is not consent or collection authority.
+session-bound client. Successful synchronization is not consent or collection
+authority, and these HMAC identity keys are separate from optional signing keys.
+
+The drainer sends the retained installation UUID and credential as
+`Trove-Source-Installation-ID` and `Trove-Source-Credential` headers on Bundle
+submissions. These transport credentials do not enter FHIR bytes, resource IDs or
+submission commitments. Known installation revocation blocks submission, while an
+uncertain earlier upload can still recover its receipt through authenticated lookup
+without these headers. The server independently checks installation revocation at
+admission; a stale client state cannot authorize a revoked installation.
 
 ## HealthKit Acquisition
 

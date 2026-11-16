@@ -31,7 +31,15 @@ Then, from `TroveInfrastructure/docker`:
 
 ```bash
 cp .env.example .env
+docker compose run --rm source-keyring-init
 ```
+
+The initialization command creates the encryption keyring once in the
+`source_identity_keys` volume, owned by the same non-root user as the server. It
+refuses to overwrite an existing file. Normal startup mounts this volume read-only
+and never generates a replacement. Retain and back up the keyring together with
+the database; recreating the server container must reuse both volumes. Do not rerun
+initialization against retained data if the keyring is lost; restore its backup.
 
 ## Full Stack
 

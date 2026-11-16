@@ -46,7 +46,10 @@ GRANT SELECT, INSERT ON public.published_studies, public.enrollment_consents TO 
 GRANT SELECT, INSERT ON public.study_delegations, public.study_publication_candidates TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.study_delegations TO :"runtime_name";
 GRANT SELECT, INSERT ON public.source_bindings TO :"runtime_name";
+GRANT SELECT, INSERT ON public.source_installations TO :"runtime_name";
+GRANT UPDATE (revoked_at) ON public.source_installations TO :"runtime_name";
 GRANT UPDATE (revoked_at) ON public.source_bindings TO :"runtime_name";
+GRANT SELECT, INSERT ON public.source_identity_keys, public.source_identity_key_envelopes TO :"runtime_name";
 GRANT SELECT, INSERT ON public.audit_events TO :"runtime_name";
 GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representations, public.clinical_event_nodes,
     public.clinical_point_facts, public.study_data_grants, public.clinical_source_records,

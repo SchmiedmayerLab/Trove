@@ -18,7 +18,7 @@ actor SourceRegistrationTransport: ClientTransport {
         case malformedReply
     }
 
-    private var binding: Components.Schemas.ParticipantSource
+    private var binding: Components.Schemas.ParticipantSourceRegistration
     private let status: Int
     private var failure: Failure?
     private var replyAction: (@Sendable () async throws -> Void)?
@@ -26,7 +26,7 @@ actor SourceRegistrationTransport: ClientTransport {
     private(set) var paths: [String] = []
     private(set) var bodies: [Data] = []
 
-    init(binding: Components.Schemas.ParticipantSource, status: Int = 200, failure: Failure? = nil) {
+    init(binding: Components.Schemas.ParticipantSourceRegistration, status: Int = 200, failure: Failure? = nil) {
         self.binding = binding
         self.status = status
         self.failure = failure
@@ -36,7 +36,7 @@ actor SourceRegistrationTransport: ClientTransport {
         replyAction = action
     }
 
-    func replaceBinding(_ binding: Components.Schemas.ParticipantSource) {
+    func replaceBinding(_ binding: Components.Schemas.ParticipantSourceRegistration) {
         self.binding = binding
     }
 
@@ -64,6 +64,13 @@ actor SourceRegistrationTransport: ClientTransport {
         }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        if operationID == "recoverParticipantSourceIdentity" {
+            let recovery = Components.Schemas.ParticipantSourceIdentityRecovery(
+                registration: binding, identityKeyBase64: DeliveryFixture.identityKey.base64EncodedString()
+            )
+            let response = HTTPResponse(status: .ok, headerFields: [.contentType: "application/json", .cacheControl: "no-store"])
+            return (response, HTTPBody(try encoder.encode(recovery)))
+        }
         return (.init(status: .ok, headerFields: [.contentType: "application/json"]), HTTPBody(try encoder.encode(binding)))
     }
 }

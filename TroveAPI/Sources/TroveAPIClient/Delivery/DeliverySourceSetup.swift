@@ -36,13 +36,13 @@ extension DeliveryJournal {
             guard existing.isEmpty else { throw JournalError.sourceConflict }
             let count = try database.query("SELECT count(*) FROM source_state") { sqlite3_column_int64($0, 0) }
             guard let count = count.first, count < Self.maximumSources else { throw JournalError.capacityExceeded }
-            let key = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+            let credential = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
             try database.execute(
                 """
-                INSERT INTO source_state(local_id, privacy_key, query_definition, next_sequence, checkpoint_revision)
+                INSERT INTO source_state(local_id, installation_credential, query_definition, next_sequence, checkpoint_revision)
                 VALUES (?, ?, ?, 1, ?)
                 """,
-                [.text(localID.uuidString.lowercased()), .blob(key), .blob(queryDefinition), .text(UUID().uuidString.lowercased())]
+                [.text(localID.uuidString.lowercased()), .blob(credential), .blob(queryDefinition), .text(UUID().uuidString.lowercased())]
             )
             try checkByteLimit()
             try Task.checkCancellation()
@@ -79,7 +79,7 @@ extension DeliveryJournal {
     /// Records a response from the caller's authenticated, scope-bound client. Does not establish authentication itself.
     /// Identity is immutable; the sole permitted update is permanent revocation. Stale replies cannot reactivate a source.
     @discardableResult
-    public func confirmSource(_ binding: Contract.SourceBinding, for expected: SourceSetup) throws -> SourceSetup {
+    public func confirmSource(_ binding: Contract.SourceBinding, for expected: SourceSetup, identityKey: Data? = nil) throws -> SourceSetup {
         try Task.checkCancellation()
         guard expected.scope == scope else { throw JournalError.wrongScope }
         let source = try Contract.source(binding, localID: expected.localID, scope: scope)
@@ -89,11 +89,21 @@ extension DeliveryJournal {
             if let existing = current.binding {
                 try Contract.validateUpdate(from: existing, to: binding)
             }
+            let retainedKeys = try database.query(
+                "SELECT privacy_key FROM source_state WHERE local_id = ?", [.text(expected.localID.uuidString.lowercased())]
+            ) { sqlite3_column_type($0, 0) == SQLITE_NULL ? nil : try DeliverySQLite.blob($0, 0) }
+            let retainedKey = retainedKeys.compactMap { $0 }.first
+            guard identityKey.map({ $0.count == 32 }) ?? true,
+                  retainedKey == nil || identityKey == nil || retainedKey == identityKey,
+                  source.revokedAt != nil || retainedKey != nil || identityKey != nil else { throw JournalError.sourceConflict }
             let bytes = try JSONEncoder().encode(binding)
             guard bytes.count <= 16_384 else { throw JournalError.invalidSourceBinding }
             try database.execute(
-                "UPDATE source_state SET source_id = ?, producer_system = ?, binding = ? WHERE local_id = ?",
-                [.text(source.id.uuidString.lowercased()), .text(source.eventSystem), .blob(bytes), .text(expected.localID.uuidString.lowercased())]
+                "UPDATE source_state SET source_id = ?, producer_system = ?, binding = ?, privacy_key = coalesce(privacy_key, ?) WHERE local_id = ?",
+                [
+                    .text(source.id.uuidString.lowercased()), .text(source.eventSystem), .blob(bytes),
+                    identityKey.map(DeliverySQLite.Value.blob) ?? .null, .text(expected.localID.uuidString.lowercased())
+                ]
             )
             if source.revokedAt != nil {
                 // No future query may use this checkpoint. Retain custody payloads and receipts,
@@ -106,8 +116,21 @@ extension DeliveryJournal {
         }
     }
 
+    /// Installation proof is stored before the first registration request and excluded from public setup state.
+    public func installationCredential(for localID: UUID) throws -> Data {
+        try Task.checkCancellation()
+        let values = try database.query(
+            "SELECT installation_credential FROM source_state WHERE local_id = ?", [.text(localID.uuidString.lowercased())]
+        ) {
+            try DeliverySQLite.blob($0, 0)
+        }
+        guard let credential = values.first else { throw JournalError.unknownSource }
+        guard credential.count == 32 else { throw JournalError.corruptJournal }
+        return credential
+    }
+
     /// Restores the private Grove conversion scope only for a confirmed, non-revoked stream.
-    /// One key epoch belongs to one stream; replacing a lost key requires an explicitly new source.
+    /// A recovered server identity is immutable even when the local installation changes.
     public func identityScope(for sourceID: UUID) throws -> OpaqueIdentityScope {
         let setup = try activeSource(sourceID)
         guard let binding = setup.binding else { throw JournalError.corruptJournal }
@@ -115,10 +138,11 @@ extension DeliveryJournal {
             try DeliverySQLite.blob($0, 0)
         }
         guard let key = keys.first, key.count == 32 else { throw JournalError.corruptJournal }
+        let source = try Contract.source(binding, localID: setup.localID, scope: scope)
         return try .init(
-            systems: Contract.source(binding, localID: setup.localID, scope: scope).systems,
-            keyID: setup.localID.uuidString.lowercased(),
-            epoch: KeyEpoch(1),
+            systems: source.systems,
+            keyID: source.identity.keyID,
+            epoch: source.identity.epoch,
             key: SymmetricKey(data: key)
         )
     }
@@ -148,14 +172,17 @@ extension DeliveryJournal {
 extension DeliveryJournal {
     private static var maximumSources: Int64 { 512 }
     private static var sourceSetupSelection: String { """
-        SELECT local_id, query_definition, binding, source_id, producer_system, length(privacy_key), typeof(privacy_key)
+        SELECT local_id, query_definition, binding, source_id, producer_system, length(privacy_key), typeof(privacy_key),
+            length(installation_credential), typeof(installation_credential)
         FROM source_state
         """ }
 
     private static func decodeSetup(_ statement: OpaquePointer, scope: Scope) throws -> SourceSetup {
         let rawID = try DeliverySQLite.text(statement, 0)
+        let keyType = try DeliverySQLite.text(statement, 6)
         guard let localID = UUID(uuidString: rawID), rawID == localID.uuidString.lowercased(),
-              sqlite3_column_int64(statement, 5) == 32, try DeliverySQLite.text(statement, 6) == "blob",
+              sqlite3_column_int64(statement, 7) == 32, try DeliverySQLite.text(statement, 8) == "blob",
+              keyType == "null" || (sqlite3_column_int64(statement, 5) == 32 && keyType == "blob"),
               (1...16_384).contains(sqlite3_column_bytes(statement, 1)) else { throw JournalError.corruptJournal }
         let query = try DeliverySQLite.blob(statement, 1)
         var binding: Contract.SourceBinding?
@@ -166,11 +193,13 @@ extension DeliveryJournal {
                 let source = try Contract.source(decoded, localID: localID, scope: scope)
                 guard source.id.uuidString.lowercased() == (try DeliverySQLite.text(statement, 3)),
                       source.eventSystem.utf8.elementsEqual(try DeliverySQLite.text(statement, 4).utf8) else { throw JournalError.corruptJournal }
+                guard source.revokedAt != nil || sqlite3_column_int64(statement, 5) == 32 else { throw JournalError.corruptJournal }
                 binding = decoded
             } catch {
                 throw JournalError.corruptJournal
             }
-        } else if sqlite3_column_type(statement, 3) != SQLITE_NULL || sqlite3_column_type(statement, 4) != SQLITE_NULL {
+        } else if sqlite3_column_type(statement, 3) != SQLITE_NULL || sqlite3_column_type(statement, 4) != SQLITE_NULL
+            || sqlite3_column_type(statement, 5) != SQLITE_NULL {
             throw JournalError.corruptJournal
         }
         return SourceSetup(localID: localID, queryDefinition: query, binding: binding, scope: scope)

@@ -68,7 +68,7 @@ struct HealthDataSession {
             _ = try await acquisition.prepareQueryDefinition(enrollmentIDs: enrollmentIDs())
             let refreshed = try await api.synchronizeSource(localID: source.localID, journal: journal, for: session)
             try checkSession()
-            guard refreshed.binding?.revokedAt == nil else {
+            guard refreshed.binding?.isRevoked != true else {
                 return .revoked
             }
             try await healthKit.askForAuthorization(for: .init(read: [HKQuantityType(.heartRate)]))
@@ -90,7 +90,7 @@ struct HealthDataSession {
             _ = try await journal.pruneDelivered()
         }
         try checkSession()
-        guard source.binding?.revokedAt == nil else {
+        guard source.binding?.isRevoked != true else {
             return .revoked
         }
         let enrollments = try await enrollmentIDs()
@@ -125,7 +125,7 @@ struct HealthDataSession {
         finished: Bool = false,
         progress: HeartRateAcquisition.Progress = .caughtUp
     ) async throws -> HealthDataStatus {
-        if source.binding?.revokedAt != nil {
+        if source.binding?.isRevoked == true {
             return .revoked
         }
         let pending = try await journal.pendingDeliveryIDs(limit: 128)

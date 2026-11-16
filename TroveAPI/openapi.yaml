@@ -1083,16 +1083,17 @@ paths:
     post:
       tags:
         - Participant
-      summary: Register a participant-owned app data stream
+      summary: Register an installation against the participant's logical source
       description: >
-        Requires an existing participant profile. A registrationID is an
-        idempotency key scoped to that participant. Repeating it returns the same
-        stream, including its revoked state; it never reactivates a stream.
-        Registration grants no study access and does not attest the data origin.
-        The server assigns all identity namespaces. Preserve the identity key and
-        canonical staged record bytes across restarts. Server-backed identity
-        recovery is not yet implemented; losing the journal currently requires
-        a new stream and does not preserve cross-install deduplication.
+        Requires a verified participant profile. Persist a fresh registrationID
+        and random 256-bit installation credential before the first request.
+        Retries with the same repository and credential return the retained
+        registration, including revocation. Reusing a nonce with a different
+        credential or repository is rejected. Authorized installations for the
+        same participant and repository share one server-provisioned logical
+        source, key ID, epoch and namespace. Registration grants no study access
+        and does not attest the data origin. Missing or unverifiable retained
+        identity state never creates replacement identifiers.
       requestBody:
         required: true
         content:
@@ -1100,19 +1101,22 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required:
-                - registrationID
+              required: [registrationID, repositoryKind, credentialBase64]
               properties:
                 registrationID:
                   type: string
                   format: uuid
+                repositoryKind:
+                  $ref: '#/components/schemas/NativeSourceRepository'
+                credentialBase64:
+                  $ref: '#/components/schemas/SourceInstallationCredential'
       responses:
         '200':
-          description: The registered stream, or the original result of a retry
+          description: The logical source and independently revocable installation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParticipantSource'
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1121,6 +1125,125 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/source-installations/{registrationId}:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getParticipantSourceInstallation
+      tags: [Participant]
+      summary: Restore an account-owned installation's public registration state
+      responses:
+        '200':
+          description: Retained source and installation state, including revocation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/source-installations/{registrationId}/revoke:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: revokeParticipantSourceInstallation
+      tags: [Participant]
+      summary: Permanently revoke one account-owned installation
+      description: >
+        Idempotent. The verified owner may revoke a lost installation without its
+        credential. Other installations and the logical source remain active.
+        This does not withdraw enrollment, retract source records or erase data.
+      responses:
+        '200':
+          description: Retained source and revoked installation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /participant/source-installations/{registrationId}/identity:
+    parameters:
+      - name: registrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: recoverParticipantSourceIdentity
+      tags: [Participant]
+      summary: Recover the complete logical-source identity for an active installation
+      description: >
+        Requires both verified participant ownership and the installation
+        credential. The server commits a disclosure-intent audit event before
+        returning the source identity key. Keep the response out of logs, caches
+        and exports. The derivation key is independent of installation credentials
+        and optional signing keys. Unavailable key-encryption material or corrupt
+        retained state returns an explicit failure without minting a replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [credentialBase64]
+              properties:
+                credentialBase64:
+                  $ref: '#/components/schemas/SourceInstallationCredential'
+      responses:
+        '200':
+          description: The retained registration and its participant identity key
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSourceIdentityRecovery'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/OperationFailure'
 
   /participant/sources/{sourceId}:
     parameters:
@@ -1236,6 +1359,8 @@ paths:
 
   /participant/sources/{sourceId}/events/{eventId}/attributions:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1255,7 +1380,7 @@ paths:
       description: >
         Requires participant source ownership and independently eligible exact consent
         targets. Never changes event bytes, original submission intent or current
-        revision selection. New grants require active enrollment and source, including
+        revision selection. New grants require active enrollment, source and installation, including
         for historical measurements. Pre-consent collection is not implicitly eligible.
         Each command is atomic and idempotent within its source. Exact command retries
         return the original outcome even after withdrawal or revocation; changed event
@@ -1295,6 +1420,8 @@ paths:
 
   /participant/sources/{sourceId}/events:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1312,7 +1439,7 @@ paths:
         relabel delayed measurements. Every retained clinical output requires coverage
         by a named consent; only explicitly selected outputs receive that study's grant.
         A source retraction requires an empty target list and creates no study grants.
-        It requires an authenticated, active source binding but no active enrollment.
+        It requires an authenticated, active source and installation but no active enrollment.
         It suppresses every output of every version of the source record, including later arrivals,
         without deleting retained evidence or affecting other sources. The first accepted retraction
         retains its lifecycle effect when another report repeats its record-retraction identity.
@@ -1379,6 +1506,8 @@ paths:
 
   /participant/sources/{sourceId}/events/batch:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1438,6 +1567,8 @@ paths:
 
   /participant/sources/{sourceId}/record-bundles:
     parameters:
+      - $ref: '#/components/parameters/SourceInstallationID'
+      - $ref: '#/components/parameters/SourceInstallationProof'
       - name: sourceId
         in: path
         required: true
@@ -1867,6 +1998,25 @@ paths:
 
 components:
   parameters:
+    SourceInstallationID:
+      name: Trove-Source-Installation-ID
+      in: header
+      required: true
+      description: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+      schema:
+        type: string
+        format: uuid
+    SourceInstallationProof:
+      name: Trove-Source-Credential
+      in: header
+      required: true
+      description: >
+        Private installation credential. Requires independently verified participant
+        authentication and ownership of the named source. New writes require an active
+        installation; the server rechecks under the revocation lock before committing.
+        Never include this value in logs, URLs, clinical resources or exports.
+      schema:
+        $ref: '#/components/schemas/SourceInstallationCredential'
     DelegationId:
       name: Trove-Delegation-ID
       in: header
@@ -2520,53 +2670,78 @@ components:
           enum:
             - participant-app
 
+    NativeSourceRepository:
+      type: string
+      enum: [healthkit, sensorkit]
+      description: Native repository identity; assignment alone does not imply receiver support for every data type.
+
+    SourceInstallationCredential:
+      type: string
+      minLength: 44
+      maxLength: 44
+      pattern: '^[A-Za-z0-9+/]{43}=$'
+      description: Canonical base64 of a random 256-bit installation secret, independent of identity and signing keys.
+
+    SourceBusinessIdentifier:
+      type: object
+      additionalProperties: false
+      required: [system, value]
+      properties:
+        system:
+          type: string
+          format: uri
+          maxLength: 512
+        value:
+          type: string
+          minLength: 1
+          maxLength: 256
+
     ParticipantSource:
       type: object
       additionalProperties: false
       description: >
-        Server-assigned identity for an unverified participant-app stream.
-        Identifiers are not credentials. Every use requires participant
-        authentication and ownership checks. This is not provider attestation.
-      required:
-        - id
-        - registrationID
-        - kind
-        - eventIdentifierSystem
-        - identifierRoot
-        - participantIdentifier
-        - createdAt
+        Server-assigned logical source shared by a participant's authorized
+        installations for one native repository. Identifiers are not credentials
+        or provider attestation. Reinstalling does not change this identity.
+      required: [id, keyID, keyEpoch, repositoryKind, repositoryScope, kind, eventIdentifierSystem, identifierRoot, participantIdentifier, createdAt]
       properties:
         id:
           type: string
           format: uuid
-        registrationID:
+        keyID:
           type: string
           format: uuid
+        keyEpoch:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: '^[1-9][0-9]*$'
+          description: Immutable derivation-key epoch. Encryption-key rotation does not change it; current sources use epoch 1.
+        repositoryKind:
+          $ref: '#/components/schemas/NativeSourceRepository'
+        repositoryScope:
+          $ref: '#/components/schemas/SourceBusinessIdentifier'
         kind:
           type: string
-          enum:
-            - participant-app
+          enum: [participant-app]
         eventIdentifierSystem:
           type: string
           format: uri
-          description: Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
+          description: Immutable Grove record-version namespace; retractions use the corresponding record-retraction namespace.
         identifierRoot:
           type: string
           format: uri
           maxLength: 256
           description: >
-            Immutable, server-assigned root for this source's Grove identifiers.
-            Derive DeploymentIdentifierSystems with registrationID as keyID and
-            epoch 1. The derived recordVersion system must equal eventIdentifierSystem.
-            The client persists its identity key, pending conversion instant and
-            canonical record bytes in its account-scoped delivery journal.
+            Derive DeploymentIdentifierSystems from this server-assigned root,
+            keyID and keyEpoch. The derived recordVersion system must equal
+            eventIdentifierSystem. Use the supplied repositoryScope in all
+            conversions and retain exact staged record bytes across retries.
         participantIdentifier:
           type: object
           additionalProperties: false
-          description: Complete FHIR Patient business identifier assigned to this participant.
-          required:
-            - system
-            - value
+          description: Complete FHIR Patient business identifier assigned to this participant within this deployment.
+          required: [system, value]
           properties:
             system:
               type: string
@@ -2579,7 +2754,50 @@ components:
         revokedAt:
           type: string
           format: date-time
-          description: Present only after permanent revocation; never cleared.
+          description: Permanent logical-source revocation affects every installation; never cleared.
+
+    ParticipantSourceInstallation:
+      type: object
+      additionalProperties: false
+      required: [registrationID, sourceID, createdAt]
+      properties:
+        registrationID:
+          type: string
+          format: uuid
+        sourceID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          description: Permanent installation revocation; other installations retain independent authority.
+
+    ParticipantSourceRegistration:
+      type: object
+      additionalProperties: false
+      required: [source, installation]
+      properties:
+        source:
+          $ref: '#/components/schemas/ParticipantSource'
+        installation:
+          $ref: '#/components/schemas/ParticipantSourceInstallation'
+
+    ParticipantSourceIdentityRecovery:
+      type: object
+      additionalProperties: false
+      required: [registration, identityKeyBase64]
+      properties:
+        registration:
+          $ref: '#/components/schemas/ParticipantSourceRegistration'
+        identityKeyBase64:
+          type: string
+          minLength: 44
+          maxLength: 44
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+          description: Canonical base64 of the existing 256-bit source identity key. Store under the client's account-bound OS protections.
 
     LocalizationKey:
       type: string

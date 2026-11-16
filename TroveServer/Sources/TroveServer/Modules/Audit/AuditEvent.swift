@@ -54,6 +54,9 @@ struct AuditEvent: Sendable {
         case artifactDiscardScheduled = "artifact.discard.scheduled"
         case sourceRegistered = "source.registered"
         case sourceRevoked = "source.revoked"
+        case sourceInstallationRegistered = "source.installation.registered"
+        case sourceInstallationRevoked = "source.installation.revoked"
+        case sourceIdentityDisclosure = "source.identity.disclosure"
         case clinicalEventAccepted = "clinical.event.accepted"
         case clinicalEventAttributed = "clinical.event.attributed"
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
@@ -62,7 +65,9 @@ struct AuditEvent: Sendable {
 
         var scopeKind: Scope.Kind {
             switch self {
-            case .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
+            case .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
+                 .sourceIdentityDisclosure,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
@@ -75,9 +80,10 @@ struct AuditEvent: Sendable {
             switch self {
             case .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .studyBundleDisclosure,
                  .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDraftDisclosure,
-                 .delegationDisclosure, .studyPublicationDisclosure: true
+                 .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
             case .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
-                 .sourceRegistered, .sourceRevoked, .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
+                 .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
             }
         }

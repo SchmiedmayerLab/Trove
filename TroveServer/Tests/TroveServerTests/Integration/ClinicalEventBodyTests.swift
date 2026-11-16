@@ -32,7 +32,10 @@ struct ClinicalEventBodyTests {
                 let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
                     try await service.accept(
-                        body: HTTPBody(stream, length: .unknown), sourceID: fixture.source.id, targets: fixture.targets
+                        body: HTTPBody(stream, length: .unknown),
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 } throws: { ($0 as? TroveServer.ServerError)?.status.code == 503 }
                 try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
@@ -48,7 +51,7 @@ struct ClinicalEventBodyTests {
                 let body = HTTPBody(Data(), length: .known(Int64(FHIRValidationClient.maximumBytes + 1)))
                 let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
-                    try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets)
+                    try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 } throws: { ($0 as? TroveServer.ServerError)?.status.code == 413 }
                 try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
             }
@@ -63,7 +66,7 @@ struct ClinicalEventBodyTests {
                 let body = HTTPBody([1], length: .known(2))
                 let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
-                    try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets)
+                    try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 } throws: { ($0 as? TroveServer.ServerError)?.status.code == 503 }
                 try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
             }
@@ -82,7 +85,10 @@ struct ClinicalEventBodyTests {
                 let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect(throws: CancellationError.self) {
                     try await service.accept(
-                        body: HTTPBody(stream, length: .unknown), sourceID: fixture.source.id, targets: fixture.targets
+                        body: HTTPBody(stream, length: .unknown),
+                        sourceID: fixture.source.id,
+                        targets: fixture.targets,
+                        installation: fixture.installation
                     )
                 }
                 try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)

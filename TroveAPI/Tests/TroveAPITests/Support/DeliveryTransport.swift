@@ -36,6 +36,7 @@ actor DeliveryTransport: ClientTransport {
     private var receipts: [String: Components.Schemas.EventReceipt] = [:]
     private var replyAction: (@Sendable () async -> Void)?
     private(set) var paths: [String] = []
+    private(set) var installationHeaders: [(id: String?, credential: String?)] = []
     private(set) var submittedBundleBytes: [Data] = []
     private(set) var submittedBytes: [Data] = []
     private(set) var submittedBatches: [Components.Schemas.EventBatchSubmission] = []
@@ -55,6 +56,9 @@ actor DeliveryTransport: ClientTransport {
         let bytes = try await Data(collecting: body, upTo: 6 * 1024 * 1024)
         let path = try #require(request.path)
         paths.append(path)
+        let installationHeader = try #require(HTTPField.Name("Trove-Source-Installation-ID"))
+        let credentialHeader = try #require(HTTPField.Name("Trove-Source-Credential"))
+        installationHeaders.append((request.headerFields[installationHeader], request.headerFields[credentialHeader]))
         #expect(baseURL.absoluteString == DeliveryFixture.scope.backend)
         let response: (HTTPResponse, HTTPBody?)
         if path.hasSuffix("/event-receipts/lookup") {

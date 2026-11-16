@@ -205,7 +205,15 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/profile", successStatus: .conflict, body: jsonData(profileBody())),
             participant(.GET, "\(base)/participant/profile", successStatus: .ok),
             participant(.PUT, "\(base)/participant/profile", successStatus: .ok, body: jsonData(profileBody(firstName: "Updated"))),
-            participant(.POST, "\(base)/participant/sources", successStatus: .ok, body: jsonData(["registrationID": dummyId.uuidString])),
+            participant(.POST, "\(base)/participant/sources", successStatus: .ok, body: jsonData([
+                "registrationID": dummyId.uuidString, "repositoryKind": "healthkit",
+                "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+            ])),
+            participant(.GET, "\(base)/participant/source-installations/\(dummyId)", successStatus: .ok),
+            participant(.POST, "\(base)/participant/source-installations/\(dummyId)/identity", successStatus: .ok, body: jsonData([
+                "credentialBase64": Data(repeating: 0x41, count: 32).base64EncodedString()
+            ])),
+            participant(.POST, "\(base)/participant/source-installations/\(dummyId)/revoke", successStatus: .ok),
             participant(.GET, "\(base)/participant/sources/\(dummyId)", successStatus: .notFound),
             participant(.POST, "\(base)/participant/sources/\(dummyId)/revoke", successStatus: .notFound),
             participant(

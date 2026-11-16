@@ -62,6 +62,7 @@ struct ClinicalEventReceiptHTTPTests {
             // Receipt recovery must not reopen the revoked upload path.
             try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.domain.source.id)/events", beforeRequest: {
                 $0.bearerAuth(token)
+                $0.sourceInstallation(fixture.domain.installationID)
                 try $0.encodeJSONBody(Components.Schemas.EventSubmission(
                     eventBase64: Data("must not reach validation".utf8).base64EncodedString(), targets: fixture.body.targets
                 ))
@@ -108,11 +109,11 @@ struct ClinicalEventReceiptHTTPTests {
     }
 
     @Test
-    func anotherOwnedStreamCannotRecoverTheReceipt() async throws {
+    func anotherOwnedRepositoryCannotRecoverTheReceipt() async throws {
         try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
             let fixture = try await Self.prepare(on: app)
             let other = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                try await SourceBindingService(database: app.db).register(registrationID: UUID())
+                try await SourceBindingService(database: app.db).registerSource(registrationID: UUID(), repositoryKind: .sensorKit)
             }
             try await app.test(.POST, Self.path(other.id), beforeRequest: {
                 $0.bearerAuth(token)
@@ -167,7 +168,10 @@ extension ClinicalEventReceiptHTTPTests {
         let domain = try await ClinicalEventStoreTests.prepare(on: app)
         let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
             try await ClinicalEventStore(database: app.db).accept(
-                ClinicalEventStoreTests.event(source: domain.source), sourceID: domain.source.id, targets: domain.targets
+                ClinicalEventStoreTests.event(source: domain.source),
+                sourceID: domain.source.id,
+                targets: domain.targets,
+                installation: domain.installation
             )
         }
         return .init(domain: domain, receipt: receipt, body: .init(
