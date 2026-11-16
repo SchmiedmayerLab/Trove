@@ -238,6 +238,21 @@ extension AuthIntegrationTests {
             ),
             participant(
                 .POST,
+                "\(base)/participant/sources/\(dummyId)/record-bundles",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.RecordBundleSubmission(bundleBase64: "e30=", records: [
+                    .init(
+                    commitment: .init(
+                        producerEventIdentifier: .init(system: "urn:test", value: "record"),
+                        payloadSHA256: String(repeating: "0", count: 64),
+                        targets: []
+                    ),
+                    entryFullUrls: ["urn:test:entry"]
+                    )
+                ]))
+            ),
+            participant(
+                .POST,
                 "\(base)/participant/sources/\(dummyId)/events/\(dummyId)/attributions",
                 successStatus: .notFound,
                 body: jsonData(Components.Schemas.EventAttribution(

@@ -16,7 +16,7 @@ enum ImmutablePointEventFixture {
     /// Synthetic immutable Mobile point output derived from a questionnaire response.
     /// Binding and consent are established by the real server services before rekeying this event.
     static func bytes(
-        source: SourceBinding, effectiveAt: Date = Date(), fixtureURL: URL? = nil, sequence: UInt64 = 50
+        source: SourceBinding, effectiveAt: Date = Date(), fixtureURL: URL? = nil, sequence: UInt64 = 50, recordID: String? = nil
     ) throws -> Data {
         let url = try #require(fixtureURL ?? Bundle.module.url(forResource: "ImmutablePointEvent", withExtension: "json"))
         let assets = try #require(ProcessInfo.processInfo.environment["TROVE_TEST_VALIDATOR_ASSETS"])
@@ -38,6 +38,7 @@ enum ImmutablePointEventFixture {
             "--participant-system", source.participantIdentifierSystem, "--participant-value", source.participantIdentifierValue,
             "--effective-at", timestamp, "--sequence", String(sequence)
         ]
+        if let recordID { process.arguments?.append(contentsOf: ["--native-record-id", recordID]) }
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice

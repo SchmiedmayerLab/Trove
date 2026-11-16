@@ -84,7 +84,8 @@ enum DeliveryFixture {
         let record = try RecordFixture.make(
             sourceID: sourceID,
             registrationID: registrationID,
-            seed: "\(sequence):\((producerID ?? sourceID).uuidString):\(changes.joined(separator: ","))"
+            seed: "\(sequence):\((producerID ?? sourceID).uuidString):\(changes.joined(separator: ","))",
+            sourceSeed: changes.joined(separator: ",")
         )
         return .init(bytes: record.json, targets: [.init(consentID: consentID, outputFullURLs: record.outputFullURLs)])
     }

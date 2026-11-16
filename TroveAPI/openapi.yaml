@@ -1430,6 +1430,73 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /participant/sources/{sourceId}/record-bundles:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: submitParticipantRecordBundle
+      tags: [Participant]
+      summary: Admit a Grove Bundle with independent record outcomes
+      description: >
+        Submit one Grove active or retraction Bundle for one owned active source, with
+        1–16 record commitments in response order. Active records and retractions cannot mix.
+        Shared entries travel once. Each commitment names the original staged record's
+        ordered entry addresses, exact payload digest and study targets. The receiver
+        reconstructs and validates that record before independently committing it.
+        The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB.
+        A malformed Bundle or a mismatch between its lifecycle records and the commitment
+        list rejects the envelope before admission. Record-level validation or authorization
+        failures do not roll back accepted siblings. Receipts commit the original record
+        bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each
+        uncertain receipt before retrying; remaining records may be packed differently.
+        Transport-only framing and rejected records are not retained as accepted custody.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordBundleSubmission'
+      responses:
+        '200':
+          description: One independent outcome per submitted event, in input order
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 16
+                items:
+                  $ref: '#/components/schemas/EventBatchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: Batch exceeds the request size limit; no member was processed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Invalid Grove exchange graph; no record was admitted
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /participant/studies:
     get:
       tags:
@@ -2206,6 +2273,42 @@ components:
           maxItems: 16
           items:
             $ref: '#/components/schemas/EventSubmission'
+
+    RecordBundleSubmission:
+      type: object
+      additionalProperties: false
+      required: [bundleBase64, records]
+      properties:
+        bundleBase64:
+          type: string
+          minLength: 4
+          maxLength: 5593772
+          description: Canonical RFC 4648 padded base64 of one Grove active or retraction Bundle, at most 4 MiB plus 1 KiB decoded.
+        records:
+          type: array
+          minItems: 1
+          maxItems: 16
+          description: Exactly one commitment per lifecycle record, in response order; entry addresses preserve original record custody.
+          items:
+            $ref: '#/components/schemas/RecordBundleMember'
+
+    RecordBundleMember:
+      type: object
+      additionalProperties: false
+      required: [commitment, entryFullUrls]
+      properties:
+        commitment:
+          $ref: '#/components/schemas/EventReceiptLookup'
+        entryFullUrls:
+          type: array
+          minItems: 1
+          maxItems: 512
+          uniqueItems: true
+          description: Original staged record entry order, including shared nodes; this list confers no collection or study authority.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 512
 
     EventBatchResult:
       description: >

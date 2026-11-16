@@ -211,11 +211,21 @@ remains absent.
 
 `POST /participant/sources/{sourceId}/events` accepts a JSON envelope with
 `eventBase64` and `targets: [{consentId, outputFullUrls}]`. Base64 carries the exact
-original Grove Mobile exchange Bundle bytes; no FHIR JSON reconstruction occurs.
+original Grove Mobile record as a one-record Bundle; no FHIR values are re-encoded.
 Targets name immutable consent records and exact clinical output addresses, not
 mutable enrollment revisions. The limits are 6 MiB for the envelope, 4 MiB for
 decoded event bytes, 512 resource nodes, 16 distinct consents and 512 KiB for
 normalized target intent. Study targets do not appear in URLs.
+
+`POST /participant/sources/{sourceId}/record-bundles` packs several records with
+shared entries into one transport. Each member supplies its original ordered entry
+addresses, payload digest and consent targets. Grove validates the graph; the
+receiver restores exact canonical record bytes without re-encoding FHIR values and
+then applies the same full-validator and atomic admission path. A malformed record
+inventory rejects the envelope; individual record failures return ordered problems
+alongside accepted siblings' receipts. Transport grouping does not enter custody
+identity, and rejected siblings are not retained as accepted bytes. See the
+[Bundle wire limits and retry rules](../TroveAPI/README.md#record-bundle-delivery).
 
 Only an actual byte-limit overflow returns HTTP 413. Interrupted reads and inconsistent
 declared lengths return a sanitized HTTP 503; cancellation stops processing. Incomplete

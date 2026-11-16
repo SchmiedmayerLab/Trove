@@ -171,8 +171,28 @@ rejection results are not persistent receipts and can change with retained state
 After a lost response, recover each member's original receipt before resubmitting
 unchanged bytes and targets. Apply bounded backoff to transient problems and
 retain permanent rejections for inspection. Processing is sequential, not a
-background job. The durable drainer uses this operation for all submissions,
-including one-member batches, with exact receipt lookup for uncertain deliveries.
+background job.
+
+## Record Bundle Delivery
+
+The durable drainer uses `POST /participant/sources/{sourceId}/record-bundles`.
+Grove's packer combines up to 16 compatible records and states shared entries once.
+Active records and retractions travel separately, as do different versions of the
+same source record. The Bundle is transient: the journal continues to store each
+original canonical one-record Bundle and its exact consent targets.
+
+Each member carries its receipt commitment and original entry order. The receiver
+validates the transport graph, restores the original record by splicing unchanged
+entry tokens, and checks the payload digest before full record validation and
+atomic admission. Missing or repeated commitments reject the envelope before any
+admission. A record's validation or authorization failure does not discard accepted
+siblings. Rejected records and transport-only framing are not retained as custody.
+
+The decoded transport limit is 4 MiB plus 1 KiB for framing; each restored record
+remains limited to 4 MiB and 512 entries. The full JSON envelope stays within
+6 MiB, including entry addresses and consent targets. Remaining records can be
+regrouped or reordered on retry: receipts still bind their original bytes and
+intent, independently of transport timestamps and shared-entry placement.
 
 ## Delivery Journal
 
@@ -230,7 +250,7 @@ physical limit. Full storage never silently evicts pending work.
 ## Authenticated Delivery
 
 `EventDeliveryDrainer` performs a bounded pass over ready journal entries using
-source-specific batches, the generated client and a captured-session validator. Construct it for
+source-specific Bundles, the generated client and a captured-session validator. Construct it for
 the journal's exact backend, issuer and participant. The app's `TroveAPIModule`
 factory supplies its existing session-bound transport; it does not enable collection.
 
@@ -243,7 +263,8 @@ retains the payload and requires explicit intervention; it never loops or silent
 discards work.
 
 Packing checks both base64 length and the complete encoded envelope, including
-consent intent, and flushes before crossing a bound or changing source. A short,
+consent intent and original entry addresses, and flushes before crossing a bound,
+changing source or kind, or encountering another version of a packed source record. A short,
 extra or malformed batch result list retains every member with backoff. Complete
 receipts are verified against their original positional commitments; one invalid
 receipt cannot retire another event. Any 401 in a batch stops that instance before

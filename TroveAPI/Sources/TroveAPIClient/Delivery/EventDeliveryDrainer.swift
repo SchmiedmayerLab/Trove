@@ -61,24 +61,24 @@ public actor EventDeliveryDrainer {
         try await checkSession()
         let ids = try await journal.readyDeliveryIDs(at: now(), limit: limit)
         var processed: [UUID] = []
-        var batch = EventDeliveryBatch()
+        var batch = EventDeliveryBatch(packedAt: now())
         for id in ids {
             try await checkSession()
             guard let attempt = try await journal.prepareAttempt(id, at: now()) else { continue }
             processed.append(id)
             guard try await requiresSubmission(attempt) else { continue }
             let member = try EventDeliveryBatch.Member(attempt)
-            if !batch.append(member) {
+            if try !batch.append(member) {
                 try await deliver(batch)
-                batch = EventDeliveryBatch()
-                guard batch.append(member) else {
+                batch = EventDeliveryBatch(packedAt: now())
+                guard try batch.append(member) else {
                     try await apply(.status(413), to: attempt)
                     continue
                 }
             }
             if batch.members.count == EventSubmissionLimits.maximumBatchEvents {
                 try await deliver(batch)
-                batch = EventDeliveryBatch()
+                batch = EventDeliveryBatch(packedAt: now())
             }
         }
         try await deliver(batch)
@@ -201,25 +201,32 @@ extension EventDeliveryDrainer {
     }
 
     private func submit(_ batch: EventDeliveryBatch) async throws -> [Response] {
-        guard let first = batch.members.first else { throw BatchError.invalidResponse }
-        let response = try await client.submitParticipantEventBatch(.init(
+        guard let first = batch.members.first, let submission = batch.submission else { throw BatchError.invalidResponse }
+        let response = try await client.submitParticipantRecordBundle(.init(
             path: .init(sourceId: first.attempt.commitment.sourceID.uuidString.lowercased()),
-            body: .json(.init(events: batch.members.map(\.submission)))
+            body: .json(submission)
         ))
+        return try submissionResponses(response, expectedCount: batch.members.count)
+    }
+
+    private func submissionResponses(
+        _ response: Operations.SubmitParticipantRecordBundle.Output, expectedCount: Int
+    ) throws -> [Response] {
         let failure: Response
         switch response {
         case .ok(let value):
-            return try batchResponses(value.body.json, expectedCount: batch.members.count)
+            return try batchResponses(value.body.json, expectedCount: expectedCount)
         case .badRequest: failure = .status(400)
         case .unauthorized: failure = .status(401)
         case .forbidden: failure = .status(403)
         case .notFound: failure = .status(404)
         case .conflict: failure = .status(409)
         case .contentTooLarge: failure = .status(413)
+        case .unprocessableContent: failure = .status(422)
         case .internalServerError: failure = .status(500)
         case let .undocumented(code, payload): failure = .status(code, retryAfter: retryAfter(payload.headerFields[.retryAfter]))
         }
-        return Array(repeating: failure, count: batch.members.count)
+        return Array(repeating: failure, count: expectedCount)
     }
 
     private func batchResponses(_ results: [Components.Schemas.EventBatchResult], expectedCount: Int) throws -> [Response] {

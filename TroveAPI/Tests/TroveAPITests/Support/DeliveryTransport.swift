@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GroveFHIRContract
 import HTTPTypes
 import OpenAPIRuntime
 import Testing
@@ -35,6 +36,7 @@ actor DeliveryTransport: ClientTransport {
     private var receipts: [String: Components.Schemas.EventReceipt] = [:]
     private var replyAction: (@Sendable () async -> Void)?
     private(set) var paths: [String] = []
+    private(set) var submittedBundleBytes: [Data] = []
     private(set) var submittedBytes: [Data] = []
     private(set) var submittedBatches: [Components.Schemas.EventBatchSubmission] = []
     private(set) var batchBodyBytes: [Int] = []
@@ -64,7 +66,7 @@ actor DeliveryTransport: ClientTransport {
                 response = rejected(404)
             }
         } else {
-            #expect(path.hasSuffix("/events/batch"))
+            #expect(path.hasSuffix("/record-bundles"))
             let components = path.split(separator: "/")
             let sourceIndex = try #require(components.firstIndex(of: "sources"))
             let sourceID = try #require(UUID(uuidString: String(components[sourceIndex + 1])))
@@ -77,7 +79,20 @@ actor DeliveryTransport: ClientTransport {
     }
 
     private func submit(_ bytes: Data, sourceID: UUID) throws -> (HTTPResponse, HTTPBody?) {
-        let batch = try JSONDecoder().decode(Components.Schemas.EventBatchSubmission.self, from: bytes)
+        let submission = try JSONDecoder().decode(Components.Schemas.RecordBundleSubmission.self, from: bytes)
+        let packed = try #require(Data(base64Encoded: submission.bundleBase64))
+        let graph = try (try? ExchangeGraph(validating: packed, kind: .active)) ?? ExchangeGraph(validating: packed, kind: .retraction)
+        let records = try graph.records()
+        let requests = try submission.records.map { member in
+            let record = try #require(records.first {
+                $0.version.identifier.identifier.system.rawValue == member.commitment.producerEventIdentifier.system
+                    && $0.version.identifier.identifier.value == member.commitment.producerEventIdentifier.value
+            })
+            let original = try ExchangeRecordBytes(record).restoring(entryFullURLs: member.entryFullUrls)
+            return Components.Schemas.EventSubmission(eventBase64: original.json.base64EncodedString(), targets: member.commitment.targets)
+        }
+        submittedBundleBytes.append(packed)
+        let batch = Components.Schemas.EventBatchSubmission(events: requests)
         let priorCount = submittedBytes.count
         submittedBatches.append(batch)
         batchBodyBytes.append(bytes.count)

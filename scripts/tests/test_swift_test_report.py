@@ -60,7 +60,7 @@ class SwiftTestReportTests(unittest.TestCase):
             self.path.write_text(document("".join(ET.tostring(case, encoding="unicode") for case in selected),
                                           tests=str(len(selected) - skipped), skipped=str(skipped)))
         write(cases)
-        self.assertEqual(REPORT.verify(self.path, require_full_validator=True), (6, 0))
+        self.assertEqual(REPORT.verify(self.path, require_full_validator=True), (7, 0))
         for index in range(len(cases)):
             with self.subTest(missing=index):
                 write(cases[:index] + cases[index + 1:])

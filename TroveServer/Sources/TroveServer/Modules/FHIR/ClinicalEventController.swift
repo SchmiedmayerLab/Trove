@@ -12,6 +12,15 @@ import TroveAPIServer
 
 
 extension Controller {
+    func submitParticipantRecordBundle(
+        _ input: Operations.SubmitParticipantRecordBundle.Input
+    ) async throws -> Operations.SubmitParticipantRecordBundle.Output {
+        _ = try AuthContext.checkIsParticipant()
+        guard case .json(let body) = input.body else { throw ServerError.invalidRequestBody }
+        let results = try await clinicalEventService.acceptBundle(body, sourceID: input.path.sourceId.requireId())
+        return .ok(.init(body: .json(results)))
+    }
+
     func postParticipantSourcesSourceIdEvents(
         _ input: Operations.PostParticipantSourcesSourceIdEvents.Input
     ) async throws -> Operations.PostParticipantSourcesSourceIdEvents.Output {

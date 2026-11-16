@@ -19,11 +19,13 @@ struct ClinicalEventBatchHTTPTests {
     ])
     func authenticationPrecedesEnvelopeCollection(identity: TestApp.Token, status: HTTPStatus) async throws {
         try await TestApp.withApp(token: identity) { app, token in
-            try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/events/batch", beforeRequest: {
+            for route in ["events/batch", "record-bundles"] {
+                try await app.test(.POST, "\(apiBasePath)/participant/sources/\(UUID())/\(route)", beforeRequest: {
                 $0.bearerAuth(token)
                 $0.headers.contentType = .json
                 $0.body = .init(data: Data(repeating: 32, count: 6 * 1024 * 1024 + 1))
-            }) { #expect($0.status == status) }
+                }) { #expect($0.status == status) }
+            }
         }
     }
 

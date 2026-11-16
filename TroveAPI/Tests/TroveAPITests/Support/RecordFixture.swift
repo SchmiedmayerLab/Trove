@@ -15,7 +15,7 @@ import Testing
 enum RecordFixture {
     /// The Grove 0.3.0-beta.11 minimal heart-rate record with synthetic test identities.
     /// These test values exercise graph shape and custody, not keyed producer-conformance verification.
-    static func make(sourceID: UUID, registrationID: UUID, seed: String, note: String? = nil) throws -> ExchangeRecord {
+    static func make(sourceID: UUID, registrationID: UUID, seed: String, note: String? = nil, sourceSeed: String? = nil) throws -> ExchangeRecord {
         let url = try #require(Bundle.module.url(forResource: "record-heart-rate", withExtension: "json"))
         let original = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         let keyID = registrationID.uuidString.lowercased()
@@ -37,6 +37,7 @@ enum RecordFixture {
         let identifier = try #require(extensions.first?["valueIdentifier"] as? [String: Any])
         let oldVersion = try #require(identifier["value"] as? String)
         entries = try #require(mapStrings(entries) { $0 == oldVersion ? "v0:\(keyID):1:\(digest)" : $0 } as? [[String: Any]])
+        if let sourceSeed { entries = try distinctSource(entries, seed: sourceSeed, keyID: keyID) }
         var addresses: [String: String] = [:]
         for entry in entries {
             let oldAddress = try #require(entry["fullUrl"] as? String)
@@ -54,6 +55,23 @@ enum RecordFixture {
         }
         bundle["entry"] = mapStrings(entries) { addresses[$0] ?? $0 }
         return try ExchangeRecord(validating: JSONSerialization.data(withJSONObject: bundle))
+    }
+
+    private static func distinctSource(_ entries: [[String: Any]], seed: String, keyID: String) throws -> [[String: Any]] {
+        let outputs = entries.compactMap { $0["resource"] as? [String: Any] }
+        let output = try #require(outputs.first { $0["resourceType"] as? String == "Observation" })
+        var replacements: [String: String] = [:]
+        for identifier in try #require(output["identifier"] as? [[String: Any]]) {
+            let coding = (identifier["type"] as? [String: Any])?["coding"] as? [[String: Any]]
+            guard let role = coding?.first?["code"] as? String, ["source-record", "source-output"].contains(role) else { continue }
+            let old = try #require(identifier["value"] as? String)
+            let value = Data(SHA256.hash(data: Data("\(seed):\(role)".utf8))).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            replacements[old] = "v0:\(keyID):1:\(value)"
+        }
+        return try #require(mapStrings(entries) { replacements[$0] ?? $0 } as? [[String: Any]])
     }
 
     private static func mapStrings(_ value: Any, transform: (String) throws -> String) rethrows -> Any {
