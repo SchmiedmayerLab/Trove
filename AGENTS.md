@@ -98,7 +98,7 @@ upstream source changes; verify those separately before release.
 Image candidates use `scripts/release-artifact.py` to package and verify the exact
 tested Docker archives. Do not rebuild in the publication job or replace missing
 platform evidence with another architecture's result. Dirty-source packages are
-never publishable. See [candidate publication](README.md#verified-image-candidates)
+never publishable. See [candidate publication](docs/Engineering-and-Verification.md#verified-image-candidates)
 for the independent approval boundary and remaining deployment gates.
 
 The server defaults to isolated SQLite tests. The real-store lane uses disposable
@@ -121,6 +121,21 @@ traverse build caches or apply Trove's rules to ignored dependency checkouts.
 Keep test inputs unchanged during execution. Record commands, source/dependency
 identity, executed/skipped counts and evidence locations. Reuse valid evidence for
 unchanged components; do not present editable dependencies as a released build.
+
+## Workflows and Repository Settings
+
+- Keep GitHub's default CodeQL setup disabled; `static-analysis.yml` and
+  `codeql.yml` upload the scans, and a second setup produces conflicting uploads.
+- `.github/rulesets/main.json` records the required checks and review rules but
+  does not apply them. When it changes, report that the hosted `main` ruleset must
+  be updated to match; that is a repository-administration step, not a commit.
+- Review workflow changes and the code that will execute before approving a fork
+  run; runner selection is not an isolation boundary. Never give self-hosted
+  runners or untrusted pull requests production credentials, signing material or
+  access to study data.
+
+See [continuous integration](docs/Engineering-and-Verification.md#continuous-integration)
+for the job selection and required checks.
 
 ## Safe Handoff
 

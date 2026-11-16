@@ -69,7 +69,8 @@ in the native app before authorizing collection.
 ## Participant App
 
 Discover published studies, review the details, and provide consent in the iOS app.
-Collection continues offline under the accepted study settings. Study-specific apps
+HealthKit collection, and SensorKit collection where a deployment enables it,
+continues offline under the accepted study settings. Study-specific apps
 can integrate through the API rather than adopting Trove's participant interface.
 
 <div class="trove-phones">

@@ -61,23 +61,113 @@ UI checks include localization, accessibility and appropriate client versions.
 Simulator tests cover the current local client workflow; they do not verify
 physical-device background collection or data protection.
 
-## CI and Release Artifacts
+## Continuous Integration
 
-The aggregate verification job checks that selected component jobs ran and
-succeeded. The API package runs on Linux and natively on macOS; only the macOS job
-can build and test the HealthKit and SensorKit acquisition targets. Repository standards and security checks remain separate required
-checks. Workflow files do not themselves configure branch protection or
-independent review.
+[Build and Test](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/build-and-test.yml) is the entry point.
+It detects which components a change touches and runs only their jobs, so a
+web-only change does not rebuild the iOS app.
+
+| Job | Runs when |
+|----------|-------------|
+| API | `TroveAPI/**` |
+| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit and SensorKit acquisition tests that Linux cannot build |
+| Server | `TroveServer/**`, `TroveAPI/**` |
+| Web | `TroveWeb/**`, `TroveAPI/openapi.yaml` |
+| iOS | `TroveiOS/**`, `TroveAPI/**` |
+| iOS Real Stack UI | `TroveiOS/**`, `TroveAPI/**`, `TroveServer/**` |
+| Infrastructure | `TroveInfrastructure/**` |
+| Dev Stack | `TroveServer/**`, `TroveWeb/**`, `TroveInfrastructure/**` |
+| Secret Scan | Every run, including documentation-only changes |
+| Vulnerability Scan | Every run; also scheduled weekly |
+
+Manual runs and the weekly Sunday 06:17 UTC run select every Trove component,
+including the native AMD64/ARM64 stack checks, to detect gaps in path selection.
+They do not publish images or deploy services. This is the Trove matrix, not the
+full matrix of its upstream Grove repository.
+
+`Required Verification` checks that the selected component jobs ran and succeeded.
+It rejects failed, cancelled, missing or unexpectedly skipped required jobs.
+
+### Secret and Dependency Scans
+
+The secret scan uses the same pinned tool and shared command locally and in CI,
+tests synthetic negative controls, and retains location-only findings.
+
+The dependency scan requires every declared input to be analyzed and checks a
+known-vulnerable control. Web and development-stack jobs also scan their built
+application images by local image ID. Findings of any severity fail verification;
+reports, input identities and CycloneDX inventories are retained as artifacts.
+The [verification commands](https://github.com/SchmiedmayerLab/Trove/blob/main/AGENTS.md#verification) run the same checks locally.
+
+### Static Analysis and Repository Standards
+
+`static-analysis.yml` runs SwiftLint and Swift CodeQL analysis; `codeql.yml` covers
+JavaScript and TypeScript. Both scans run on every pull request, including stacked
+pull requests. GitHub's default CodeQL setup must remain disabled to avoid
+conflicting uploads. Swift CodeQL runs on hosted macOS 26 with Xcode 26.6 because
+its [build tracer does not support Xcode 27](https://github.com/github/codeql/issues/22742).
+
+`repository-standards.yml` runs the organization checks and the verification-script
+tests; coverage is uploaded to Codecov. Repository standards and security checks
+remain separate required checks.
+
+The required checks, signed commits and review requirements are recorded in
+[`.github/rulesets/main.json`](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/rulesets/main.json). Neither this file nor
+the workflows configure branch protection or independent review; keep the hosted
+`main` ruleset synchronized with it.
+
+## Runners and Fork Pull Requests
+
+Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
+use GitHub-hosted Xcode 27 runners. All external contributors' runs require
+maintainer approval.
 
 Untrusted pull requests must not receive signing or production credentials,
-privileged caches, or access to study data. Review the code and workflow changes
-before approving execution on a self-hosted runner.
+privileged caches, or access to study data. Before approving a fork, review the
+workflow changes and the code that will execute: runner selection in a pull
+request is not an isolation boundary. Self-hosted runners must have no production
+credentials or access to study data. Workflow tokens default to read-only and
+cannot approve pull requests.
+
+## Verified Image Candidates
 
 Build release candidates once, then test and publish those exact artifacts.
 Retain source and dependency identities, toolchains, schema/configuration versions,
-provenance and inventories. The [candidate publication procedure](https://github.com/SchmiedmayerLab/Trove#verified-image-candidates)
-defines independent approval and per-architecture evidence. Publication does not
-deploy a service.
+provenance and inventories.
+
+The Dev Stack workflow builds the server and dashboard once on native AMD64 and
+ARM64 runners. Each image must pass its vulnerability scan and stack checks;
+the dashboard is tested both through instrumented Vite and as the built image.
+Docker archives retain the tested image identities, build provenance and SBOMs.
+`scripts/release-artifact.py` binds their bytes and scan evidence to one clean
+source tree and workflow attempt. Local dirty-tree packages are useful for testing
+but cannot be published.
+
+Candidate publication is disabled by default. After configuring the approval
+boundary below, an administrator can set the repository variable
+`TROVE_CANDIDATE_PUBLICATION_ENABLED=true` to enable it. Unset or false leaves
+verification and documentation deployment enabled without publishing images.
+
+After required verification succeeds on `main`, enabled publication consumes
+these archives without rebuilding. It requires the `candidate-publication`
+environment to have required reviewers, prevent self-review and allow only
+protected branches. An administrator must configure this environment and branch
+protection before publication; missing configuration fails closed. Disable
+administrator bypass as part of that setup. The API check verifies configuration,
+not the absence of a privileged administrator override.
+
+Candidates go to `ghcr.io/schmiedmayerlab/trove-server` and
+`ghcr.io/schmiedmayerlab/trove-web` under source/run/attempt-specific tags. Publication
+checks each registry digest and verifies that the combined index preserves both
+platforms and their attestations. `Trove-Published-Candidate/candidate.json` records
+the resulting digests. Consume those digests, not mutable tags. An expired advisory
+database requires a new verification run before publication.
+
+This publishes a candidate, not a deployment: it does not update `main` image tags,
+deployment manifests or running services. Target configuration, recovery evidence,
+identity/withdrawal reconciliation and deployment approval remain separate release
+gates. A failed publication can leave partial candidate uploads, but produces no
+successful candidate record and does not deploy them.
 
 ## Local Development and Deployment
 

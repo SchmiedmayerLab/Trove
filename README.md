@@ -19,7 +19,35 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally)
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Read the Documentation](https://troveplatform.org)
+
+## Why Trove
+
+A digital health study needs more than an app: participants must find it, check
+their eligibility, enroll and consent before any data is collected, and researchers
+need that data in a form they can trust and retrieve. Trove covers that whole path
+on one open-source platform.
+
+- **One study definition.** Information, eligibility, enrollment, consent,
+  questionnaires and health-data collection are configured together and published
+  as a reviewed revision.
+- **Terms that stay fixed.** Enrollments point at the revision a participant
+  accepted, so later edits never change what they agreed to.
+- **Health data from the sources participants already use.** The iOS app collects
+  HealthKit data and, where a deployment enables it, SensorKit data, and keeps
+  collecting offline. Deployments with approved provider registrations also collect
+  from participants' linked wearable accounts.
+- **Standard exchange.** Health data follows the
+  [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/),
+  so records use a documented FHIR structure rather than an app-specific format. The
+  [event-admission contract](TroveServer/README.md#event-admission) lists the
+  supported data and validation requirements.
+- **Access you can account for.** A measurement is stored once and authorized
+  separately for each study. Every data retrieval checks current authority and is
+  audited first.
+- **Open and extensible.** The server, CLI and iOS app are written in Swift and
+  share one typed OpenAPI contract with the web dashboard. Study-specific apps can
+  integrate through the same API. Trove is MIT licensed.
 
 ## For Research Teams
 
@@ -55,10 +83,6 @@ Trove is in beta and is being actively tested and used at Stanford.
 These screenshots use a fictional Daily Activity
 Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
 current flows.
-
-Health-data exchange follows the Grove FHIR implementation guide. See the
-[event-admission contract](TroveServer/README.md#event-admission) for supported data
-and validation requirements.
 
 ## How it fits together
 
@@ -98,116 +122,27 @@ A study is a set of components a researcher configures and combines: information
 
 ## Storing the data
 
-One **PostgreSQL database with TimescaleDB** owns study definitions, enrolments, consent,
-audit and the clinical data boundary. Repositories participating in one accepted operation
-share its explicit transaction; two separate database pools cannot provide that guarantee.
-**S3-compatible object storage** holds immutable study bundles, collected recordings and signed consent PDFs.
-
-During the beta, schema changes target fresh development databases, with no upgrade
-or legacy-data import path. Recreate disposable development databases when their schema
-changes; do not attach an old PostgreSQL data directory to a different engine image.
-The IG receiver retains event custody separately from independently authorized
-study grants; withdrawal from one study does not rewrite another study's evidence.
+One **PostgreSQL database with TimescaleDB** holds study definitions, enrolments, consent,
+audit records and clinical data. **S3-compatible object storage** holds immutable study
+bundles, collected recordings and signed consent PDFs. A measurement relevant to several
+studies is stored once, and withdrawal from one study does not change another study's data.
 
 Keycloak is the sole authority for identities, roles, and group membership; all three applications authenticate against it over OpenID Connect and the server validates tokens against its JWKS.
 
 ## Running it locally
 
 Follow the [local stack instructions](TroveInfrastructure/docker/README.md) to build the
-current images and initialize a fresh database. The setup orders schema creation and explicit
-runtime grants before server startup. Serving and schema-owner credentials are separate;
-the runtime must not be a database owner.
+current images and start the server, dashboard, Keycloak, database and object storage
+with Docker Compose on a fresh development database.
 
-[`TroveInfrastructure/docker/smoke-test.sh`](TroveInfrastructure/docker/smoke-test.sh) checks the stack end to end — services healthy, realm imported, protected routes rejecting anonymous callers, and the server answering an authenticated request with the groups it synced from Keycloak. It runs in CI on every change to the server, web, or infrastructure.
+[`TroveInfrastructure/docker/smoke-test.sh`](TroveInfrastructure/docker/smoke-test.sh) checks the stack end to end — services healthy, realm imported, protected routes rejecting anonymous callers, and the server answering an authenticated request with the groups it synced from Keycloak.
 
-## Continuous integration
+## Documentation
 
-`build-and-test.yml` is the entry point: it works out which components a change touches and runs only those, so a web-only change does not rebuild the iOS app.
-
-Manual runs and the weekly Sunday 06:17 UTC run select every Trove component,
-including the native AMD64/ARM64 stack checks, to detect gaps in path selection.
-They do not publish images or deploy services. This is the Trove matrix, not the
-full matrix of its upstream Grove repository.
-
-| Job | Runs when |
-|----------|-------------|
-| API | `TroveAPI/**` |
-| API (macOS) | `TroveAPI/**`; runs the package tests natively, including the HealthKit and SensorKit acquisition tests that Linux cannot build |
-| Server | `TroveServer/**`, `TroveAPI/**` |
-| Web | `TroveWeb/**`, `TroveAPI/openapi.yaml` |
-| iOS | `TroveiOS/**`, `TroveAPI/**` |
-| iOS Real Stack UI | `TroveiOS/**`, `TroveAPI/**`, `TroveServer/**` |
-| Infrastructure | `TroveInfrastructure/**` |
-| Dev Stack | `TroveServer/**`, `TroveWeb/**`, `TroveInfrastructure/**` |
-| Secret Scan | Every run, including documentation-only changes |
-| Dependency Vulnerability Scan | Every run; also scheduled weekly |
-
-`Required Verification` rejects failed, cancelled, missing or unexpectedly skipped
-required jobs. The secret scan uses the same pinned tool and shared command locally
-and in CI, tests synthetic negative controls, and retains location-only findings.
-See [verification commands](AGENTS.md#verification).
-
-The dependency scan requires every declared input to be analyzed and checks a
-known-vulnerable control. Web and development-stack jobs also scan their built
-application images by local image ID. Findings of any severity fail verification;
-reports, input identities and CycloneDX inventories are retained as artifacts.
-
-`static-analysis.yml` runs SwiftLint and Swift CodeQL analysis. `codeql.yml` covers
-JavaScript and TypeScript. Both scans run on every pull request, including stacks;
-GitHub's default CodeQL setup must remain disabled to avoid conflicting uploads.
-`repository-standards.yml` runs the organization checks; coverage is uploaded to
-Codecov. The required checks, signed commits and review requirements are in
-[`.github/rulesets/main.json`](.github/rulesets/main.json). This file does not apply
-branch protection automatically; keep the hosted `main` ruleset synchronized with it.
-
-Trusted iOS tests and coverage use self-hosted macOS runners. Fork pull requests
-use GitHub-hosted Xcode 27 runners. Swift CodeQL uses hosted macOS 26 with Xcode
-26.6 because its [build tracer does not support Xcode 27](https://github.com/github/codeql/issues/22742).
-All external contributors' runs require maintainer approval.
-Before approving a fork, review workflow changes and the code that will execute:
-runner selection in a pull request is not an isolation boundary. Self-hosted
-runners must have no production credentials or access to study data. Workflow
-tokens default to read-only and cannot approve pull requests.
-
-### Verified Image Candidates
-
-The Dev Stack workflow builds the server and dashboard once on native AMD64 and
-ARM64 runners. Each image must pass its vulnerability scan and stack checks;
-the dashboard is tested both through instrumented Vite and as the built image.
-Docker archives retain the tested image identities, build provenance and SBOMs.
-Artifacts bind their bytes and scan evidence to one clean source tree and workflow
-attempt. Local dirty-tree packages are useful for testing but cannot be published.
-
-Candidate publication is disabled by default. After configuring the approval
-boundary below, an administrator can set the repository variable
-`TROVE_CANDIDATE_PUBLICATION_ENABLED=true` to enable it. Unset or false leaves
-verification and documentation deployment enabled without publishing images.
-
-After required verification succeeds on `main`, enabled publication consumes
-these archives without rebuilding. It requires the `candidate-publication`
-environment to have required reviewers, prevent self-review and allow only
-protected branches. An administrator must configure this environment and branch
-protection before publication; missing configuration fails closed. Disable
-administrator bypass as part of that setup. The API check verifies configuration,
-not the absence of a privileged administrator override.
-
-Candidates go to `ghcr.io/schmiedmayerlab/trove-server` and
-`ghcr.io/schmiedmayerlab/trove-web` under source/run/attempt-specific tags. Publication
-checks each registry digest and verifies that the combined index preserves both
-platforms and their attestations. `Trove-Published-Candidate/candidate.json` records
-the resulting digests. Consume those digests, not mutable tags. An expired advisory
-database requires a new verification run before publication.
-
-This publishes a candidate, not a deployment: it does not update `main` image tags,
-deployment manifests or running services. Target configuration, recovery evidence,
-identity/withdrawal reconciliation and deployment approval remain separate release
-gates. A failed publication can leave partial candidate uploads, but produces no
-successful candidate record and does not deploy them.
-
-## Design Documentation
-
-The [design documentation](docs/Vision.md) explains the architecture, study model
-and integration contracts.
+The [Trove documentation](https://troveplatform.org) walks through the platform and
+explains its design: the study model, data architecture and integration contracts.
+Its contributor guides cover engineering and verification, collection acceptance
+and the documentation site itself.
 
 ## Contributing
 
