@@ -3,12 +3,16 @@
 
 name: Documentation
 
+# Pull requests and main pushes only build and check the site. Publishing a release
+# deploys the documentation of its tag; a manual run on a release tag redeploys it.
 on:
   pull_request:
     paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
   push:
     branches: [main]
     paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -40,13 +44,13 @@ jobs:
           python documentation/check_site.py
           python -m unittest discover -s documentation -p 'test_*.py'
       - uses: actions/upload-pages-artifact@v5
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         with:
           path: site
 
   deploy:
     name: Publish Documentation
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
