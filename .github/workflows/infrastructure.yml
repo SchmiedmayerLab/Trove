@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@v2
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
       - name: Check formatting
         run: tofu fmt -check -diff
       - name: Initialize
@@ -91,7 +91,7 @@ jobs:
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
       - name: Install Helm
-        uses: azure/setup-helm@v5
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
       - name: Create KIND cluster
         run: kind create cluster --name trove --config tools/kind-config.yaml
       # The dev overlay runs the published images, which do not exist for an unmerged change.

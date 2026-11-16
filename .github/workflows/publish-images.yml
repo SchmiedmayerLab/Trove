@@ -44,11 +44,11 @@ jobs:
           python3 -B scripts/release-artifact.py verify --artifacts "$RUNNER_TEMP/candidates" \
             --revision "$GITHUB_SHA" --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
             --output "$RUNNER_TEMP/publication-plan.json"
-      - uses: docker/setup-docker-action@v5
+      - uses: docker/setup-docker-action@3f1ab1ab0e29231562e4db4ca600c1a49653bac6 # v5.7.0
         with:
           daemon-config: '{"features":{"containerd-snapshotter":true}}'
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

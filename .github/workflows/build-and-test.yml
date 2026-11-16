@@ -42,7 +42,7 @@ jobs:
       devstack: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.devstack }}
     steps:
       - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         with:
@@ -114,7 +114,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -143,7 +143,7 @@ jobs:
     name: iOS
     needs: changes
     if: needs.changes.outputs.ios == 'true'
-    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       contents: read
     with:
@@ -170,7 +170,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -401,7 +401,7 @@ jobs:
       NATIVE_COVERAGE_SUBDIRECTORY: native-coverage-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -455,7 +455,7 @@ jobs:
         needs.web.result == 'success' ||
         needs.dev-stack.result == 'success'
       )
-    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       actions: read
       contents: read
