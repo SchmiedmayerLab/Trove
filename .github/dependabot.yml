@@ -55,7 +55,7 @@ updates:
     cooldown:
       default-days: 7
     ignore:
-      # grove-design-system's DataTable is built on react-table 8; remove once it supports 9.
+      # grove-design-system's DataTable is built on react-table 8; remove once it supports 9 (#182).
       - dependency-name: "@tanstack/react-table"
         versions: [">=9"]
     groups:
@@ -79,7 +79,7 @@ updates:
     cooldown:
       default-days: 7
     ignore:
-      # botocore requires python-dateutil<3.0.0; remove once botocore allows a newer major version.
+      # botocore requires python-dateutil<3.0.0; remove once botocore allows a newer major version (#182).
       - dependency-name: "python-dateutil"
         versions: [">=3"]
     groups:
