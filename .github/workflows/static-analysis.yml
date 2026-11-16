@@ -24,7 +24,7 @@ permissions:
 jobs:
   swiftlint:
     name: SwiftLint
-    uses: SchmiedmayerLab/.github/.github/workflows/swiftlint.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/swiftlint.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       contents: read
     with:
@@ -34,7 +34,7 @@ jobs:
   # so the iOS app is scanned through xcodebuild instead.
   codeql:
     name: CodeQL (Swift)
-    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       security-events: write
       actions: read

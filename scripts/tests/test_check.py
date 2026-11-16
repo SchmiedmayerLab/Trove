@@ -69,7 +69,7 @@ class VerificationInputTests(unittest.TestCase):
     def test_linux_verification_and_release_use_the_same_pinned_swift_image(self):
         dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
         workflow = (ROOT / ".github/workflows/swift-package.yml").read_text()
-        image_pattern = r"swift:6\.4\.0-noble@sha256:[a-f0-9]{64}"
+        image_pattern = r"swift:6\.4\.2-noble@sha256:[a-f0-9]{64}"
         build_images = re.findall(image_pattern, dockerfile)
         self.assertEqual(len(build_images), 1)
         self.assertEqual(re.findall(image_pattern, workflow), build_images * 2)
@@ -98,7 +98,7 @@ class VerificationInputTests(unittest.TestCase):
         compose = (ROOT / "TroveInfrastructure/docker/docker-compose.yml").read_text()
         self.assertIn("server_authority_data:/pgdata", compose)
         self.assertIn("PGDATA: /pgdata", compose)
-        self.assertIn("timescale/timescaledb:latest-pg18@sha256:", compose)
+        self.assertIn("timescale/timescaledb:2.32.0-pg18@sha256:", compose)
         self.assertNotIn("server_db_data", compose)
         self.assertNotIn("server_timescale_data", compose)
         self.assertNotIn("server-timescale", compose)
@@ -123,10 +123,14 @@ class VerificationInputTests(unittest.TestCase):
     def test_dependency_updates_point_at_manifests(self):
         source = (ROOT / ".github/dependabot.yml").read_text()
         updates = re.findall(r'package-ecosystem: "([^"]+)"\s+directory: "([^"]+)"', source)
-        self.assertEqual(len(updates), 11)
+        self.assertEqual(len(updates), 17)
+        self.assertIn(("docker-compose", "/TroveServer/Benchmarks"), updates)
+        for directory in ("infrastructure/base/keycloak", "infrastructure/dev", "database-operator", "argocd-apps/dev"):
+            self.assertIn(("docker", "/TroveInfrastructure/" + directory), updates)
         self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
+        self.assertIn(("docker", "/TroveInfrastructure/validator/runtime"), updates)
         manifests = {
             "github-actions": ".github/workflows/*.yml",
             "swift": "Package.swift",
@@ -138,7 +142,33 @@ class VerificationInputTests(unittest.TestCase):
         }
         for ecosystem, directory in updates:
             with self.subTest(ecosystem=ecosystem, directory=directory):
-                self.assertTrue(list((ROOT / directory.lstrip("/")).glob(manifests[ecosystem])))
+                path = ROOT / directory.lstrip("/")
+                found = list(path.glob(manifests[ecosystem]))
+                if ecosystem == "docker" and not found:
+                    # Kubernetes manifests with pinned images.
+                    found = [item for item in path.glob("*.yaml") if re.search(r"image: \S+@sha256:", item.read_text())]
+                self.assertTrue(found)
+
+    def test_validator_runtime_images_match_the_manifest(self):
+        # Dependabot updates only the runtime Dockerfile; the manifest identity must change with it.
+        runtime = (ROOT / "TroveInfrastructure/validator/runtime/Dockerfile").read_text()
+        manifest = json.loads((ROOT / "TroveInfrastructure/validator/manifest.json").read_text())["runtimeImages"]
+        self.assertEqual(re.findall(r"^FROM (\S+)", runtime, re.MULTILINE), [manifest["base"]])
+        self.assertRegex(manifest["base"], r"^cgr\.dev/chainguard/wolfi-base:latest@sha256:[0-9a-f]{64}$")
+        installed = re.search(r"apk add --no-cache((?:\s+\\\n\s+\S+)+)", runtime).group(1)
+        self.assertEqual(sorted(re.findall(r"(\S+=\S+)", installed)), sorted(manifest["packages"]))
+        for package in manifest["packages"]:
+            self.assertRegex(package, r"^[a-z0-9.-]+=[0-9][^=\s]*-r\d+$")
+        self.assertTrue(any(package.startswith("python-3.15=") for package in manifest["packages"]))
+        self.assertTrue(any(package.startswith("openjdk-21-jre=") for package in manifest["packages"]))
+        validator = (ROOT / "TroveInfrastructure/validator/Dockerfile").read_text()
+        self.assertEqual(re.findall(r"^FROM (\S+)", validator, re.MULTILINE), ["${RUNTIME_IMAGE}"])
+        self.assertNotIn("RUN ", validator)
+        for workflow in ("dev-stack.yml", "swift-package.yml"):
+            text = (ROOT / ".github/workflows" / workflow).read_text()
+            runtime_build = text.index("TroveInfrastructure/validator/runtime")
+            offline_build = text.index("docker build --network=none --build-arg RUNTIME_IMAGE=")
+            self.assertLess(runtime_build, offline_build)
 
     def test_ui_stack_rejects_invalid_prebuilt_binary_before_startup(self):
         for binary in ("relative/server", str(ROOT / "TroveServer"), str(ROOT / "TroveServer/Package.swift")):
@@ -235,6 +265,59 @@ class VerificationInputTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
         job = workflow.split("  manifests:\n", 1)[1].split("\n  tofu-validate:\n", 1)[0]
         self.assertRegex(job, r"defaults:\n\s+run:\n\s+shell: bash\n")
+
+    def test_python_tool_requirements_are_hashed_and_installed_with_hashes(self):
+        for path in ("TroveInfrastructure/tools/requirements.txt",
+                     "TroveInfrastructure/validator/recovery-requirements.txt"):
+            with self.subTest(path=path):
+                text = (ROOT / path).read_text()
+                pins = re.findall(r"^([A-Za-z0-9_.-]+)==\S+", text, re.MULTILINE)
+                self.assertTrue(pins)
+                self.assertEqual(len(re.findall(r"^\S+==\S+.*\\\n\s+--hash=sha256:[0-9a-f]{64}", text, re.MULTILINE)), len(pins))
+                self.assertTrue((ROOT / path.replace(".txt", ".in")).is_file())
+        installs = [line for path in sorted((ROOT / ".github/workflows").glob("*.yml"))
+                    for line in path.read_text().splitlines() if "tools/requirements.txt" in line and "install" in line]
+        self.assertEqual(len(installs), 3)
+        for line in installs:
+            self.assertIn("--require-hashes", line)
+
+    def test_every_action_is_pinned_to_a_commit_with_its_release(self):
+        files = sorted((ROOT / ".github").rglob("*.yml"))
+        references = []
+        for path in files:
+            for line in path.read_text().splitlines():
+                match = re.match(r"\s*(?:-\s+)?uses:\s+(\S+)(.*)$", line)
+                if match and not match.group(1).startswith("./"):
+                    references.append((path.name, match.group(1), match.group(2)))
+        self.assertGreater(len(references), 50)
+        for name, reference, comment in references:
+            with self.subTest(file=name, reference=reference):
+                self.assertRegex(reference, r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}$")
+                self.assertRegex(comment, r"^ # v\d+\.\d+\.\d+$")
+
+    def test_infrastructure_tools_are_pinned_and_checksum_verified(self):
+        workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
+        self.assertNotIn("/latest/", workflow)
+        self.assertNotIn("azure/setup-helm", workflow)
+        for release, checksum in (("KUBECONFORM_RELEASE: v0.8.0", "KUBECONFORM_SHA256"),
+                                  ("KIND_RELEASE: v0.33.0", "KIND_SHA256"),
+                                  ("HELM_RELEASE: v4.3.2", "HELM_SHA256")):
+            with self.subTest(release=release):
+                step = workflow.split(release, 1)[1].split("- name:", 1)[0]
+                self.assertRegex(workflow, checksum + r": [0-9a-f]{64}\n")
+                self.assertIn(f'"${checksum}"', step)
+                self.assertLess(step.index("sha256sum --check --strict"), step.index("/usr/local/bin"))
+
+    def test_opentofu_uses_the_committed_provider_lock(self):
+        workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
+        self.assertIn("tofu init -backend=false -lockfile=readonly", workflow)
+        self.assertRegex(workflow, r"setup-opentofu@[0-9a-f]{40} # v[0-9.]+\n\s+with:\n\s+tofu_version: \d+\.\d+\.\d+\n")
+        lock = (ROOT / "TroveInfrastructure/terraform/.terraform.lock.hcl").read_text()
+        for provider in ("hashicorp/google", "hashicorp/google-beta"):
+            block = lock.split(f'provider "registry.opentofu.org/{provider}"', 1)[1].split("\n}\n", 1)[0]
+            self.assertRegex(block, r'version\s+= "\d+\.\d+\.\d+"')
+            self.assertIn('"h1:', block)
+            self.assertIn('"zh:', block)
 
     def test_dev_stack_uses_declared_node_version(self):
         package = json.loads((ROOT / "TroveWeb/package.json").read_text())

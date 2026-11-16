@@ -6,29 +6,31 @@
 # SPDX-License-Identifier: MIT
 #
 
+# Traefik v3.7.19. The chart cannot derive the version from a digest.
+image:
+  digest: sha256:aa942a00bce033c909bf1f7e861d93761be4b31a035f10d2410d33e38a8f41cf
+versionOverride: v3.7.19
 service:
   enabled: true
-  type: LoadBalancer
   spec:
+    type: LoadBalancer
     loadBalancerIP: "34.182.76.103"
-logs:
-  general:
-    level: WARN
-  access:
-    enabled: true
-    format: json
-    fields:
-      general:
-        defaultmode: drop
-        names:
-          StartUTC: keep
-          RequestMethod: keep
-          DownstreamStatus: keep
-          Duration: keep
-          RouterName: keep
-          ServiceName: keep
-      headers:
-        defaultmode: drop
+log:
+  level: WARN
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    defaultMode: drop
+    names:
+      StartUTC: keep
+      RequestMethod: keep
+      DownstreamStatus: keep
+      Duration: keep
+      RouterName: keep
+      ServiceName: keep
+    headers:
+      defaultMode: drop
 persistence:
   enabled: true
   name: traefik-data

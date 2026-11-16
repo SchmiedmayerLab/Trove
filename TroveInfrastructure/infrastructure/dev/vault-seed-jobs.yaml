@@ -20,7 +20,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: vault-setup
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           env:
             - name: VAULT_ADDR
               value: http://vault.vault.svc.cluster.local:8200
@@ -48,7 +48,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: vault-setup
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           env:
             - name: VAULT_ADDR
               value: http://vault.vault.svc.cluster.local:8200
@@ -78,7 +78,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: vault-setup
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           env:
             - name: VAULT_ADDR
               value: http://vault.vault.svc.cluster.local:8200
@@ -106,7 +106,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: vault-setup
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           env:
             - name: VAULT_ADDR
               value: http://vault.vault.svc.cluster.local:8200
@@ -135,7 +135,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: vault-setup
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           env:
             - name: VAULT_ADDR
               value: http://vault.vault.svc.cluster.local:8200

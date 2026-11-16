@@ -28,7 +28,7 @@ jobs:
       group: documentation-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -44,7 +44,7 @@ jobs:
           test "$release" = "false false"
           latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           test "$latest" = "$TAG"
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.13'
           cache: pip
@@ -56,7 +56,7 @@ jobs:
           zensical build --clean --strict
           python documentation/check_site.py
           python -m unittest discover -s documentation -p 'test_*.py'
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         with:
           path: site
@@ -90,4 +90,4 @@ jobs:
           test "$latest" = "$TAG"
       - name: Deploy the checked site
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

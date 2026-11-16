@@ -6,10 +6,20 @@
 # SPDX-License-Identifier: MIT
 #
 
+# The chart has no digest values, so each tag carries the digest of the image that
+# chart 10.18.0 selects. Update them with ARGOCD_CHART_VERSION in tools/setup.py.
+global:
+  image:
+    tag: v3.6.1@sha256:296e3d74f449b2ce45265613fcb68c18ed7366488360c8ea32f5f2a93d2e5c54
+dex:
+  image:
+    tag: v2.46.1@sha256:65b72ca0f4b0bf6d4ada84ec21da8851782563404ac7b8f926923d27ceced9ab
+
 # Pull the chart-selected Redis image directly from its upstream registry.
 redis:
   image:
     repository: docker.io/library/redis
+    tag: 8.6.4-alpine@sha256:2cc044fc5a07c9b701f8f1255a309ae9ad7856e694ac03513bf3648c01e40763
 
 configs:
   cm:

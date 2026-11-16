@@ -6,27 +6,30 @@
 # SPDX-License-Identifier: MIT
 #
 
+# Traefik v3.7.19. The chart cannot derive the version from a digest.
+image:
+  digest: sha256:aa942a00bce033c909bf1f7e861d93761be4b31a035f10d2410d33e38a8f41cf
+versionOverride: v3.7.19
 service:
   enabled: true
-  type: NodePort
-logs:
-  general:
-    level: WARN
-  access:
-    enabled: true
-    format: json
-    fields:
-      general:
-        defaultmode: drop
-        names:
-          StartUTC: keep
-          RequestMethod: keep
-          DownstreamStatus: keep
-          Duration: keep
-          RouterName: keep
-          ServiceName: keep
-      headers:
-        defaultmode: drop
+  spec:
+    type: NodePort
+log:
+  level: WARN
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    defaultMode: drop
+    names:
+      StartUTC: keep
+      RequestMethod: keep
+      DownstreamStatus: keep
+      Duration: keep
+      RouterName: keep
+      ServiceName: keep
+    headers:
+      defaultMode: drop
 persistence:
   enabled: true
   name: traefik-data
@@ -38,7 +41,7 @@ persistence:
 deployment:
   initContainers:
     - name: volume-permissions
-      image: busybox:1.37
+      image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
       command: ["sh", "-c", "touch /data/acme.json; chown 65532:65532 /data/acme.json; chmod -v 600 /data/acme.json"]
       securityContext:
         runAsNonRoot: false
@@ -64,8 +67,9 @@ ports:
     nodePort: 30443
     expose:
       default: true
-    tls:
-      enabled: true
+    http:
+      tls:
+        enabled: true
 ingressRoute:
   dashboard:
     enabled: true

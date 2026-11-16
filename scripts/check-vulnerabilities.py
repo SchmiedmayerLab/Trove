@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 
-VERSION = "0.74.0"
+VERSION = "0.76.2"
 ROOT = Path(__file__).resolve().parents[1]
 # Recovery uses a nonstandard filename; stage identical bytes under a detected name.
 INPUTS = {

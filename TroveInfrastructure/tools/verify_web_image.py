@@ -27,7 +27,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
-TRAEFIK = "traefik:v3.5.0@sha256:4e7175cfe19be83c6b928cae49dde2f2788fb307189a4dc9550b67acf30c11a5"
+TRAEFIK = "traefik:v3.7.19@sha256:aa942a00bce033c909bf1f7e861d93761be4b31a035f10d2410d33e38a8f41cf"
 SETTINGS = {"VITE_API_BASE_PATH": "https://localhost", "VITE_KEYCLOAK_URL": "https://localhost/auth",
             "VITE_KEYCLOAK_REALM": "synthetic-realm", "VITE_KEYCLOAK_CLIENT_ID": "synthetic-web"}
 
@@ -91,6 +91,7 @@ class Verification:
         self.network = False
         self.results = {"image": json.loads(command("docker", "image", "inspect", image))[0]["Id"], "checks": [], "passed": False}
         self.context = ssl.create_default_context(cafile=str(fixtures.ca_file))
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     def container(self, name, *, identity=None, environment=None, image=None, arguments=(), mounts=(), serving=True):
         options = ["docker", "create", "--name", self.name + "-" + name, "--network", self.name,
@@ -233,11 +234,12 @@ class Verification:
                      "serversTransports": {"platform-https": {"serverName": "localhost", "insecureSkipVerify": False, "rootCAs": ["/fixtures/ca.pem"]}}},
             "tls": {"certificates": [{"certFile": "/run/secrets/https/tls.crt", "keyFile": "/run/secrets/https/tls.key"}]},
         }
-        path = self.fixtures.root / "ingress.json"
+        # Traefik's file provider reads only YAML and TOML; JSON is valid YAML.
+        path = self.fixtures.root / "ingress.yaml"
         path.write_text(json.dumps(config))
         ingress, port = self.container("ingress", identity=identity, image=TRAEFIK,
-                                       mounts=[(path, "/etc/traefik/dynamic.json"), (self.fixtures.ca_file, "/fixtures/ca.pem")],
-                                       arguments=["--entrypoints.https.address=:8080", "--providers.file.filename=/etc/traefik/dynamic.json", "--log.level=WARN"])
+                                       mounts=[(path, "/etc/traefik/dynamic.yaml"), (self.fixtures.ca_file, "/fixtures/ca.pem")],
+                                       arguments=["--entrypoints.https.address=:8080", "--providers.file.filename=/etc/traefik/dynamic.yaml", "--log.level=WARN"])
         self.ready(ingress, port)
         self.check_content(port, secure=True)
         self.results["checks"].append("verified-traefik-https-on-both-hops")

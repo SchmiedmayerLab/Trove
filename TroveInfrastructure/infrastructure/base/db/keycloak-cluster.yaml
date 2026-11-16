@@ -14,7 +14,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie@sha256:5c389b0268d9e637ca55efa41a7fafa3996332b5ea3c6099d0861c5f31acb00e
+  # No extension constrains this database; use the newest minimal Trixie image.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.7-minimal-trixie@sha256:452a15584e2aa1ce658c4ae8538b5dc157eb031d41b82fd19882e0c03bcec01d
   instances: 1
   storage:
     size: 1Gi

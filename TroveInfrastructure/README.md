@@ -75,14 +75,14 @@ not identity recovery. Production never uses this development seeder.
 
 ### Production Database
 
-Production uses CloudNativePG 1.30.0 (chart 0.29.0), PostgreSQL 18.6 and TimescaleDB
-2.29.2, with immutable multi-architecture image references. Its supported
+Production uses CloudNativePG 1.30.1 (chart 0.29.1), PostgreSQL 18.6 and TimescaleDB
+2.32.0, with immutable multi-architecture image references. Its supported
 [image-volume extension mechanism](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/)
 requires Kubernetes 1.35 or later and a compatible runtime (containerd 2.1+ or
 CRI-O 1.31+). Confirm ImageVolume support before bootstrap. The PostgreSQL and
 extension images both target PostgreSQL 18 on Debian Trixie; do not mix their OS,
-major version or architecture. Keycloak uses the same PostgreSQL image without
-the clinical extension.
+major version or architecture. Keycloak's database has no extension and uses
+PostgreSQL 18.7.
 
 The Cluster preloads TimescaleDB and disables its telemetry. The `Database/trove`
 resource installs the extension at the pinned SQL version. On first installation,

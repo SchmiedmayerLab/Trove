@@ -40,11 +40,12 @@ Prepare from a local Grove FHIR checkout containing the pinned commit, `.build/f
 python3 TroveInfrastructure/validator/prepare.py \
   --grove-fhir /absolute/path/to/grove-fhir \
   --output /private/tmp/trove-validator-build
+docker build --tag trove-fhir-validator-runtime:local TroveInfrastructure/validator/runtime
 docker build --network=none --tag trove-fhir-validator:local /private/tmp/trove-validator-build
 python3 -m unittest discover -s TroveInfrastructure/validator -p test_worker.py
 ```
 
-The two base images are digest-pinned; Docker may fetch those bases when they are not cached. No build step resolves FHIR packages online. Keep the prepared context outside the repository; it contains approximately 1.4 GB of tooling and package data.
+The runtime image (`runtime/Dockerfile`) installs pinned Wolfi packages for Python 3.15 and the OpenJDK 21 runtime on a digest-pinned base, and is the only step that uses the network. The validator build then adds the verified assets with `--network=none`; pass `--build-arg RUNTIME_IMAGE=<tag>` to use another runtime tag. No build step resolves FHIR packages online. Keep the prepared context outside the repository; it contains approximately 1.4 GB of tooling and package data.
 
 If the checkout's build outputs have changed, pass
 `--artifacts /absolute/path/to/locked-artifacts` to preparation. That directory
@@ -142,14 +143,14 @@ The smoke check tests the CLI with networking disabled, then HTTP through a temp
 
 ## Backend Process Restart Check
 
-On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.8.0 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
+On macOS, run the complete one-event/two-studies checkpoint with a compiled native server, Python 3.12 or later, JDK 21, Docker, and the prepared context above. The Keycloak 26.8.2 archive must match the checksum checked by the script. Cache the script's digest-pinned PostgreSQL/Timescale and SeaweedFS images first; this harness does not build or update dependencies.
 
 ```sh
 python3 TroveInfrastructure/validator/verify_process_restart.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.2.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 
@@ -178,7 +179,7 @@ python3 TroveInfrastructure/validator/verify_healthkit_acquisition.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.2.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home \
   --runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
@@ -277,13 +278,13 @@ ordinary tooling tests do not depend on it:
 
 ```sh
 python3 -m venv /private/tmp/trove-recovery-tools
-/private/tmp/trove-recovery-tools/bin/python -m pip install \
+/private/tmp/trove-recovery-tools/bin/python -m pip install --require-hashes \
   -r TroveInfrastructure/validator/recovery-requirements.txt
 /private/tmp/trove-recovery-tools/bin/python TroveInfrastructure/validator/verify_backup_restore.py \
   --binary /absolute/path/to/TroveServer/.build/debug/TroveServer \
   --assets /private/tmp/trove-validator-build/assets \
   --image trove-fhir-validator:local \
-  --keycloak-archive /absolute/path/to/keycloak-26.8.0.tar.gz \
+  --keycloak-archive /absolute/path/to/keycloak-26.8.2.tar.gz \
   --java-home /absolute/path/to/jdk-21/Contents/Home
 ```
 

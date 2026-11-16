@@ -92,7 +92,7 @@ class CIPathTests(unittest.TestCase):
         steps = workflow["jobs"]["changes"]["steps"]
         filters = [step for step in steps if step.get("id") == "filter"]
         self.assertEqual(len(filters), 1)
-        self.assertEqual(filters[0]["uses"], "dorny/paths-filter@v4")
+        self.assertEqual(filters[0]["uses"], "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d")
         self.filters = yaml.safe_load(filters[0]["with"]["filters"])
         self.assertEqual(set(self.filters), SELECTORS)
         # The current rules use only exact paths and directory/**. Reject richer

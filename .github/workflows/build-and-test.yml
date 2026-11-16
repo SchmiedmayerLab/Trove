@@ -41,8 +41,8 @@ jobs:
       infrastructure: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.infrastructure }}
       devstack: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outputs.devstack }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         with:
@@ -113,8 +113,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -146,7 +146,7 @@ jobs:
     # xcodebuild.yml v0.5 has no strict package resolution option and tolerates errors in
     # its resolution step, so this job does not enforce the iOS Package.resolved. The
     # real-stack UI job resolves strictly but does not prove this job used the same graph.
-    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       contents: read
     with:
@@ -172,8 +172,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -197,7 +197,7 @@ jobs:
           git diff --exit-code -- Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
       - name: Retain resolved Swift dependency lockfiles
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-Apple-Swift-Package.resolved
           path: |
@@ -206,7 +206,7 @@ jobs:
           if-no-files-found: error
       - name: Retain resolved iOS dependency lockfile
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-iOS-Package.resolved
           path: TroveiOS/Trove.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
@@ -214,8 +214,8 @@ jobs:
       - name: Install the native test stack
         shell: bash
         env:
-          KEYCLOAK_VERSION: 26.8.0
-          KEYCLOAK_SHA256: 9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a
+          KEYCLOAK_VERSION: 26.8.2
+          KEYCLOAK_SHA256: dd124787283918bc597628887168333465ee2a811a389e0003569e52be7e487f
         run: |
           if ! brew list --versions openjdk@21 >/dev/null; then
             brew install openjdk@21
@@ -285,14 +285,14 @@ jobs:
             bash TroveiOS/scripts/verify-ui-test-consent.sh
       - name: Upload the UI-test result
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-iOS-UI-Tests.xcresult
           path: TroveiOS/Trove-iOS-UI-Tests.xcresult
           if-no-files-found: warn
       - name: Upload the raw UI-test log
         if: success() || failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-iOS-UI-Test-Log
           path: ${{ runner.temp }}/trove-ui-xcodebuild.log
@@ -368,7 +368,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Require every selected verification job to succeed
         shell: bash
         env:
@@ -403,8 +403,8 @@ jobs:
     env:
       NATIVE_COVERAGE_SUBDIRECTORY: native-coverage-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '27.2'
       - name: Verify and use stable Xcode
@@ -413,13 +413,13 @@ jobs:
           echo "DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer" >> "$GITHUB_ENV"
       - name: Download native unit-test coverage
         if: needs.ios.result == 'success'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Trove-iOS-Tests.xcresult
           path: ${{ runner.temp }}/${{ env.NATIVE_COVERAGE_SUBDIRECTORY }}/unit.xcresult
       - name: Download native UI-test coverage
         if: needs.ios-ui.result == 'success'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Trove-iOS-UI-Tests.xcresult
           path: ${{ runner.temp }}/${{ env.NATIVE_COVERAGE_SUBDIRECTORY }}/ui.xcresult
@@ -436,7 +436,7 @@ jobs:
           python3 -B scripts/native-line-coverage.py --repository "$GITHUB_WORKSPACE" \
             --output "$RUNNER_TEMP/Trove-iOS-Line-Tests.lcov" "${bundles[@]}"
       - name: Upload native line coverage
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-iOS-Line-Tests.lcov
           path: ${{ runner.temp }}/Trove-iOS-Line-Tests.lcov
@@ -458,7 +458,7 @@ jobs:
         needs.web.result == 'success' ||
         needs.dev-stack.result == 'success'
       )
-    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@v0.5
+    uses: SchmiedmayerLab/.github/.github/workflows/coverage.yml@fb9dd6c658af3d5b6073b986655cb093ea5821c3 # v0.5.23
     permissions:
       actions: read
       contents: read

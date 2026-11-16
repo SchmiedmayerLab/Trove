@@ -12,6 +12,9 @@ path = [
     "TroveServer/Tests/TroveServerTests/Resources/HealthKitComponentEvents/**",
     "docs/images/**/*.png",
     "documentation/requirements.txt",
+    "TroveInfrastructure/tools/requirements.txt",
+    "TroveInfrastructure/validator/recovery-requirements.txt",
+    "TroveInfrastructure/terraform/.terraform.lock.hcl",
 ]
 SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
 SPDX-License-Identifier = "MIT"

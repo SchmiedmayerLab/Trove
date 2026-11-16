@@ -159,7 +159,11 @@
   ],
   "workerSHA256": "3df1de656e5e19be8654a9bed841be77a1c45299012f38cc99c1a90f5da9bad4",
   "runtimeImages": {
-    "python": "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
-    "java": "eclipse-temurin:21-jre-jammy@sha256:eebd356ad7358b7094758e5787a6726f332917cfd56feab6457c56dab895cdbf"
+    "base": "cgr.dev/chainguard/wolfi-base:latest@sha256:2c12da5496e21e99003b3db3b9246f025e53d533c4df334205391260f1e8f85b",
+    "packages": [
+      "openjdk-21-default-jvm=21.0.13.0.3-r1",
+      "openjdk-21-jre=21.0.13.0.3-r1",
+      "python-3.15=3.15.2_git20261113-r0"
+    ]
   }
 }

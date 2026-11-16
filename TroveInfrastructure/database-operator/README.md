@@ -67,7 +67,7 @@ in PostgreSQL.
 
 ## Verification
 
-Install `TroveInfrastructure/tools/requirements.txt` in a local Python environment
+Install `TroveInfrastructure/tools/requirements.txt` with `--require-hashes` in a local Python environment
 and have `kubectl` available. `bash scripts/check tooling` renders both overlays and
 checks credential separation, sync ordering, image consistency, TLS policy and
 persistent-volume wiring. These checks require no live cluster.

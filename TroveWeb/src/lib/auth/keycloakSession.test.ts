@@ -38,6 +38,7 @@ const keycloakFixture = (): SessionKeycloak => {
       keycloak.token = undefined;
       keycloak.tokenParsed = undefined;
       if (hadToken) keycloak.onAuthLogout?.();
+      return Promise.resolve();
     },
   };
   return keycloak;
@@ -74,9 +75,9 @@ afterEach(() => {
 });
 
 describe("Keycloak session lifetime", () => {
-  it("allows signed-out initialization without ending or authenticating a session", () => {
+  it("allows signed-out initialization without ending or authenticating a session", async () => {
     const keycloak = keycloakFixture();
-    keycloak.clearToken();
+    await keycloak.clearToken();
     const { binding, onUser, onEnded } = setup(keycloak);
     keycloak.onAuthLogout?.();
     binding.synchronize();
@@ -142,6 +143,53 @@ describe("Keycloak session lifetime", () => {
       expect(requests[0]?.headers.get("Authorization")).toBeNull();
     },
   );
+
+  it("ends once and detaches requests before Keycloak finishes clearing its token", async () => {
+    const keycloak = keycloakFixture();
+    const clearImmediately = keycloak.clearToken;
+    let pendingClear: Promise<void> | undefined;
+    keycloak.clearToken = () => {
+      pendingClear = Promise.resolve().then(clearImmediately);
+      return pendingClear;
+    };
+    const { binding, cache, onUser, onEnded, requests } = setup(keycloak);
+    binding.synchronize();
+    cache.setQueryData(["private"], "old-data");
+    keycloak.onAuthRefreshError?.();
+    expect(keycloak.token).toBe("initial-token");
+    expect(cache.getQueryData(["private"])).toBeUndefined();
+    expect(onUser).toHaveBeenLastCalledWith(null);
+    await client.get({ url: "/fixture", throwOnError: true });
+    expect(requests[0]?.headers.get("Authorization")).toBeNull();
+    await pendingClear;
+    expect(keycloak.token).toBeUndefined();
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends the session when Keycloak fails to clear its token", async () => {
+    const keycloak = keycloakFixture();
+    let attempts = 0;
+    // A plain function: Vitest mocks observe returned promises, which would
+    // mark an unhandled rejection as handled.
+    keycloak.clearToken = () => {
+      attempts += 1;
+      return Promise.reject(new Error("Clear failed"));
+    };
+    const { binding, cache, onUser, onEnded, requests } = setup(keycloak);
+    binding.synchronize();
+    cache.setQueryData(["private"], "old-data");
+    keycloak.onAuthRefreshError?.();
+    // The token remains set after the failed clear, so a later event retries it.
+    keycloak.onAuthLogout?.();
+    expect(attempts).toBe(2);
+    expect(cache.getQueryData(["private"])).toBeUndefined();
+    expect(onUser).toHaveBeenLastCalledWith(null);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    await client.get({ url: "/fixture", throwOnError: true });
+    expect(requests[0]?.headers.get("Authorization")).toBeNull();
+    // Let Node report any unhandled clear rejection, which fails the Vitest run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 
   it.each([
     { sub: "other-researcher" },

@@ -148,7 +148,7 @@ dependencies:
 ```bash
 docker build -f TroveWeb/Dockerfile -t trove-web:local .
 python3 -m venv .build/web-tooling
-.build/web-tooling/bin/pip install -r TroveInfrastructure/tools/requirements.txt
+.build/web-tooling/bin/pip install --require-hashes -r TroveInfrastructure/tools/requirements.txt
 .build/web-tooling/bin/python TroveInfrastructure/tools/verify_web_image.py --image trove-web:local
 ```
 

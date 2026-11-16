@@ -79,7 +79,7 @@ This is a current-file scan, not a scan of Git history or a substitute for depen
 and container vulnerability checks. Never suppress an entire test directory to
 make a secret check pass.
 
-Vulnerability checks require Trivy 0.74.0 and a fresh evidence directory separate
+Vulnerability checks require Trivy 0.76.2 and a fresh evidence directory separate
 from its cache. Use the same commands as CI:
 
 ```sh

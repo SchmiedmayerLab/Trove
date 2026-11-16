@@ -5,6 +5,7 @@
 """Check the rendered deployment contract, not just individual YAML fragments."""
 
 import json
+import re
 from pathlib import Path
 import subprocess
 import unittest
@@ -55,6 +56,20 @@ class DeploymentContractTests(unittest.TestCase):
                     for user in realm.get("users", []):
                         self.assertFalse(any(value.endswith("/" + capability) for value in user.get("groups", [])))
                     self.assertFalse(any(value.endswith("/" + capability) for value in realm.get("defaultGroups", [])))
+
+    def test_only_the_server_client_can_obtain_admin_api_tokens(self):
+        # Keycloak 26.8.2 rejects Admin REST API tokens without the kc-admin-api scope.
+        for path in (ROOT / "docker/keycloak/realm.json", ROOT / "infrastructure/base/keycloak/realm/00-realm.json",
+                     ROOT / "infrastructure/dev/realm/00-realm.json"):
+            with self.subTest(path=path):
+                realm = json.loads(path.read_text())
+                admin_clients = {client["clientId"] for client in realm["clients"]
+                                 if "kc-admin-api" in client.get("defaultClientScopes", [])
+                                 + client.get("optionalClientScopes", [])}
+                self.assertEqual(admin_clients, {"trove-server"})
+                account = next(user for user in realm["users"] if user.get("serviceAccountClientId") == "trove-server")
+                self.assertEqual(account["clientRoles"], {"realm-management": ["query-groups", "view-users"]})
+                self.assertNotIn("realmRoles", account)
 
     def test_local_cluster_uses_the_verified_extension_compatible_node(self):
         configuration = yaml.safe_load((ROOT / "tools/kind-config.yaml").read_text())
@@ -253,8 +268,9 @@ class DeploymentContractTests(unittest.TestCase):
         documents = self.rendered["infrastructure", "prod"]
         database = named(documents, "Cluster", "trove-db")["spec"]
         identity = named(documents, "Cluster", "keycloak-db")["spec"]
-        self.assertEqual(database["imageName"], identity["imageName"])
+        # TimescaleDB 2.32.0 supports PostgreSQL up to 18.6; the identity database has no extension.
         self.assertRegex(database["imageName"], r"postgresql:18\.6-minimal-trixie@sha256:[a-f0-9]{64}$")
+        self.assertRegex(identity["imageName"], r"postgresql:18\.7-minimal-trixie@sha256:[a-f0-9]{64}$")
         self.assertFalse(database["enableSuperuserAccess"])
         engine = database["postgresql"]
         self.assertEqual(engine["shared_preload_libraries"], ["timescaledb"])
@@ -262,13 +278,71 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(len(engine["extensions"]), 1)
         extension = engine["extensions"][0]
         self.assertEqual(extension["name"], "timescaledb-oss")
-        self.assertRegex(extension["image"]["reference"], r"timescaledb-oss:2\.29\.2-18-trixie@sha256:[a-f0-9]{64}$")
+        self.assertRegex(extension["image"]["reference"], r"timescaledb-oss:2\.32\.0-18-trixie@sha256:[a-f0-9]{64}$")
         self.assertNotIn("extensions", identity.get("postgresql", {}))
         installation = named(documents, "Database", "trove")["spec"]
         self.assertEqual(installation["cluster"], {"name": "trove-db"})
         self.assertEqual(installation["owner"], database["bootstrap"]["initdb"]["owner"])
-        self.assertEqual(installation["extensions"], [{"name": "timescaledb", "version": "2.29.2"}])
+        self.assertEqual(installation["extensions"], [{"name": "timescaledb", "version": "2.32.0"}])
         self.assertFalse(any(item["kind"] == "Database" for item in self.rendered["infrastructure", "dev"]))
+
+    def test_development_and_test_timescale_match_the_production_extension(self):
+        documents = self.rendered["infrastructure", "prod"]
+        extension = named(documents, "Cluster", "trove-db")["spec"]["postgresql"]["extensions"][0]["image"]["reference"]
+        production = re.search(r"timescaledb-oss:(\d+\.\d+\.\d+)-18-", extension).group(1)
+        installed = named(documents, "Database", "trove")["spec"]["extensions"][0]["version"]
+        self.assertEqual(installed, production)
+        paths = ["docker/docker-compose.yml", "infrastructure/dev/timescale.yaml", "database-operator/job.yaml",
+                 "validator/verify_process_restart.py", "../TroveServer/Benchmarks/docker-compose.yml",
+                 "../.github/workflows/swift-package.yml"]
+        references = [match for path in paths
+                      for match in re.findall(r"timescale/timescaledb:(\S+?)@sha256:[0-9a-f]{64}", (ROOT / path).read_text())]
+        self.assertGreaterEqual(len(references), 7)
+        for tag in references:
+            with self.subTest(tag=tag):
+                self.assertRegex(tag, rf"^{re.escape(production)}-pg1[78]$")
+
+    def test_duplicated_pins_stay_identical(self):
+        repository = ROOT.parent
+        def references(pattern, *paths):
+            return [match for path in paths for match in re.findall(pattern, (repository / path).read_text())]
+
+        keycloak = set(references(r"quay\.io/keycloak/keycloak:(\S+)", "TroveInfrastructure/docker/docker-compose.yml",
+                                  "TroveInfrastructure/infrastructure/base/keycloak/keycloak.yaml"))
+        self.assertEqual(len(keycloak), 1)
+        version = re.fullmatch(r"(\d+\.\d+\.\d+)-\d+@sha256:[0-9a-f]{64}", keycloak.pop()).group(1)
+        workflow = (repository / ".github/workflows/build-and-test.yml").read_text()
+        verifier = (ROOT / "validator/verify_process_restart.py").read_text()
+        checksum = re.search(r"KEYCLOAK_SHA256: ([0-9a-f]{64})", workflow).group(1)
+        self.assertIn(f"KEYCLOAK_VERSION: {version}\n", workflow)
+        self.assertIn(f'KEYCLOAK_VERSION = "{version}"', verifier)
+        self.assertIn(f'KEYCLOAK_SHA = "{checksum}"', verifier)
+        self.assertIn(f"^{checksum}$", (repository / ".gitleaks.toml").read_text())
+        for readme in ("TroveInfrastructure/validator/README.md", "TroveServer/Benchmarks/README.md"):
+            self.assertEqual(set(references(r"keycloak-(\d+\.\d+\.\d+)\.tar\.gz", readme)), {version})
+
+        vault = references(r"image: (hashicorp/vault:\S+)", "TroveInfrastructure/infrastructure/dev/vault-server.yaml",
+                           "TroveInfrastructure/infrastructure/dev/vault-seed-jobs.yaml")
+        self.assertEqual(len(vault), 6)
+        self.assertEqual(len(set(vault)), 1)
+        self.assertRegex(vault[0], r":\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$")
+
+        storage = references(r"chrislusf/seaweedfs:\S+?@sha256:[0-9a-f]{64}", "TroveInfrastructure/docker/docker-compose.yml",
+                             "TroveInfrastructure/infrastructure/dev/seaweedfs.yaml", ".github/workflows/swift-package.yml",
+                             "TroveInfrastructure/validator/verify_process_restart.py")
+        self.assertEqual(len(storage), 4)
+        self.assertEqual(len(set(storage)), 1)
+
+        operator = yaml.safe_load((ROOT / "argocd-apps/base/cnpg-operator.yaml").read_text())["spec"]["source"]
+        operator_version = re.fullmatch(r"(\d+\.\d+\.\d+)@sha256:[0-9a-f]{64}", operator["helm"]["valuesObject"]["image"]["tag"]).group(1)
+        self.assertIn(f"CloudNativePG {operator_version} (chart {operator['targetRevision']})", (ROOT / "README.md").read_text())
+        clusters = references(r"cloudnative-pg/postgresql:(\d+)\.\d+-minimal-(\w+)@sha256:[0-9a-f]{64}",
+                              "TroveInfrastructure/infrastructure/base/db/cluster.yaml",
+                              "TroveInfrastructure/infrastructure/base/db/keycloak-cluster.yaml")
+        extensions = references(r"timescaledb-oss:\d+\.\d+\.\d+-(\d+)-(\w+)@sha256:[0-9a-f]{64}",
+                                "TroveInfrastructure/infrastructure/prod/patches/db-cluster.yaml")
+        self.assertEqual(len(clusters), 2)
+        self.assertEqual(set(clusters), set(extensions))
 
     def test_only_the_schema_owner_can_provision_runtime_roles(self):
         database = named(self.rendered["infrastructure", "prod"], "Cluster", "trove-db")["spec"]
@@ -277,9 +351,9 @@ class DeploymentContractTests(unittest.TestCase):
             "ALTER ROLE trove CREATEROLE", "GRANT pg_read_all_settings TO trove",
         ])
         chart = yaml.safe_load((ROOT / "argocd-apps/base/cnpg-operator.yaml").read_text())
-        self.assertEqual(chart["spec"]["source"]["targetRevision"], "0.29.0")
+        self.assertEqual(chart["spec"]["source"]["targetRevision"], "0.29.1")
         self.assertRegex(chart["spec"]["source"]["helm"]["valuesObject"]["image"]["tag"],
-                         r"^1\.30\.0@sha256:[a-f0-9]{64}$")
+                         r"^1\.30\.1@sha256:[a-f0-9]{64}$")
 
     def test_production_identity_tls_is_consistent(self):
         documents = self.rendered["infrastructure", "prod"]
@@ -400,18 +474,43 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn({"to": [{"podSelector": {"matchLabels": {"app": "keycloak"}}}],
                        "ports": [{"protocol": "TCP", "port": 8443}]}, egress)
 
+    def test_cluster_traefik_runs_the_verified_image_by_digest(self):
+        verifier = (ROOT / "tools/verify_web_image.py").read_text()
+        reference = re.search(r'^TRAEFIK = "traefik:(v[0-9.]+)@(sha256:[0-9a-f]{64})"$', verifier, re.MULTILINE)
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                values = yaml.safe_load((ROOT / f"argocd-apps/{environment}/traefik-values.yaml").read_text())
+                self.assertEqual(values["image"], {"digest": reference.group(2)})
+                self.assertEqual(values["versionOverride"], reference.group(1))
+
+    def test_operator_and_argocd_images_are_pinned_by_digest(self):
+        digest = r"sha256:[0-9a-f]{64}"
+        manager = yaml.safe_load((ROOT / "argocd-apps/base/cert-manager.yaml").read_text())["spec"]["source"]["helm"]["valuesObject"]
+        self.assertRegex(manager["image"]["digest"], f"^{digest}$")
+        for component in ("webhook", "cainjector", "acmesolver", "startupapicheck"):
+            self.assertRegex(manager[component]["image"]["digest"], f"^{digest}$")
+        secrets = yaml.safe_load((ROOT / "argocd-apps/base/external-secrets-operator.yaml").read_text())
+        values = secrets["spec"]["source"]["helm"]["valuesObject"]
+        version = secrets["spec"]["source"]["targetRevision"]
+        for image in (values["image"], values["webhook"]["image"], values["certController"]["image"]):
+            self.assertRegex(image["tag"], f"^v{re.escape(version)}@{digest}$")
+        bootstrap = yaml.safe_load((ROOT / "bootstrap/helm-values/base.yaml").read_text())
+        for image in (bootstrap["global"]["image"], bootstrap["dex"]["image"], bootstrap["redis"]["image"]):
+            self.assertRegex(image["tag"], f"@{digest}$")
+
     def test_ingress_access_logs_exclude_headers_urls_and_participant_identifiers(self):
         for environment in ("dev", "prod"):
             values = yaml.safe_load((ROOT / f"argocd-apps/{environment}/traefik-values.yaml").read_text())
-            self.assertEqual(values["logs"]["general"]["level"], "WARN")
-            access = values["logs"]["access"]
+            self.assertNotIn("logs", values)
+            self.assertEqual(values["log"], {"level": "WARN"})
+            access = values["accessLog"]
             self.assertTrue(access["enabled"])
             self.assertEqual(access["format"], "json")
-            self.assertEqual(access["fields"]["headers"], {"defaultmode": "drop"})
-            self.assertEqual(access["fields"]["general"], {
-                "defaultmode": "drop",
+            self.assertEqual(access["fields"], {
+                "defaultMode": "drop",
                 "names": dict.fromkeys(("StartUTC", "RequestMethod", "DownstreamStatus", "Duration",
                                         "RouterName", "ServiceName"), "keep"),
+                "headers": {"defaultMode": "drop"},
             })
 
     def test_runtime_secret_is_distinct_and_production_secrets_have_no_seed_values(self):

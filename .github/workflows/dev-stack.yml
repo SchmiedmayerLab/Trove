@@ -32,16 +32,16 @@ jobs:
     env:
       COMPOSE_FILE: docker-compose.yml:../validator/compose.yaml
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Prepare hosted runner disk capacity
         run: bash scripts/prepare-hosted-disk.sh
-      - uses: docker/setup-docker-action@v5
+      - uses: docker/setup-docker-action@3f1ab1ab0e29231562e4db4ca600c1a49653bac6 # v5.7.0
         with:
           daemon-config: '{"features":{"containerd-snapshotter":true}}'
       - name: Restore pinned public validator artifacts
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/validator-artifacts
           key: fhir-validator-artifacts-v1-${{ hashFiles('TroveInfrastructure/validator/manifest.json') }}
@@ -64,29 +64,6 @@ jobs:
           fi
           docker build --provenance=mode=max --sbom=true --label "org.opencontainers.image.revision=$SOURCE_REVISION" \
             -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
-      - uses: ./.github/actions/setup-trivy
-      - name: Scan the application images used by this stack
-        run: |
-          set -euo pipefail
-          result=0
-          for component in server web; do
-            bash scripts/check vulnerabilities image --image "ghcr.io/schmiedmayerlab/trove-$component:main" \
-              --output "$RUNNER_TEMP/trove-image-scans/$component" --cache "$RUNNER_TEMP/trivy-cache" || result=1
-          done
-          exit "$result"
-      - name: Retain application image scans and inventories
-        if: success() || failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: Trove-Stack-Image-Scans-${{ matrix.architecture }}
-          path: ${{ runner.temp }}/trove-image-scans
-          if-no-files-found: error
-      - name: Release build cache before pulling backing services
-        if: runner.environment == 'github-hosted'
-        # Runtime images remain tagged. Only build cache on this ephemeral hosted runner is removed.
-        run: |
-          docker builder prune --all --force
-          df -h /
       - name: Prepare the pinned offline FHIR validator
         run: |
           set -euo pipefail
@@ -97,9 +74,37 @@ jobs:
           git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")"
           python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
             --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context"
-          docker build --network=none -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
+          # Only the runtime base needs the network; the validator build adds verified assets offline.
+          docker build -t trove-fhir-validator-runtime:ci TroveInfrastructure/validator/runtime
+          docker build --network=none --build-arg RUNTIME_IMAGE=trove-fhir-validator-runtime:ci \
+            -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
           echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect trove-fhir-validator:ci --format '{{.Id}}')" >> "$GITHUB_ENV"
           echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-trivy
+      - name: Scan the application and validator images used by this stack
+        run: |
+          set -euo pipefail
+          result=0
+          for component in server web validator; do
+            image="ghcr.io/schmiedmayerlab/trove-$component:main"
+            if [ "$component" = validator ]; then image=trove-fhir-validator:ci; fi
+            bash scripts/check vulnerabilities image --image "$image" \
+              --output "$RUNNER_TEMP/trove-image-scans/$component" --cache "$RUNNER_TEMP/trivy-cache" || result=1
+          done
+          exit "$result"
+      - name: Retain application image scans and inventories
+        if: success() || failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Trove-Stack-Image-Scans-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/trove-image-scans
+          if-no-files-found: error
+      - name: Release build cache before pulling backing services
+        if: runner.environment == 'github-hosted'
+        # Runtime images remain tagged. Only build cache on this ephemeral hosted runner is removed.
+        run: |
+          docker builder prune --all --force
+          df -h /
       # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
       # migration has to run first. It starts the backing services it depends on.
       - name: Initialize the fresh keyring and apply migrations
@@ -124,7 +129,7 @@ jobs:
           KEYCLOAK_DEV_PASSWORD="$dev_password" ./verify-fhir-ingestion.sh
       # The end-to-end tests drive the real application, so they belong with the running stack
       # rather than in the web job, which has no backend to talk to.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
           cache: npm
@@ -160,7 +165,7 @@ jobs:
               --scans "$RUNNER_TEMP/trove-image-scans/$component" --output "$RUNNER_TEMP/trove-candidates/$component"
           done
       - name: Retain tested image candidates
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-Candidates-${{ matrix.architecture }}
           path: ${{ runner.temp }}/trove-candidates
@@ -169,14 +174,14 @@ jobs:
           if-no-files-found: error
       - name: Upload the end-to-end coverage report
         if: (success() || failure()) && matrix.architecture == 'amd64'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-Web-E2E.lcov
           path: TroveWeb/coverage-e2e/lcov.info
           if-no-files-found: warn
       - name: Collect diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Trove-Web-E2E-diagnostics-${{ matrix.architecture }}
           path: TroveWeb/test-results/

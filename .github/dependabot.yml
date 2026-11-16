@@ -12,6 +12,8 @@ updates:
     directory: "/documentation"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -20,6 +22,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -28,6 +32,8 @@ updates:
     directory: "/TroveAPI"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -36,6 +42,8 @@ updates:
     directory: "/TroveServer"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -44,6 +52,12 @@ updates:
     directory: "/TroveWeb"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    ignore:
+      # grove-design-system's DataTable is built on react-table 8; remove once it supports 9 (#182).
+      - dependency-name: "@tanstack/react-table"
+        versions: [">=9"]
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -52,6 +66,8 @@ updates:
     directory: "/TroveInfrastructure/tools"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -60,6 +76,12 @@ updates:
     directory: "/TroveInfrastructure/validator"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    ignore:
+      # botocore requires python-dateutil<3.0.0; remove once botocore allows a newer major version (#182).
+      - dependency-name: "python-dateutil"
+        versions: [">=3"]
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -68,6 +90,8 @@ updates:
     directory: "/TroveServer"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -76,6 +100,18 @@ updates:
     directory: "/TroveWeb"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/validator/runtime"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -84,6 +120,59 @@ updates:
     directory: "/TroveInfrastructure/docker"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker-compose"
+    directory: "/TroveServer/Benchmarks"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  # Kubernetes manifests; tests keep duplicated pins in other files identical.
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/infrastructure/base/keycloak"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/infrastructure/dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/database-operator"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/argocd-apps/dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -92,6 +181,8 @@ updates:
     directory: "/TroveInfrastructure/terraform"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       compatible-updates:
         patterns: ["*"]
