@@ -111,9 +111,8 @@ For iOS, use the selected scheme, test and stack setup from
 simulator, xcbeautify and coverage tools before building. Preserve exit status with
 `set -o pipefail`, retain raw output with `tee`, and format Xcode output with
 `xcbeautify`. Keep the `.xcresult` and verify actual test counts. A simulator result
-does not establish physical-device background delivery or data-protection behavior.
-Simulator verification is the accepted client boundary for the current M1/M2
-iteration; physical-device acceptance is deferred and must not be reported as passed.
+does not establish physical-device background delivery or data-protection behavior;
+do not report physical-device acceptance as passed from simulator results.
 
 Lint explicit source files with the owning repository's configuration; do not
 traverse build caches or apply Trove's rules to ignored dependency checkouts.

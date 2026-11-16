@@ -1,5 +1,5 @@
 ---
-title: "Trove: Digital Health Studies"
+title: Overview
 hide:
   - navigation
   - toc
@@ -22,7 +22,6 @@ and health-data collection, with a Swift server and command-line client.
 
 [Explore the Platform](Platform-Tour.md){ .md-button .md-button--primary }
 [Run Trove Locally](https://github.com/SchmiedmayerLab/Trove#local-development){ .md-button }
-
 
 </div>
 

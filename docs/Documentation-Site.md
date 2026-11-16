@@ -35,7 +35,8 @@ HTML images that Markdown validation may not cover. Repository files outside
 The [Documentation workflow](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/documentation.yml)
 builds and checks the site for pull requests and for changes on `main`. Publishing
 a stable GitHub release deploys the documentation of that release to
-`https://troveplatform.org/` through GitHub Pages.
+`https://troveplatform.org/` through GitHub Pages. A manual run of the workflow on
+the latest release's tag deploys it again.
 
 ## Maintaining Content
 
