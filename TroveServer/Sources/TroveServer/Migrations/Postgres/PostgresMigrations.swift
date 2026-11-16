@@ -22,6 +22,7 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreatePublishedStudies())
     app.migrations.add(CreateStudyPublicationCandidates())
     app.migrations.add(CreateParticipants())
+    app.migrations.add(CreateProviderRegistrations())
     app.migrations.add(CreateSourceBindings())
     app.migrations.add(CreateSourceIdentityKeys())
     app.migrations.add(CreateSourceInstallations())
@@ -31,4 +32,5 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateAuditEvents())
     app.migrations.add(CreateClinicalEvents())
     app.migrations.add(CreateRecordingTransfers())
+    app.migrations.add(CreateProviderConnections())
 }

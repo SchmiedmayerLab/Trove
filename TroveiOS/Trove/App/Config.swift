@@ -32,6 +32,15 @@ enum Config {
         environment.keycloakIssuer
         #endif
     }
+    /// An operator-approved HTTPS callback requires the matching Associated Domains entitlement.
+    static var providerRedirectURI: URL? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "TroveProviderRedirectURI") as? String,
+              let url = URL(string: value), (try? ProviderAuthorizationCallback.redirectComponents(url)) != nil else {
+            return nil
+        }
+        return url
+    }
+
     static var keycloakClientID: String { environment.keycloakClientID }
     static var keycloakRedirectScheme: String { environment.keycloakRedirectScheme }
     static var keycloakRedirectURI: URL {

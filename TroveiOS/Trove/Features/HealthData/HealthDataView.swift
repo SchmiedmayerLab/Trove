@@ -11,6 +11,7 @@ import SwiftUI
 
 struct HealthDataView: View {
     @Environment(HealthDataModel.self) private var model
+    @Environment(ProviderConnectionsModel.self) private var providers
     @Environment(\.scenePhase) private var scenePhase
     @State private var action: HealthDataModel.Action?
 
@@ -18,6 +19,7 @@ struct HealthDataView: View {
         NavigationStack {
             Form {
                 healthKitSection
+                ProviderConnectionsSection()
                 SavedCollectionSection()
                 HealthDataExplanationView()
             }
@@ -26,6 +28,10 @@ struct HealthDataView: View {
             .refreshable {
                 await model.run(.refresh)
                 await model.refreshCollectionSettings()
+                await providers.refresh()
+            }
+            .task(id: providers.sessionSnapshot) {
+                await providers.refresh()
             }
             .task(id: model.sessionSnapshot) {
                 await model.run(.refresh)

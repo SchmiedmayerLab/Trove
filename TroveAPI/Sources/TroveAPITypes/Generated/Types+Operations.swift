@@ -16517,4 +16517,1018 @@ public enum Operations {
             }
         }
     }
+    /// - Remark: HTTP `GET /participant/provider-registrations`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)`.
+    public enum GetParticipantProviderRegistrations {
+        public static let id: Swift.String = "getParticipantProviderRegistrations"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/provider-registrations/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantProviderRegistrations.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantProviderRegistrations.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetParticipantProviderRegistrations.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetParticipantProviderRegistrations.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/provider-registrations/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetParticipantProviderRegistrations.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/provider-registrations/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.ProviderRegistration])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.ProviderRegistration] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetParticipantProviderRegistrations.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetParticipantProviderRegistrations.Output.Ok.Headers = .init(),
+                    body: Operations.GetParticipantProviderRegistrations.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetParticipantProviderRegistrations.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetParticipantProviderRegistrations.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-registrations/get(getParticipantProviderRegistrations)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// - Remark: HTTP `GET /studies/{studyId}/collection-provider-capabilities`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)`.
+    public enum GetStudyCollectionProviderCapabilities {
+        public static let id: Swift.String = "getStudyCollectionProviderCapabilities"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/path/studyId`.
+                public var studyId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                public init(studyId: Swift.String) {
+                    self.studyId = studyId
+                }
+            }
+            public var path: Operations.GetStudyCollectionProviderCapabilities.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyCollectionProviderCapabilities.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyCollectionProviderCapabilities.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyCollectionProviderCapabilities.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyCollectionProviderCapabilities.Input.Path,
+                headers: Operations.GetStudyCollectionProviderCapabilities.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyCollectionProviderCapabilities.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/collection-provider-capabilities/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.ProviderRegistration])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.ProviderRegistration] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyCollectionProviderCapabilities.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyCollectionProviderCapabilities.Output.Ok.Headers = .init(),
+                    body: Operations.GetStudyCollectionProviderCapabilities.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyCollectionProviderCapabilities.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyCollectionProviderCapabilities.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/collection-provider-capabilities/get(getStudyCollectionProviderCapabilities)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// - Remark: HTTP `POST /participant/provider-registrations/{registrationId}/link-intents`.
+    /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)`.
+    public enum StartParticipantProviderLink {
+        public static let id: Swift.String = "startParticipantProviderLink"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/path/registrationId`.
+                public var registrationId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - registrationId:
+                public init(registrationId: Swift.String) {
+                    self.registrationId = registrationId
+                }
+            }
+            public var path: Operations.StartParticipantProviderLink.Input.Path
+            /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartParticipantProviderLink.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartParticipantProviderLink.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StartParticipantProviderLink.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.ProviderLinkRequest)
+            }
+            public var body: Operations.StartParticipantProviderLink.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.StartParticipantProviderLink.Input.Path,
+                headers: Operations.StartParticipantProviderLink.Input.Headers = .init(),
+                body: Operations.StartParticipantProviderLink.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.StartParticipantProviderLink.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/provider-registrations/{registrationId}/link-intents/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ProviderLinkIntent)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ProviderLinkIntent {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StartParticipantProviderLink.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.StartParticipantProviderLink.Output.Ok.Headers = .init(),
+                    body: Operations.StartParticipantProviderLink.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.StartParticipantProviderLink.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.StartParticipantProviderLink.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-registrations/{registrationId}/link-intents/post(startParticipantProviderLink)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// - Remark: HTTP `POST /participant/provider-link-intents/{intentId}/complete`.
+    /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)`.
+    public enum CompleteParticipantProviderLink {
+        public static let id: Swift.String = "completeParticipantProviderLink"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/path/intentId`.
+                public var intentId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - intentId:
+                public init(intentId: Swift.String) {
+                    self.intentId = intentId
+                }
+            }
+            public var path: Operations.CompleteParticipantProviderLink.Input.Path
+            /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantProviderLink.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantProviderLink.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CompleteParticipantProviderLink.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.ProviderLinkCompletion)
+            }
+            public var body: Operations.CompleteParticipantProviderLink.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.CompleteParticipantProviderLink.Input.Path,
+                headers: Operations.CompleteParticipantProviderLink.Input.Headers = .init(),
+                body: Operations.CompleteParticipantProviderLink.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CompleteParticipantProviderLink.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/provider-link-intents/{intentId}/complete/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ProviderConnection)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ProviderConnection {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CompleteParticipantProviderLink.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CompleteParticipantProviderLink.Output.Ok.Headers = .init(),
+                    body: Operations.CompleteParticipantProviderLink.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.CompleteParticipantProviderLink.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.CompleteParticipantProviderLink.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-link-intents/{intentId}/complete/post(completeParticipantProviderLink)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// - Remark: HTTP `GET /participant/provider-connections`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)`.
+    public enum GetParticipantProviderConnections {
+        public static let id: Swift.String = "getParticipantProviderConnections"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/provider-connections/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantProviderConnections.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantProviderConnections.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetParticipantProviderConnections.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetParticipantProviderConnections.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-connections/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/provider-connections/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetParticipantProviderConnections.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/provider-connections/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/provider-connections/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.ProviderConnection])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.ProviderConnection] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetParticipantProviderConnections.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetParticipantProviderConnections.Output.Ok.Headers = .init(),
+                    body: Operations.GetParticipantProviderConnections.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetParticipantProviderConnections.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetParticipantProviderConnections.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-connections/get(getParticipantProviderConnections)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// - Remark: HTTP `POST /participant/provider-connections/{connectionId}/disconnect`.
+    /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)`.
+    public enum DisconnectParticipantProviderConnection {
+        public static let id: Swift.String = "disconnectParticipantProviderConnection"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/path/connectionId`.
+                public var connectionId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - connectionId:
+                public init(connectionId: Swift.String) {
+                    self.connectionId = connectionId
+                }
+            }
+            public var path: Operations.DisconnectParticipantProviderConnection.Input.Path
+            /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DisconnectParticipantProviderConnection.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DisconnectParticipantProviderConnection.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DisconnectParticipantProviderConnection.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DisconnectParticipantProviderConnection.Input.Path,
+                headers: Operations.DisconnectParticipantProviderConnection.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// Always no-store.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl: Always no-store.
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DisconnectParticipantProviderConnection.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/provider-connections/{connectionId}/disconnect/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ProviderConnection)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ProviderConnection {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DisconnectParticipantProviderConnection.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DisconnectParticipantProviderConnection.Output.Ok.Headers = .init(),
+                    body: Operations.DisconnectParticipantProviderConnection.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authenticated, authorized result.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DisconnectParticipantProviderConnection.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DisconnectParticipantProviderConnection.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/provider-connections/{connectionId}/disconnect/post(disconnectParticipantProviderConnection)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
 }

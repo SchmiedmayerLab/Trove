@@ -16,6 +16,7 @@ const CollectionRoute = () => {
     form,
     query,
     capabilities,
+    providers,
     measurements,
     isSupported,
     getDraftHeaders,
@@ -48,9 +49,9 @@ const CollectionRoute = () => {
       disabled={disabled}
     />
   );
-  if (query.isPending || capabilities.isPending)
+  if (query.isPending || capabilities.isPending || providers.isPending)
     content = <p role="status">Loading collection settings…</p>;
-  else if (query.isError || capabilities.isError)
+  else if (query.isError || capabilities.isError || providers.isError)
     content = (
       <p role="alert">
         Collection settings could not be loaded. Reload to try again.

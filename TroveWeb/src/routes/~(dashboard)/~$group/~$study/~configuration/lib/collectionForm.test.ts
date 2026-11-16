@@ -6,8 +6,10 @@ import type { CollectionMeasurementWindow } from "@/lib/api/generated/types.gen"
 import {
   canEditCollection,
   makeCollectionFormSchema,
+  measurementsFromProviderRegistrations,
   measurementsFromCapabilities,
   bodyWeightProfile,
+  heartRateProfile,
   collectionMeasurements,
   collectionFormSchema,
   collectionSummary,
@@ -353,6 +355,96 @@ describe("server-described collection streams", () => {
       expect(
         schema.safeParse({ collectionRequirements: [requirement] }).success,
       ).toBe(false);
+    expect(
+      makeCollectionFormSchema([]).safeParse({
+        collectionRequirements: [first],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("qualified wearable provider measurements", () => {
+  const registrations = [
+    "10000000-0000-4000-8000-000000000001",
+    "10000000-0000-4000-8000-000000000002",
+  ].map((id, index) => ({
+    id,
+    provider: "withings" as const,
+    displayName: `Wearable integration ${index + 1}`,
+    controller: "Study operator",
+    region: "EU",
+    redirects: [
+      { id: "native", uri: "https://app.example.org/provider/callback" },
+    ],
+    capabilities: [
+      {
+        sourceTypeIdentifier: "getmeas:1",
+        effectiveTime: "point" as const,
+        measurements: [
+          {
+            profile: bodyWeightProfile,
+            displayNameEnglish: "Body weight",
+            displayNameGerman: "Körpergewicht",
+          },
+        ],
+      },
+    ],
+  }));
+  const choices = measurementsFromProviderRegistrations(registrations);
+  const requirements = choices.map((choice) => ({
+    profile: choice.profile,
+    sourceKind: "server-worker" as const,
+    providerRegistrationId: choice.providerRegistrationId,
+    sourceTypeIdentifier: choice.sourceTypeIdentifier,
+  }));
+  const schema = makeCollectionFormSchema(choices);
+
+  it("retains independent registrations even when profile and provider stream coincide", () => {
+    const value = { collectionRequirements: requirements };
+    expect(schema.parse(value)).toEqual(value);
+    expect(collectionSummary(requirements, choices)).toContain(
+      "Wearable integration 1: Body weight",
+    );
+    expect(collectionSummary(requirements, choices)).toContain(
+      "Wearable integration 2: Body weight",
+    );
+    expect(
+      setCollectionRequirement(
+        requirements,
+        bodyWeightProfile,
+        undefined,
+        "getmeas:1",
+        choices[0],
+      ),
+    ).toEqual([requirements[1]]);
+    const native = {
+      profile: bodyWeightProfile,
+      sourceKind: "participant-app" as const,
+    };
+    expect(
+      setCollectionRequirement([...requirements, native], bodyWeightProfile),
+    ).toEqual(requirements);
+  });
+
+  it("requires the exact qualified registration, source token and output profile", () => {
+    const first = requirements[0];
+    for (const changed of [
+      { ...first, providerRegistrationId: undefined },
+      {
+        ...first,
+        providerRegistrationId: "10000000-0000-4000-8000-000000000099",
+      },
+      { ...first, sourceTypeIdentifier: "getmeas:2" },
+      { ...first, profile: heartRateProfile },
+      { ...first, sourceKind: "participant-app" },
+      { ...first, includeWorkoutRoutes: true },
+    ])
+      expect(
+        schema.safeParse({ collectionRequirements: [changed] }).success,
+      ).toBe(false);
+    expect(
+      schema.safeParse({ collectionRequirements: [first, first] }).success,
+    ).toBe(false);
     expect(
       makeCollectionFormSchema([]).safeParse({
         collectionRequirements: [first],
