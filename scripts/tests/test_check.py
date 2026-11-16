@@ -123,10 +123,11 @@ class VerificationInputTests(unittest.TestCase):
     def test_dependency_updates_point_at_manifests(self):
         source = (ROOT / ".github/dependabot.yml").read_text()
         updates = re.findall(r'package-ecosystem: "([^"]+)"\s+directory: "([^"]+)"', source)
-        self.assertEqual(len(updates), 11)
+        self.assertEqual(len(updates), 12)
         self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
+        self.assertIn(("docker", "/TroveInfrastructure/validator"), updates)
         manifests = {
             "github-actions": ".github/workflows/*.yml",
             "swift": "Package.swift",
@@ -139,6 +140,15 @@ class VerificationInputTests(unittest.TestCase):
         for ecosystem, directory in updates:
             with self.subTest(ecosystem=ecosystem, directory=directory):
                 self.assertTrue(list((ROOT / directory.lstrip("/")).glob(manifests[ecosystem])))
+
+    def test_validator_runtime_images_match_the_manifest(self):
+        # Dependabot updates only the Dockerfile; the manifest identity must change with it.
+        dockerfile = (ROOT / "TroveInfrastructure/validator/Dockerfile").read_text()
+        images = re.findall(r"^FROM (\S+)", dockerfile, re.MULTILINE)
+        manifest = json.loads((ROOT / "TroveInfrastructure/validator/manifest.json").read_text())
+        self.assertEqual(images, [manifest["runtimeImages"]["java"], manifest["runtimeImages"]["python"]])
+        for image in images:
+            self.assertRegex(image, r"@sha256:[0-9a-f]{64}$")
 
     def test_ui_stack_rejects_invalid_prebuilt_binary_before_startup(self):
         for binary in ("relative/server", str(ROOT / "TroveServer"), str(ROOT / "TroveServer/Package.swift")):

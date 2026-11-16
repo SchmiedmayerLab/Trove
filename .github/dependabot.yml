@@ -106,6 +106,16 @@ updates:
       compatible-updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/validator"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "docker-compose"
     directory: "/TroveInfrastructure/docker"
     schedule:
