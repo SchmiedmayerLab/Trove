@@ -26,9 +26,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install kubeconform
+        env:
+          KUBECONFORM_RELEASE: v0.8.0
+          KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
         run: |
-          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
-            | tar xz -C /usr/local/bin
+          set -euo pipefail
+          archive="$RUNNER_TEMP/kubeconform.tar.gz"
+          curl --fail --location --retry 3 --max-time 120 \
+            "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_RELEASE/kubeconform-linux-amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$KUBECONFORM_SHA256" "$archive" | sha256sum --check --strict
+          sudo tar --extract --gzip --file "$archive" --directory /usr/local/bin kubeconform
       - name: Build and validate all overlays
         run: |
           python3 -m venv "$RUNNER_TEMP/manifest-tools"
@@ -86,12 +94,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install KIND
+        env:
+          KIND_RELEASE: v0.33.0
+          KIND_SHA256: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
         run: |
-          curl -sSLo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+          set -euo pipefail
+          binary="$RUNNER_TEMP/kind"
+          curl --fail --location --retry 3 --max-time 120 \
+            "https://github.com/kubernetes-sigs/kind/releases/download/$KIND_RELEASE/kind-linux-amd64" \
+            --output "$binary"
+          printf '%s  %s\n' "$KIND_SHA256" "$binary" | sha256sum --check --strict
+          sudo install -m 0755 "$binary" /usr/local/bin/kind
       - name: Install Helm
         uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
       - name: Create KIND cluster
         run: kind create cluster --name trove --config tools/kind-config.yaml
       # The dev overlay runs the published images, which do not exist for an unmerged change.

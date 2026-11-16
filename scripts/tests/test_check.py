@@ -236,6 +236,18 @@ class VerificationInputTests(unittest.TestCase):
         job = workflow.split("  manifests:\n", 1)[1].split("\n  tofu-validate:\n", 1)[0]
         self.assertRegex(job, r"defaults:\n\s+run:\n\s+shell: bash\n")
 
+    def test_infrastructure_tools_are_pinned_and_checksum_verified(self):
+        workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
+        self.assertNotIn("/latest/", workflow)
+        for release, checksum in (("KUBECONFORM_RELEASE: v0.8.0", "KUBECONFORM_SHA256"),
+                                  ("KIND_RELEASE: v0.33.0", "KIND_SHA256")):
+            with self.subTest(release=release):
+                step = workflow.split(release, 1)[1].split("- name:", 1)[0]
+                self.assertRegex(workflow, checksum + r": [0-9a-f]{64}\n")
+                self.assertIn(f'"${checksum}"', step)
+                self.assertLess(step.index("sha256sum --check --strict"), step.index("/usr/local/bin"))
+        self.assertRegex(workflow, r"azure/setup-helm@[0-9a-f]{40} # v[0-9.]+\n\s+with:\n\s+version: v4\.3\.2\n")
+
     def test_dev_stack_uses_declared_node_version(self):
         package = json.loads((ROOT / "TroveWeb/package.json").read_text())
         workflow = (ROOT / ".github/workflows/dev-stack.yml").read_text()
