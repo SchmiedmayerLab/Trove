@@ -24,6 +24,25 @@ Individual targets can be regenerated on their own:
 swift run --package-path TroveAPI TroveAPIGenerator --package-path TroveAPI --types --client
 ```
 
+## Study Data Retrieval
+
+The generated `getStudyData` operation reads authorized point data for a study.
+Its records contain Base64-encoded derived FHIR Bundles to preserve clinical numeric
+tokens through JSON clients. Decode with a decimal-preserving FHIR reader; source
+profile names are lineage, not conformance claims for the derived representation.
+The endpoint requires explicit clinical-data access and committed disclosure audit.
+See [study data access](../TroveServer/README.md#study-data-access) for the full
+contract, limits and live-page semantics.
+
+The generated `getStudyRecording` operation downloads the original CSV for an exact
+study grant. Derived recording attachments contain authenticated, origin-relative
+download locations. Pass the same current/history selection when using the operation
+directly. The server verifies the complete recording and commits disclosure intent
+before returning its `HTTPBody`; consume that body incrementally into a bounded
+destination. Default `OpenAPIURLSession` transport streams on Apple platforms but
+buffers on Linux, so incremental application reads alone do not establish bounded
+Linux transport memory.
+
 ## Local Verification
 
 Run `bash scripts/check swift TroveAPI` from the repository root with Swift 6.4.x.
@@ -43,6 +62,44 @@ event bytes or change the IG's timestamp rules.
 The same configuration emits compact JSON without escaping forward slashes,
 avoiding unnecessary expansion of base64 envelopes. Use it for API JSON, not
 for embedding an unescaped response in HTML.
+
+## Recording Transfers
+
+The generated clients expose `declareParticipantRecordingTransfer`,
+`uploadParticipantRecordingTransfer` and `lookupParticipantRecordingTransferReceipt`.
+Retain one transfer UUID and unchanged declaration across retries. Register the
+small JSON declaration, then send the bytes separately as `application/octet-stream`
+with the declared `Content-Length`. Swift accepts an `HTTPBody` backed by an
+asynchronous byte sequence; the caller must provide the exact known length.
+Zstandard compression is declared in the content descriptor, not HTTP
+`Content-Encoding`. Stored and decoded counts and SHA-256 digests are separate.
+
+After a lost upload response, look up the receipt before retransmitting. A receipt
+confirms the stored transport bytes, not decoded-source validity or clinical
+custody. It has an explicit expiry and does not create study grants. See
+[recording transfer limits and authority](../TroveServer/README.md#artifact-storage).
+
+`RecordingTransferDrainer` uploads a declaration prepared in the delivery journal.
+It first recovers any server receipt, then registers the retained declaration and
+streams an immutable snapshot of the queued file. The snapshot's length and SHA-256
+must match the declaration before upload. Reads are demand-driven and at most
+64 KiB each; retries preserve the transfer identity and exact bytes. Registration
+and upload receipts remain in the journal across restarts. An upload receipt does
+not retire the file or submit its clinical record.
+
+The HTTP transport must also stream request bodies to preserve bounded memory.
+The pinned Swift OpenAPI URLSession transport streams on Trove's supported Apple
+platforms; its Linux implementation buffers request bodies. A bounded body adapter
+alone does not make that Linux transport suitable for large recordings. Snapshot
+creation temporarily requires disk space for one additional copy of the active
+recording.
+
+`EventDeliveryDrainer` transfers each prepared recording before submitting its
+clinical Bundle. Each member carries the relative attachment path and exact
+transfer/artifact IDs separately from its immutable FHIR bytes. After an uncertain
+clinical response, receipt lookup precedes any recording upload; only verified
+clinical custody permits file reclamation. The HealthKit acquisition adapter still
+requires integration with file-backed staging and transfer declaration preparation.
 
 ## Source Registration
 
@@ -66,8 +123,35 @@ same conversion identity for the same native record ID while retaining independe
 credentials, acquisition cursors and revocation. `identityScope(for:)` restores the
 Grove context. `confirmSource(_:for:identityKey:)` rejects changed keys or immutable
 identity metadata. Known source or installation revocation cannot be cleared by a
-later response. Journal format 9 rejects earlier or unknown formats without
+later response. Journal format 17 rejects earlier or unknown formats without
 migration or deletion.
+
+Recording files are staged beside the journal in an owner-only directory. The
+journal commits empty-file reservations before consuming recording chunks, then
+flushes the complete files and commits their SHA-256 digests, delivery bindings,
+and acquisition cursor together. Failed staging leaves the cursor unchanged;
+`reclaimRecordingFiles()` removes abandoned reservations without touching pending
+recordings or unknown files. A verified clinical custody receipt retires files;
+reclamation removes their bytes before `pruneDelivered()` removes the retained
+commitments. An artifact-transfer receipt alone does not permit file deletion.
+
+Recording limits are separate from JSON and SQLite limits: 128 MiB per file,
+1 GiB of pending recording bytes, and 4,096 retained file entries by default.
+Callers may configure these budgets through `DeliveryJournal.Limits`; exceeding
+one refuses staging without evicting queued data. The event drainer requires a
+prepared transfer declaration for every queued recording before submission.
+Temporary upload or admission failures retain the file and schedule a retry.
+
+`prepareRecordingTransfer(recordingID:deliveryID:declaration:)` retains a transfer
+declaration before networking. It checks the queued bytes, relative attachment
+path, document profile/format, available measurement period, and exact consent
+selection. `RecordingTransferCommitment` canonicalizes declarations at the API's
+microsecond date precision and verifies the entire server acknowledgement.
+Registration and artifact receipts survive reopening through
+`recordingTransfer(for:)`. Expired artifact evidence remains readable, but
+`usableReceipt(at:)` excludes it from new clinical admissions. A newer upload may
+replace expired artifact evidence while the clinical delivery is pending; it does
+not replace the declaration or release the file.
 
 The private journal retains both secrets under its OS/app storage protections;
 this does not provide independent at-rest encryption or resist same-user access.
@@ -89,27 +173,61 @@ admission; a stale client state cannot authorize a revoked installation.
 ## HealthKit Acquisition
 
 The optional Apple-platform `TroveHealthKit` product connects Grove's anchored
-heart-rate query and FHIR converter to the delivery journal. The server and
+heart-rate, sleep, workout and optional workout-route queries and FHIR converter to the delivery journal. The server and
 cross-platform API client do not link this adapter. The app's
-`makeHeartRateAcquisition` factory supplies the existing captured-session client;
+`makeHealthKitAcquisition` factory supplies the journal and captured-session validation;
 constructing it does not request HealthKit access or start collection.
 
-Explicitly create a stream with `HeartRateAcquisition.queryDefinition(start:)`,
-then reuse that immutable definition and the journal's retained anchor. One pass
-refreshes source state and the requested enrollments' collection plans before
-querying and again before staging. Changed authority, malformed plans or session
-loss stops the pass. The receiver still independently authorizes each upload.
+The journal can retain several immutable query definitions for one registered source.
+`createQuery(for:queryID:definition:)` adds a separate cursor and pending conversion
+instant; `checkpoints(for:)` restores them without resetting the original query.
+The original query remains the default of `checkpoint(for:)`. Staging advances only
+its selected checkpoint while all queries share the source identity, credentials,
+delivery sequence and exact-payload deduplication. Pending deletion bounds are
+also query-specific so another page cannot retire them. Query count and bytes are
+bounded; a rejected creation or page leaves every existing checkpoint intact.
+
+`prepareQueryDefinition()` chooses the initial live boundary from the retained
+accepted plan and setup time. Persist it once through source creation; restoration
+never replaces it. Historical ranges have separate immutable definitions and
+anchors, reconciled through `healthKitQueryPlan(for:state:)` as described below.
+Acquisition checks local source, session and retained consent state on every page;
+changed local authority or session loss stops staging. Foreground refresh learns
+server changes, and the receiver independently authorizes each upload.
 
 `ParticipantCollectionSnapshot` validates the complete requested set of plans and
 selects exact half-open measurement windows, which may precede consent adoption
 when historical collection was explicitly accepted. One converted Observation can
 target multiple studies without duplicating its record. Overlapping historical
 revisions select the newest eligible consent per enrollment. Both the native
-measurement time and Grove's millisecond-normalized wire time must be inside that
-scope, so rounding cannot widen the accepted measurement range.
+measurement and Grove's millisecond-normalized wire measurement must satisfy the same
+selection rule: points fall inside a window; complete intervals overlap it. Rounding
+cannot widen the accepted measurement range.
 
-The query requests at most 64 additions and retains a hard 128-change staging
-bound. The journal persists one conversion instant for the pending checkpoint,
+Workout routes require `includeWorkoutRoutes` in the accepted workout requirement and
+separate HealthKit read permission. They have their own live and historical cursors,
+so enabling routes backfills eligible history independently of workout summaries.
+Only an eligible route loads its companion locations. Grove carries the complete
+HealthKit sample interval in `DocumentReference.context.period` and its locations in
+the registered CSV attachment. A route targets only consents that explicitly request
+routes; a study requesting workout summaries does not receive the recording.
+
+The adapter includes the original lowercase HealthKit sample UUID by default,
+using Grove's existing native-identifier option. Its clear identifier system is
+`<identifierRoot>/NamingSystem/healthkit-native-record`, separate from Grove's
+keyed identity systems and stable across installations and derivation-key epochs.
+The same UUID accompanies a retraction target. It does not replace the opaque
+source-record/output identities, authorize access, or establish source authenticity.
+Published collection consent describes this baseline disclosure. Original queued
+bytes remain unchanged; upgrading the adapter never rewrites a pending record.
+Native conversion regressions require the Apple verification lane.
+
+Ordinary queries request at most 64 additions; route queries request one recording
+per page. All pages retain the 128-change staging bound. The route reader verifies
+that every location was returned and bounds reads using the current event byte limit.
+The complete encoded record must fit that limit; larger recordings are refused without
+truncation or cursor advancement. File-backed transfer for larger recordings remains
+outside the current adapter. The journal persists one conversion instant for the pending checkpoint,
 so Grove's stateless converter reproduces the same record version after interruption.
 Canonical record bytes, targets and the next anchor then commit together, clearing
 that pending instant. A failed member preserves the previous anchor, conversion
@@ -126,12 +244,21 @@ Source registration assigns an immutable `identifierRoot`; Grove derives the ful
 namespace set using the retained registration ID and key epoch. Record-version
 and retraction identifiers replace producer-instance event sequences; queue ordering
 is local to the journal. The receiver authenticates ownership and checks the assigned
-namespace for each lifecycle kind. Journal schema 9 and query definition 3 reject earlier local formats
+namespace for each lifecycle kind. Journal schema 14 and query definition 6 reject earlier local formats
 without removing queued work; this development change includes no data migration.
 
-This acquisition path is not enabled automatically. App lifecycle and permission UI remain
-unfinished. Synthetic tests exercise the real converter and journal, not a live
-HealthKit store or background execution. An empty query result does not prove
+Collection requires participant setup and HealthKit permission UI. The app connects
+foreground sync and observer capture to the same journal owner. Native offline and
+query-scheduling changes still require Apple-platform build and runtime verification.
+Saved plans include the study identity and title from the adopted publication. The
+local Health Data screen can read these settings without remote profile discovery,
+including locally stopped plans. Withdrawal persists the local stop before server
+requests; a retry reconciles an already completed server withdrawal. Displayed
+settings do not grant acquisition permission, and account changes hide prior settings.
+These native UI changes remain subject to the Apple-platform verification above.
+
+Synthetic adapter tests exercise the converter and journal, not a live HealthKit
+store or physical-device background execution. An empty query result does not prove
 that HealthKit read permission was granted.
 
 ## Source Retractions
@@ -164,8 +291,9 @@ operation; the former `PATCH /participant/enrollments/{enrollmentId}` route has
 been removed, including its generated client types.
 
 `GET /participant/enrollments/{enrollmentId}/collection-plan` returns only the
-owned enrollment's exact consent/publication windows and collection requirements.
-The outer window's `start`/`end` describe adoption chronology. Each resolved
+owned enrollment's exact consent/publication windows, collection requirements,
+study display details and retained enrollment end.
+The outer window's `start`/`end` describe adoption chronology, capped by enrollment end. Each resolved
 requirement has its own inclusive measurement `start` and optional exclusive `end`;
 historical starts can precede adoption. These resolved values are retained at
 acceptance. A later publication does not broaden them. Do not infer measurement
@@ -173,10 +301,105 @@ bounds from the outer adoption window or recompute relative history on a device.
 The audited response includes an enrollment state version and server observation
 time, uses `Cache-Control: no-store`, and contains no signatures or samples.
 Publishing alone does not change these windows; participant adoption does.
-Withdrawal returns no windows. The snapshot is not an upload capability or
-permission for continued offline collection: uploads recheck authority. The
-foreground heart-rate adapter refreshes these windows before and after each query;
-it does not enable automatic or offline collection.
+Withdrawal returns no windows. A collection snapshot is not an upload capability;
+the receiver rechecks every upload against current server authority.
+
+`ParticipantCollectionRefresh` discovers the complete enrollment set and retains
+all active plans atomically in the account/backend-bound delivery journal. Failed
+or partial discovery does not replace accepted plans. Known withdrawals are
+persisted immediately, including when a later plan request fails. Enrollment
+versions and observation times cannot move backward, and a delayed response cannot
+overwrite an intervening adoption or local stop.
+
+`collectionState()` restores these plans without a network request or elapsed-time
+lease. `snapshot.active(at:)` excludes enrollments at their retained exclusive end. Observation time is not a lease, and resolved historical bounds never
+move on restart. Call `stopCollection(for:)` before attempting local withdrawal
+online; that stop survives restart and cannot be undone by a server refresh.
+The stop preserves queued bytes and their original consent IDs. Use
+`collectionCheckpoint(for:state:)` to bind acquisition to its retained snapshot;
+`stage` rejects it atomically if authority changed while the page was in flight,
+including changes written through another journal connection and expiry of an
+enrollment while querying, converting or staging. Other studies can continue on
+the next pass; expiry does not erase queued data or become a withdrawal.
+
+The native HealthKit adapter has no network client. It uses the retained plan,
+source binding and local session checks on each page. Foreground sync refreshes
+source and collection authority once; an unavailable network preserves previously
+accepted collection. Background observer capture makes no HTTP requests. Initial
+setup still requires successful server discovery and source registration. Uploads
+remain separate: a full queue preserves the uncommitted page while foreground
+delivery can free space, and ending collection does not discard pending custody.
+
+Native account restoration uses the retained, configuration-bound identity without
+first requiring a token refresh. Expired access tokens alone do not end local
+collection; authenticated requests still obtain a usable token. A temporarily
+unavailable keychain leaves credentials intact and restoration retries after device
+unlock. SDK state changes persist token rotation or clear a confirmed invalid
+session even after a waiting request was cancelled. These native changes still
+require Apple-platform verification. Offline profile/navigation availability is a
+separate remaining acceptance check; restoring identity does not establish that a
+server profile was loaded successfully.
+
+The enrollment UI persists a local stop before its withdrawal request, including
+before device setup. A failed network request leaves collection stopped and shows
+withdrawal as pending until the server confirms it. Reopening restores that state
+from the same account-bound journal. New settings and remote withdrawals become
+known through foreground refresh; the receiver checks current authority
+independently at upload.
+
+Initial setup fixes a live query boundary for its first measurement profile. Each
+additional requested profile has its own live query and independent historical queries. `healthKitQueryPlan(for:state:)` creates
+independent historical queries for earlier accepted measurements and newly eligible
+gaps. Reconciliation records consent IDs alongside query creation in one journal
+transaction; a broader consent can require a new backfill even inside an existing
+query's date range if its cursor previously skipped unauthorized measurements.
+Overlapping study requirements share queries. Existing anchors and source identity
+are preserved; capacity failures roll back both new queries and reconciliation.
+
+When an accepted configuration disables a measurement or routes, existing cursors
+continue in `retractionsOnly` mode while the enrollment remains active. New samples
+are ignored without loading route locations. Only deleted UUIDs in the durable
+conversion index produce retractions, including records whose earlier delivery may
+have uncertain custody. This index survives receipt-based payload pruning and restart;
+no new history query is created for a disabled stream. Local withdrawal and enrollment
+end stop this maintenance as well. Re-enabling a stream creates independent backfill
+queries for newly authorized gaps, even if deletion processing advanced an old cursor.
+
+Each native catch-up pass services each live measurement query first, then the least
+recently served pending query, with at most eight pages total. Page ordering and sweep
+progress survive restart and observation-only authority refreshes. Only an empty
+raw HealthKit delta exhausts a query for that sweep; filtering every sample out of
+a page does not. Later sweeps revisit historical predicates for late imports and
+explicit deletions. Heart-rate predicates partition sample start dates into half-open
+ranges. Sleep and workout predicates include complete intervals overlapping the selected range.
+An interval can be observed by more than one query. The journal retains the first
+conversion time per native UUID and converter configuration across queries and
+restarts. An unchanged sample therefore reuses its record version and exact payload;
+new study targets can still produce a distinct delivery intent. This index counts
+toward the configured journal byte limit. Capacity failure preserves existing cursors.
+Application build, host facts, writer revision, and export policy identify the converter configuration;
+a changed configuration records its own conversion time.
+
+Heart-rate points use half-open measurement windows. Sleep-stage and workout records are selected
+in full when their intervals overlap an accepted window, including records that cross
+a boundary. `ParticipantCollectionSnapshot` applies that same rule when selecting
+consent IDs and selects at most one consent per study. Query and source identity must
+not depend on clipping a record to a study window.
+
+Published collection-policy schema 4 includes the explicit enrollment period: an
+optional Gregorian calendar duration from enrollment, a fixed closing date, or
+both (earliest wins). Neither means ongoing enrollment. Creation resolves the
+rule from the database's stored enrollment timestamp and retains `endsAt` in the
+same transaction. Later publication/adoption never renews an existing end.
+The enrollment editor configures this rule and publication includes its translated
+text in retained consent. Dates are distinct from historical measurement windows.
+
+At or after the retained end, the server refuses new consent commands while
+preserving exact receipt replay. Previously collected pre-end measurements can
+still be admitted under their original consent; timestamps at the end are
+excluded. Withdrawal and source revocation retain their independent restrictions.
+Apple-platform and physical-device acceptance remain separate gates from portable
+journal tests; the native scheduler has not yet completed those gates.
 
 ## Record Representations and Receipts
 
@@ -201,7 +424,9 @@ recoverable after withdrawal or source revocation without restoring study access
 `POST /participant/sources/{sourceId}/events/batch` submits 1–16 events for one
 owned, active source. Use the existing `EventSubmission` representation: canonical
 base64 of each original event and its exact consent/output targets. The envelope
-is limited to 6 MiB, with at most 5,592,408 bytes across the base64 strings.
+defaults to 6 MiB, with at most 5,592,408 bytes across the base64 strings.
+Deployment settings may raise these to the shared wire ceilings of 24 MiB and
+22,369,624 bytes respectively; clients must use the deployment's operating policy.
 
 The ordered response contains one custody receipt or `ProblemDetails` per event.
 An outer HTTP 200 does not mean every event was accepted. Each event commits
@@ -229,11 +454,43 @@ atomic admission. Missing or repeated commitments reject the envelope before any
 admission. A record's validation or authorization failure does not discard accepted
 siblings. Rejected records and transport-only framing are not retained as custody.
 
-The decoded transport limit is 4 MiB plus 1 KiB for framing; each restored record
-remains limited to 4 MiB and 512 entries. The full JSON envelope stays within
-6 MiB, including entry addresses and consent targets. Remaining records can be
+The default decoded transport budget is 4 MiB plus 1 KiB for framing, with a
+4 MiB record budget and 6 MiB JSON envelope. `EventSubmissionLimits.Configuration`
+accepts independently configured budgets up to 16 MiB per record, 16 MiB plus
+1 KiB per transport Bundle and 24 MiB per JSON envelope, including consent targets.
+The 512-entry record bound remains. Remaining records can be
 regrouped or reordered on retry: receipts still bind their original bytes and
 intent, independently of transport timestamps and shared-entry placement.
+
+## Collection capacity
+
+`EventDeliveryCapacityConfiguration(settings:)` validates deployment settings once
+and supplies both journal staging and `EventDeliveryDrainer` packing limits. Use
+the same configuration for both. `COLLECTION_MAX_RECORD_BYTES`,
+`COLLECTION_MAX_BUNDLE_BYTES`, `COLLECTION_MAX_ENVELOPE_BYTES` and
+`COLLECTION_MAX_BATCH_RECORDS` control admission and transport. A Bundle must leave
+at least 1 KiB above the configured record budget; its envelope must accommodate
+base64 expansion and framing. Exact encoded envelopes are checked when packing.
+Only whole records move between Bundles. A record that cannot fit the local
+operating budget stays pending and reports capacity backpressure; raising the
+budget permits retry without changing its bytes or identity.
+
+Pending storage has independent settings: `COLLECTION_MAX_PENDING_BYTES` (64 MiB
+by default), `COLLECTION_MAX_DATABASE_BYTES` (128 MiB),
+`COLLECTION_MAX_RECORDING_BYTES` (128 MiB per recording), and
+`COLLECTION_MAX_PENDING_RECORDING_BYTES` (1 GiB). Count settings are
+`COLLECTION_MAX_PENDING_EVENTS` (2,048), `COLLECTION_MAX_QUERIES` (2,048), and
+`COLLECTION_MAX_RECORDING_FILES` (4,096). Invalid values fail configuration. Lower
+new-record budgets do not erase already staged work or change custody commitments.
+Staging above a budget fails before advancing its query cursor.
+
+The native app reads these decimal-string values from the signed Info.plist
+`TroveCollectionCapacity` dictionary. Debug launches may override individual keys
+with environment values. Server upload stored/decoded limits and study-export and
+recording-download budgets remain independent and must be sized for the deployment.
+Defaults retain existing behavior; the larger bounded options are not claims of
+measured peak-memory suitability. Verify representative complete-record and
+continued-collection workloads before selecting larger deployment values.
 
 ## Delivery Journal
 
@@ -255,7 +512,8 @@ be opened explicitly and are never silently recreated or migrated.
 
 The caller owns source registration, FHIR transformation, authenticated transport
 and bounded source queries. Register an immutable query definition with each
-source; changing filters or restarting a lost stream requires a new source.
+source; additional immutable ranges use independent queries under that same source.
+Never reset a retained anchor or generate a replacement identity to widen a range.
 Always query from the journal's current checkpoint. Do not also let another store
 advance that stream's cursor or reuse an old query result under a newer checkpoint.
 The journal does not validate FHIR conformance or grant collection authority.
@@ -283,7 +541,7 @@ requirements cannot be verified on a physical device. Simulator builds enforce
 backup exclusion and the filesystem checks above, but cannot verify iOS Data
 Protection; device lock and encryption behavior require physical-device testing.
 This protection permits background access after
-the first device unlock. Logical payload/intent/setup/query/cursor byte and event quotas, and an independent
+the first device unlock. Logical payload/intent/setup/query/cursor/collection-plan byte and event quotas, and an independent
 SQLite database-size limit provide backpressure; reserve additional disk space
 for the rollback journal. Fixed-size receipt/metadata overhead is covered by the
 physical limit. Full storage never silently evicts pending work.
@@ -318,11 +576,17 @@ fresh development journal; no migration or automatic replacement is provided.
 
 ## Grove Development Dependency
 
-API, server and iOS pin Grove `0.3.0-beta.11` at
-`5aba9a0ad1a0e6bd4046b523d1dbd70b7cb71e6d`. This adopts stateless record conversion
-and Bundle exchange while retaining `GroveConsent` for the shared consent document
-format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation and
-simulator checks remain separate verification gates.
+API, server and iOS pin Grove commit
+`833850907283712ea4dcf987fb8edf6d721fc4fc`, the top of Grove's unreleased collection stack
+(branch `provider-converters`), which builds on
+[Grove #144](https://github.com/SchmiedmayerLab/Grove/pull/144). It
+provides typed source metadata, recording-device mappings, complete recording periods,
+file-backed recordings, the collection catalog and the provider and SensorKit converters
+for the stateless Bundle exchange. Trove sets the HealthKit exporter's metadata policy
+to `.all`: every supported source metadata key, identifying and custom keys included, is
+preserved, and no study narrows it. `GroveConsent` supplies the shared consent
+document format. Stable Xcode 27.2 (27B52) generated the iOS lockfile; Apple compilation
+and simulator checks are separate verification gates.
 Resolve each package and the Xcode project with their checked-in lockfiles;
 local editable overrides are not adoption evidence.
 

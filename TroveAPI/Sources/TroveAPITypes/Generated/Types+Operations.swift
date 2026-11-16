@@ -2160,6 +2160,422 @@ public enum Operations {
             }
         }
     }
+    /// Read an authorized page of derived study data
+    ///
+    /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/get(getStudyData)`.
+    public enum GetStudyData {
+        public static let id: Swift.String = "getStudyData"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                public init(studyId: Components.Parameters.StudyId) {
+                    self.studyId = studyId
+                }
+            }
+            public var path: Operations.GetStudyData.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/query/before`.
+                public var before: Swift.String?
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/query/versions`.
+                public var versions: Components.Schemas.StudyDataVersions?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - limit:
+                ///   - before:
+                ///   - versions:
+                public init(
+                    limit: Swift.Int? = nil,
+                    before: Swift.String? = nil,
+                    versions: Components.Schemas.StudyDataVersions? = nil
+                ) {
+                    self.limit = limit
+                    self.before = before
+                    self.versions = versions
+                }
+            }
+            public var query: Operations.GetStudyData.Input.Query
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyData.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyData.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyData.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyData.Input.Path,
+                query: Operations.GetStudyData.Input.Query = .init(),
+                headers: Operations.GetStudyData.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetStudyData.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.GetStudyData.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyData.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.StudyDataPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.StudyDataPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyData.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyData.Output.Ok.Headers,
+                    body: Operations.GetStudyData.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Derived study data after committed disclosure intent
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/data/get(getStudyData)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyData.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyData.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/data/get(getStudyData)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Download an authorized recording's original source bytes
+    ///
+    /// Requires the same interactive researcher membership and explicit data-reader capability as study data pages. The grant identifier is an exact study grant from export Provenance, not an authorization token. Current and history selection exclude withdrawn and retracted data. The server checks authority before storage access and again after preparing the complete verified file, then commits disclosure intent before returning any bytes. The response is the original decoded CSV, matching the FHIR attachment hash and size even when the stored transport representation is compressed. Transfer expiry does not expire retained clinical custody. Storage, integrity or configured capacity failures return no partial successful response and can be retried.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/data/recordings/{grantId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/data/recordings/{grantId}/get(getStudyRecording)`.
+    public enum GetStudyRecording {
+        public static let id: Swift.String = "getStudyRecording"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/path/grantId`.
+                public var grantId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - grantId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    grantId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.grantId = grantId
+                }
+            }
+            public var path: Operations.GetStudyRecording.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/query/versions`.
+                public var versions: Components.Schemas.StudyDataVersions?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - versions:
+                public init(versions: Components.Schemas.StudyDataVersions? = nil) {
+                    self.versions = versions
+                }
+            }
+            public var query: Operations.GetStudyRecording.Input.Query
+            /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyRecording.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyRecording.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyRecording.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyRecording.Input.Path,
+                query: Operations.GetStudyRecording.Input.Query = .init(),
+                headers: Operations.GetStudyRecording.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetStudyRecording.Output.Ok.Headers.CacheControlPayload
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/headers/Content-Disposition`.
+                    public var contentDisposition: Swift.String
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    ///   - contentDisposition:
+                    public init(
+                        cacheControl: Operations.GetStudyRecording.Output.Ok.Headers.CacheControlPayload,
+                        contentDisposition: Swift.String
+                    ) {
+                        self.cacheControl = cacheControl
+                        self.contentDisposition = contentDisposition
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyRecording.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/data/recordings/{grantId}/GET/responses/200/content/text\/csv`.
+                    case csv(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.csv`.
+                    ///
+                    /// - Throws: An error if `self` is not `.csv`.
+                    /// - SeeAlso: `.csv`.
+                    public var csv: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .csv(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyRecording.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyRecording.Output.Ok.Headers,
+                    body: Operations.GetStudyRecording.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Complete verified source recording after committed disclosure intent
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/data/recordings/{grantId}/get(getStudyRecording)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyRecording.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyRecording.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/data/recordings/{grantId}/get(getStudyRecording)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case csv
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "text/csv":
+                    self = .csv
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .csv:
+                    return "text/csv"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .csv,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Read a bounded page of study audit history
     ///
     /// Requires researcher identity plus both admin and audit-reader membership in the study's group. Administration alone does not grant audit access. Includes only that study's group-scoped history, never participant/source history. Ordered by occurredAt and id descending. A cursor is an existing event ID in the same scope, not an authorization token. Each page requires committed disclosure intent before release; identifiers remain governed study data. New records require a fresh first page; this is not a frozen export snapshot.
@@ -10443,6 +10859,1105 @@ public enum Operations {
             }
         }
     }
+    /// Register an immutable recording transfer declaration
+    ///
+    /// Requires current participant source ownership, installation proof and collection authority. Persist a transfer UUID and the unchanged declaration before sending. Replays return the same declaration commitment; changing it under the same source/UUID returns 409. The JSON envelope is limited to 64 KiB. Registration is audited and does not store recording bytes, accept a clinical record or create study grants. Retain the declaration commitment for matching upload and recovery receipts. Workout consent alone does not authorize route collection.
+    ///
+    /// - Remark: HTTP `POST /participant/sources/{sourceId}/recording-transfers/{transferId}/declaration`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)`.
+    public enum DeclareParticipantRecordingTransfer {
+        public static let id: Swift.String = "declareParticipantRecordingTransfer"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/path/sourceId`.
+                public var sourceId: Swift.String
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/path/transferId`.
+                public var transferId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - sourceId:
+                ///   - transferId:
+                public init(
+                    sourceId: Swift.String,
+                    transferId: Swift.String
+                ) {
+                    self.sourceId = sourceId
+                    self.transferId = transferId
+                }
+            }
+            public var path: Operations.DeclareParticipantRecordingTransfer.Input.Path
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeclareParticipantRecordingTransfer.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///   - accept:
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeclareParticipantRecordingTransfer.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeclareParticipantRecordingTransfer.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.RecordingTransferDeclaration)
+            }
+            public var body: Operations.DeclareParticipantRecordingTransfer.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.DeclareParticipantRecordingTransfer.Input.Path,
+                headers: Operations.DeclareParticipantRecordingTransfer.Input.Headers,
+                body: Operations.DeclareParticipantRecordingTransfer.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.RecordingTransferRegistration)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RecordingTransferRegistration {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeclareParticipantRecordingTransfer.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeclareParticipantRecordingTransfer.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Register an immutable recording transfer declaration
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DeclareParticipantRecordingTransfer.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DeclareParticipantRecordingTransfer.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ContentTooLarge: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/413/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/413/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeclareParticipantRecordingTransfer.Output.ContentTooLarge.Body
+                /// Creates a new `ContentTooLarge`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeclareParticipantRecordingTransfer.Output.ContentTooLarge.Body) {
+                    self.body = body
+                }
+            }
+            /// Declaration or recording exceeds its configured budget
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/413`.
+            ///
+            /// HTTP response code: `413 contentTooLarge`.
+            case contentTooLarge(Operations.DeclareParticipantRecordingTransfer.Output.ContentTooLarge)
+            /// The associated value of the enum case if `self` is `.contentTooLarge`.
+            ///
+            /// - Throws: An error if `self` is not `.contentTooLarge`.
+            /// - SeeAlso: `.contentTooLarge`.
+            public var contentTooLarge: Operations.DeclareParticipantRecordingTransfer.Output.ContentTooLarge {
+                get throws {
+                    switch self {
+                    case let .contentTooLarge(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "contentTooLarge",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ServiceUnavailable: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/503/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/POST/responses/503/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeclareParticipantRecordingTransfer.Output.ServiceUnavailable.Body
+                /// Creates a new `ServiceUnavailable`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeclareParticipantRecordingTransfer.Output.ServiceUnavailable.Body) {
+                    self.body = body
+                }
+            }
+            /// Interrupted request; retry unchanged declaration and bytes
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/declaration/post(declareParticipantRecordingTransfer)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Operations.DeclareParticipantRecordingTransfer.Output.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Operations.DeclareParticipantRecordingTransfer.Output.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Stream the exact bytes of a registered recording transfer
+    ///
+    /// Send application/octet-stream with Content-Length equal to storedByteCount. For zstd, send the declared Zstandard frame without an HTTP Content-Encoding header. Current source/installation and collection authority are checked before body consumption and before issuing a receipt. Stored count and SHA-256 are verified by readback. An active attempt returns 409; failed attempts can be retried and crashed attempts expire. Late attempts cannot replace newer uploads. Recover a lost response before resending bytes. This receipt attests stored transport bytes only, not decoded-source validity, FHIR admission or researcher access. Keep the source recording until its clinical record has a custody receipt.
+    ///
+    /// - Remark: HTTP `PUT /participant/sources/{sourceId}/recording-transfers/{transferId}/content`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)`.
+    public enum UploadParticipantRecordingTransfer {
+        public static let id: Swift.String = "uploadParticipantRecordingTransfer"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/path/sourceId`.
+                public var sourceId: Swift.String
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/path/transferId`.
+                public var transferId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - sourceId:
+                ///   - transferId:
+                public init(
+                    sourceId: Swift.String,
+                    transferId: Swift.String
+                ) {
+                    self.sourceId = sourceId
+                    self.transferId = transferId
+                }
+            }
+            public var path: Operations.UploadParticipantRecordingTransfer.Input.Path
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/header/Trove-Source-Installation-ID`.
+                public var troveSourceInstallationID: Components.Parameters.SourceInstallationID
+                /// Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/header/Trove-Source-Credential`.
+                public var troveSourceCredential: Components.Parameters.SourceInstallationProof
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadParticipantRecordingTransfer.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveSourceInstallationID: Registered installation UUID; separate from the participant's logical source and derivation key ID.
+                ///   - troveSourceCredential: Private installation credential. Requires independently verified participant authentication and ownership of the named source. New writes require an active installation; the server rechecks under the revocation lock before committing. Never include this value in logs, URLs, clinical resources or exports.
+                ///   - accept:
+                public init(
+                    troveSourceInstallationID: Components.Parameters.SourceInstallationID,
+                    troveSourceCredential: Components.Parameters.SourceInstallationProof,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadParticipantRecordingTransfer.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveSourceInstallationID = troveSourceInstallationID
+                    self.troveSourceCredential = troveSourceCredential
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UploadParticipantRecordingTransfer.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/requestBody/content/application\/octet-stream`.
+                case binary(OpenAPIRuntime.HTTPBody)
+            }
+            public var body: Operations.UploadParticipantRecordingTransfer.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.UploadParticipantRecordingTransfer.Input.Path,
+                headers: Operations.UploadParticipantRecordingTransfer.Input.Headers,
+                body: Operations.UploadParticipantRecordingTransfer.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.RecordingTransferReceipt)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RecordingTransferReceipt {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadParticipantRecordingTransfer.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UploadParticipantRecordingTransfer.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Stream the exact bytes of a registered recording transfer
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UploadParticipantRecordingTransfer.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UploadParticipantRecordingTransfer.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ContentTooLarge: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/413/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/413/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadParticipantRecordingTransfer.Output.ContentTooLarge.Body
+                /// Creates a new `ContentTooLarge`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UploadParticipantRecordingTransfer.Output.ContentTooLarge.Body) {
+                    self.body = body
+                }
+            }
+            /// Declaration or recording exceeds its configured budget
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/413`.
+            ///
+            /// HTTP response code: `413 contentTooLarge`.
+            case contentTooLarge(Operations.UploadParticipantRecordingTransfer.Output.ContentTooLarge)
+            /// The associated value of the enum case if `self` is `.contentTooLarge`.
+            ///
+            /// - Throws: An error if `self` is not `.contentTooLarge`.
+            /// - SeeAlso: `.contentTooLarge`.
+            public var contentTooLarge: Operations.UploadParticipantRecordingTransfer.Output.ContentTooLarge {
+                get throws {
+                    switch self {
+                    case let .contentTooLarge(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "contentTooLarge",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ServiceUnavailable: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/503/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/content/PUT/responses/503/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ProblemDetails)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ProblemDetails {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadParticipantRecordingTransfer.Output.ServiceUnavailable.Body
+                /// Creates a new `ServiceUnavailable`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UploadParticipantRecordingTransfer.Output.ServiceUnavailable.Body) {
+                    self.body = body
+                }
+            }
+            /// Interrupted request; retry unchanged declaration and bytes
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/content/put(uploadParticipantRecordingTransfer)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Operations.UploadParticipantRecordingTransfer.Output.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Operations.UploadParticipantRecordingTransfer.Output.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Recover the latest completed recording transfer receipt
+    ///
+    /// Requires participant source ownership and a committed disclosure audit. Works after withdrawal or source revocation without admitting bytes or restoring access. Returns 404 when the latest attempt has no committed receipt or the source is not owned. Match the source/transfer identity, retained declaration commitment and stored byte count/digest. expiresAt bounds attachment acceptance; an expired receipt proves the past transfer, not current retention.
+    ///
+    /// - Remark: HTTP `GET /participant/sources/{sourceId}/recording-transfers/{transferId}/receipt`.
+    /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)`.
+    public enum LookupParticipantRecordingTransferReceipt {
+        public static let id: Swift.String = "lookupParticipantRecordingTransferReceipt"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/path/sourceId`.
+                public var sourceId: Swift.String
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/path/transferId`.
+                public var transferId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - sourceId:
+                ///   - transferId:
+                public init(
+                    sourceId: Swift.String,
+                    transferId: Swift.String
+                ) {
+                    self.sourceId = sourceId
+                    self.transferId = transferId
+                }
+            }
+            public var path: Operations.LookupParticipantRecordingTransferReceipt.Input.Path
+            /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupParticipantRecordingTransferReceipt.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupParticipantRecordingTransferReceipt.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.LookupParticipantRecordingTransferReceipt.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.LookupParticipantRecordingTransferReceipt.Input.Path,
+                headers: Operations.LookupParticipantRecordingTransferReceipt.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.RecordingTransferReceipt)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RecordingTransferReceipt {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LookupParticipantRecordingTransferReceipt.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.LookupParticipantRecordingTransferReceipt.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Recover the latest completed recording transfer receipt
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.LookupParticipantRecordingTransferReceipt.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.LookupParticipantRecordingTransferReceipt.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Bad request
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Authentication required
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Insufficient permissions
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflict
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Internal server error
+            ///
+            /// - Remark: Generated from `#/paths//participant/sources/{sourceId}/recording-transfers/{transferId}/receipt/get(lookupParticipantRecordingTransferReceipt)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Components.Responses.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Components.Responses.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Recover an immutable receipt for an event owned by the participant
     ///
     /// Matches an accepted representation by event identifier, payload digest and exact consent/output intent. Works after source revocation or enrollment withdrawal without admitting data, restoring access or returning samples. Requires source ownership and a committed audit disclosure intent. An unknown or foreign-owned event or an unaccepted payload digest returns 404; a different consent/output intent returns 409. Unknown bytes must be submitted for validation. A receipt proves past custody only; clients must match its identity and digest to their staged bytes before retirement. The JSON request is limited to 1 MiB.
@@ -11139,7 +12654,7 @@ public enum Operations {
     }
     /// Admit one validated collection or source-retraction event
     ///
-    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant point-quantity records and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope is limited to 6 MiB, original event bytes to 4 MiB and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
+    /// The server validates the original bytes against its pinned Grove FHIR contract, then independently checks each named immutable consent and its collection interval and policy. Adoption of a later study revision does not relabel delayed measurements. Every retained clinical output requires coverage by a named consent; only explicitly selected outputs receive that study's grant. A source retraction requires an empty target list and creates no study grants. It requires an authenticated, active source and installation but no active enrollment. It suppresses every output of every version of the source record, including later arrivals, without deleting retained evidence or affecting other sources. The first accepted retraction retains its lifecycle effect when another report repeats its record-retraction identity. Event, point indexes or retraction assertions, study grants and audit commit together. The same event bytes and consent/output intent return the original receipt without creating new grants. Equivalent JSON serialization and changed enrollment snapshots outside the clinical version may be retained as additional byte representations under the same event ID, with their own payload digest, receipt time and node count. New representations require current collection authority; they create no additional clinical facts or study grants. Changed clinical resource tokens, a changed body under a retained snapshot key, or different consent/output intent under an existing version identity is a conflict. The receipt records acceptance, not current permission to access study data. Initially supports immutable, single-participant heart-rate point quantities, sleep-stage intervals, complete workout sessions with segments, and whole-source-record retractions; unsupported valid FHIR shapes are rejected explicitly. No clinical payload is returned. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), original event bytes to 4 MiB (hard ceiling 16 MiB), and normalized target intent to 512 KiB. Base64 preserves exact producer bytes; the server never reconstructs the event from decoded FHIR JSON. Sets are order-independent.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events`.
@@ -11591,7 +13106,7 @@ public enum Operations {
     }
     /// Admit a bounded batch with independent event outcomes
     ///
-    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope is limited to 6 MiB and the sum of eventBase64 UTF-8 lengths to 5592408 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
+    /// Submit 1–16 original event submissions for one owned active source. Authentication and envelope bounds precede processing. The JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB). The sum of eventBase64 UTF-8 lengths is bounded by the configured record-byte budget after Base64 expansion, with a hard ceiling of 22369624 bytes. Each member retains the single-event validation, consent and size limits. The response has one receipt or sanitized problem per member in input order. Members commit independently and are processed sequentially. One rejection does not roll back another event. Cancellation or a lost response may leave accepted members; recover each original receipt before retrying unchanged bytes and targets. A receipt is custody evidence, not current study access. This is not a background job or a latency guarantee. No clinical payload is returned.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/events/batch`.
@@ -11943,7 +13458,7 @@ public enum Operations {
     }
     /// Admit a Grove Bundle with independent record outcomes
     ///
-    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The JSON envelope is limited to 6 MiB and the decoded Bundle to 4 MiB plus 1 KiB of transport framing. Each restored record remains limited to 4 MiB. A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
+    /// Submit one Grove active or retraction Bundle for one owned active source, with 1–16 record commitments in response order. Active records and retractions cannot mix. Shared entries travel once. Each commitment names the original staged record's ordered entry addresses, exact payload digest and study targets. The receiver reconstructs and validates that record before independently committing it. The configured JSON envelope budget defaults to 6 MiB (hard ceiling 24 MiB), the decoded Bundle budget to 4 MiB plus 1 KiB (hard ceiling 16 MiB plus 1 KiB), and each restored record budget to 4 MiB (hard ceiling 16 MiB). A malformed Bundle or a mismatch between its lifecycle records and the commitment list rejects the envelope before admission. Record-level validation or authorization failures do not roll back accepted siblings. Receipts commit the original record bytes, not the transport Bundle's timestamp, grouping or entry order. Recover each uncertain receipt before retrying; remaining records may be packed differently. Transport-only framing and rejected records are not retained as accepted custody.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources/{sourceId}/record-bundles`.
@@ -13177,7 +14692,7 @@ public enum Operations {
     }
     /// Read exact consented collection windows for an owned enrollment
     ///
-    /// Returns an audited, consistent snapshot of accepted consent windows and their published collection requirements. No consent responses, signatures, artifacts or samples are returned. Withdrawal or no accepted consent yields no windows. Publication alone does not change the timeline. Inconsistent history or unknown policy fails the whole read, never a partial plan. This snapshot is not an upload capability or permission for continued offline collection. Refresh before collection and after enrollment or consent changes; the receiver independently checks every submitted target.
+    /// Returns an audited, consistent snapshot of accepted consent windows and their published collection requirements. No consent responses, signatures, artifacts or samples are returned. Withdrawal or no accepted consent yields no windows. Publication alone does not change the timeline. Inconsistent history or unknown policy fails the whole read, never a partial plan. Retain a complete, account-bound set of accepted plans for offline collection until each enrollment ends. Observation time is not an expiration and no elapsed-time lease or per-page network authorization is required. Enforce local withdrawal, account changes, known source revocation and known enrollment end. Refresh on reconnect and enrollment or consent changes; initial consent and broader revision adoption require server authorization. A retained plan is not an upload capability: the receiver independently checks every submitted target against its original consent and revision.
     ///
     ///
     /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/collection-plan`.

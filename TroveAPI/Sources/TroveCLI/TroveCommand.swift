@@ -12,7 +12,9 @@ import ArgumentParser
 struct StudyCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "study",
-        subcommands: [CreateStudy.self, GetStudy.self, EditStudy.self, ValidateStudy.self, PublishStudy.self]
+        subcommands: [
+            CreateStudy.self, GetStudy.self, GetStudyData.self, GetStudyRecording.self, EditStudy.self, ValidateStudy.self, PublishStudy.self
+        ]
     )
 }
 
@@ -26,7 +28,7 @@ struct QuestionnaireCommand: AsyncParsableCommand {
 struct TroveCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "trove",
-        abstract: "Read, edit, validate and publish study drafts through the Trove API.",
+        abstract: "Read study data and author study drafts through the Trove API.",
         discussion: "Writes use the revision you reviewed. A conflict requires a new read and review, never an automatic retry.",
         subcommands: [StudyCommand.self, QuestionnaireCommand.self]
     )

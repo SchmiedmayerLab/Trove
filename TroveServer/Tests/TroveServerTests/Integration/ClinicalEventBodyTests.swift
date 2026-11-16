@@ -29,7 +29,7 @@ struct ClinicalEventBodyTests {
                 continuation.finish(throwing: URLError(.networkConnectionLost))
             }
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
+                let service = TestApp.clinicalService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
                     try await service.accept(
                         body: HTTPBody(stream, length: .unknown),
@@ -49,7 +49,7 @@ struct ClinicalEventBodyTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let body = HTTPBody(Data(), length: .known(Int64(FHIRValidationClient.maximumBytes + 1)))
-                let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
+                let service = TestApp.clinicalService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
                     try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 } throws: { ($0 as? TroveServer.ServerError)?.status.code == 413 }
@@ -64,7 +64,7 @@ struct ClinicalEventBodyTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let body = HTTPBody([1], length: .known(2))
-                let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
+                let service = TestApp.clinicalService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect {
                     try await service.accept(body: body, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 } throws: { ($0 as? TroveServer.ServerError)?.status.code == 503 }
@@ -82,7 +82,7 @@ struct ClinicalEventBodyTests {
                 continuation.finish(throwing: CancellationError())
             }
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = ClinicalEventService(database: app.db, validator: Self.forbiddenValidator)
+                let service = TestApp.clinicalService(database: app.db, validator: Self.forbiddenValidator)
                 await #expect(throws: CancellationError.self) {
                     try await service.accept(
                         body: HTTPBody(stream, length: .unknown),

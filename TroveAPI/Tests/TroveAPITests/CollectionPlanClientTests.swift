@@ -20,6 +20,7 @@ struct CollectionPlanClientTests {
             #expect(operationID == "getParticipantCollectionPlan")
             let json = """
                 {"enrollmentId":"00000000-0000-4000-8000-000000000001","stateVersion":2,
+                 "studyId":"00000000-0000-4000-8000-000000000004","title":{"en-US":"Saved Study"},
                  "asOf":"2001-01-01T00:00:01.654321Z","windows":[{
                  "consentId":"00000000-0000-4000-8000-000000000002",
                  "publicationId":"00000000-0000-4000-8000-000000000003","revision":1,

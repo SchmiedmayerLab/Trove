@@ -12,21 +12,25 @@ import TroveAPITypes
 
 struct CollectionRequirement: Codable, Sendable, Hashable {
     /// Receiver capability, not a duplicate measurement catalog or substitute for IG validation.
-    /// Grove FHIR 0.8.0: mobile/input/fsh/generated-measurement-profiles.fsh, GroveMobileHeartRate.
-    static let supportedProfile = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
+    static let supportedProfile = CollectionObservationProfile.heartRate.rawValue
 
     let profile: String
     let sourceKind: SourceKind
     let measurementWindow: CollectionMeasurementWindow?
+    let includeWorkoutRoutes: Bool
 
-    init(profile: String, sourceKind: SourceKind, measurementWindow: CollectionMeasurementWindow? = nil) {
+    init(profile: String, sourceKind: SourceKind, measurementWindow: CollectionMeasurementWindow? = nil, includeWorkoutRoutes: Bool = false) {
         self.profile = profile
         self.sourceKind = sourceKind
         self.measurementWindow = measurementWindow
+        self.includeWorkoutRoutes = includeWorkoutRoutes
     }
 
     static func validate(_ requirements: [Self]) throws {
-        guard requirements.count <= 1, requirements.allSatisfy({ $0.profile == supportedProfile }) else {
+        guard requirements.count <= CollectionObservationProfile.allCases.count,
+              Set(requirements.map(\.profile)).count == requirements.count,
+              requirements.allSatisfy({ CollectionObservationProfile(rawValue: $0.profile) != nil
+                  && (!$0.includeWorkoutRoutes || $0.profile == CollectionObservationProfile.workout.rawValue) }) else {
             throw ServerError.badRequest("Collection requirements contain duplicate or unsupported receiver capabilities")
         }
         for requirement in requirements { try requirement.measurementWindow?.validate() }
@@ -42,9 +46,11 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         let sourceKind: SourceKind
         let start: Date
         let end: Date?
+        let includeWorkoutRoutes: Bool
 
-        func contains(_ instant: Date) -> Bool {
-            CollectionMeasurementWindow.valid(instant) && instant >= start && (end.map { instant < $0 } ?? true)
+        func contains(_ instant: Date, through sampleEnd: Date? = nil) -> Bool {
+            CollectionMeasurementWindow.valid(instant) && (sampleEnd.map(CollectionMeasurementWindow.valid) ?? true)
+                && CollectionMeasurementSelection.includes(sampleStart: instant, sampleEnd: sampleEnd, windowStart: start, windowEnd: end)
         }
     }
 
@@ -52,6 +58,7 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
 
     static let filename = "collection-policy.json"
 
+    let enrollmentPeriod: EnrollmentPeriod
     let schemaVersion: Int
     let contractVersion: String
     let contractRevision: String
@@ -61,16 +68,20 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
     let collectionWindow: String
     let requirements: [CollectionRequirement]
 
-    static func compile(studyID: UUID, revision: Int, requirements: [CollectionRequirement]) throws -> Self {
+    static func compile(
+        studyID: UUID, revision: Int, requirements: [CollectionRequirement], enrollmentPeriod: EnrollmentPeriod = .ongoing
+    ) throws -> Self {
         guard revision > 0 else { throw ServerError.badRequest("Collection policy revision must be positive") }
+        try enrollmentPeriod.validate()
         try CollectionRequirement.validate(requirements)
         return Self(
-            schemaVersion: 2,
+            enrollmentPeriod: enrollmentPeriod,
+            schemaVersion: 5,
             contractVersion: FHIRValidationClient.contractVersion,
             contractRevision: FHIRValidationClient.contractRevision,
             studyID: studyID,
             revision: revision,
-            valueShape: "point-quantity",
+            valueShape: "profiled-observation",
             collectionWindow: "retained-measurement-window",
             requirements: requirements
         )
@@ -103,14 +114,16 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
 
     /// Unknown policy fails; an empty array explicitly means no collection.
     func validatedRequirements(studyID: UUID, revision: Int) throws -> [CollectionRequirement] {
-        guard schemaVersion == 2, contractVersion == FHIRValidationClient.contractVersion,
+        guard schemaVersion == 5, contractVersion == FHIRValidationClient.contractVersion,
               contractRevision == FHIRValidationClient.contractRevision,
               self.studyID == studyID, self.revision == revision,
-              revision > 0, valueShape == "point-quantity", collectionWindow == "retained-measurement-window",
-              requirements.count <= 1, requirements.allSatisfy({ $0.profile == CollectionRequirement.supportedProfile }) else {
+              revision > 0, valueShape == "profiled-observation", collectionWindow == "retained-measurement-window" else {
             throw ServerError.internalServerError("Exact collection policy is unavailable")
         }
-        do { try CollectionRequirement.validate(requirements) } catch {
+        do {
+            try enrollmentPeriod.validate()
+            try CollectionRequirement.validate(requirements)
+        } catch {
             throw ServerError.internalServerError("Exact collection policy is unavailable")
         }
         return requirements
@@ -127,10 +140,11 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
             let retained = scope?.requirements.filter { $0.profile == requirement.profile && $0.sourceKind == requirement.sourceKind }
             let window: ResolvedCollectionWindow
             if let retained {
-                guard retained.count == 1, let value = retained.first else { throw Self.missingScope }
+                guard retained.count == 1, let value = retained.first,
+                      value.includeWorkoutRoutes == requirement.includeWorkoutRoutes else { throw Self.missingScope }
                 window = value.window
             } else {
-                guard requirement.measurementWindow == nil else { throw Self.missingScope }
+                guard requirement.measurementWindow == nil, !requirement.includeWorkoutRoutes else { throw Self.missingScope }
                 window = .init(start: nil, end: nil)
             }
             try Self.validate(window, for: requirement, acceptedAt: acceptedAt)
@@ -140,11 +154,17 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
                 throw Self.missingScope
             }
             // A later revision can close a future explicit range before it starts: retain an empty interval.
-            return .init(profile: requirement.profile, sourceKind: requirement.sourceKind, start: lower, end: upper.map { max(lower, $0) })
+            return .init(
+                profile: requirement.profile,
+                sourceKind: requirement.sourceKind,
+                start: lower,
+                end: upper.map { max(lower, $0) },
+                includeWorkoutRoutes: requirement.includeWorkoutRoutes
+            )
         }
     }
 
-    // Call only for an IG-validated point Quantity after resolving active server-owned authority.
+    // Call only for an IG-validated observation after resolving active server-owned authority.
     // swiftlint:disable:next function_parameter_count
     func permits(
         studyID: UUID,
@@ -153,12 +173,22 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         sourceKind: SourceKind,
         effectiveAt: Date,
         consentAcceptedAt: Date,
+        effectiveEnd: Date? = nil,
         scope: AcceptedCollectionScope? = nil,
-        adoptionEnd: Date? = nil
+        adoptionEnd: Date? = nil,
+        requiresWorkoutRoute: Bool = false
     ) -> Bool {
+        // The profile determines its temporal shape; an interval end cannot be dropped.
+        guard let capability = CollectionObservationProfile(rawValue: profile),
+              capability.isInterval == (effectiveEnd != nil) else {
+            return false
+        }
         guard let requirements = try? resolvedRequirements(
             studyID: studyID, revision: revision, acceptedAt: consentAcceptedAt, scope: scope, adoptionEnd: adoptionEnd
         ) else { return false }
-        return requirements.contains { $0.profile == profile && $0.sourceKind == sourceKind && $0.contains(effectiveAt) }
+        return requirements.contains {
+            $0.profile == profile && $0.sourceKind == sourceKind && $0.contains(effectiveAt, through: effectiveEnd)
+                && (!requiresWorkoutRoute || $0.includeWorkoutRoutes)
+        }
     }
 }

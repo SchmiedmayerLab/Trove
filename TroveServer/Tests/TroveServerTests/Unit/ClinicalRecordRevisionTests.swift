@@ -54,7 +54,7 @@ struct ClinicalRecordRevisionTests {
 extension ClinicalRecordRevisionTests {
     private static func point(
         record: String = "record", writer: String? = "writer", version: String? = "1", output: String = "primary"
-    ) -> ValidatedExchangeEvent.PointOutput {
+    ) -> ValidatedExchangeEvent.Output {
         .init(
             fullURL: "urn:point:" + output,
             profile: CollectionRequirement.supportedProfile,
@@ -63,15 +63,13 @@ extension ClinicalRecordRevisionTests {
             sourceOutputIdentifier: .init(system: "urn:output", value: output),
             writerIdentifier: writer.map { .init(system: "urn:writer", value: $0) },
             writerVersion: version,
-            quantityValue: "72",
-            quantitySystem: "http://unitsofmeasure.org",
-            quantityCode: "/min",
+            value: .quantity(value: "72", system: "http://unitsofmeasure.org", code: "/min"),
             codeSystem: "http://loinc.org",
             code: "8867-4"
         )
     }
 
-    private static func event(_ outputs: [ValidatedExchangeEvent.PointOutput]) -> ValidatedExchangeEvent {
+    private static func event(_ outputs: [ValidatedExchangeEvent.Output]) -> ValidatedExchangeEvent {
         .init(
             rawBytes: Data([1]),
             recorded: .init(seconds: 0, fraction: ""),

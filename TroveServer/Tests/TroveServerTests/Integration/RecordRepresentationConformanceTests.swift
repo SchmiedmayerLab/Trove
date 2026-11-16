@@ -26,7 +26,7 @@ struct RecordRepresentationConformanceTests {
             let targets = fixture.targets(for: projection)
             let retractions = try [1, 2].map { try RetractionEventFixture.bytes(activeBytes: active[0], sequence: UInt64($0)) }
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                let service = try ClinicalEventService(database: app.db, validator: FHIRValidationClient(application: app))
+                let service = try TestApp.clinicalService(database: app.db, validator: FHIRValidationClient(application: app))
                 for (payloads, intent) in [(active, targets), (retractions, [])] {
                     let first = try await service.accept(
                         body: HTTPBody(payloads[0]), sourceID: fixture.source.id, targets: intent, installation: fixture.installation

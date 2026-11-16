@@ -10,6 +10,7 @@ import { Field, RadioGroup } from "@schmiedmayerlab/grove-design-system";
 import { CriteriaTreeBuilder } from "@/components/interfaces/CriteriaTreeBuilder";
 import { Card, CardHeader } from "@/components/ui/Card";
 import type { EnrollmentForm as EnrollmentFormType } from "../lib/useEnrollmentForm";
+import { EnrollmentPeriodControls } from "./EnrollmentPeriodControls";
 
 interface RadioOptionProps {
   title: string;
@@ -80,6 +81,30 @@ export const EnrollmentForm = ({ form, onSubmit }: EnrollmentFormProps) => {
                 ]}
                 {...field}
               />
+            )}
+          />
+        </div>
+      </Card>
+      <Card>
+        <CardHeader
+          title="Enrollment period"
+          description="Set when participation ends. Leave both options off for ongoing enrollment."
+        />
+        <div className="p-(--card-padding)">
+          <Field
+            control={form.control}
+            name="enrollmentPeriod"
+            render={({ field }) => (
+              <div
+                id={field.id}
+                aria-invalid={field["aria-invalid"]}
+                aria-errormessage={field["aria-errormessage"]}
+              >
+                <EnrollmentPeriodControls
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              </div>
             )}
           />
         </div>

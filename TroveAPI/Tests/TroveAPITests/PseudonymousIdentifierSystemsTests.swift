@@ -14,6 +14,22 @@ import TroveAPITypes
 
 struct ParticipantSourceIdentifierTests {
     @Test
+    func nativeNamespaceIsStoreScopedAndIndependentOfKeyEpoch() throws {
+        let original = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
+        var rotated = original
+        rotated.keyID = UUID().uuidString.lowercased()
+        rotated.keyEpoch = "2"
+        let systems = try DeploymentIdentifierSystems.derived(
+            root: IdentifierSystem(rotated.identifierRoot), keyID: rotated.keyID, epoch: KeyEpoch(rotated.keyEpoch)
+        )
+        rotated.eventIdentifierSystem = systems.recordVersion.rawValue
+        let native = try original.nativeRecordIdentifierSystem()
+        #expect(native == (try rotated.nativeRecordIdentifierSystem()))
+        #expect(native.rawValue == original.identifierRoot + "/NamingSystem/healthkit-native-record")
+        #expect(native != systems.sourceRecord && native != systems.sourceOutput && native != systems.recordVersion)
+    }
+
+    @Test
     func roundTripDerivesAllThirteenDistinctSystems() throws {
         let source = DeliveryFixture.binding(sourceID: UUID(), registrationID: UUID()).source
         let decoded = try JSONDecoder().decode(Components.Schemas.ParticipantSource.self, from: JSONEncoder().encode(source))

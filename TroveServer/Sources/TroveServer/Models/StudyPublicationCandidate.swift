@@ -49,7 +49,14 @@ final class StudyPublicationCandidate: Model, @unchecked Sendable {
     @Field(key: "expires_at") var expiresAt: Date
 
     var artifact: ArtifactReference {
-        .init(id: artifactID, ownerID: studyID, purpose: .publication, digest: bundleDigest, byteCount: byteCount)
+        .init(
+            id: artifactID,
+            ownerID: studyID,
+            purpose: .publication,
+            digest: bundleDigest,
+            byteCount: byteCount,
+            scope: .study(.init(studyID: studyID, groupID: groupID))
+        )
     }
 
     init() {}

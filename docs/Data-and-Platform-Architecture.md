@@ -88,6 +88,15 @@ history reader is not a cross-study activity feed, frozen export or retention po
 
 ## Source Data and Study Attribution
 
+Clinical retrieval uses a separately assigned `data-reader` group capability in
+addition to researcher identity and membership. `GET /studies/{studyId}/data`
+returns bounded, live pages of derived FHIR collection Bundles with exact numeric
+tokens, stable study subjects, historical protocol context and derivation
+Provenance. The receiver retains original custody bytes separately. Selection,
+current-authority checks and disclosure audit share a transaction; a failed audit
+cannot return clinical data. See [study data access](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveServer/README.md#study-data-access)
+for response limits, cursor semantics and the current point-data capability.
+
 Consider a participant whose heart-rate observation is eligible for two studies. The source event and its resource version are stored once within the appropriate participant/source scope. Each eligible study receives a separate, exact attribution record.
 
 Those attributions identify the authorized enrollment, study revision and resource version. They are not inferred from whoever uploaded the record, nor from an unfiltered list of study references supplied by a client.

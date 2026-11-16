@@ -53,7 +53,7 @@ actor DeliveryTransport: ClientTransport {
 
     func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String) async throws -> (HTTPResponse, HTTPBody?) {
         let body = try #require(body)
-        let bytes = try await Data(collecting: body, upTo: 6 * 1024 * 1024)
+        let bytes = try await Data(collecting: body, upTo: EventSubmissionLimits.maximumEnvelopeBytes)
         let path = try #require(request.path)
         paths.append(path)
         let installationHeader = try #require(HTTPField.Name("Trove-Source-Installation-ID"))

@@ -24,23 +24,23 @@ struct HeartRateCatchUpTests {
             .init(eventIDs: [UUID()], changeCount: 1),
             .init(eventIDs: [], changeCount: 0)
         ])
-        #expect(try await HeartRateAcquisition.catchUp { try await source.next() } == .caughtUp)
+        #expect(try await HealthKitAcquisition.catchUp { try await source.next() } == .caughtUp)
         #expect(await source.calls == 3)
     }
 
     @Test
     func pageBudgetRequiresAnotherPassWithoutSkippingItsNextPage() async throws {
         let source = Pages(Array(repeating: .init(eventIDs: [], changeCount: 64), count: 9) + [.init(eventIDs: [], changeCount: 0)])
-        #expect(try await HeartRateAcquisition.catchUp { try await source.next() } == .needsAnotherPass)
+        #expect(try await HealthKitAcquisition.catchUp { try await source.next() } == .needsAnotherPass)
         #expect(await source.calls == 8)
-        #expect(try await HeartRateAcquisition.catchUp { try await source.next() } == .caughtUp)
+        #expect(try await HealthKitAcquisition.catchUp { try await source.next() } == .caughtUp)
         #expect(await source.calls == 10)
     }
 
     @Test
     func failedPageDoesNotBecomeSuccessfulCatchUp() async {
         await #expect(throws: Failure.self) {
-            try await HeartRateAcquisition.catchUp { throw Failure.expected }
+            try await HealthKitAcquisition.catchUp { throw Failure.expected }
         }
     }
 
@@ -48,7 +48,7 @@ struct HeartRateCatchUpTests {
     func alreadyCancelledPassDoesNotStartAQuery() async {
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return try await HeartRateAcquisition.catchUp {
+            return try await HealthKitAcquisition.catchUp {
                 Issue.record("Cancelled catch-up started a query.")
                 return .init(eventIDs: [], changeCount: 0)
             }
@@ -59,7 +59,7 @@ struct HeartRateCatchUpTests {
     @Test
     func cancellationDuringTheLastQueryCannotReportCaughtUp() async {
         let task = Task {
-            try await HeartRateAcquisition.catchUp {
+            try await HealthKitAcquisition.catchUp {
                 withUnsafeCurrentTask { $0?.cancel() }
                 return .init(eventIDs: [], changeCount: 0)
             }
@@ -71,12 +71,12 @@ struct HeartRateCatchUpTests {
 
 extension HeartRateCatchUpTests {
     private actor Pages {
-        let pages: [HeartRateAcquisition.Page]
+        let pages: [HealthKitAcquisition.Page]
         private(set) var calls = 0
 
-        init(_ pages: [HeartRateAcquisition.Page]) { self.pages = pages }
+        init(_ pages: [HealthKitAcquisition.Page]) { self.pages = pages }
 
-        func next() throws -> HeartRateAcquisition.Page {
+        func next() throws -> HealthKitAcquisition.Page {
             let page = try #require(pages.indices.contains(calls) ? pages[calls] : nil)
             calls += 1
             return page

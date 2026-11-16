@@ -149,15 +149,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Each integration suite writes to its own bucket. SeaweedFS grows seven volumes for every
+          # new bucket by default, which exhausts the 32 volume slots after four buckets; grow one.
           docker run --detach --name "$STORAGE_CONTAINER" \
             --publish 127.0.0.1:18333:8333 \
             --tmpfs /data:rw,size=2g \
-            --health-cmd 'wget -qO- http://127.0.0.1:8333/ || exit 1' \
+            --env AWS_ACCESS_KEY_ID=trove_test \
+            --env AWS_SECRET_ACCESS_KEY=trove_test \
+            --env WEED_MASTER_VOLUME_GROWTH_COPY_1=1 \
+            --health-cmd 'wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q "HTTP/1.1 403"' \
             --health-interval 2s --health-timeout 5s --health-retries 60 \
             "$STORAGE_IMAGE" server -s3 -dir=/data -master.volumeSizeLimitMB=100 \
             -volume.port=8081 -volume.max=32 -master.telemetry=false
           for _ in $(seq 1 60); do
-            # Test objects are tiny and disposable. Keep their storage independent
+            # Test objects are disposable, including the large streaming fixture. Keep their storage independent
             # of the cold Swift build, and require allocation, not just HTTP health.
             if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$STORAGE_CONTAINER")" == healthy ]] && \
                 docker exec "$STORAGE_CONTAINER" wget -T 5 -qO- http://127.0.0.1:9333/dir/assign | \

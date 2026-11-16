@@ -45,6 +45,8 @@ struct AuthContext: Sendable {
     let groupMemberships: [String: GroupRole]
     /// Independent governed-data capability; administration alone does not imply it.
     let auditReaderGroups: Set<String>
+    /// Clinical disclosure is separately granted; neither administration nor audit access implies it.
+    let dataReaderGroups: Set<String>
 
     init(
         issuer: String,
@@ -79,6 +81,7 @@ struct AuthContext: Sendable {
 
         var memberships: [String: GroupRole] = [:]
         var auditReaders: Set<String> = []
+        var dataReaders: Set<String> = []
         for path in groups {
             guard path.hasPrefix("/") else { continue }
             // Empty segments are invalid claims, not alternate spellings of a group.
@@ -89,11 +92,16 @@ struct AuthContext: Sendable {
                 auditReaders.insert(groupName)
                 continue
             }
+            if parts[1] == "data-reader" {
+                dataReaders.insert(groupName)
+                continue
+            }
             guard let role = GroupRole(rawValue: String(parts[1])) else { continue }
             memberships[groupName] = max(memberships[groupName] ?? role, role)
         }
         self.groupMemberships = memberships
         self.auditReaderGroups = auditReaders
+        self.dataReaderGroups = dataReaders
     }
 
     @discardableResult
@@ -128,10 +136,22 @@ struct AuthContext: Sendable {
         guard context.auditReaderGroups.contains(groupName) else { throw ServerError.forbidden }
     }
 
+    static func checkHasDataAccess(groupName: String) throws {
+        try requireCurrent().checkDataAccess(groupName: groupName)
+    }
+
     static func requireCurrent() throws -> AuthContext {
         guard let context = current else {
             throw ServerError.missingToken
         }
         return context
+    }
+
+    /// Database callbacks use the captured verified actor, not request-local task storage.
+    func checkDataAccess(groupName: String) throws {
+        guard clientAccess == .interactive, roles.contains(researcherRole),
+              groupMemberships[groupName] != nil, dataReaderGroups.contains(groupName) else {
+            throw ServerError.forbidden
+        }
     }
 }

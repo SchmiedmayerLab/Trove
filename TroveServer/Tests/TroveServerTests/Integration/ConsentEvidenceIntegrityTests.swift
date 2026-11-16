@@ -14,7 +14,7 @@ import Testing
 import VaporTesting
 
 
-private actor ConsentEvidenceStorage: ObjectStorageProvider {
+private actor ConsentEvidenceStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private let corruptUploads: Bool
     private(set) var downloads: [String] = []
@@ -23,11 +23,11 @@ private actor ConsentEvidenceStorage: ObjectStorageProvider {
         self.corruptUploads = corruptUploads
     }
 
-    func upload(data: Data, key: String, contentType: String) {
+    func uploadBuffered(data: Data, key: String, contentType: String) {
         objects[key] = corruptUploads ? data + Data("CORRUPTED".utf8) : data
     }
 
-    func download(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
+    func downloadBuffered(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
         downloads.append(key)
         guard let data = objects[key] else {
             throw ServerError.notFound("Synthetic evidence not found")
@@ -83,7 +83,7 @@ struct ConsentEvidenceIntegrityTests {
         let storage = ConsentEvidenceStorage()
         try await TestApp.withApp(token: .participant(subject: Self.subject), storageProvider: storage) { app, token in
             let record = try await Self.fixture(on: app, bytes: Data("accepted PDF".utf8))
-            await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
+            try await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
             try await Self.download(record, app: app, token: token) { response in
                 #expect(response.status == .internalServerError)
                 Self.expectNoEvidence(in: response)
@@ -130,7 +130,7 @@ struct ConsentEvidenceIntegrityTests {
         let storage = ConsentEvidenceStorage()
         try await TestApp.withApp(token: .participant(subject: Self.subject), storageProvider: storage) { app, token in
             let record = try await Self.fixture(on: app, bytes: Self.privatePDF)
-            await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
+            try await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
             try await Self.download(record, app: app, token: token) { response in
                 #expect(response.status == .ok)
                 #expect(Data(buffer: response.body) == Self.privatePDF)
@@ -144,7 +144,7 @@ struct ConsentEvidenceIntegrityTests {
         let storage = ConsentEvidenceStorage()
         try await TestApp.withApp(token: .participant(subject: Self.subject), storageProvider: storage) { app, token in
             let record = try await Self.fixture(on: app, bytes: Self.privatePDF)
-            await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
+            try await storage.upload(data: Self.privatePDF, key: record.evidenceKey, contentType: "application/pdf")
             let sql = try #require(app.db as? any SQLDatabase)
             try await sql.raw("DROP TABLE audit_events").run()
             try await Self.download(record, app: app, token: token) { response in

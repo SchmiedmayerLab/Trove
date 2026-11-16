@@ -36,10 +36,7 @@ struct StudyAuditDecodingTests {
         }
     }
 
-    @Test(arguments: [
-        AuditEvent.Action.sourceRegistered, .sourceRevoked, .clinicalEventAccepted,
-        .clinicalEventAttributed, .clinicalEventReceiptDisclosure
-    ])
+    @Test(arguments: AuditEvent.Action.allCases.filter { $0.scopeKind == .participantSource })
     func sourceActionsCannotBeMappedIntoStudyResponses(action: AuditEvent.Action) {
         #expect(throws: AuditError.invalidScope) { try Components.Schemas.StudyAuditAction(action) }
     }

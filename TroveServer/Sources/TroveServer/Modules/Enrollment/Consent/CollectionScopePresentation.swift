@@ -25,8 +25,33 @@ enum CollectionScopePresentation {
         }
         var lines = ["", "", german ? "## Erfassung von Gesundheitsdaten" : "## Health data collection"]
         for requirement in requirements {
-            lines.append(german ? "- Herzfrequenz" : "- Heart rate")
+            let sleep = requirement.profile == CollectionObservationProfile.sleepStage.rawValue
+            let workout = requirement.profile == CollectionObservationProfile.workout.rawValue
+            let label = workout ? (german ? "- Trainingseinheiten" : "- Workouts")
+                : sleep ? (german ? "- Schlafphasen" : "- Sleep stages") : (german ? "- Herzfrequenz" : "- Heart rate")
+            lines.append(label)
+            lines.append(german
+                ? "- Die ursprüngliche HealthKit-Kennung (UUID) wird zusammen mit jeder Messung und ihrer Löschmeldung gespeichert."
+                : "- The original HealthKit sample identifier (UUID) is retained with each measurement and its deletion notice.")
             lines += try bounds(requirement.measurementWindow, german: german)
+            if workout {
+                lines.append(requirement.includeWorkoutRoutes
+                    ? (german ? "- Genaue Standortverläufe der Trainingseinheiten werden für diese Studie erfasst."
+                        : "- Precise location routes for workouts are collected for this study.")
+                    : (german ? "- Standortverläufe der Trainingseinheiten werden für diese Studie nicht erfasst."
+                        : "- Workout location routes are not collected for this study."))
+                lines.append(german
+                    ? "- Trainingseinheiten werden mit allen Abschnitten und Statistiken vollständig erfasst, wenn sie den Erfassungszeitraum "
+                        + "überlappen. Sie können davor beginnen oder danach enden."
+                    : "- Workouts include all segments and statistics when the session overlaps the collection window. "
+                        + "They may start before it or end after it.")
+            }
+            if sleep {
+                lines.append(german
+                    ? "- Schlafaufzeichnungen werden vollständig erfasst, wenn sie den Erfassungszeitraum überlappen. "
+                        + "Sie können davor beginnen oder danach enden."
+                    : "- Sleep records are collected in full when they overlap the collection window. They may start before it or end after it.")
+            }
         }
         return lines.joined(separator: "\n")
     }

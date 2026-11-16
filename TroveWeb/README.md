@@ -46,21 +46,74 @@ through the shared API with the revision that populated the form. Concurrent edi
 are rejected without replacing unsaved values. Saving a draft does not change an
 accepted participant scope; publish and obtain acceptance of the new version.
 
-The current editor supports heart rate from participant acceptance, a Gregorian
-calendar lookback (six months initially), a fixed start, or all available history.
+The editor configures independent heart-rate, sleep-stage and workout windows from participant
+acceptance, a Gregorian calendar lookback (six months initially), a fixed start, or
+all available history. Sleep records and complete workouts are included whole when they overlap their
+window; the form and scope summary disclose that they may extend outside it.
 Choose an explicit IANA time zone for lookbacks and an optional exclusive end.
 Fixed times use UTC strings, preserving the API's six fractional-second digits
 through unrelated edits. Relative dates resolve once at acceptance on the server.
 Unsupported settings remain unchanged and cannot be saved through this editor.
 
 Native health-data components remain separate app configuration; adding a component
-does not authorize server collection. Sleep/workout admission, metadata and route
-controls, durable backfill, and offline execution remain in the collection roadmap.
-This editor does not establish those acquisition capabilities.
+does not authorize server collection. The receiver admits heart-rate, sleep-stage and complete workout
+records. The native path implements these measurements; Apple-platform sleep and workout verification
+remains outstanding. Route and metadata controls are not available in this editor.
 
 The browser regressions in `e2e/collection-authoring.spec.ts` use the real authenticated
 API to verify save/reload, exact date retention, invalid input, and stale revisions.
 They exercise draft authoring, not publication or native data acquisition.
+
+## Study results
+
+Results loads one authorized page on request, with current measurement versions
+selected by default. Researchers need membership in the study's group and its
+explicit `data-reader` capability; administrator or audit access alone is
+insufficient. The server independently authorizes and audits each disclosure.
+
+Choose history to include superseded versions without treating them as additional
+measurements. Next page follows the server's opaque cursor. Start from the first
+page after eligibility changes or to include newly attributed historical records.
+These pages are a live view, not a frozen final dataset or a clinical chart.
+
+Each download decodes the returned derived FHIR Bundle directly to bytes, retaining
+exact numeric values, source facts and study-specific derivation Provenance. Pages
+are held only in the mounted view, outside the shared query cache. Changing study,
+version mode or page size clears the results; starting another request clears the
+previous page, and cancellation cannot restore it. Session termination unmounts
+the view through the existing authentication boundary. Downloads already saved by
+the researcher remain governed study data.
+
+External CSV recordings have a separate **Save CSV** action. It requests the
+generated, authenticated study-recording endpoint for the selected grant and
+version view; attachment URLs cannot redirect credentials to other endpoints.
+The server verifies the original recording before disclosure. The browser checks
+the returned media type and exact attachment byte count without parsing or
+rewriting the CSV. FHIR downloads retain the original numeric tokens even when
+the page inspects attachment metadata.
+
+Where the browser exposes the File System Access save picker, CSV bytes stream
+to a temporary destination with backpressure; the destination is committed only
+after the complete expected payload arrives. This requires a secure context and
+a user-initiated save. Other browsers use an explicitly bounded 64 MiB payload
+fallback. This is a browser implementation capacity limit, independent of study
+collection and server download limits; fallback buffering and Blob creation can
+use more memory than the payload itself. For larger recordings, use the
+[Trove CLI](../TroveAPI/CLI.md) or a browser exposing the streaming save picker.
+The page reports this limit before downloading and never offers a truncated file.
+
+Changing the page, study, version mode or session cancels pending recording work;
+the user can also cancel explicitly. A session change while the save picker is
+open cannot transfer the request to the replacement account. Cancellation aborts
+an unfinished destination, but cannot retract a file already committed or
+handed to the browser's download manager. Unit tests cover stream backpressure,
+size mismatches, cancellation, session replacement and fallback capacity; native
+save-picker and operating-system disk behavior require browser verification.
+
+The server exports heart-rate, sleep and complete workout records. Pages count records
+and do not split workout segments. Routes, full metadata adoption and final dataset
+snapshots remain separate implementation work. A page
+capacity refusal offers smaller page sizes; it never offers a partial download.
 
 ## Container transport
 

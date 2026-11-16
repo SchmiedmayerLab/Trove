@@ -28,9 +28,10 @@ enum RetainedRecordFixtures {
             ownerID: ownerID,
             purpose: purpose,
             digest: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
-            byteCount: bytes.count
+            byteCount: bytes.count,
+            scope: .study(.init(studyID: studyID))
         )
-        let record = StoredArtifact(reference: reference, scope: .init(studyID: studyID), expiresAt: Date())
+        let record = StoredArtifact(reference: reference, expiresAt: Date())
         record.state = .retained
         record.cleanupAfter = nil
         try await record.save(on: database)

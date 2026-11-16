@@ -58,7 +58,7 @@ struct ClinicalAttributionStore: Sendable {
             throw ServerError.notFound("Clinical event not found")
         }
         let rows = try await sql.raw("""
-            SELECT f.node_id, n.full_url, f.profile, f.effective_at
+            SELECT f.node_id, n.full_url, f.profile, f.effective_at, f.effective_end, f.code_system, f.code
             FROM clinical_point_facts f JOIN clinical_event_nodes n ON n.id = f.node_id
             WHERE f.event_id = \(bind: eventID) AND f.source_id = \(bind: sourceID)
             """)
@@ -67,7 +67,10 @@ struct ClinicalAttributionStore: Sendable {
             try ClinicalGrantStore.Output(
                 fullURL: $0.decode(column: "full_url", as: String.self),
                 profile: $0.decode(column: "profile", as: String.self),
-                effectiveAt: $0.decode(column: "effective_at", as: Date.self)
+                effectiveAt: $0.decode(column: "effective_at", as: Date.self),
+                effectiveEnd: $0.decode(column: "effective_end", as: Date?.self),
+                codeSystem: $0.decode(column: "code_system", as: String.self),
+                code: $0.decode(column: "code", as: String.self)
             )
         }
         let authorities = try await grants.authorities(outputs: outputs, intent: intent, requireCustodyCoverage: false)

@@ -47,12 +47,20 @@ struct ConsentCollectionPlanTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let plan = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
             #expect(plan.enrollmentId == fixture.enrollmentIDs[0].uuidString.lowercased())
+            #expect(plan.studyId == fixture.studyIDs[0].uuidString.lowercased())
+            let query = PublishedStudy.query(on: app.db)
+                .filter(\.$study.$id == fixture.studyIDs[0])
+                .filter(\.$revision == 1)
+            let publication = try #require(try await query.first())
+            #expect(plan.title == publication.metadata.title)
             #expect(plan.stateVersion == 2)
             let window = try #require(plan.windows.first)
             #expect(plan.windows.count == 1)
             #expect(window.consentId == fixture.consentIDs[0].uuidString.lowercased())
             #expect(window.revision == 1 && window.end == nil && window.start <= plan.asOf)
-            #expect(window.requirements == [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp, start: window.start)])
+            #expect(window.requirements == [
+                .init(includeWorkoutRoutes: false, profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp, start: window.start)
+            ])
             let sql = try Self.sql(app)
             let audit = try #require(try await sql.raw("""
                 SELECT actor_subject, study_id, group_id, target_id, outcome FROM audit_events WHERE action = 'collection.plan.disclosure'
@@ -72,21 +80,62 @@ struct ConsentCollectionPlanTests {
         try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let before = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
-            try await AuthContext.$current.withValue(ClinicalEventStoreTests.researcher) {
-                try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: fixture.studyIDs[0])
-            }
+            let next = try await PublishedStudyFixtures.createPublishedStudy(
+                on: app.db,
+                studyId: fixture.studyIDs[0],
+                revision: 2,
+                title: "Revised Study Name",
+                collectionRequirements: [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)]
+            )
             let published = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
             #expect(published.windows == before.windows && published.stateVersion == before.stateVersion)
+            #expect(published.title == before.title && published.studyId == before.studyId)
             let accepted = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 try await ClinicalEventStoreTests.acceptConsent(enrollmentID: fixture.enrollmentIDs[0], on: app, revision: 2)
             }
             let adopted = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
             try #require(adopted.windows.count == 2)
+            #expect(adopted.title == next.metadata.title && adopted.title != before.title)
+            #expect(adopted.studyId == before.studyId)
             #expect(adopted.stateVersion == 3)
             #expect(adopted.windows[0].consentId == before.windows[0].consentId)
             #expect(adopted.windows[0].end == adopted.windows[1].start)
             #expect(adopted.windows[1].consentId == accepted.id?.uuidString.lowercased())
             #expect(adopted.windows[1].revision == 2 && adopted.windows[1].end == nil)
+        }
+    }
+
+    @Test
+    func workoutRouteChangesRequireAcceptanceAndRetainPriorDisclosureScope() async throws {
+        try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
+            let fixture = try await ClinicalEventStoreTests.prepare(on: app)
+            for (offset, includesRoutes) in [false, true, false].enumerated() {
+                let revision = offset + 2
+                let before = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
+                _ = try await PublishedStudyFixtures.createPublishedStudy(
+                    on: app.db,
+                    studyId: fixture.studyIDs[0],
+                    revision: revision,
+                    collectionRequirements: [
+                        .init(
+                            profile: CollectionObservationProfile.workout.rawValue,
+                            sourceKind: .participantApp,
+                            includeWorkoutRoutes: includesRoutes
+                        )
+                    ]
+                )
+                #expect(try await Self.read(fixture.enrollmentIDs[0], on: app, token: token).windows == before.windows)
+                let consent = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                    try await ClinicalEventStoreTests.acceptConsent(enrollmentID: fixture.enrollmentIDs[0], on: app, revision: revision)
+                }
+                let stored = try #require(try await EnrollmentConsent.find(consent.requireID(), on: app.db))
+                #expect(stored.collectionScope?.requirements.first?.includeWorkoutRoutes == includesRoutes)
+                let adopted = try await Self.read(fixture.enrollmentIDs[0], on: app, token: token)
+                #expect(adopted.windows.last?.requirements.first?.includeWorkoutRoutes == includesRoutes)
+                #expect(adopted.windows.dropLast().map { $0.requirements.map(\.includeWorkoutRoutes) }
+                    == before.windows.map { $0.requirements.map(\.includeWorkoutRoutes) })
+                #expect(adopted.windows.dropLast().last?.end == adopted.windows.last?.start)
+            }
         }
     }
 
@@ -213,7 +262,7 @@ extension ConsentCollectionPlanTests {
             try #require(response.status == .ok)
             #expect(response.headers.first(name: "Cache-Control") == "no-store")
             let json = try #require(JSONSerialization.jsonObject(with: Data(response.body.readableBytesView)) as? [String: Any])
-            #expect(Set(json.keys) == ["enrollmentId", "stateVersion", "asOf", "windows"])
+            #expect(Set(json.keys) == ["enrollmentId", "studyId", "title", "stateVersion", "asOf", "windows"])
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .custom { value in
                 try TroveDateTranscoder().decode(value.singleValueContainer().decode(String.self))

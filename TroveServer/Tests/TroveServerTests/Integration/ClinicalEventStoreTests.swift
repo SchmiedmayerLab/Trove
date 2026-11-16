@@ -274,7 +274,7 @@ extension ClinicalEventStoreTests {
                 .init(identifier: "event", digest: digest, count: 0, bytes: Data([1])),
                 .init(identifier: "event", digest: digest, count: 513, bytes: Data([1])),
                 .init(identifier: "event", digest: digest, count: 1, bytes: Data()),
-                .init(identifier: "event", digest: digest, count: 1, bytes: Data(repeating: 1, count: 4 * 1024 * 1024 + 1))
+                .init(identifier: "event", digest: digest, count: 1, bytes: Data(repeating: 1, count: EventSubmissionLimits.maximumEventBytes + 1))
             ]
             for invalid in cases {
                 await #expect {
@@ -315,9 +315,9 @@ extension ClinicalEventStoreTests {
                 await #expect {
                     try await sql.raw("""
                         INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                            quantity_value, quantity_system, quantity_code, code_system, code)
+                            value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
                         SELECT n.id, n.source_id, f.event_id, f.record_id, f.output_binding_id, \(bind: profile), CURRENT_TIMESTAMP,
-                            \(bind: quantity), 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4'
+                            'quantity', \(bind: quantity), 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4'
                         FROM clinical_event_nodes n JOIN clinical_point_facts f ON f.event_id = n.event_id WHERE n.ordinal = 0
                         """)
                         .run()
@@ -371,7 +371,14 @@ extension ClinicalEventStoreTests {
             || (error as? SQLiteError)?.reason == .constraintCheckFailed
     }
 
-    static func prepare(on app: Application, consentCount: Int = 2, secondPolicy: Bool = true) async throws -> Fixture {
+    static func prepare(
+        on app: Application,
+        consentCount: Int = 2,
+        secondPolicy: Bool = true,
+        profile: String = CollectionRequirement.supportedProfile,
+        measurementWindow: CollectionMeasurementWindow? = nil,
+        routeStudies: Set<Int> = []
+    ) async throws -> Fixture {
         try await ParticipantFixtures.createParticipant(on: app.db)
         let group = try await GroupFixtures.createGroup(on: app.db)
         let studyIDs = try await AuthContext.$current.withValue(researcher) {
@@ -380,7 +387,14 @@ extension ClinicalEventStoreTests {
                 let study = try await StudyFixtures.createStudy(on: app.db, groupId: group.requireId())
                 study.consent[.enUS] = ConsentContent(title: "Consent", content: "<toggle id=\"agree\" expected-value=\"true\">I agree.</toggle>")
                 if index == 0 || secondPolicy {
-                    study.collectionRequirements = [.init(profile: CollectionRequirement.supportedProfile, sourceKind: .participantApp)]
+                    study.collectionRequirements = [
+                        .init(
+                            profile: profile,
+                            sourceKind: .participantApp,
+                            measurementWindow: measurementWindow,
+                            includeWorkoutRoutes: routeStudies.contains(index)
+                        )
+                    ]
                 }
                 try await study.save(on: app.db)
                 try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study.requireId())
@@ -429,7 +443,12 @@ extension ClinicalEventStoreTests {
     }
 
     static func event(
-        source: SourceBinding, sequence: Int = 1, outputID: String = UUID().uuidString, rawSuffix: String = "", effectiveAt: Date = Date()
+        source: SourceBinding,
+        sequence: Int = 1,
+        outputID: String = UUID().uuidString,
+        rawSuffix: String = "",
+        effectiveAt: Date = Date(),
+        value: ClinicalOutputValue? = nil
     ) -> ValidatedExchangeEvent {
         .init(
             rawBytes: Data("Synthetic prevalidated storage projection \(sequence) \(rawSuffix)".utf8),
@@ -452,9 +471,7 @@ extension ClinicalEventStoreTests {
                     sourceOutputIdentifier: .init(system: "https://example.test/output", value: outputID),
                     writerIdentifier: nil,
                     writerVersion: nil,
-                    quantityValue: "72.12345678901234567890123456789",
-                    quantitySystem: "http://unitsofmeasure.org",
-                    quantityCode: "/min",
+                    value: value ?? .quantity(value: "72.12345678901234567890123456789", system: "http://unitsofmeasure.org", code: "/min"),
                     codeSystem: "http://loinc.org",
                     code: "8867-4"
                 )

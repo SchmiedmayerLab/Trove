@@ -56,6 +56,7 @@ extension ArtifactStore {
                 .filter(.custom(SQLRaw("""
                     NOT EXISTS (SELECT 1 FROM enrollment_consents WHERE artifact_id = stored_artifacts.id)
                     AND NOT EXISTS (SELECT 1 FROM published_studies WHERE artifact_id = stored_artifacts.id)
+                    AND NOT EXISTS (SELECT 1 FROM clinical_recording_attachments WHERE artifact_id = stored_artifacts.id)
                     """)))
                 .sort(\.$cleanupAfter)
                 .sort(\.$id)
@@ -63,14 +64,15 @@ extension ArtifactStore {
                 .all()
             var claimed: [ArtifactReference] = []
             for record in records where try await self.fenceCleanup(record, now: now, on: transaction) {
+                let reference = try record.reference()
                 let event = AuditEvent(
                     context: auditContext,
-                    action: .artifactDiscardScheduled,
-                    scope: .study(studyID: record.studyID, groupID: record.groupID),
+                    action: reference.scope.discardAction,
+                    scope: reference.scope.auditScope,
                     target: .init(id: try record.requireID())
                 )
                 try await AuditRepository.recordMutation(event, on: transaction)
-                claimed.append(try record.reference())
+                claimed.append(reference)
             }
             return claimed
         }
@@ -83,6 +85,7 @@ extension ArtifactStore {
             WHERE id = \(bind: record.requireID()) AND state <> 'retained' AND cleanup_after <= \(bind: now)
               AND NOT EXISTS (SELECT 1 FROM enrollment_consents WHERE artifact_id = stored_artifacts.id)
               AND NOT EXISTS (SELECT 1 FROM published_studies WHERE artifact_id = stored_artifacts.id)
+              AND NOT EXISTS (SELECT 1 FROM clinical_recording_attachments WHERE artifact_id = stored_artifacts.id)
             RETURNING id
             """)
             .first()

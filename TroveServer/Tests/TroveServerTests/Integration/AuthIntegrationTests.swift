@@ -90,6 +90,7 @@ struct AuthIntegrationTests {
     func researcherAllowedActions() async throws {
         let endpoints = Self.allEndpoints(.dummy)
         for index in endpoints.indices where endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
+            guard !endpoints[index].requiresDataReader else { continue }
             try await withFixtures(token: .researcher(groups: ["/Test Group/researcher"])) { app, token, endpoints in
                 let endpoint = endpoints[index]
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
@@ -120,6 +121,22 @@ struct AuthIntegrationTests {
         try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
             for endpoint in endpoints where endpoint.requiresAuditReader {
                 try await self.expectStatus(expected, for: endpoint, token: token, on: app)
+            }
+        }
+    }
+
+    @Test(arguments: [
+        (["/Test Group/admin"], HTTPStatus.forbidden),
+        (["/Test Group/researcher"], HTTPStatus.forbidden),
+        (["/Test Group/data-reader"], HTTPStatus.forbidden),
+        (["/Test Group/admin", "/Test Group/data-reader"], HTTPStatus.ok),
+        (["/Test Group/researcher", "/Test Group/data-reader"], HTTPStatus.ok),
+        (["/Test Group/data-reader", "/Test Group/researcher", "/Test Group/admin"], HTTPStatus.ok)
+    ])
+    func dataReadersRequireExplicitCapability(groups: [String], expected: HTTPStatus) async throws {
+        try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
+            for endpoint in endpoints where endpoint.requiresDataReader {
+                try await self.expectStatus(expected == .ok ? endpoint.successStatus : expected, for: endpoint, token: token, on: app)
             }
         }
     }
@@ -226,7 +243,8 @@ struct AuthIntegrationTests {
     ) async throws {
         try await app.test(endpoint.method, endpoint.path, beforeRequest: { req in
             if endpoint.path.contains("/participant/sources/")
-                && (endpoint.path.contains("/events") || endpoint.path.hasSuffix("/record-bundles")) {
+                && (endpoint.path.contains("/events") || endpoint.path.hasSuffix("/record-bundles")
+                    || endpoint.path.contains("/recording-transfers/")) {
                 req.sourceInstallation(dummyUUID)
             }
             req.bearerAuth(token)

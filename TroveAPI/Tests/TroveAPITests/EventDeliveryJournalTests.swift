@@ -165,21 +165,30 @@ struct EventDeliveryJournalTests {
         }
     }
 
-    @Test
-    func failureAfterPayloadInsertionRollsBackAllStagingState() async throws {
+    @Test(arguments: [false, true])
+    func failureAfterPayloadInsertionRollsBackAllStagingState(backfill: Bool) async throws {
         try await DeliveryFixture.withJournal { journal, url in
-            let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let original = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let checkpoint: EventDeliveryJournal.Checkpoint
+            if backfill {
+                checkpoint = try await journal.createQuery(for: original.sourceID, queryID: UUID(), definition: Data([2]))
+            } else {
+                checkpoint = original
+            }
             let connection = try DeliverySQLite(url: url)
             try connection.execute("""
-                CREATE TRIGGER fail_staging BEFORE UPDATE OF cursor ON source_state
+                CREATE TRIGGER fail_staging BEFORE UPDATE OF cursor ON acquisition_query
                 BEGIN SELECT RAISE(ABORT, 'injected staging failure'); END
                 """)
             await #expect(throws: DeliverySQLite.Failure.self) {
-                try await DeliveryFixture.stage(journal, changes: ["add:a"])
+                try await journal.stage(
+                    from: checkpoint, nextCursor: Data([1]), payloads: [try DeliveryFixture.payload(sequence: 1, changes: ["add:a"])]
+                )
             }
             let pending = try await journal.pendingDeliveryIDs()
             #expect(pending.isEmpty)
-            #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
+            #expect(try await journal.checkpoint(for: original.sourceID) == original)
+            #expect(try await journal.checkpoint(for: original.sourceID, queryID: checkpoint.queryID) == checkpoint)
             try connection.execute("DROP TRIGGER fail_staging")
             connection.close()
             let id = try await journal.stage(

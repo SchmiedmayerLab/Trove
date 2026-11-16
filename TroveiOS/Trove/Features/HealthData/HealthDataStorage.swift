@@ -19,6 +19,48 @@ enum HealthDataStorage {
         return root.appending(path: "HealthDelivery", directoryHint: .isDirectory).appending(path: digest, directoryHint: .isDirectory)
     }
 
+    static func stoppedEnrollments(scope: EventDeliveryJournal.Scope, root: URL) async throws -> Set<UUID> {
+        guard let journal = try await open(scope: scope, root: root, create: false) else {
+            return []
+        }
+        do {
+            let stopped = try await journal.collectionState().stoppedEnrollmentIDs
+            await journal.close()
+            return stopped
+        } catch {
+            await journal.close()
+            throw error
+        }
+    }
+
+    static func collections(scope: EventDeliveryJournal.Scope, root: URL) async throws -> [ParticipantCollectionState.Collection] {
+        guard let journal = try await open(scope: scope, root: root, create: false) else {
+            return []
+        }
+        do {
+            let collections = try await journal.collectionState().collections
+            await journal.close()
+            return collections
+        } catch {
+            await journal.close()
+            throw error
+        }
+    }
+
+    /// A withdrawal is also an explicit participant action: retain it even before source setup.
+    static func stopCollection(for enrollmentID: UUID, scope: EventDeliveryJournal.Scope, root: URL) async throws {
+        guard let journal = try await open(scope: scope, root: root, create: true) else {
+            throw EventDeliveryJournal.JournalError.corruptJournal
+        }
+        do {
+            try await journal.stopCollection(for: enrollmentID)
+            await journal.close()
+        } catch {
+            await journal.close()
+            throw error
+        }
+    }
+
     /// Creation is an explicit participant action. A present directory with a missing or
     /// damaged database is an error, never an invitation to replace keys and checkpoints.
     nonisolated static func open(scope: EventDeliveryJournal.Scope, root: URL, create: Bool) async throws -> EventDeliveryJournal? {
@@ -44,7 +86,10 @@ enum HealthDataStorage {
             try directory.setResourceValues(values)
         }
         return try EventDeliveryJournal(
-            url: directory.appending(path: "delivery.sqlite"), scope: scope, mode: exists ? .openExisting : .createNew
+            url: directory.appending(path: "delivery.sqlite"),
+            scope: scope,
+            mode: exists ? .openExisting : .createNew,
+            limits: Config.collectionCapacity().journal
         )
     }
 }

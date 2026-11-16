@@ -177,6 +177,22 @@ extension AuthIntegrationTests {
                 successStatus: .ok
             ),
             researcher(.GET, "\(base)/studies/\(studyId)/enrollments", successStatus: .ok),
+            AuthEndpoint(
+                method: .GET,
+                path: "\(base)/studies/\(studyId)/data",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .ok
+            ),
+            AuthEndpoint(
+                method: .GET,
+                path: "\(base)/studies/\(studyId)/data/recordings/\(dummyId)",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .notFound
+            ),
 
             // The positive administrator fixture has an accepted publication.
             researcher(.DELETE, "\(base)/studies/\(studyId)", draftRevision: ids.draftRevision, minRole: .admin, successStatus: .conflict),
@@ -216,6 +232,20 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/source-installations/\(dummyId)/revoke", successStatus: .ok),
             participant(.GET, "\(base)/participant/sources/\(dummyId)", successStatus: .notFound),
             participant(.POST, "\(base)/participant/sources/\(dummyId)/revoke", successStatus: .notFound),
+            participant(
+                .POST,
+                "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/declaration",
+                successStatus: .notFound,
+                body: jsonData(recordingDeclarationBody())
+            ),
+            participant(
+                .PUT,
+                "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/content",
+                successStatus: .notFound,
+                body: Data([0]),
+                contentType: .binary
+            ),
+            participant(.GET, "\(base)/participant/sources/\(dummyId)/recording-transfers/\(dummyId)/receipt", successStatus: .notFound),
             participant(
                 .POST,
                 "\(base)/participant/sources/\(dummyId)/event-receipts/lookup",
@@ -352,4 +382,23 @@ private func scheduleBody() -> [String: Any] {
         "completionPolicy": "anytime",
         "notification": false
     ] as [String: Any]
+}
+
+
+private func recordingDeclarationBody() -> [String: Any] {
+    let output = "urn:uuid:24622144-883b-4f1a-99a6-054f532482b5"
+    let digest = ArtifactStore.digest(Data([0]))
+    return [
+        "attachmentPath": "recordings/route.csv",
+        "outputFullUrl": output,
+        "profile": FHIRRecordingProjection.profile,
+        "format": FHIRRecordingProjection.routeFormat,
+        "effectiveAt": "2026-01-01T00:00:00.000000Z",
+        "effectiveEnd": "2026-01-01T00:00:00.000000Z",
+        "content": [
+            "encoding": "identity", "storedByteCount": 1, "storedSHA256": digest,
+            "sourceByteCount": 1, "sourceSHA256": digest
+        ] as [String: Any],
+        "targets": [["consentId": dummyUUID.uuidString, "outputFullUrls": [output]] as [String: Any]]
+    ]
 }

@@ -16,6 +16,12 @@ struct HealthDataExplanationView: View {
                 "Only data covered by your study consents is shared. One sample can support more than one study without being uploaded twice."
             )
             Text(
+                """
+                After setup, approved data can be collected offline and sent when you reconnect. \
+                Changes made elsewhere are checked when this app connects.
+                """
+            )
+            Text(
                 "Health does not tell apps whether read access was denied. An empty sync does not confirm permission or complete data delivery."
             )
             Text(

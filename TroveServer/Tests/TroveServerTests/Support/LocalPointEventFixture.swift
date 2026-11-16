@@ -18,8 +18,8 @@ import TroveAPIServer
 /// These keys are not evidence of producer HMAC conformance.
 /// Full-validator tests retain ImmutablePointEventFixture and the independently pinned IG implementation.
 enum LocalPointEventFixture {
-    static func bytes(source: SourceBinding, sequence: UInt64 = 50, recordID: String? = nil) throws -> Data {
-        let url = try #require(Bundle.module.url(forResource: "ImmutablePointEvent", withExtension: "json"))
+    static func bytes(source: SourceBinding, sequence: UInt64 = 50, recordID: String? = nil, fixtureURL: URL? = nil) throws -> Data {
+        let url = try #require(fixtureURL ?? Bundle.module.url(forResource: "ImmutablePointEvent", withExtension: "json"))
         let original = try Data(contentsOf: url)
         let previous = try ExchangeGraph(validating: original, kind: .active)
         var document = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
@@ -34,8 +34,9 @@ enum LocalPointEventFixture {
         }
         try rekeyEntries(&entries, sequence: sequence, systems: systems, replacements: &replacements)
         document["entry"] = entries
-        replacements["https://study.example.org/fhir/identifiers/participant"] = source.participantIdentifierSystem
-        replacements["participant-001"] = source.participantIdentifierValue
+        let participant = try #require(FHIRPointProjection.project(validatedBytes: original, validatorIdentity: "fixture-shape").participants.first)
+        replacements[participant.system] = source.participantIdentifierSystem
+        replacements[participant.value] = source.participantIdentifierValue
         let timestamp = try TroveDateTranscoder().encode(Date())
         let transformed = transform(document, replacements: replacements, timestamp: timestamp)
         let bytes = try JSONSerialization.data(withJSONObject: transformed, options: [.sortedKeys, .withoutEscapingSlashes])

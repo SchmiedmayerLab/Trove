@@ -36,7 +36,7 @@ struct ClinicalRecordBundleTests {
             }
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect {
-                    try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
+                    try await TestApp.clinicalService(database: app.db, validator: ClinicalEventBatchTests.validator())
                         .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == expected }
             }
@@ -57,7 +57,7 @@ struct ClinicalRecordBundleTests {
             submitted[1].targets[0].consentId = UUID().uuidString
             let request = try Self.bundle(submitted, sourceID: fixture.source.id)
             let outcomes = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
+                try await TestApp.clinicalService(database: app.db, validator: ClinicalEventBatchTests.validator())
                     .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
             }
             try #require(outcomes.count == 3)
@@ -75,7 +75,7 @@ struct ClinicalRecordBundleTests {
             try await TestDatabase.withRestartedApplication(app) { reopened in
                 try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                     let regrouped = try Self.bundle([events[2], events[0]], sourceID: fixture.source.id, packedAt: Date().addingTimeInterval(100))
-                    let replay = try await ClinicalEventService(database: reopened.db, validator: ClinicalEventBatchTests.validator())
+                    let replay = try await TestApp.clinicalService(database: reopened.db, validator: ClinicalEventBatchTests.validator())
                         .acceptBundle(regrouped, sourceID: fixture.source.id, installation: fixture.installation)
                     #expect(replay == [outcomes[2], outcomes[0]])
                 }
@@ -100,7 +100,7 @@ struct ClinicalRecordBundleTests {
             }
             await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 await #expect {
-                    try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
+                    try await TestApp.clinicalService(database: app.db, validator: ClinicalEventBatchTests.validator())
                         .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
                 } throws: { ($0 as? ServerError)?.status.code == 400 }
             }
@@ -124,7 +124,7 @@ struct ClinicalRecordBundleTests {
                 request.records[0].entryFullUrls.removeFirst()
             }
             let results = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
-                try await ClinicalEventService(database: app.db, validator: ClinicalEventBatchTests.validator())
+                try await TestApp.clinicalService(database: app.db, validator: ClinicalEventBatchTests.validator())
                     .acceptBundle(request, sourceID: fixture.source.id, installation: fixture.installation)
             }
             #expect(results[0].problemStatus == 400)

@@ -123,9 +123,14 @@ final class EnrollmentConsent: Model, @unchecked Sendable {
 
 
 extension EnrollmentConsent {
-    func resolveCollectionScope(from publication: PublishedStudy) throws {
+    func resolveCollectionScope(from publication: PublishedStudy, before end: Date? = nil, at now: Date = .now) throws {
         let codec = TroveDateTranscoder()
-        let acceptedAt = try codec.decode(codec.encode(Date()))
+        let acceptedAt = try codec.decode(codec.encode(now))
+        // Target validation may suspend after the initial enrollment check. Bind the
+        // deadline to the exact retained acceptance instant, before changing any state.
+        guard end.map({ acceptedAt < $0 }) ?? true else {
+            throw ServerError.conflict("Cannot submit consent for an ended enrollment")
+        }
         let requirements = try publication.collectionPolicy.validatedRequirements(studyID: publication.$study.id, revision: revision)
         collectionScope = try AcceptedCollectionScope(requirements: requirements, acceptedAt: acceptedAt)
         createdAt = acceptedAt

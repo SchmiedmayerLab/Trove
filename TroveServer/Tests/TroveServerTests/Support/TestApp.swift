@@ -39,11 +39,21 @@ enum TestApp {
         try .init(currentKeyID: "synthetic-fixture", keys: ["synthetic-fixture": SymmetricKey(data: Data(repeating: 0x71, count: 32))])
     }
 
+    /// Isolated inline-record service tests need no configured application after reopening their database.
+    static func clinicalService(database: any Database, validator: FHIRValidationClient) -> ClinicalEventService {
+        let transfers = RecordingTransferService(
+            database: database, storage: ObjectStorageService(provider: InMemoryObjectStorageProvider()), limits: .standard
+        )
+        return ClinicalEventService(database: database, validator: validator, recordings: transfers)
+    }
+
     static func withApp(
         token tokenConfig: Token = .researcher(),
         storageProvider: any ObjectStorageProvider = InMemoryObjectStorageProvider(),
         validator: FHIRValidationClient? = nil,
         grantorAuthority: GrantorAuthorityProvider = .unavailable,
+        recordingDownloadByteLimit: String? = nil,
+        collectionCapacity: CollectionCapacityConfiguration = .standard,
         _ test: @escaping @Sendable (Application, String?) async throws -> Void
     ) async throws {
         let app = try await makeApplication()
@@ -53,7 +63,9 @@ enum TestApp {
                 app,
                 storageProvider: storageProvider,
                 validator: validator,
-                grantorAuthority: grantorAuthority
+                grantorAuthority: grantorAuthority,
+                recordingDownloadByteLimit: recordingDownloadByteLimit,
+                collectionCapacity: collectionCapacity
             )
             let token: String? = switch tokenConfig {
             case .none:
@@ -109,7 +121,9 @@ enum TestApp {
         _ app: Application,
         storageProvider: any ObjectStorageProvider = InMemoryObjectStorageProvider(),
         validator: FHIRValidationClient? = nil,
-        grantorAuthority: GrantorAuthorityProvider = .unavailable
+        grantorAuthority: GrantorAuthorityProvider = .unavailable,
+        recordingDownloadByteLimit: String? = nil,
+        collectionCapacity: CollectionCapacityConfiguration = .standard
     ) async throws -> JWTKeyCollection {
         try await TestDatabase.configure(for: app)
         configureMigrations(for: app)
@@ -119,7 +133,9 @@ enum TestApp {
             storageProvider: storageProvider,
             validator: validator ?? FHIRValidationClient(application: app),
             sourceKeyring: TestApp.sourceKeyring(),
-            grantorAuthority: grantorAuthority
+            grantorAuthority: grantorAuthority,
+            recordingDownloadByteLimit: recordingDownloadByteLimit,
+            collectionCapacity: collectionCapacity
         )
 
         return try await configureTransport(for: app)

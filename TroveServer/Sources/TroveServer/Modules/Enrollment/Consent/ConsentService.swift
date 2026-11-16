@@ -53,8 +53,8 @@ final class ConsentService: Module, @unchecked Sendable {
         enrollmentId: UUID, locale: String, revision: Int? = nil
     ) async throws -> (presentation: ConsentPresentation, enrollmentVersion: Int64) {
         let enrollment = try await authorizationService.checkParticipantHasEnrollmentAccess(id: enrollmentId)
-        guard enrollment.withdrawnAt == nil else {
-            throw ServerError.conflict("Cannot review consent for a withdrawn enrollment")
+        guard enrollment.withdrawnAt == nil, enrollment.endsAt.map({ Date() < $0 }) ?? true else {
+            throw ServerError.conflict("Cannot review consent for a withdrawn or ended enrollment")
         }
         let target = revision ?? enrollment.currentRevision
         guard target > 0 else {
@@ -213,7 +213,7 @@ final class ConsentService: Module, @unchecked Sendable {
                 let publication = try await self.validateTarget(
                     command, enrollment: enrollment, participant: participant, on: transaction
                 )
-                try record.resolveCollectionScope(from: publication)
+                try record.resolveCollectionScope(from: publication, before: enrollment.endsAt)
                 record.acceptedEnrollmentVersion = try await self.repository.adoptRevision(
                     id: command.enrollmentID, expectedVersion: command.expectedVersion, revision: command.reviewedRevision, on: transaction
                 )

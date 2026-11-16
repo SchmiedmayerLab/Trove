@@ -52,6 +52,10 @@ struct AuditEvent: Sendable {
         case delegationDisclosure = "delegation.disclosure"
         case studyBundleDisclosure = "study.bundle.disclosure"
         case artifactDiscardScheduled = "artifact.discard.scheduled"
+        case recordingTransferDeclared = "recording.transfer.declared"
+        case recordingTransferStored = "recording.transfer.stored"
+        case recordingTransferReceiptDisclosure = "recording.transfer.receipt.disclosure"
+        case recordingArtifactDiscardScheduled = "recording.artifact.discard.scheduled"
         case sourceRegistered = "source.registered"
         case sourceRevoked = "source.revoked"
         case sourceInstallationRegistered = "source.installation.registered"
@@ -62,26 +66,32 @@ struct AuditEvent: Sendable {
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
         case studyDataGranted = "study.data.granted"
         case studyAuditDisclosure = "study.audit.disclosure"
+        case studyDataDisclosure = "study.data.disclosure"
+        case studyRecordingDisclosure = "study.recording.disclosure"
 
         var scopeKind: Scope.Kind {
             switch self {
-            case .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
+            case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure, .recordingArtifactDiscardScheduled,
+                 .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .sourceIdentityDisclosure,
                  .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
-                 .studyDataGranted, .studyAuditDisclosure, .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
+                 .studyDataGranted, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure,
+                 .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
                  .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure: .study
             }
         }
 
         var isDisclosure: Bool {
             switch self {
-            case .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .studyBundleDisclosure,
-                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDraftDisclosure,
+            case .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
+                 .collectionPlanDisclosure, .studyBundleDisclosure,
+                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
                  .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
             case .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
+                 .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false

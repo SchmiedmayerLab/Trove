@@ -21,7 +21,7 @@ import tempfile
 import time
 from decimal import Decimal
 
-MAX_BODY = 4 * 1024 * 1024
+MAX_BODY = 16 * 1024 * 1024
 MAX_DEPTH = 64
 MAX_OUTCOME = 8 * 1024 * 1024
 TIMEOUT = 120
@@ -333,7 +333,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path not in ("/validate", "/validate/questionnaire") or self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
             self.send_result(400, {"code": "invalid_request"})
             return
-        if len(lengths[0]) > 7 or not lengths[0].isascii() or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= MAX_BODY:
+        if len(lengths[0]) > len(str(MAX_BODY)) or not lengths[0].isascii() or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= MAX_BODY:
             self.send_result(413, {"code": "invalid_request"})
             return
         if self.headers.get_all("Content-Type") != ["application/fhir+json"]:

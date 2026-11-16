@@ -13,6 +13,9 @@ import Foundation
 /// Checks persisted request configuration before restoring a session or refreshing its tokens.
 enum KeycloakAuthStateBinding {
     static func validate(_ state: OIDAuthState, configuration: KeycloakConfiguration) throws {
+        // AppAuth retains expired tokens for refresh, but marks a confirmed OAuth failure unauthorized.
+        // Expiration alone must not prevent restoring an account for accepted offline collection.
+        guard state.isAuthorized else { throw KeycloakAccountError.notSignedIn }
         let authorization = state.lastAuthorizationResponse.request
         guard authorization.clientID == configuration.clientID,
               authorization.redirectURL == configuration.redirectURI,

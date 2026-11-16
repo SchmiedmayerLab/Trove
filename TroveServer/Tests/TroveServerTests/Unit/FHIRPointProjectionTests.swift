@@ -26,8 +26,8 @@ struct FHIRPointProjectionTests {
         #expect(event.nodes.count == 6)
         let point = try #require(event.outputs.first)
         #expect(event.outputs.count == 1)
-        #expect(point.quantityValue == "73")
-        #expect(point.quantityCode == "/min")
+        #expect(point.value.quantityValue == "73")
+        #expect(point.value.quantityCode == "/min")
         #expect(Set(event.deploymentIdentifiers.systems.keys) == [.recordVersion, .sourceRecord, .sourceOutput, .deviceSnapshot])
     }
 
@@ -54,7 +54,7 @@ struct FHIRPointProjectionTests {
         #expect(event.eventIdentifierValue == record.version.identifier.identifier.value)
         #expect(event.nodes.count == 8)
         try #require(event.outputs.count == 1)
-        #expect(event.outputs[0].quantityValue == "72.0000")
+        #expect(event.outputs[0].value.quantityValue == "72.0000")
         #expect(event.outputs[0].writerIdentifier == nil)
         #expect(event.outputs[0].writerVersion == nil)
         #expect(event.participants == [.init(system: "https://study.example.org/fhir/identifiers/participant", value: "participant-001")])
@@ -150,5 +150,56 @@ extension FHIRPointProjectionTests {
         var document = try #require(JSONSerialization.jsonObject(with: fixture()) as? [String: Any])
         try mutate(&document)
         return try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+    }
+}
+
+
+extension FHIRPointProjectionTests {
+    @Test
+    func sleepProjectionRetainsCompletePeriodAndNativeCodings() throws {
+        // Synthetic graph fixture, not a native capture or official-validator result.
+        let bytes = try sleepFixture()
+        let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator")
+        let sleep = try #require(event.outputs.first)
+        #expect(sleep.profile == Profile.groveMobileSleepStage.value?.url.absoluteString)
+        #expect(sleep.effectiveAt == ISO8601DateFormatter().date(from: "2026-08-20T00:00:00Z"))
+        #expect(sleep.effectiveEnd == ISO8601DateFormatter().date(from: "2026-08-20T08:00:00Z"))
+        #expect(sleep.value == .coded(system: "https://grovealliance.org/fhir/mobile/CodeSystem/grove-sleep-stage", code: "deep"))
+        #expect(event.rawBytes == bytes)
+        #expect(String(decoding: event.rawBytes, as: UTF8.self).contains("native-stage"))
+    }
+
+    @Test(arguments: ["missing-end", "reversed", "date-only", "point", "wrong-value"])
+    func sleepProjectionRejectsIncompleteOrIncorrectTemporalShape(corruption: String) throws {
+        let bytes = try sleepFixture { observation in
+            switch corruption {
+            case "missing-end": observation["effectivePeriod"] = ["start": "2026-08-20T00:00:00Z"]
+            case "reversed": observation["effectivePeriod"] = ["start": "2026-08-20T08:00:00Z", "end": "2026-08-20T00:00:00Z"]
+            case "date-only": observation["effectivePeriod"] = ["start": "2026-08-20", "end": "2026-08-21"]
+            case "point":
+                observation.removeValue(forKey: "effectivePeriod")
+                observation["effectiveDateTime"] = "2026-08-20T00:00:00Z"
+            default:
+                observation.removeValue(forKey: "valueCodeableConcept")
+                observation["valueString"] = "deep"
+            }
+        }
+        #expect { try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-validator") }
+        throws: { ($0 as? ServerError)?.status.code == 422 }
+    }
+
+    private func sleepFixture(_ mutate: (inout [String: Any]) throws -> Void = { _ in }) throws -> Data {
+        try changedObservation { observation in
+            observation["meta"] = ["profile": ["https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-sleep-stage"]]
+            let measurement = ["system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement", "code": "sleep-stage"]
+            observation["code"] = ["coding": [measurement]]
+            observation.removeValue(forKey: "effectiveDateTime")
+            observation.removeValue(forKey: "valueQuantity")
+            observation["effectivePeriod"] = ["start": "2026-08-20T00:00:00Z", "end": "2026-08-20T08:00:00Z"]
+            let stage = ["system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-sleep-stage", "code": "deep"]
+            let native = ["system": "https://fixture.trove.test/native-stage", "code": "4"]
+            observation["valueCodeableConcept"] = ["coding": [stage, native]]
+            try mutate(&observation)
+        }
     }
 }

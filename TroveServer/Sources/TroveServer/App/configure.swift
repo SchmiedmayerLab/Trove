@@ -62,6 +62,12 @@ private func configureDevelopmentCORS(for app: Application) {
 private func configureObjectStorage(
     for app: Application, ephemeral: Bool, keycloak: KeycloakClient, sourceKeyring: SourceIdentityKeyring
 ) async throws {
+    let collectionCapacity = try CollectionCapacityConfiguration(environment: ProcessInfo.processInfo.environment)
+    let recordingLimits = try RecordingTransferService.Limits(
+        storedBytes: Environment.get("RECORDING_MAX_STORED_BYTES"),
+        sourceBytes: Environment.get("RECORDING_MAX_SOURCE_BYTES"),
+        leaseSeconds: Environment.get("RECORDING_UPLOAD_LEASE_SECONDS")
+    )
     if ephemeral {
         app.logger.info("Configuring ephemeral UI-test object storage...")
         try await configureServices(
@@ -70,7 +76,10 @@ private func configureObjectStorage(
             validator: FHIRValidationClient(application: app),
             sourceKeyring: sourceKeyring,
             grantorAuthority: keycloak.authorityProvider,
-            clientPolicy: keycloak.config.clientPolicy
+            clientPolicy: keycloak.config.clientPolicy,
+            recordingLimits: recordingLimits,
+            recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
+            collectionCapacity: collectionCapacity
         )
         return
     }
@@ -78,14 +87,23 @@ private func configureObjectStorage(
     app.logger.info("Connecting to S3 object storage...")
     let validator = try FHIRValidationClient(application: app)
     let storageProvider = try S3ObjectStorageProvider(application: app, config: S3ObjectStorageConfiguration())
-    await configureServices(
-        for: app,
-        storageProvider: storageProvider,
-        validator: validator,
-        sourceKeyring: sourceKeyring,
-        grantorAuthority: keycloak.authorityProvider,
-        clientPolicy: keycloak.config.clientPolicy
-    )
+    do {
+        try await configureServices(
+            for: app,
+            storageProvider: storageProvider,
+            validator: validator,
+            sourceKeyring: sourceKeyring,
+            grantorAuthority: keycloak.authorityProvider,
+            clientPolicy: keycloak.config.clientPolicy,
+            recordingLimits: recordingLimits,
+            recordingDownloadByteLimit: Environment.get("RECORDING_MAX_DOWNLOAD_BYTES"),
+            collectionCapacity: collectionCapacity
+        )
+    } catch {
+        // The storage lifecycle is not registered yet; release the provider's own HTTP client.
+        try? await storageProvider.shutdown()
+        throw error
+    }
     let storageService = app.grove[ObjectStorageService.self]
     app.lifecycle.use(ObjectStorageLifecycle(storageService: storageService))
     try await storageService.ensureBucketExists()
@@ -169,15 +187,23 @@ func configureServices(
     validator: FHIRValidationClient,
     sourceKeyring: SourceIdentityKeyring,
     grantorAuthority: GrantorAuthorityProvider = .unavailable,
-    clientPolicy: KeycloakClientPolicy = .production
-) async {
+    clientPolicy: KeycloakClientPolicy = .production,
+    recordingLimits: RecordingTransferService.Limits = .standard,
+    recordingDownloadByteLimit: String? = nil,
+    collectionCapacity: CollectionCapacityConfiguration = .standard
+) async throws {
+    let storage = ObjectStorageService(provider: storageProvider)
+    let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
+    let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
     await app.grove.configure {
-        ObjectStorageService(provider: storageProvider)
+        storage
+        recordings
+        downloads
 
         AuthorizationService(grantorAuthority: grantorAuthority)
         DelegationService(clientPolicy: clientPolicy)
         GroupService()
-        StudyService()
+        StudyService(exportLimits: collectionCapacity.export)
         ComponentService()
         ComponentScheduleService()
         StudyBundleService()
@@ -186,7 +212,7 @@ func configureServices(
         ProfileService()
         SourceBindingService(database: app.db(.psql))
         SourceInstallationService(database: app.db(.psql), keyring: sourceKeyring)
-        ClinicalEventService(database: app.db(.psql), validator: validator)
+        ClinicalEventService(database: app.db(.psql), validator: validator, recordings: recordings, limits: collectionCapacity.admission)
         PublishedStudyService()
         EnrollmentService()
         ParticipantEnrollmentService()
@@ -216,7 +242,7 @@ public func configureRoutes(for app: Application, middlewares: [any ServerMiddle
         on: transport,
         serverURL: try Servers.Server1.url(),
         configuration: .trove,
-        middlewares: middlewares + [ClinicalRequestBodyMiddleware()]
+        middlewares: middlewares + [ClinicalRequestBodyMiddleware(limits: app.grove[ClinicalEventService.self].limits)]
     )
 
     let components = apiBasePath.split(separator: "/")

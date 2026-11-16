@@ -20,6 +20,7 @@ enum DeliveryFixture {
 
     static func withJournal(
         limits: EventDeliveryJournal.Limits = .init(),
+        query: Data = queryDefinition,
         _ operation: (EventDeliveryJournal, URL) async throws -> Void
     ) async throws {
         let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
@@ -36,7 +37,7 @@ enum DeliveryFixture {
         let url = directory.appendingPathComponent("delivery.sqlite")
         let journal = try EventDeliveryJournal(url: url, scope: scope, mode: .createNew, limits: limits)
         do {
-            try await register(journal, sourceID: sourceID, query: queryDefinition, localID: epoch)
+            try await register(journal, sourceID: sourceID, query: query, localID: epoch)
             try await operation(journal, url)
         } catch {
             await journal.close()

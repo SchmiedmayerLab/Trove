@@ -65,6 +65,10 @@ extension Controller {
         grove[SourceInstallationService.self]
     }
 
+    var recordingTransferService: RecordingTransferService {
+        grove[RecordingTransferService.self]
+    }
+
     var clinicalEventService: ClinicalEventService {
         grove[ClinicalEventService.self]
     }

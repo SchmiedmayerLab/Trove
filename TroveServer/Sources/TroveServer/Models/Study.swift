@@ -21,6 +21,7 @@ struct StudyPatch: Sendable {
     var consent: LocalizationsDictionary<ConsentContent>?
     var visibility: StudyVisibility?
     var enrollmentCondition: EnrollmentConditions?
+    var enrollmentPeriod: EnrollmentPeriod?
     var collectionRequirements: [CollectionRequirement]? // swiftlint:disable:this discouraged_optional_collection
 }
 
@@ -30,6 +31,7 @@ final class Study: Model, @unchecked Sendable {
     /// as a native SQL array rather than the JSON collection configuration.
     private struct CollectionConfiguration: Codable, Sendable {
         var requirements: [CollectionRequirement]
+        var enrollmentPeriod: EnrollmentPeriod = .ongoing
     }
 
     static let schema = "studies"
@@ -70,9 +72,14 @@ final class Study: Model, @unchecked Sendable {
 
     @Children(for: \.$study) var invitationCodes: [InvitationCode]
 
+    var enrollmentPeriod: EnrollmentPeriod {
+        get { collectionConfiguration.enrollmentPeriod }
+        set { collectionConfiguration.enrollmentPeriod = newValue }
+    }
+
     var collectionRequirements: [CollectionRequirement] {
         get { collectionConfiguration.requirements }
-        set { collectionConfiguration = .init(requirements: newValue) }
+        set { collectionConfiguration.requirements = newValue }
     }
 
     init() {}
@@ -99,7 +106,7 @@ final class Study: Model, @unchecked Sendable {
         self.consent = consent
         self.visibility = visibility
         self.enrollmentCondition = enrollmentCondition
-        self.collectionRequirements = collectionRequirements
+        self.collectionConfiguration = .init(requirements: collectionRequirements)
     }
 
     func requireDraftRevision(_ expectedRevision: UUID) throws {
@@ -109,9 +116,11 @@ final class Study: Model, @unchecked Sendable {
     }
 
     func apply(_ patch: StudyPatch) throws {
+        try patch.enrollmentPeriod?.validate()
         if let requirements = patch.collectionRequirements {
             try CollectionRequirement.validate(requirements)
         }
+        if let period = patch.enrollmentPeriod { enrollmentPeriod = period }
         func apply<T>(_ otherKeyPath: KeyPath<StudyPatch, T?>, to selfKeyPath: ReferenceWritableKeyPath<Study, T>) {
             if let value = patch[keyPath: otherKeyPath] {
                 self[keyPath: selfKeyPath] = value

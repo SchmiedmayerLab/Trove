@@ -172,6 +172,18 @@ struct ParticipantCollectionSnapshotTests {
         }
     }
 
+    @Test(arguments: ["study", "title", "blank-title", "long-title"])
+    func invalidSavedDetailsCannotBeRetained(field: String) throws {
+        var plan = Self.plan()
+        switch field {
+        case "study": plan.studyId = "invalid"
+        case "title": plan.title = .init()
+        case "blank-title": plan.title = .init([.enUS: " \n\t"])
+        default: plan.title = .init([.enUS: String(repeating: "a", count: 4097)])
+        }
+        #expect(throws: ParticipantCollectionSnapshot.CollectionError.invalidPlan) { try Self.snapshot([plan]) }
+    }
+
     @Test
     func unsupportedProfileDoesNotBecomeAnEmptyPermission() throws {
         var plan = Self.plan()
@@ -199,18 +211,61 @@ struct ParticipantCollectionSnapshotTests {
 
 extension ParticipantCollectionSnapshotTests {
     private static func plan() -> Components.Schemas.ParticipantCollectionPlan {
-        .init(enrollmentId: UUID().uuidString.lowercased(), stateVersion: 2, asOf: start.addingTimeInterval(10), windows: [
-            .init(
-                consentId: UUID().uuidString.lowercased(),
-                publicationId: UUID().uuidString.lowercased(),
-                revision: 1,
-                start: start,
-                requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
-            )
-        ])
+        .init(
+            enrollmentId: UUID().uuidString.lowercased(),
+            studyId: UUID().uuidString,
+            title: .init([.enUS: "Saved Study"]),
+            stateVersion: 2,
+            asOf: start.addingTimeInterval(10),
+            windows: [
+                .init(
+                    consentId: UUID().uuidString.lowercased(),
+                    publicationId: UUID().uuidString.lowercased(),
+                    revision: 1,
+                    start: start,
+                    requirements: [.init(profile: ParticipantCollectionSnapshot.heartRateProfile, sourceKind: .participantApp, start: start)]
+                )
+            ]
+        )
     }
 
     private static func snapshot(_ plans: [Components.Schemas.ParticipantCollectionPlan]) throws -> ParticipantCollectionSnapshot {
         try ParticipantCollectionSnapshot(plans: plans, enrollmentIDs: plans.map { try #require(UUID(uuidString: $0.enrollmentId)) })
+    }
+}
+
+
+extension ParticipantCollectionSnapshotTests {
+    @Test(arguments: [(-60.0, 60.0, true), (-60, 0, false), (60, 180, true), (120, 180, false), (-60, 180, true)])
+    func sleepSelectionIncludesWholeIntervalsAndSharesOneRecordAcrossStudies(start: Double, end: Double, included: Bool) throws {
+        var first = Self.plan(), second = Self.plan()
+        for index in [0, 1] {
+            var plan = index == 0 ? first : second
+            plan.windows[0].requirements.append(.init(
+                profile: ParticipantCollectionSnapshot.sleepStageProfile,
+                sourceKind: .participantApp,
+                start: Self.start,
+                end: Self.start.addingTimeInterval(120)
+            ))
+            if index == 0 { first = plan } else { second = plan }
+        }
+        let snapshot = try Self.snapshot([first, second])
+        #expect(snapshot.permitsSleepAcquisition && snapshot.permitsHeartRateAcquisition)
+        #expect(snapshot.sleepQueryStart == Self.start)
+        let consents = try snapshot.consentIDs(
+            forSleepStarting: Self.start.addingTimeInterval(start), ending: Self.start.addingTimeInterval(end)
+        )
+        let expected = included ? [first.windows[0].consentId, second.windows[0].consentId] : []
+        #expect(Set(consents.map { $0.uuidString.lowercased() }) == Set(expected))
+    }
+
+    @Test
+    func duplicateSleepRequirementCannotWidenAuthority() throws {
+        var plan = Self.plan()
+        let sleep = Components.Schemas.CollectionPlanRequirement(
+            profile: ParticipantCollectionSnapshot.sleepStageProfile, sourceKind: .participantApp, start: Self.start
+        )
+        plan.windows[0].requirements = [sleep, sleep]
+        #expect(throws: ParticipantCollectionSnapshot.CollectionError.invalidPlan) { try Self.snapshot([plan]) }
     }
 }

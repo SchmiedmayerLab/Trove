@@ -16,7 +16,7 @@ import TroveAPIServer
 import VaporTesting
 
 
-private actor AdoptionEvidenceStorage: ObjectStorageProvider {
+private actor AdoptionEvidenceStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private var nextUpload: (@Sendable () async throws -> Void)?
     private let corruptUploads: Bool
@@ -30,7 +30,7 @@ private actor AdoptionEvidenceStorage: ObjectStorageProvider {
         nextUpload = action
     }
 
-    func upload(data: Data, key: String, contentType: String) async throws {
+    func uploadBuffered(data: Data, key: String, contentType: String) async throws {
         uploads += 1
         objects[key] = corruptUploads ? data + Data("corrupt".utf8) : data
         let action = nextUpload
@@ -38,7 +38,7 @@ private actor AdoptionEvidenceStorage: ObjectStorageProvider {
         try await action?()
     }
 
-    func download(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
+    func downloadBuffered(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
         guard let data = objects[key] else { throw ServerError.notFound("Synthetic evidence not found") }
         return data
     }

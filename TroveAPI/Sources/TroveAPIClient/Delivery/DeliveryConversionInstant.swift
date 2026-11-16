@@ -18,10 +18,10 @@ extension DeliveryJournal {
         guard (0...253_402_300_799).contains(now.timeIntervalSince1970) else { throw JournalError.invalidConfiguration }
         return try database.transaction {
             _ = try activeSource(expected.sourceID)
-            guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
-            let sourceID = expected.sourceID.uuidString.lowercased()
+            try validateCheckpoint(expected)
+            let queryID = expected.queryID.uuidString.lowercased()
             let rows = try database.query(
-                "SELECT value FROM producer_ledger WHERE source_id = ? AND key = 'conversion-instant'", [.text(sourceID)]
+                "SELECT conversion_instant FROM acquisition_query WHERE id = ? AND conversion_instant IS NOT NULL", [.text(queryID)]
             ) { try DeliverySQLite.blob($0, 0) }
             if let bytes = rows.first {
                 guard let instant = try? JSONDecoder().decode(Date.self, from: bytes),
@@ -31,7 +31,7 @@ extension DeliveryJournal {
             let instant = Date(timeIntervalSince1970: (now.timeIntervalSince1970 * 1000).rounded(.toNearestOrEven) / 1000)
             let bytes = try JSONEncoder().encode(instant)
             try database.execute(
-                "INSERT INTO producer_ledger(source_id, key, value) VALUES (?, 'conversion-instant', ?)", [.text(sourceID), .blob(bytes)]
+                "UPDATE acquisition_query SET conversion_instant = ? WHERE id = ?", [.blob(bytes), .text(queryID)]
             )
             try checkByteLimit()
             try Task.checkCancellation()

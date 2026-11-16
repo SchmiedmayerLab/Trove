@@ -20,15 +20,24 @@ actor ReceiverClientTransport: ClientTransport {
     private let token: String?
     private var loseBatchResponse: Bool
     private var loseRegistrationResponse: Bool
+    private var loseRecordingResponse: Bool
     private(set) var paths: [String] = []
     private(set) var batchBodies: [Data] = []
     private(set) var registrationBodies: [Data] = []
+    private(set) var recordingBodies: [Data] = []
 
-    init(application: Application, token: String?, loseBatchResponse: Bool = false, loseRegistrationResponse: Bool = false) {
+    init(
+        application: Application,
+        token: String?,
+        loseBatchResponse: Bool = false,
+        loseRegistrationResponse: Bool = false,
+        loseRecordingResponse: Bool = false
+    ) {
         self.application = application
         self.token = token
         self.loseBatchResponse = loseBatchResponse
         self.loseRegistrationResponse = loseRegistrationResponse
+        self.loseRecordingResponse = loseRecordingResponse
     }
 
     func send(
@@ -49,6 +58,8 @@ actor ReceiverClientTransport: ClientTransport {
         if path.hasSuffix("/record-bundles") { batchBodies.append(bytes) }
         let isRegistration = request.method == .post && path.hasSuffix("/participant/sources")
         if isRegistration { registrationBodies.append(bytes) }
+        let isRecording = request.method == .put && path.contains("/recording-transfers/") && path.hasSuffix("/content")
+        if isRecording { recordingBodies.append(bytes) }
         let response = try await application.performTest(request: .init(
             method: .init(rawValue: request.method.rawValue), url: .init(string: path), headers: headers, body: .init(data: bytes)
         ))
@@ -59,6 +70,10 @@ actor ReceiverClientTransport: ClientTransport {
         }
         if isRegistration, loseRegistrationResponse {
             loseRegistrationResponse = false
+            throw URLError(.networkConnectionLost)
+        }
+        if isRecording, loseRecordingResponse {
+            loseRecordingResponse = false
             throw URLError(.networkConnectionLost)
         }
         var fields = HTTPFields()

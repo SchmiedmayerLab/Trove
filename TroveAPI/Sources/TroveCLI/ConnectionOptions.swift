@@ -7,7 +7,9 @@
 //
 
 import ArgumentParser
+import AsyncHTTPClient
 import Foundation
+import OpenAPIAsyncHTTPClient
 import OpenAPIURLSession
 
 
@@ -57,6 +59,29 @@ struct ConnectionOptions: ParsableArguments {
             throw CLIError.invalidEndpoint
         }
         return url
+    }
+
+    /// Keep the streaming transport alive until the complete response has been consumed.
+    func withRecordingClient(_ operation: (AuthoringClient) async throws -> Void) async throws {
+        let endpoint = try Self.endpoint(server, allowInsecureLoopback: allowInsecureLoopback)
+        let token = try CredentialInput.read(file: tokenFile, standardInput: tokenStdin)
+        let http = HTTPClient(configuration: .init(
+            redirectConfiguration: .disallow,
+            timeout: .init(connect: .seconds(30), read: .seconds(60))
+        ))
+        do {
+            let client = AuthoringClient(
+                serverURL: endpoint,
+                token: token,
+                transport: AsyncHTTPClientTransport(configuration: .init(client: http, timeout: .minutes(10)))
+            )
+            try await operation(client)
+        } catch {
+            try? await http.shutdown()
+            throw CLIError.sanitized(error)
+        }
+        // The output is already complete; a shutdown failure must not suggest downloading again.
+        try? await http.shutdown()
     }
 
     func client() throws -> AuthoringClient {

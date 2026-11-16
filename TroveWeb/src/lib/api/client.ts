@@ -98,6 +98,9 @@ const createSession = (provider: AccessTokenProvider | undefined) => {
 
 let session = createSession(undefined);
 
+/** Capture before awaiting user interaction so an operation cannot adopt another session. */
+export const apiSessionSignal = (): AbortSignal => session.controller.signal;
+
 /**
  * Registers the function used to retrieve the current access token.
  * Replacing or removing it ends the old session, including in-flight requests.

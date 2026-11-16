@@ -12,13 +12,13 @@ import Testing
 import Vapor
 
 
-private actor LifecycleStorage: ObjectStorageProvider {
+private actor LifecycleStorage: BufferedTestObjectStorageProvider {
     private(set) var shutdownCompleted = false
     let fails: Bool
 
     init(fails: Bool) { self.fails = fails }
-    func upload(data: Data, key: String, contentType: String) {}
-    func download(key: String, maximumBytes: Int) -> Data { Data() }
+    func uploadBuffered(data: Data, key: String, contentType: String) {}
+    func downloadBuffered(key: String, maximumBytes: Int) -> Data { Data() }
     func delete(key: String) {}
     func ensureBucketExists() {}
 

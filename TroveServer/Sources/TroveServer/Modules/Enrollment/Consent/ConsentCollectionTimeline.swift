@@ -54,7 +54,12 @@ enum ConsentCollectionTimeline {
                 collectionScope: record.collectionScope
             )
         }
-        return try windows(acceptances, currentRevision: enrollment.currentRevision, stateVersion: enrollment.stateVersion, asOf: asOf)
+        let timeline = try windows(acceptances, currentRevision: enrollment.currentRevision, stateVersion: enrollment.stateVersion, asOf: asOf)
+        guard let end = enrollment.endsAt else {
+            return timeline
+        }
+        guard CollectionMeasurementWindow.valid(end), acceptances.allSatisfy({ $0.acceptedAt < end }) else { throw inconsistent }
+        return timeline.map { .init(acceptance: $0.acceptance, end: min($0.end ?? end, end)) }
     }
 
     static func windows(_ history: [Acceptance], currentRevision: Int, stateVersion: Int64, asOf: Date) throws -> [Window] {

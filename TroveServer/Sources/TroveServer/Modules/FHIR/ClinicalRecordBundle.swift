@@ -18,10 +18,12 @@ private enum ClinicalRecordBundle {
     }
 
     /// Graph validity and an exact commitment inventory precede any independent admission.
-    static func records(_ submission: Components.Schemas.RecordBundleSubmission) throws -> [ExchangeRecord] {
+    static func records(
+        _ submission: Components.Schemas.RecordBundleSubmission, limits: EventSubmissionLimits.Configuration
+    ) throws -> [ExchangeRecord] {
         guard let bytes = Data(base64Encoded: submission.bundleBase64), !bytes.isEmpty,
               bytes.base64EncodedString() == submission.bundleBase64 else { throw ServerError.badRequest("Provide canonical Bundle base64") }
-        guard bytes.count <= EventSubmissionLimits.maximumBundleBytes else { throw FHIRValidationClient.tooLarge }
+        guard bytes.count <= limits.bundleBytes else { throw FHIRValidationClient.tooLarge }
         let records = try unpack(bytes)
         guard records.count == submission.records.count else { throw ServerError.badRequest("Record inventory does not match the Bundle") }
         var indexed: [BusinessIdentifier: ExchangeRecord] = [:]
@@ -75,19 +77,21 @@ extension ClinicalEventService {
         _ submission: Components.Schemas.RecordBundleSubmission, sourceID: UUID, installation: SourceInstallationProof
     ) async throws -> [Components.Schemas.EventBatchResult] {
         _ = try AuthContext.checkIsParticipant()
-        guard (1...EventSubmissionLimits.maximumBatchEvents).contains(submission.records.count) else {
-            throw ServerError.badRequest("Submit between 1 and 16 record commitments")
+        guard (1...limits.batchRecords).contains(submission.records.count) else {
+            throw ServerError.badRequest("Submit between 1 and \(limits.batchRecords) record commitments")
         }
-        guard submission.bundleBase64.utf8.count <= EventSubmissionLimits.maximumBundleBase64Bytes else { throw FHIRValidationClient.tooLarge }
+        guard submission.bundleBase64.utf8.count <= limits.bundleBase64Bytes else { throw FHIRValidationClient.tooLarge }
         let source = try await SourceBindingService(database: database).find(id: sourceID)
         _ = try await installation.validate(source: source, on: database)
-        let records = try ClinicalRecordBundle.records(submission)
+        let records = try ClinicalRecordBundle.records(submission, limits: limits)
         var results: [Components.Schemas.EventBatchResult] = []
         for (member, record) in zip(submission.records, records) {
             try Task.checkCancellation()
             do {
                 let original = try ClinicalRecordBundle.restore(record, member: member, sourceID: sourceID)
-                let receipt = try await accept(submission: original, sourceID: sourceID, installation: installation)
+                let receipt = try await accept(
+                    submission: original, sourceID: sourceID, installation: installation, attachments: member.recordings ?? []
+                )
                 results.append(.EventReceipt(receipt.apiRepresentation))
             } catch {
                 try Task.checkCancellation()

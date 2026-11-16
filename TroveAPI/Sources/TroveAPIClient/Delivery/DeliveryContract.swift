@@ -18,9 +18,12 @@ public enum DeliveryJournalError: Error, Equatable {
     case unsupportedFormat
     case sourceConflict
     case unknownSource
+    case queryConflict
+    case unknownQuery
     case sourceRevoked
     case invalidSourceBinding
     case staleCheckpoint
+    case staleCollectionState
     case capacityExceeded
     case sequenceExhausted
     case eventIdentityMismatch

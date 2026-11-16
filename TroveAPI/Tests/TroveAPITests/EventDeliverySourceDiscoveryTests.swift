@@ -54,14 +54,15 @@ struct EventDeliverySourceDiscoveryTests {
                 "local_id": "local_id = 'not-a-uuid'",
                 "privacy_key": "privacy_key = x'00'",
                 "installation_credential": "installation_credential = x'00'",
-                "query_definition": "query_definition = zeroblob(16385)",
+                "query_definition": "definition = zeroblob(16385)",
                 "binding": "binding = x'00'",
                 "source_id": "source_id = '00000000-0000-0000-0000-000000000000'",
                 "producer_system": "producer_system = 'https://wrong.test/events'"
             ]
             let assignment = try #require(assignments[field])
+            let table = field == "query_definition" ? "acquisition_query" : "source_state"
             try connection.execute(
-                "UPDATE source_state SET " + assignment + " WHERE local_id = ?", [.text(DeliveryFixture.epoch.uuidString.lowercased())]
+                "UPDATE " + table + " SET " + assignment + " WHERE local_id = ?", [.text(DeliveryFixture.epoch.uuidString.lowercased())]
             )
             await #expect(throws: EventDeliveryJournal.JournalError.corruptJournal) { try await journal.sourceSetups() }
             // A valid stream remains intact, but must not mask the broken stream during discovery.
@@ -125,12 +126,13 @@ struct EventDeliverySourceDiscoveryTests {
 
 extension EventDeliverySourceDiscoveryTests {
     private static func insertPendingSource(_ connection: DeliverySQLite) throws {
+        let localID = UUID().uuidString.lowercased()
         try connection.execute(
-            """
-            INSERT INTO source_state(local_id, installation_credential, query_definition, next_sequence, checkpoint_revision)
-            VALUES (?, zeroblob(32), x'01', 1, ?)
-            """,
-            [.text(UUID().uuidString.lowercased()), .text(UUID().uuidString.lowercased())]
+            "INSERT INTO source_state(local_id, installation_credential, next_sequence) VALUES (?, zeroblob(32), 1)", [.text(localID)]
+        )
+        try connection.execute(
+            "INSERT INTO acquisition_query(id, local_id, definition, checkpoint_revision) VALUES (?, ?, x'01', ?)",
+            [.text(localID), .text(localID), .text(UUID().uuidString.lowercased())]
         )
     }
 }

@@ -19,7 +19,7 @@ import VaporTesting
 import ZIPFoundation
 
 
-private actor PublicationStorage: ObjectStorageProvider {
+private actor PublicationStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private var nextUpload: (@Sendable () async throws -> Void)?
     private(set) var uploads: [String] = []
@@ -29,7 +29,7 @@ private actor PublicationStorage: ObjectStorageProvider {
         nextUpload = action
     }
 
-    func upload(data: Data, key: String, contentType: String) async throws {
+    func uploadBuffered(data: Data, key: String, contentType: String) async throws {
         objects[key] = data
         uploads.append(key)
         let action = nextUpload
@@ -37,7 +37,7 @@ private actor PublicationStorage: ObjectStorageProvider {
         try await action?()
     }
 
-    func download(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
+    func downloadBuffered(key: String, maximumBytes: Int = 50 * 1024 * 1024) throws -> Data {
         downloads.append(key)
         guard let data = objects[key] else { throw ServerError.notFound("Synthetic object not found") }
         return data

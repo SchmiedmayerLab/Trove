@@ -34,6 +34,9 @@ final class Enrollment: Model, @unchecked Sendable {
 
     @Field(key: "participation_data") var participationData: ParticipationData
     
+    /// Resolved from the publication selected when joining; later revisions never renew it.
+    @OptionalField(key: "ends_at") var endsAt: Date?
+
     @OptionalField(key: "withdrawn_at") var withdrawnAt: Date?
     
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?

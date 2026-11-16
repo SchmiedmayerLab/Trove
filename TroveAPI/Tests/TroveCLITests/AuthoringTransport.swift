@@ -20,10 +20,12 @@ actor AuthoringTransport: ClientTransport {
 
     private let status: Int
     private let response: Data
+    private let headers: HTTPFields
     private(set) var records: [Record] = []
 
-    init<Value: Encodable>(response: Value, status: Int = 200) throws {
+    init<Value: Encodable>(response: Value, status: Int = 200, headers: HTTPFields = [.contentType: "application/json"]) throws {
         self.status = status
+        self.headers = headers
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         self.response = try encoder.encode(response)
@@ -37,6 +39,6 @@ actor AuthoringTransport: ClientTransport {
             data = Data()
         }
         records.append(.init(request: request, body: data, operation: operationID))
-        return (.init(status: .init(code: status), headerFields: [.contentType: "application/json"]), HTTPBody(response))
+        return (.init(status: .init(code: status), headerFields: headers), HTTPBody(response))
     }
 }

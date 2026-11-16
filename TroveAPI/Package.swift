@@ -31,11 +31,13 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.12.1"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession.git", from: "1.3.2"),
+        .package(url: "https://github.com/swift-server/swift-openapi-async-http-client", from: "1.5.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.36.2"),
         .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"6.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
         // TroveAPIGenerator runs this package's executable; no target links against it.
         .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.14.1"),
-        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", exact: "0.3.0-beta.11")
+        .package(url: "https://github.com/SchmiedmayerLab/Grove.git", revision: "833850907283712ea4dcf987fb8edf6d721fc4fc")
     ] + swiftLintPackage(),
     targets: [
         .systemLibrary(name: "CTroveDeliverySQLite", pkgConfig: "sqlite3", providers: [.apt(["libsqlite3-dev"])]),
@@ -69,6 +71,7 @@ let package = Package(
             name: "TroveHealthKit",
             dependencies: [
                 .target(name: "TroveAPIClient"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
                 .product(
                     name: "GroveHealthKit", package: "Grove", condition: .when(platforms: [.iOS, .macOS, .watchOS, .visionOS, .macCatalyst])
@@ -93,6 +96,8 @@ let package = Package(
             dependencies: [
                 .target(name: "TroveAPIClient"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
             ],
@@ -101,6 +106,7 @@ let package = Package(
         .testTarget(
             name: "TroveCLITests",
             dependencies: [.target(name: "TroveCLI")],
+            resources: [.copy("Fixtures/recording-server.py")],
             plugins: [] + swiftLintPlugin()
         ),
         .executableTarget(

@@ -374,9 +374,9 @@ extension DatabaseRuntimePrivilegesTests {
                 public.clinical_events, public.clinical_event_representations,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
-                public.clinical_record_retractions,
-                public.clinical_questionnaire_contexts, public.clinical_point_derivations,
-                public.clinical_attribution_commands TO \(ident: role)
+                public.clinical_record_retractions, public.clinical_questionnaire_contexts, public.clinical_point_derivations,
+                public.clinical_attribution_commands, public.recording_transfers, public.recording_transfer_attempts,
+                public.recording_transfer_receipts, public.clinical_recording_attachments TO \(ident: role)
             """)
             .run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
@@ -411,9 +411,9 @@ extension DatabaseRuntimePrivilegesTests {
         let (recordID, bindingID) = try await appendRecordIdentity(on: sql, sourceID: sourceID, eventID: eventID)
         try await sql.raw("""
             INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                quantity_value, quantity_system, quantity_code, code_system, code)
+                value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
             VALUES (\(bind: nodeID), \(bind: sourceID), \(bind: eventID), \(bind: recordID), \(bind: bindingID),
-                \(bind: CollectionRequirement.supportedProfile), CURRENT_TIMESTAMP, '72',
+                \(bind: CollectionRequirement.supportedProfile), CURRENT_TIMESTAMP, 'quantity', '72',
                 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4')
             """)
             .run()

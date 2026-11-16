@@ -157,7 +157,7 @@
       "sha256": "d7519a5d723336c64ac258b149874474995f057b878ac86d7125bbb32b358cd4"
     }
   ],
-  "workerSHA256": "51e40e0ecf2a4c19be7a8fbbca24c2fdbd5805ec63bd34bb8c146b669e0debc5",
+  "workerSHA256": "3df1de656e5e19be8654a9bed841be77a1c45299012f38cc99c1a90f5da9bad4",
   "runtimeImages": {
     "python": "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
     "java": "eclipse-temurin:21-jre-jammy@sha256:eebd356ad7358b7094758e5787a6726f332917cfd56feab6457c56dab895cdbf"

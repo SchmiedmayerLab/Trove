@@ -21,6 +21,7 @@ public actor EventDeliveryDrainer {
     public enum DeliveryError: Error, Equatable {
         case drainInProgress
         case authenticationRequired
+        case recordingTransportRequired
     }
 
     private enum Response {
@@ -31,9 +32,11 @@ public actor EventDeliveryDrainer {
     private enum BatchError: Error { case invalidResponse }
 
     private let journal: EventDeliveryJournal
+    private let limits: EventSubmissionLimits.Configuration
     private let client: any APIProtocol
     private let validateSession: @Sendable () async throws -> Void
     private let now: @Sendable () -> Date
+    private let recordings: RecordingTransferDrainer
     private var isDraining = false
     private var authenticationFailed = false
 
@@ -42,14 +45,17 @@ public actor EventDeliveryDrainer {
         journal: EventDeliveryJournal,
         scope: EventDeliveryJournal.Scope,
         client: any APIProtocol,
+        limits: EventSubmissionLimits.Configuration = .standard,
         validateSession: @escaping @Sendable () async throws -> Void,
         now: @escaping @Sendable () -> Date = { Date() }
     ) throws {
         guard journal.scope == scope else { throw EventDeliveryJournal.JournalError.wrongScope }
         self.journal = journal
+        self.limits = limits
         self.client = client
         self.validateSession = validateSession
         self.now = now
+        recordings = try .init(journal: journal, scope: scope, client: client, validateSession: validateSession, now: now)
     }
 
     /// A failed session stops this instance until a new captured-session drainer is constructed.
@@ -61,24 +67,23 @@ public actor EventDeliveryDrainer {
         try await checkSession()
         let ids = try await journal.readyDeliveryIDs(at: now(), limit: limit)
         var processed: [UUID] = []
-        var batch = EventDeliveryBatch(packedAt: now())
+        var batch = EventDeliveryBatch(packedAt: now(), limits: limits)
         for id in ids {
             try await checkSession()
             guard let attempt = try await journal.prepareAttempt(id, at: now()) else { continue }
             processed.append(id)
             guard try await requiresSubmission(attempt) else { continue }
-            let member = try EventDeliveryBatch.Member(attempt)
+            guard let member = try await prepareMember(for: attempt) else { continue }
             if try !batch.append(member) {
                 try await deliver(batch)
-                batch = EventDeliveryBatch(packedAt: now())
+                batch = EventDeliveryBatch(packedAt: now(), limits: limits)
                 guard try batch.append(member) else {
-                    try await apply(.status(413), to: attempt)
-                    continue
+                    throw EventDeliveryJournal.JournalError.capacityExceeded
                 }
             }
-            if batch.members.count == EventSubmissionLimits.maximumBatchEvents {
+            if batch.members.count == limits.batchRecords {
                 try await deliver(batch)
-                batch = EventDeliveryBatch(packedAt: now())
+                batch = EventDeliveryBatch(packedAt: now(), limits: limits)
             }
         }
         try await deliver(batch)
@@ -107,6 +112,41 @@ public actor EventDeliveryDrainer {
 
 
 extension EventDeliveryDrainer {
+    private func prepareMember(
+        for attempt: EventDeliveryJournal.Attempt
+    ) async throws -> EventDeliveryBatch.Member? {
+        var bindings: [Components.Schemas.RecordingAttachmentBinding] = []
+        do {
+            for file in attempt.recordings {
+                try await checkSession()
+                let receipt = try await recordings.transfer(file.id)
+                try await checkSession()
+                bindings.append(.init(attachmentPath: file.relativePath, transferId: receipt.transferId, artifactId: receipt.artifactId))
+            }
+            return try EventDeliveryBatch.Member(attempt, recordings: bindings)
+        } catch let error as RecordingTransferDrainer.Failure {
+            switch error {
+            case .authenticationRequired:
+                authenticationFailed = true
+                throw DeliveryError.authenticationRequired
+            case .unpreparedTransfer:
+                throw DeliveryError.recordingTransportRequired
+            case .transportFailed, .receiptExpired, .transferInProgress:
+                try await checkSession()
+                try await retry(attempt, notBefore: nil)
+            case .rejected(let status):
+                try await apply(.status(status), to: attempt)
+            case .invalidReceipt, .fileChanged:
+                try await checkSession()
+                try await journal.block(attempt.deliveryID, reason: .invalidReceipt)
+            }
+            return nil
+        } catch DeliveryJournalError.sourceRevoked {
+            try await apply(.status(409), to: attempt)
+            return nil
+        }
+    }
+
     private func requiresSubmission(_ attempt: EventDeliveryJournal.Attempt) async throws -> Bool {
         guard attempt.custodyWasUncertain else {
             return true
@@ -201,7 +241,7 @@ extension EventDeliveryDrainer {
     }
 
     private func submit(_ batch: EventDeliveryBatch) async throws -> [Response] {
-        guard let first = batch.members.first, let submission = batch.submission else { throw BatchError.invalidResponse }
+        guard let first = batch.members.first, let submission = try batch.submission() else { throw BatchError.invalidResponse }
         let setup: EventDeliveryJournal.SourceSetup
         do {
             setup = try await journal.activeSource(first.attempt.commitment.sourceID)

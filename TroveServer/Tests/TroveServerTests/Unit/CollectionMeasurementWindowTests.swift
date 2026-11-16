@@ -116,6 +116,8 @@ struct CollectionMeasurementWindowTests {
         )
         #expect(try CollectionScopePresentation.markdown(requirements: [requirement], locale: "en-US").contains("6 months"))
         #expect(try CollectionScopePresentation.markdown(requirements: [requirement], locale: "de-DE").contains("6 Monate"))
+        #expect(try CollectionScopePresentation.markdown(requirements: [requirement], locale: "en-US").contains("HealthKit sample identifier (UUID)"))
+        #expect(try CollectionScopePresentation.markdown(requirements: [requirement], locale: "de-DE").contains("HealthKit-Kennung (UUID)"))
         #expect(throws: ServerError.self) { try CollectionScopePresentation.markdown(requirements: [requirement], locale: "fr-FR") }
     }
 }

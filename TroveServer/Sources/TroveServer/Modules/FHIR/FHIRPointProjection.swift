@@ -11,7 +11,7 @@ import GroveFHIRContract
 import ModelsR4
 
 
-/// Extracts the supported immutable point subset only AFTER complete validation of the exact bytes.
+/// Extracts supported immutable clinical outputs only AFTER complete validation of the exact bytes.
 /// This is a receiver capability boundary, not an alternative implementation of the IG validator.
 enum FHIRPointProjection {
     private typealias Identity = ValidatedExchangeEvent.Identifier
@@ -20,16 +20,20 @@ enum FHIRPointProjection {
         let meta: Meta?
     }
 
-    static func project(validatedBytes bytes: Data, validatorIdentity: String) throws -> ValidatedExchangeEvent {
+    static func project(
+        validatedBytes bytes: Data, validatorIdentity: String, recordings: [ClinicalRecordingAttachment] = []
+    ) throws -> ValidatedExchangeEvent {
         do {
-            return try extract(bytes, validatorIdentity: validatorIdentity)
+            return try extract(bytes, validatorIdentity: validatorIdentity, recordings: recordings)
         } catch {
             // Model-decoder errors can contain participant values and coding paths.
             throw FHIRValidationClient.invalid
         }
     }
 
-    private static func extract(_ bytes: Data, validatorIdentity: String) throws -> ValidatedExchangeEvent {
+    private static func extract(
+        _ bytes: Data, validatorIdentity: String, recordings: [ClinicalRecordingAttachment]
+    ) throws -> ValidatedExchangeEvent {
         guard !bytes.isEmpty, bytes.count <= FHIRValidationClient.maximumBytes else { throw FHIRValidationClient.invalid }
         // Enforce the receiver's tighter nesting bound and retain number tokens before
         // any model decoder can round them. This is not graph or identity validation.
@@ -37,6 +41,7 @@ enum FHIRPointProjection {
         let header = try JSONDecoder().decode(Header.self, from: bytes)
         if let profile = Profile.groveMobileRetractionBundle.value?.url.absoluteString,
            header.meta?.profile.contains(profile) == true {
+            guard recordings.isEmpty else { throw FHIRValidationClient.invalid }
             return try FHIRRetractionProjection.project(bytes: bytes, validatorIdentity: validatorIdentity)
         }
         // Shared graph/identity rules consume the original bytes; receiver capability and
@@ -45,34 +50,57 @@ enum FHIRPointProjection {
         try FHIRPointSupportBoundary.validateExtensionLocations(in: bytes)
         guard let entries = graph.bundle.entry, (1...512).contains(entries.count) else { throw FHIRValidationClient.invalid }
         let record = try ExchangeRecord(validating: bytes)
-        let identity = record.version.identifier.identifier
         let (nodes, resources) = try index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
+        try FHIRWorkoutProjection.validate(resources: resources)
         var participants: Set<Identity> = []
-        var outputs: [ValidatedExchangeEvent.PointOutput] = []
+        var outputs: [ValidatedExchangeEvent.Output] = []
+        var nativeIdentifiers: [ValidatedExchangeEvent.Identifier] = []
         for node in nodes {
             guard let resource = resources[node.fullURL] else { throw FHIRValidationClient.invalid }
             participants.formUnion(try participantIdentifiers(resource, resources: resources))
             if case .observation(let observation) = resource {
-                guard let quantity = quantities[node.ordinal] else { throw FHIRValidationClient.invalid }
-                outputs.append(try point(observation, fullURL: node.fullURL, quantityText: quantity))
+                let identifiers = try FHIRNativeRecordIdentifiers.output(observation.identifier ?? [])
+                nativeIdentifiers.append(contentsOf: identifiers.native)
+                outputs.append(try output(
+                    observation, identifiers: identifiers.roles, fullURL: node.fullURL, quantityText: quantities[node.ordinal]
+                ))
+            } else if case .documentReference(let document) = resource {
+                let identifiers = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [])
+                nativeIdentifiers.append(contentsOf: identifiers.native)
+                outputs.append(try recording(document, identifiers: identifiers.roles, fullURL: node.fullURL, recordings: recordings))
             }
         }
-        guard participants.count == 1, !outputs.isEmpty else { throw FHIRValidationClient.invalid }
+        try validateOutputs(outputs, participants: participants, nativeIdentifiers: nativeIdentifiers, recordings: recordings)
         var result = ValidatedExchangeEvent(
             rawBytes: bytes,
             recorded: try RecordedInstant.extract(from: resources),
             validatorIdentity: validatorIdentity,
-            eventIdentifierSystem: identity.system.rawValue,
-            eventIdentifierValue: identity.value,
+            eventIdentifierSystem: record.version.identifier.identifier.system.rawValue,
+            eventIdentifierValue: record.version.identifier.identifier.value,
             deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
             participants: participants,
             nodes: nodes,
-            outputs: outputs
+            outputs: outputs,
+            nativeRecordIdentifiers: nativeIdentifiers,
+            recordings: recordings
         )
         _ = try ClinicalRecordRevision(result)
         try FHIRClinicalDerivations.extract(resources: resources, into: &result)
         return result
+    }
+
+    private static func validateOutputs(
+        _ outputs: [ValidatedExchangeEvent.Output],
+        participants: Set<Identity>,
+        nativeIdentifiers: [Identity],
+        recordings: [ClinicalRecordingAttachment]
+    ) throws {
+        guard participants.count == 1, !outputs.isEmpty, nativeIdentifiers.count <= 1,
+              Set(recordings.map { $0.declaration.output.fullURL }).count == recordings.count,
+              recordings.allSatisfy({ attachment in
+                  outputs.contains { $0.fullURL == attachment.declaration.output.fullURL && $0.value == .recording }
+              }), !outputs.contains(where: { $0.value == .recording }) || outputs.count == 1 else { throw FHIRValidationClient.invalid }
     }
 
     static func index(_ entries: [BundleEntry]) throws -> ([ValidatedExchangeEvent.Node], [String: ResourceProxy]) {
@@ -98,6 +126,8 @@ enum FHIRPointProjection {
         case .observation(let observation):
             return try [subject(observation.subject, resources: resources)]
                 + (observation.performer ?? []).map { try subject($0, resources: resources) }
+        case .documentReference(let document):
+            return [try subject(document.subject, resources: resources)]
         case .questionnaireResponse(let response):
             return [try subject(response.subject, resources: resources)]
         case .researchSubject(let researchSubject):
@@ -111,46 +141,63 @@ enum FHIRPointProjection {
         }
     }
 
-    private static func point(_ observation: Observation, fullURL: String, quantityText: String) throws -> ValidatedExchangeEvent.PointOutput {
-        let identifiers = try (observation.identifier ?? []).map(RoledIdentifier.init)
-        guard observation.status.value == .final,
-              observation.meta?.profile?.contains(Profile.groveMobileHeartRate) == true,
-              let profile = Profile.groveMobileHeartRate.value?.url.absoluteString,
-              case .dateTime(let primitive)? = observation.effective, let effective = primitive.value,
-              effective.time != nil, effective.timeZone != nil,
-              case .quantity(let quantity)? = observation.value, quantity.value?.value != nil, quantity.comparator == nil,
-              let quantitySystem = quantity.system?.value?.url.absoluteString, let quantityCode = quantity.code?.value?.string,
-              let coding = observation.code.coding?.first, observation.code.coding?.count == 1,
-              let codeSystem = coding.system?.value?.url.absoluteString, let code = coding.code?.value?.string,
-              observation.component?.isEmpty != false, observation.hasMember?.isEmpty != false,
-              observation.focus?.isEmpty != false, observation.specimen == nil,
-              observation.basedOn?.isEmpty != false, observation.partOf?.isEmpty != false, observation.encounter == nil else {
-            throw FHIRValidationClient.invalid
-        }
-        let writers = identifiers.filter { $0.role == .writerRecord }
-        let versions = (observation.extension ?? []).filter { $0.url == Canonicals.writerRecordVersion }
-        guard writers.count <= 1, writers.count == versions.count else { throw FHIRValidationClient.invalid }
-        let writerVersion: String?
-        if let version = versions.first {
-            guard case .string(let raw)? = version.value, let text = raw.value?.string else { throw FHIRValidationClient.invalid }
-            writerVersion = text
-        } else {
-            writerVersion = nil
-        }
+    private static func output(
+        _ observation: Observation, identifiers: [RoledIdentifier], fullURL: String, quantityText: String?
+    ) throws -> ValidatedExchangeEvent.Output {
+        let value = try FHIRObservationValueProjection(observation: observation, quantityText: quantityText)
+        let writer = try writerRevision(identifiers: identifiers, extensions: observation.extension ?? [])
         return try .init(
             fullURL: fullURL,
-            profile: profile,
-            effectiveAt: effective.asNSDate(),
+            profile: value.profile,
+            effectiveAt: value.start,
+            effectiveEnd: value.end,
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
-            writerIdentifier: writers.first.map { .init(system: $0.identifier.system.rawValue, value: $0.identifier.value) },
-            writerVersion: writerVersion,
-            quantityValue: quantityText,
-            quantitySystem: quantitySystem,
-            quantityCode: quantityCode,
-            codeSystem: codeSystem,
-            code: code
+            writerIdentifier: writer.identifier,
+            writerVersion: writer.version,
+            value: value.value,
+            codeSystem: value.codeSystem,
+            code: value.code
         )
+    }
+
+    private static func recording(
+        _ document: DocumentReference, identifiers: [RoledIdentifier], fullURL: String, recordings: [ClinicalRecordingAttachment]
+    ) throws -> ValidatedExchangeEvent.Output {
+        let external = recordings.first { $0.declaration.output.fullURL == fullURL }
+        let bounds = try FHIRRecordingProjection.routeBounds(document, external: external)
+        // The exact source-artifact identity remains in the immutable document and study view.
+        _ = try oneIdentifier(identifiers, role: .sourceArtifact)
+        // A recording record's sole document is its primary output and states the writer revision like an Observation.
+        let writer = try writerRevision(identifiers: identifiers, extensions: document.extension ?? [])
+        return try .init(
+            fullURL: fullURL,
+            profile: FHIRRecordingProjection.profile,
+            effectiveAt: bounds.0,
+            effectiveEnd: bounds.1,
+            sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
+            sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
+            writerIdentifier: writer.identifier,
+            writerVersion: writer.version,
+            value: .recording,
+            codeSystem: FHIRRecordingProjection.formatSystem,
+            code: FHIRRecordingProjection.routeFormat
+        )
+    }
+
+    /// The writer-record identity and its version travel as one complete pair or not at all; ``ClinicalRecordRevision``
+    /// checks the canonical version text and that every output of the record states the same pair.
+    private static func writerRevision(
+        identifiers: [RoledIdentifier], extensions: [Extension]
+    ) throws -> (identifier: Identity?, version: String?) {
+        let writers = identifiers.filter { $0.role == .writerRecord }
+        let versions = extensions.filter { $0.url == Canonicals.writerRecordVersion }
+        guard writers.count <= 1, writers.count == versions.count else { throw FHIRValidationClient.invalid }
+        guard let writer = writers.first, let version = versions.first else {
+            return (nil, nil)
+        }
+        guard case .string(let raw)? = version.value, let text = raw.value?.string else { throw FHIRValidationClient.invalid }
+        return (.init(system: writer.identifier.system.rawValue, value: writer.identifier.value), text)
     }
 
     private static func oneIdentifier(_ identifiers: [RoledIdentifier], role: GroveIdentifierRole) throws -> Identity {

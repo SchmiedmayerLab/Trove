@@ -11,7 +11,7 @@ import subprocess
 import sys
 import unittest
 
-from rekey_fixture import recovered_arguments
+from rekey_fixture import logical_participant, recovered_arguments
 
 
 def recovery_fixture():
@@ -24,6 +24,27 @@ def recovery_fixture():
 
 
 class RecoveredFixtureTests(unittest.TestCase):
+    def test_healthkit_fixture_uses_one_logical_participant_without_patient_resource(self):
+        root = Path(__file__).resolve().parents[2]
+        bundle = json.loads((root / "TroveServer/Tests/TroveServerTests/Resources/HealthKitPointEvent.json").read_text())
+        self.assertFalse(any(entry["resource"]["resourceType"] == "Patient" for entry in bundle["entry"]))
+        subject = next(entry["resource"]["subject"]["identifier"] for entry in bundle["entry"]
+                       if entry["resource"]["resourceType"] == "Observation")
+        self.assertEqual(logical_participant(bundle), subject)
+
+    def test_ambiguous_or_incomplete_logical_participant_cannot_be_rebound(self):
+        reference = {"type": "Patient", "identifier": {"system": "urn:participant", "value": "first"}}
+        first = {"resource": {"subject": reference}}
+        other = {"resource": {"subject": {**reference, "identifier": {"system": "urn:participant", "value": "other"}}}}
+        incomplete = {"resource": {"subject": {"type": "Patient", "identifier": {"value": "first"}}}}
+        for entries in ([], [first, other], [incomplete]):
+            with self.subTest(entries=entries), self.assertRaisesRegex(ValueError, "one complete logical Patient identity"):
+                logical_participant({"entry": entries})
+        self.assertEqual(logical_participant({"entry": [first, copy.deepcopy(first)]}), reference["identifier"])
+        self.assertIsNone(logical_participant({"entry": []}, allow_absent=True))
+        with self.assertRaises(ValueError):
+            logical_participant({"entry": [first, other]}, allow_absent=True)
+
     def test_recovers_complete_context_including_noninitial_epoch(self):
         arguments = recovered_arguments(recovery_fixture())
         self.assertEqual(arguments["identity_key"], bytes(reversed(range(32))))

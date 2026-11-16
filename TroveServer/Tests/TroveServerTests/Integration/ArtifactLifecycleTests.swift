@@ -13,7 +13,7 @@ import Testing
 @testable import TroveServer
 
 
-private actor ArtifactStorage: ObjectStorageProvider {
+private actor ArtifactStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private var beforeUpload: (@Sendable () async throws -> Void)?
     private(set) var deleted: [String] = []
@@ -23,14 +23,14 @@ private actor ArtifactStorage: ObjectStorageProvider {
     func failDeletes(_ value: Bool) { failDeletion = value }
     func contains(_ key: String) -> Bool { objects[key] != nil }
 
-    func upload(data: Data, key: String, contentType: String) async throws {
+    func uploadBuffered(data: Data, key: String, contentType: String) async throws {
         let action = beforeUpload
         beforeUpload = nil
         try await action?()
         objects[key] = data
     }
 
-    func download(key: String, maximumBytes: Int) throws -> Data {
+    func downloadBuffered(key: String, maximumBytes: Int) throws -> Data {
         guard let data = objects[key] else { throw ServerError.notFound("Synthetic artifact missing") }
         return data
     }

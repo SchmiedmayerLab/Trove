@@ -1,0 +1,4 @@
+SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+SPDX-License-Identifier: MIT
+
+Source: Grove Tests/GroveHealthKitFHIRTests/Resources/Goldens/heartbeat-series-sync-identifier-disclosure.json

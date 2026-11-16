@@ -10,6 +10,7 @@ import Crypto
 import Fluent
 import Foundation
 import SQLKit
+import TroveAPITypes
 
 
 /// Immutable point-event history and exact study grants. Revision selection never grants authority.
@@ -29,20 +30,9 @@ struct ClinicalEventStore: Sendable {
     /// this availability count does not authorize disclosure of an entire supporting response or Bundle.
     func effectiveGrantCount(studyID: UUID, currentOnly: Bool = true) async throws -> Int {
         let sql = try sql(on: database)
-        let selection: SQLQueryString = currentOnly ? ClinicalRecordStore.currentPredicate(on: sql) : "1 = 1"
+        let eligible = StudyDataQuery.eligibleOutputs(studyID: studyID, versions: currentOnly ? .current : .history, on: sql)
         let row = try await sql.raw("""
-            SELECT COUNT(DISTINCT g.node_id) AS count FROM study_data_grants g
-            JOIN enrollments e ON e.id = g.enrollment_id AND e.study_id = g.study_id
-            JOIN enrollment_consents c ON c.id = g.consent_id AND c.enrollment_id = e.id AND c.revision = g.revision
-            JOIN published_studies p ON p.id = g.publication_id AND p.study_id = g.study_id AND p.revision = g.revision
-            JOIN clinical_event_nodes n ON n.id = g.node_id
-            JOIN clinical_point_facts f ON f.node_id = n.id
-            JOIN clinical_record_events r ON r.event_id = n.event_id
-            JOIN source_bindings s ON s.id = n.source_id AND s.participant_id = e.participant_id
-            WHERE g.study_id = \(bind: studyID) AND e.withdrawn_at IS NULL
-                AND NOT EXISTS (SELECT 1 FROM clinical_record_retractions t WHERE t.record_id = f.record_id)
-                AND \(selection)
-                AND \(ClinicalGraphStore.disclosurePredicate)
+            WITH eligible AS (\(eligible)) SELECT COUNT(*) AS count FROM eligible
             """)
             .first()
         guard let row else { throw ServerError.unexpectedError }
@@ -73,7 +63,7 @@ struct ClinicalEventStore: Sendable {
                 let receivedAt = Date()
                 let grants = ClinicalGrantStore(database: transaction, source: source, context: context, acceptedAt: receivedAt)
                 let authorities = try await grants.authorities(
-                    outputs: event.outputs.map { .init(fullURL: $0.fullURL, profile: $0.profile, effectiveAt: $0.effectiveAt) },
+                    outputs: event.collectionOutputs,
                     intent: intent,
                     requireCustodyCoverage: true
                 )
@@ -110,7 +100,7 @@ struct ClinicalEventStore: Sendable {
               Set(event.nodes.map(\.ordinal)) == Set(0..<event.nodes.count),
               Set(event.outputs.map(\.fullURL)).count == event.outputs.count,
               event.outputs.allSatisfy({ output in
-                  event.nodes.contains { $0.fullURL == output.fullURL && $0.resourceType == "Observation" }
+                  event.nodes.contains { $0.fullURL == output.fullURL && $0.resourceType == output.value.resourceType }
               }) else {
             throw ServerError.badRequest("Unsupported or unbounded immutable point event")
         }
@@ -143,8 +133,10 @@ struct ClinicalEventStore: Sendable {
         let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID, epoch: source.keyEpoch)
         // Registered source ownership establishes authority; knowledge of an opaque version does not.
         let lifecycleSystem = event.retraction == nil ? namespaces.recordVersion : namespaces.recordRetraction
+        let nativeSystem = try Components.Schemas.ParticipantSource(source).nativeRecordIdentifierSystem().rawValue
         guard event.eventIdentifierSystem == lifecycleSystem.rawValue,
               event.deploymentIdentifiers.matches(namespaces),
+              event.nativeRecordIdentifiers.allSatisfy({ $0.system == nativeSystem }),
               event.retraction == nil ? event.participants == [participant] : event.participants.isEmpty else {
             throw ServerError.forbidden("Event identity does not match the registered participant source")
         }
@@ -186,12 +178,13 @@ struct ClinicalEventStore: Sendable {
                 let bindingID = try await records.bind(
                     output.sourceOutputIdentifier, recordID: recordID, sourceID: receipt.sourceID, eventID: receipt.eventID
                 )
-                try await records.insertPoint(output, nodeID: nodeID, recordID: recordID, bindingID: bindingID, receipt: receipt)
+                try await records.insertOutput(output, nodeID: nodeID, recordID: recordID, bindingID: bindingID, receipt: receipt)
                 for authority in authorities where authority.outputs.contains(node.fullURL) {
                     _ = try await grants.insert(authority, nodeID: nodeID)
                 }
             }
         }
+        try await ClinicalRecordingStore.retain(event.recordings, nodes: nodeIDs, source: acceptance.source, on: transaction)
         try await ClinicalGraphStore(sql: sql).insert(event, nodeIDs: nodeIDs, receipt: receipt)
         try await AuditRepository.recordMutation(.init(
             context: acceptance.context.auditContext,

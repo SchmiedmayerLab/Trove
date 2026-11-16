@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import TroveAPIClient
+import TroveAPITypes
 
 
 enum Config {
@@ -85,5 +87,24 @@ extension Config {
             }
             return url
         }
+    }
+}
+
+
+extension Config {
+    /// Signed application configuration; debug launch overrides exercise bounded-capacity behavior.
+    static func collectionCapacity() throws -> EventDeliveryCapacityConfiguration {
+        let key = "TroveCollectionCapacity"
+        var values: [String: String] = [:]
+        if let configured = Bundle.main.object(forInfoDictionaryKey: key) {
+            guard let settings = configured as? [String: String] else { throw DeliveryJournalError.invalidConfiguration }
+            values = settings
+        }
+        #if DEBUG
+        for setting in CollectionCapacitySetting.allCases {
+            if let value = ProcessInfo.processInfo.environment[setting.rawValue] { values[setting.rawValue] = value }
+        }
+        #endif
+        return try EventDeliveryCapacityConfiguration(settings: values)
     }
 }

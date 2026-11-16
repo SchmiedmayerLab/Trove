@@ -17,7 +17,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
         RAISE EXCEPTION 'The authoritative database requires operator-installed TimescaleDB';
     END IF;
-    IF (SELECT count(*) FROM _fluent_migrations) <> 17
+    IF (SELECT count(*) FROM _fluent_migrations) <> 18
        OR (SELECT count(DISTINCT name) FROM _fluent_migrations WHERE name IN (
         'TroveServer.CreateGroups', 'TroveServer.CreateStudy', 'TroveServer.CreateComponents',
         'TroveServer.CreateComponentSchedules', 'TroveServer.CreateStoredArtifacts',
@@ -25,8 +25,9 @@ BEGIN
         'TroveServer.CreateSourceIdentityKeys', 'TroveServer.CreateSourceInstallations',
         'TroveServer.CreateInvitationCodes', 'TroveServer.CreateEnrollments',
         'TroveServer.CreateEnrollmentConsents', 'TroveServer.CreateAuditEvents', 'TroveServer.CreateClinicalEvents',
+        'TroveServer.CreateRecordingTransfers',
         'TroveServer.CreateStudyDelegations', 'TroveServer.CreateStudyPublicationCandidates'
-    )) <> 17 THEN
+    )) <> 18 THEN
         RAISE EXCEPTION 'The database schema is incomplete';
     END IF;
     IF to_regclass('public.fhir_resources') IS NOT NULL

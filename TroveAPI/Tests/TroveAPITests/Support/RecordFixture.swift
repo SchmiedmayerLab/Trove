@@ -15,8 +15,10 @@ import Testing
 enum RecordFixture {
     /// The Grove 0.3.0-beta.11 minimal heart-rate record with synthetic test identities.
     /// These test values exercise graph shape and custody, not keyed producer-conformance verification.
-    static func make(sourceID: UUID, registrationID: UUID, seed: String, note: String? = nil, sourceSeed: String? = nil) throws -> ExchangeRecord {
-        let url = try #require(Bundle.module.url(forResource: "record-heart-rate", withExtension: "json"))
+    static func make(
+        sourceID: UUID, registrationID: UUID, seed: String, note: String? = nil, sourceSeed: String? = nil, fixture: String = "record-heart-rate"
+    ) throws -> ExchangeRecord {
+        let url = try #require(Bundle.module.url(forResource: fixture, withExtension: "json"))
         let original = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         let keyID = registrationID.uuidString.lowercased()
         let digest = Data(SHA256.hash(data: Data(seed.utf8))).base64EncodedString()

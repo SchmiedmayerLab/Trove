@@ -125,9 +125,9 @@ struct ClinicalRecordSchemaTests {
             await #expect {
                 try await sql.raw("""
                     INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                        quantity_value, quantity_system, quantity_code, code_system, code)
+                        value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
                     SELECT n.id, n.source_id, n.event_id, f.record_id, f.output_binding_id, f.profile, f.effective_at,
-                        f.quantity_value, f.quantity_system, f.quantity_code, f.code_system, f.code
+                        f.value_kind, f.quantity_value, f.quantity_system, f.quantity_code, f.code_system, f.code
                     FROM clinical_point_facts f CROSS JOIN clinical_event_nodes n
                     WHERE f.event_id = \(bind: receipts.0.eventID) AND n.event_id = \(bind: receipts.1.eventID) AND n.ordinal = 0
                     """)

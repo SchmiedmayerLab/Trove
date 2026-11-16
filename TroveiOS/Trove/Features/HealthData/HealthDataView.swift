@@ -27,17 +27,25 @@ struct HealthDataView: View {
                     Button("Sync Available Data") { action = .sync }
                         .disabled(model.isBusy || model.status == .notSetUp)
                 }
+                SavedCollectionSection()
                 HealthDataExplanationView()
             }
             .disabled(model.status == .signedOut || scenePhase != .active)
             .navigationTitle("Health Data")
-            .refreshable { await model.run(.refresh) }
-            .task { await model.run(.refresh) }
+            .refreshable {
+                await model.run(.refresh)
+                await model.refreshCollectionSettings()
+            }
+            .task(id: model.sessionSnapshot) {
+                await model.run(.refresh)
+                await model.refreshCollectionSettings()
+            }
             .task(id: scenePhase == .active ? action : nil) {
                 guard scenePhase == .active, let action else {
                     return
                 }
                 await model.run(action)
+                await model.refreshCollectionSettings()
                 self.action = nil
             }
         }
