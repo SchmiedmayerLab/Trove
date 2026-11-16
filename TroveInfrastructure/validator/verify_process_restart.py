@@ -34,11 +34,12 @@ from datetime import datetime, timezone
 from rekey_fixture import recovered_arguments
 
 ROOT = Path(__file__).resolve().parents[2]
+KEYCLOAK_VERSION = "26.8.2"
 KEYCLOAK_SHA = "dd124787283918bc597628887168333465ee2a811a389e0003569e52be7e487f"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 PDF = b"%PDF-1.4 Synthetic process-restart consent evidence"
 POSTGRES_IMAGE = "timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a"
-STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0"
+STORAGE_IMAGE = "chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15"
 
 # The relay can reach only its fixed worker destination in this implementation.
 # The worker itself has only the internal network, without Internet egress.
@@ -331,7 +332,7 @@ class Checkpoint:
     def prepare_keycloak(self, *, participant_usernames=()):
         with tarfile.open(self.args.keycloak_archive) as archive:
             archive.extractall(self.evidence, filter="data")
-        home = self.evidence / "keycloak-26.8.2"
+        home = self.evidence / f"keycloak-{KEYCLOAK_VERSION}"
         realm = json.loads((ROOT / "TroveInfrastructure/docker/keycloak/realm.json").read_bytes())
         existing = {user["username"] for user in realm["users"]}
         require(len(set(participant_usernames)) == len(participant_usernames)

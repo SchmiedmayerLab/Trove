@@ -302,6 +302,48 @@ class DeploymentContractTests(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assertRegex(tag, rf"^{re.escape(production)}-pg1[78]$")
 
+    def test_duplicated_pins_stay_identical(self):
+        repository = ROOT.parent
+        def references(pattern, *paths):
+            return [match for path in paths for match in re.findall(pattern, (repository / path).read_text())]
+
+        keycloak = set(references(r"quay\.io/keycloak/keycloak:(\S+)", "TroveInfrastructure/docker/docker-compose.yml",
+                                  "TroveInfrastructure/infrastructure/base/keycloak/keycloak.yaml"))
+        self.assertEqual(len(keycloak), 1)
+        version = re.fullmatch(r"(\d+\.\d+\.\d+)-\d+@sha256:[0-9a-f]{64}", keycloak.pop()).group(1)
+        workflow = (repository / ".github/workflows/build-and-test.yml").read_text()
+        verifier = (ROOT / "validator/verify_process_restart.py").read_text()
+        checksum = re.search(r"KEYCLOAK_SHA256: ([0-9a-f]{64})", workflow).group(1)
+        self.assertIn(f"KEYCLOAK_VERSION: {version}\n", workflow)
+        self.assertIn(f'KEYCLOAK_VERSION = "{version}"', verifier)
+        self.assertIn(f'KEYCLOAK_SHA = "{checksum}"', verifier)
+        self.assertIn(f"^{checksum}$", (repository / ".gitleaks.toml").read_text())
+        for readme in ("TroveInfrastructure/validator/README.md", "TroveServer/Benchmarks/README.md"):
+            self.assertEqual(set(references(r"keycloak-(\d+\.\d+\.\d+)\.tar\.gz", readme)), {version})
+
+        vault = references(r"image: (hashicorp/vault:\S+)", "TroveInfrastructure/infrastructure/dev/vault-server.yaml",
+                           "TroveInfrastructure/infrastructure/dev/vault-seed-jobs.yaml")
+        self.assertEqual(len(vault), 6)
+        self.assertEqual(len(set(vault)), 1)
+        self.assertRegex(vault[0], r":\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$")
+
+        storage = references(r"chrislusf/seaweedfs:\S+?@sha256:[0-9a-f]{64}", "TroveInfrastructure/docker/docker-compose.yml",
+                             "TroveInfrastructure/infrastructure/dev/seaweedfs.yaml", ".github/workflows/swift-package.yml",
+                             "TroveInfrastructure/validator/verify_process_restart.py")
+        self.assertEqual(len(storage), 4)
+        self.assertEqual(len(set(storage)), 1)
+
+        operator = yaml.safe_load((ROOT / "argocd-apps/base/cnpg-operator.yaml").read_text())["spec"]["source"]
+        operator_version = re.fullmatch(r"(\d+\.\d+\.\d+)@sha256:[0-9a-f]{64}", operator["helm"]["valuesObject"]["image"]["tag"]).group(1)
+        self.assertIn(f"CloudNativePG {operator_version} (chart {operator['targetRevision']})", (ROOT / "README.md").read_text())
+        clusters = references(r"cloudnative-pg/postgresql:(\d+)\.\d+-minimal-(\w+)@sha256:[0-9a-f]{64}",
+                              "TroveInfrastructure/infrastructure/base/db/cluster.yaml",
+                              "TroveInfrastructure/infrastructure/base/db/keycloak-cluster.yaml")
+        extensions = references(r"timescaledb-oss:\d+\.\d+\.\d+-(\d+)-(\w+)@sha256:[0-9a-f]{64}",
+                                "TroveInfrastructure/infrastructure/prod/patches/db-cluster.yaml")
+        self.assertEqual(len(clusters), 2)
+        self.assertEqual(set(clusters), set(extensions))
+
     def test_only_the_schema_owner_can_provision_runtime_roles(self):
         database = named(self.rendered["infrastructure", "prod"], "Cluster", "trove-db")["spec"]
         self.assertNotIn("managed", database)

@@ -123,7 +123,10 @@ class VerificationInputTests(unittest.TestCase):
     def test_dependency_updates_point_at_manifests(self):
         source = (ROOT / ".github/dependabot.yml").read_text()
         updates = re.findall(r'package-ecosystem: "([^"]+)"\s+directory: "([^"]+)"', source)
-        self.assertEqual(len(updates), 12)
+        self.assertEqual(len(updates), 17)
+        self.assertIn(("docker-compose", "/TroveServer/Benchmarks"), updates)
+        for directory in ("infrastructure/base/keycloak", "infrastructure/dev", "database-operator", "argocd-apps/dev"):
+            self.assertIn(("docker", "/TroveInfrastructure/" + directory), updates)
         self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
@@ -139,7 +142,12 @@ class VerificationInputTests(unittest.TestCase):
         }
         for ecosystem, directory in updates:
             with self.subTest(ecosystem=ecosystem, directory=directory):
-                self.assertTrue(list((ROOT / directory.lstrip("/")).glob(manifests[ecosystem])))
+                path = ROOT / directory.lstrip("/")
+                found = list(path.glob(manifests[ecosystem]))
+                if ecosystem == "docker" and not found:
+                    # Kubernetes manifests with pinned images.
+                    found = [item for item in path.glob("*.yaml") if re.search(r"image: \S+@sha256:", item.read_text())]
+                self.assertTrue(found)
 
     def test_validator_runtime_images_match_the_manifest(self):
         # Dependabot updates only the Dockerfile; the manifest identity must change with it.
@@ -288,14 +296,6 @@ class VerificationInputTests(unittest.TestCase):
                 self.assertIn(f'"${checksum}"', step)
                 self.assertLess(step.index("sha256sum --check --strict"), step.index("/usr/local/bin"))
 
-    def test_dev_stack_uses_declared_node_version(self):
-        package = json.loads((ROOT / "TroveWeb/package.json").read_text())
-        workflow = (ROOT / ".github/workflows/dev-stack.yml").read_text()
-        install = workflow.index("- name: Install the web dependencies")
-        setup = workflow.index("- uses: actions/setup-node@")
-        self.assertLess(setup, install)
-        self.assertIn(f'node-version: {package["engines"]["node"]}', workflow[setup:install])
-
     def test_opentofu_uses_the_committed_provider_lock(self):
         workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
         self.assertIn("tofu init -backend=false -lockfile=readonly", workflow)
@@ -306,6 +306,14 @@ class VerificationInputTests(unittest.TestCase):
             self.assertRegex(block, r'version\s+= "\d+\.\d+\.\d+"')
             self.assertIn('"h1:', block)
             self.assertIn('"zh:', block)
+
+    def test_dev_stack_uses_declared_node_version(self):
+        package = json.loads((ROOT / "TroveWeb/package.json").read_text())
+        workflow = (ROOT / ".github/workflows/dev-stack.yml").read_text()
+        install = workflow.index("- name: Install the web dependencies")
+        setup = workflow.index("- uses: actions/setup-node@")
+        self.assertLess(setup, install)
+        self.assertIn(f'node-version: {package["engines"]["node"]}', workflow[setup:install])
 
     def test_e2e_coverage_preserves_test_and_report_failures(self):
         command = json.loads((ROOT / "TroveWeb/package.json").read_text())["scripts"]["test:e2e:coverage"]

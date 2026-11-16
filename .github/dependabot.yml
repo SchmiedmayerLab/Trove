@@ -126,6 +126,57 @@ updates:
       compatible-updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+  - package-ecosystem: "docker-compose"
+    directory: "/TroveServer/Benchmarks"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  # Kubernetes manifests; tests keep duplicated pins in other files identical.
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/infrastructure/base/keycloak"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/infrastructure/dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/database-operator"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "docker"
+    directory: "/TroveInfrastructure/argocd-apps/dev"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      compatible-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "terraform"
     directory: "/TroveInfrastructure/terraform"
     schedule:
