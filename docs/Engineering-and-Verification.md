@@ -90,7 +90,7 @@ candidate does not deploy it.
 Use disposable Docker services for integration and a local Kubernetes setup for
 orchestration checks. Exercise the real identity provider, database, object store
 and validator. Test interrupted writes, repeated delivery, withdrawal and recovery
-before selecting a hosting provider.
+against these services.
 
 The application connects through PostgreSQL, S3-compatible storage and OIDC.
 Cloud SDKs and Kubernetes APIs stay in deployment adapters. A Kubernetes base can
@@ -106,17 +106,3 @@ permissions before serving records or resuming external work.
 
 A participant-facing deployment requires research and operational owners,
 approved content, a supported device matrix and defined acceptance measures.
-Enabled inference services additionally require approved processing routes,
-access controls and usage limits.
-
-## Assisted Workflows
-
-Researcher tools use the same authorized API as manual operations. Record the
-initiating researcher and executing client, preserve source citations, and apply
-proposals through revision-checked updates. Documents and model output cannot
-grant permissions.
-
-Keep deterministic contract tests separate from model evaluations. Evaluate
-source fidelity, unresolved ambiguity, correction effort and cost using a bounded
-synthetic corpus. Require separate authorization for publication, participant
-contact, allocation, exports and credential changes.

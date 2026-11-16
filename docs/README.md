@@ -14,7 +14,7 @@ SPDX-License-Identifier: MIT
 
 <div class="trove-hero" markdown>
 
-# Study management for digital health research
+# Trove
 
 Configure studies in the web dashboard, publish reviewed revisions, and enroll
 participants through the iOS app. Trove supports study information, consent,

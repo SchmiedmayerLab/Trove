@@ -143,6 +143,9 @@ jobs:
     name: iOS
     needs: changes
     if: needs.changes.outputs.ios == 'true'
+    # xcodebuild.yml v0.5 has no strict package resolution option and tolerates errors in
+    # its resolution step, so this job does not enforce the iOS Package.resolved. The
+    # real-stack UI job resolves strictly but does not prove this job used the same graph.
     uses: SchmiedmayerLab/.github/.github/workflows/xcodebuild.yml@v0.5
     permissions:
       contents: read
