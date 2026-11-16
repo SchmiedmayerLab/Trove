@@ -211,8 +211,8 @@ jobs:
       - name: Install the native test stack
         shell: bash
         env:
-          KEYCLOAK_VERSION: 26.8.0
-          KEYCLOAK_SHA256: 9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a
+          KEYCLOAK_VERSION: 26.8.2
+          KEYCLOAK_SHA256: dd124787283918bc597628887168333465ee2a811a389e0003569e52be7e487f
         run: |
           if ! brew list --versions openjdk@21 >/dev/null; then
             brew install openjdk@21

@@ -69,7 +69,7 @@ class VerificationInputTests(unittest.TestCase):
     def test_linux_verification_and_release_use_the_same_pinned_swift_image(self):
         dockerfile = (ROOT / "TroveServer/Dockerfile").read_text()
         workflow = (ROOT / ".github/workflows/swift-package.yml").read_text()
-        image_pattern = r"swift:6\.4\.0-noble@sha256:[a-f0-9]{64}"
+        image_pattern = r"swift:6\.4\.2-noble@sha256:[a-f0-9]{64}"
         build_images = re.findall(image_pattern, dockerfile)
         self.assertEqual(len(build_images), 1)
         self.assertEqual(re.findall(image_pattern, workflow), build_images * 2)
