@@ -268,8 +268,9 @@ class DeploymentContractTests(unittest.TestCase):
         documents = self.rendered["infrastructure", "prod"]
         database = named(documents, "Cluster", "trove-db")["spec"]
         identity = named(documents, "Cluster", "keycloak-db")["spec"]
-        self.assertEqual(database["imageName"], identity["imageName"])
+        # TimescaleDB 2.32.0 supports PostgreSQL up to 18.6; the identity database has no extension.
         self.assertRegex(database["imageName"], r"postgresql:18\.6-minimal-trixie@sha256:[a-f0-9]{64}$")
+        self.assertRegex(identity["imageName"], r"postgresql:18\.7-minimal-trixie@sha256:[a-f0-9]{64}$")
         self.assertFalse(database["enableSuperuserAccess"])
         engine = database["postgresql"]
         self.assertEqual(engine["shared_preload_libraries"], ["timescaledb"])
@@ -284,6 +285,22 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(installation["owner"], database["bootstrap"]["initdb"]["owner"])
         self.assertEqual(installation["extensions"], [{"name": "timescaledb", "version": "2.32.0"}])
         self.assertFalse(any(item["kind"] == "Database" for item in self.rendered["infrastructure", "dev"]))
+
+    def test_development_and_test_timescale_match_the_production_extension(self):
+        documents = self.rendered["infrastructure", "prod"]
+        extension = named(documents, "Cluster", "trove-db")["spec"]["postgresql"]["extensions"][0]["image"]["reference"]
+        production = re.search(r"timescaledb-oss:(\d+\.\d+\.\d+)-18-", extension).group(1)
+        installed = named(documents, "Database", "trove")["spec"]["extensions"][0]["version"]
+        self.assertEqual(installed, production)
+        paths = ["docker/docker-compose.yml", "infrastructure/dev/timescale.yaml", "database-operator/job.yaml",
+                 "validator/verify_process_restart.py", "../TroveServer/Benchmarks/docker-compose.yml",
+                 "../.github/workflows/swift-package.yml"]
+        references = [match for path in paths
+                      for match in re.findall(r"timescale/timescaledb:(\S+?)@sha256:[0-9a-f]{64}", (ROOT / path).read_text())]
+        self.assertGreaterEqual(len(references), 7)
+        for tag in references:
+            with self.subTest(tag=tag):
+                self.assertRegex(tag, rf"^{re.escape(production)}-pg1[78]$")
 
     def test_only_the_schema_owner_can_provision_runtime_roles(self):
         database = named(self.rendered["infrastructure", "prod"], "Cluster", "trove-db")["spec"]

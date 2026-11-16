@@ -13,7 +13,7 @@ volumes:
 
 services:
   server-db:
-    image: timescale/timescaledb:latest-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a
+    image: timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a
     volumes:
       - server_authority_data:/pgdata
       - ./init/010-timescale.sql:/docker-entrypoint-initdb.d/010-trove-timescale.sql:ro
@@ -176,7 +176,7 @@ services:
         condition: service_healthy
 
   server-grants:
-    image: timescale/timescaledb:latest-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a
+    image: timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a
     entrypoint: ["bash", "/operator/grant-runtime.sh"]
     environment:
       PGHOST: server-db

@@ -68,7 +68,7 @@ jobs:
       VALIDATOR_RELAY: trove-test-validator-relay-${{ github.run_id }}-${{ github.run_attempt }}
       VALIDATOR_NETWORK: trove-test-validator-${{ github.run_id }}-${{ github.run_attempt }}
       # Exercise supported PG17 here; the development stack and native checks use PG18.
-      TIMESCALE_IMAGE: timescale/timescaledb:latest-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
+      TIMESCALE_IMAGE: timescale/timescaledb:2.32.0-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
       SWIFT_IMAGE: swift:6.4.2-noble@sha256:23d9b28ad97fb1cf1999edc3a0cb265ee915ed42299a9344e7173d5a6d2b05f4
       STORAGE_IMAGE: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     steps:

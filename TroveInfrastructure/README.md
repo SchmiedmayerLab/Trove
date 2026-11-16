@@ -84,8 +84,9 @@ Production uses CloudNativePG 1.30.1 (chart 0.29.1), PostgreSQL 18.6 and Timesca
 requires Kubernetes 1.35 or later and a compatible runtime (containerd 2.1+ or
 CRI-O 1.31+). Confirm ImageVolume support before bootstrap. The PostgreSQL and
 extension images both target PostgreSQL 18 on Debian Trixie; do not mix their OS,
-major version or architecture. Keycloak uses the same PostgreSQL image without
-the clinical extension.
+major version or architecture. Keycloak's database has no extension and uses
+PostgreSQL 18.7, the newest minimal Trixie image; the clinical database stays on
+18.6, the newest release TimescaleDB 2.32.0 supports.
 
 The Cluster preloads TimescaleDB and disables its telemetry. The `Database/trove`
 resource installs the extension at the pinned SQL version. On first installation,

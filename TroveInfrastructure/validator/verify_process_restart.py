@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 KEYCLOAK_SHA = "dd124787283918bc597628887168333465ee2a811a389e0003569e52be7e487f"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 PDF = b"%PDF-1.4 Synthetic process-restart consent evidence"
-POSTGRES_IMAGE = "timescale/timescaledb:latest-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a"
+POSTGRES_IMAGE = "timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a"
 STORAGE_IMAGE = "chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0"
 
 # The relay can reach only its fixed worker destination in this implementation.

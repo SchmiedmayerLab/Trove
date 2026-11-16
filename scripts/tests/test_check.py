@@ -98,7 +98,7 @@ class VerificationInputTests(unittest.TestCase):
         compose = (ROOT / "TroveInfrastructure/docker/docker-compose.yml").read_text()
         self.assertIn("server_authority_data:/pgdata", compose)
         self.assertIn("PGDATA: /pgdata", compose)
-        self.assertIn("timescale/timescaledb:latest-pg18@sha256:", compose)
+        self.assertIn("timescale/timescaledb:2.32.0-pg18@sha256:", compose)
         self.assertNotIn("server_db_data", compose)
         self.assertNotIn("server_timescale_data", compose)
         self.assertNotIn("server-timescale", compose)
