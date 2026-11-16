@@ -13,11 +13,10 @@ SPDX-License-Identifier: MIT
 [![REUSE status](https://api.reuse.software/badge/github.com/SchmiedmayerLab/Trove)](https://github.com/SchmiedmayerLab/Trove/actions/workflows/repository-standards.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
-**Study management for digital health research. Open source, built with Swift and Grove.**
-
-Define a study in the web dashboard, then make it available to participants in the
-iOS app. Trove brings study information, eligibility, enrollment, consent and
-health-data collection into one platform.
+Trove is open-source study management software for digital health research, built
+with Swift and Grove. Define a study in the web dashboard, then make it available to
+participants in the iOS app. Trove brings study information, eligibility,
+enrollment, consent and health-data collection into one platform.
 
 ## Capabilities
 
@@ -68,7 +67,6 @@ under the accepted study settings, and withdrawal stops it on the device at once
   </tr>
 </table>
 
-Trove is in beta and is being actively tested and used at Stanford.
 These screenshots use a fictional Daily Activity
 Study and synthetic participant data. The [tour](docs/Platform-Tour.md) walks through
 each workflow.
@@ -107,7 +105,7 @@ for storage, authorization and synchronization details.
 
 ## Studies and Revisions
 
-A study is a set of components a researcher configures and combines: informational content, questionnaires, and health-data collection, each with its own schedule and eligibility rules. Publishing freezes the current definition into a numbered revision. Enrollments point at a revision rather than at the editable study, so later edits do not change the terms a participant accepted.
+A study is a set of components a researcher configures and combines: informational content, questionnaires, and health-data collection, each with its own schedule and eligibility rules. Publishing freezes the current definition into a numbered revision. Enrollments point at a revision, so later edits to the study do not change the terms a participant accepted.
 
 ## Data Storage
 

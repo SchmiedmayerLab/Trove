@@ -71,7 +71,7 @@ in the native app before authorizing collection.
 Discover published studies, review the details, and provide consent in the iOS app.
 HealthKit collection, and SensorKit collection where a deployment enables it,
 continues offline under the accepted study settings. Study-specific apps
-can integrate through the API rather than adopting Trove's participant interface.
+can integrate through the same API with their own participant interface.
 
 <div class="trove-phones">
   <figure><picture><source media="(prefers-color-scheme: dark)" srcset="images/mobile/studies~dark.png"><img src="images/mobile/studies.png" alt="Study discovery in the Trove iOS app" loading="lazy" width="260"></picture><figcaption>Discover a study</figcaption></figure>
@@ -98,10 +98,9 @@ define the exchange contracts.
 
 <section class="trove-section" markdown>
 
-## Beta Release
+## Contributing
 
-Trove is in beta and is being actively tested and used at Stanford.
-The [tour](Platform-Tour.md) documents the current interfaces.
+The source code, issues and contribution guidelines are on GitHub.
 
 [Contribute on GitHub](https://github.com/SchmiedmayerLab/Trove){ .md-button .md-button--primary }
 
