@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT
 
 Provider collection uses deployment-approved registrations and participant-linked accounts. A registration declares its controller, region, OAuth client, approved HTTPS callbacks, source tokens and scopes. A study selects the exact registration, source token and output profile. Linking an account does not authorize collection by itself: the worker also checks accepted study requirements and current enrollment authority.
 
-The runtime currently qualifies the Withings numeric `getmeas` client. The capability endpoint intersects approved registration tokens with this implemented acquisition client and the converter's exact output profiles. Oura and Google authorization clients do not by themselves qualify their clinical endpoints. Do not approve a registration for a source whose native identity, time coordinates, selected fields and query coverage have not been qualified.
+The runtime qualifies the Withings numeric `getmeas` client. The capability endpoint intersects approved registration tokens with this implemented acquisition client and the converter's exact output profiles. Oura and Google authorization clients do not by themselves qualify their clinical endpoints. Do not approve a registration for a source whose native identity, time coordinates, selected fields and query coverage have not been qualified.
 
 ## Deployment configuration
 

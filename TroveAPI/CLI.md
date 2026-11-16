@@ -13,8 +13,8 @@ draft, creating and editing a study, importing a localized questionnaire compone
 validating a publication candidate, and explicitly publishing that candidate.
 Researchers with clinical data access can also retrieve study measurement pages
 and download authorized recordings.
-It does not provide browser login, refresh-token storage, delegation management,
-participant access, or the complete dashboard command surface yet.
+It does not provide browser login, refresh-token storage, delegation management
+or participant access.
 
 Build with `swift build --package-path TroveAPI --product trove`. Use `trove --help`
 and each command's `--help` for arguments. The server URL must include the API
@@ -24,8 +24,8 @@ standard error and exit nonzero without printing credentials or server response
 bodies.
 
 Run from SwiftPM's product directory with its adjacent resource bundles. Copying
-only the executable can omit resources required by its dependencies; a distributable
-CLI package or installer is not provided yet.
+only the executable can omit resources required by its dependencies. There is no
+distributable CLI package or installer.
 
 ## Authentication
 

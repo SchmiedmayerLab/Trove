@@ -28,11 +28,8 @@ Install via [Homebrew](https://brew.sh/) or your preferred package manager:
 
 ## Quick Start
 
-**The production deployment is not ready.** The database engine and extension are
-pinned, but production certificate provisioning, enforced network policy, private
-services, recovery and immutable application release images still require acceptance.
-Production selects production transport policy; missing prerequisites must stop
-startup, not trigger a development-mode fallback.
+Production selects the production transport policy. Missing prerequisites stop
+startup; there is no fallback to development mode.
 
 Development and verification SeaweedFS instances use 32 volume slots and disable
 anonymous telemetry. The explicit slot limit permits separate test collections;
@@ -95,11 +92,10 @@ closed if they are missing. These are fresh-database definitions, not in-place
 upgrades.
 
 The maintained extension image contains the Apache-2 edition. It supports the
-current receiver and basic hypertables; it does not provide the additional
+receiver and basic hypertables; it does not provide the additional
 Timescale-licensed features used by the historical compression benchmark. That
-benchmark is not production-capacity evidence. The current clinical facts are
-ordinary indexed tables; partitioning/compression still require measured workload
-and integrity validation before adoption.
+benchmark is not production-capacity evidence. Clinical facts are stored in
+ordinary indexed tables without partitioning or compression.
 
 The schema owner receives only `CREATEROLE` and `pg_read_all_settings` in addition
 to database ownership, through two fixed bootstrap statements. Its Secret username
@@ -206,10 +202,9 @@ request-path logs do not record source/enrollment identifiers. This does not dis
 the transactional study audit trail. Do not enable verbose application or database
 logging against real participant data; reproduce with synthetic fixtures instead.
 
-The commands below describe the retained bootstrap workflow. Local database/job tests
-and manifest validation do not establish complete GitOps, network-policy enforcement,
-validator integration or production readiness. Docker remains the recommended local
-application development setup while those gates are completed:
+The commands below bootstrap the local Kubernetes cluster. Local database and job
+tests and manifest validation do not verify network-policy enforcement or validator
+integration. Use the Docker setup for local application development:
 
 ```bash
 make dev            # Create KIND cluster, bootstrap ArgoCD + all services
