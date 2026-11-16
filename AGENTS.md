@@ -98,8 +98,7 @@ upstream source changes; verify those separately before release.
 Image candidates use `scripts/release-artifact.py` to package and verify the exact
 tested Docker archives. Do not rebuild in the publication job or replace missing
 platform evidence with another architecture's result. Dirty-source packages are
-never publishable. See [candidate publication](docs/Engineering-and-Verification.md#verified-image-candidates)
-for the independent approval boundary and remaining deployment gates.
+never publishable.
 
 The server defaults to isolated SQLite tests. The real-store lane uses disposable
 loopback services selected by `TROVE_TEST_POSTGRES_PORT` and `TROVE_TEST_S3_PORT`;
