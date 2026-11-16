@@ -22,7 +22,7 @@ flowchart TB
     W["Researcher dashboard<br/>React, TypeScript"] --> S
     C["Researcher CLI<br/>Swift"] --> S
     I["Participant app<br/>Swift, SwiftUI"] --> S
-    S["Trove server<br/>HTTPS API · Swift, Vapor"]
+    S["Trove server and HTTPS API<br/>Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
     S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]

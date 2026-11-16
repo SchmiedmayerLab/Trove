@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 
 # API
 
-The shared OpenAPI contract (`openapi.yaml`) and the Swift libraries generated from it: `TroveAPITypes`, `TroveAPIClient`, and `TroveAPIServer`. It is the single source of truth consumed by the server, the iOS app, and — through a generated TypeScript client — the web portal.
+The shared OpenAPI contract (`openapi.yaml`) and the Swift libraries generated from it: `TroveAPITypes`, `TroveAPIClient`, and `TroveAPIServer`. It is the single source of truth consumed by the server, the iOS app, and, through a generated TypeScript client, the web portal.
 
 ## Code generation
 

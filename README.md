@@ -19,8 +19,6 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#local-development) · [Read the Documentation](https://troveplatform.org)
-
 ## Capabilities
 
 - **Study definition.** Study information, eligibility, enrollment, consent,
@@ -84,7 +82,7 @@ flowchart TB
     W["Researcher dashboard<br/>React, TypeScript"] --> S
     C["Researcher CLI<br/>Swift"] --> S
     I["Participant app<br/>Swift, SwiftUI"] --> S
-    S["Trove server<br/>HTTPS API · Swift, Vapor"]
+    S["Trove server and HTTPS API<br/>Swift, Vapor"]
     S --> K["Keycloak<br/>Identity and authentication"]
     S --> PG[("PostgreSQL + TimescaleDB<br/>Study and clinical records")]
     S --> OS[("S3-compatible storage<br/>Bundles, recordings and consent PDFs")]
