@@ -658,8 +658,8 @@ endpoint. The first retraction keeps its lifecycle effect.
 Withdrawal makes only that enrollment's grant ineffective; it does not rewrite the
 event or another study's decision. The receipt contains
 the server record ID, source ID, original producer identifier, SHA-256 of the exact
-accepted bytes, normalized target-intent digest, receipt time and node count, not
-samples or current study access. Clients must match the source, complete producer
+accepted bytes, normalized target-intent digest, receipt time and node count. It
+contains no samples or current study access. Clients must match the source, complete producer
 identifier and both digests to their
 staged event before retiring it; HTTP success alone does not identify accepted work. No participant
 observation-list or general clinical-query endpoint is exposed.

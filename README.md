@@ -111,8 +111,8 @@ A study is a set of components a researcher configures and combines: information
 
 One **PostgreSQL database with TimescaleDB** holds study definitions, enrollments, consent,
 audit records and clinical data. **S3-compatible object storage** holds immutable study
-bundles, collected recordings and signed consent PDFs. A measurement relevant to several
-studies is stored once, and withdrawal from one study does not change another study's data.
+bundles, collected recordings and signed consent PDFs. Withdrawal from one study does not
+change another study's data.
 
 Keycloak is the sole authority for identities, roles, and group membership; all three applications authenticate against it over OpenID Connect and the server validates tokens against its JWKS.
 

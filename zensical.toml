@@ -29,7 +29,6 @@ nav = [
     { "Documentation Site" = "Documentation-Site.md" },
     { "Reproduce the Screenshots" = "images/README.md" },
   ] },
-  { "Milestones" = "https://github.com/SchmiedmayerLab/Trove/milestones" },
 ]
 
 [project.validation]
