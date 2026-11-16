@@ -21,33 +21,26 @@ health-data collection into one platform.
 
 [Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Read the Documentation](https://troveplatform.org)
 
-## Why Trove
+## Capabilities
 
-A digital health study needs more than an app: participants must find it, check
-their eligibility, enroll and consent before any data is collected, and researchers
-need that data in a form they can trust and retrieve. Trove covers that whole path
-on one open-source platform.
-
-- **One study definition.** Information, eligibility, enrollment, consent,
-  questionnaires and health-data collection are configured together and published
-  as a reviewed revision.
-- **Terms that stay fixed.** Enrollments point at the revision a participant
-  accepted, so later edits never change what they agreed to.
-- **Health data from the sources participants already use.** The iOS app collects
-  HealthKit data and, where a deployment enables it, SensorKit data, and keeps
-  collecting offline. Deployments with approved provider registrations also collect
-  from participants' linked wearable accounts.
-- **Standard exchange.** Health data follows the
-  [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/),
-  so records use a documented FHIR structure rather than an app-specific format. The
-  [event-admission contract](TroveServer/README.md#event-admission) lists the
+- **Study definition.** Study information, eligibility, enrollment, consent,
+  questionnaires and health-data collection are configured in one study and
+  published as a numbered revision.
+- **Revisioned consent.** Enrollments reference the published revision a participant
+  accepted; later draft edits do not change it.
+- **Health-data collection.** The iOS app collects HealthKit data, and SensorKit data
+  where a deployment enables it, and continues collecting offline. Deployments with
+  approved provider registrations also collect data from participants' linked
+  wearable accounts.
+- **FHIR exchange.** Health data follows the
+  [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/).
+  The [event-admission contract](TroveServer/README.md#event-admission) lists the
   supported data and validation requirements.
-- **Access you can account for.** A measurement is stored once and authorized
-  separately for each study. Every data retrieval checks current authority and is
-  audited first.
-- **Open and extensible.** The server, CLI and iOS app are written in Swift and
-  share one typed OpenAPI contract with the web dashboard. Study-specific apps can
-  integrate through the same API. Trove is MIT licensed.
+- **Per-study authorization.** Each measurement is stored once and authorized
+  separately for each study. Every data retrieval checks current authorization and
+  is audited before data is returned.
+- **Open source.** The server, CLI and iOS app are written in Swift and share a
+  generated OpenAPI contract with the web dashboard. Trove is MIT licensed.
 
 ## For Research Teams
 
