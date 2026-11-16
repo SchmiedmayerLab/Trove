@@ -243,9 +243,10 @@ struct AuthIntegrationTests {
         on app: Application
     ) async throws {
         try await app.test(endpoint.method, endpoint.path, beforeRequest: { req in
-            if endpoint.path.contains("/participant/sources/")
+            let sourceWrite = endpoint.path.contains("/participant/sources/")
                 && (endpoint.path.contains("/events") || endpoint.path.hasSuffix("/record-bundles")
-                    || endpoint.path.contains("/recording-transfers/")) {
+                    || endpoint.path.contains("/recording-transfers/"))
+            if sourceWrite || endpoint.path.contains("/collection-reconciliations") {
                 req.sourceInstallation(dummyUUID)
             }
             req.bearerAuth(token)

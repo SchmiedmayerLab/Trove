@@ -103,6 +103,7 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
     ) throws -> ParticipantCollectionState {
         try Task.checkCancellation()
         guard expected.scope == scope else { throw JournalError.wrongScope }
+        guard snapshot.reconciliationExpiresAt == nil else { throw JournalError.invalidConfiguration }
         return try database.transaction {
             let current = try collectionState()
             guard current.revision == expected.revision else { throw JournalError.staleCollectionState }

@@ -39,6 +39,8 @@ struct AuditEvent: Sendable {
         case consentPDFDisclosure = "consent.pdf.disclosure"
         case consentRecordsDisclosure = "consent.records.disclosure"
         case collectionPlanDisclosure = "collection.plan.disclosure"
+        case collectionReconciliationIssued = "collection.reconciliation.issued"
+        case collectionReconciliationCompleted = "collection.reconciliation.completed"
         case enrollmentWithdrawn = "enrollment.withdrawn"
         case studyPublished = "study.published"
         case studyPublicationDisclosure = "study.publication.disclosure"
@@ -63,6 +65,7 @@ struct AuditEvent: Sendable {
         case sourceIdentityDisclosure = "source.identity.disclosure"
         case clinicalEventAccepted = "clinical.event.accepted"
         case clinicalEventAttributed = "clinical.event.attributed"
+        case clinicalRetractionReversed = "clinical.retraction.reversed"
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
         case studyDataGranted = "study.data.granted"
         case studyAuditDisclosure = "study.audit.disclosure"
@@ -93,9 +96,10 @@ struct AuditEvent: Sendable {
             case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .sourceIdentityDisclosure,
-                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalEventReceiptDisclosure:
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
+                 .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
                  .studyDataGranted, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
@@ -114,9 +118,10 @@ struct AuditEvent: Sendable {
                  .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
                  .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
             case .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
+                 .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
-                 .clinicalEventAccepted, .clinicalEventAttributed, .studyDataGranted,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
             }
         }

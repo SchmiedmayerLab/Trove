@@ -20,6 +20,8 @@ public struct ParticipantCollectionSnapshot: Sendable {
     }
 
     let plans: [Components.Schemas.ParticipantCollectionPlan]
+    private let reconciliation: NativeCollectionReconciliation?
+    var reconciliationExpiresAt: Date? { reconciliation?.expiresAt }
 
     /// An active requirement is needed to start another query, even if historical windows remain.
     public var permitsHeartRateAcquisition: Bool {
@@ -49,7 +51,7 @@ public struct ParticipantCollectionSnapshot: Sendable {
     public var heartRateQueryStart: Date? { queryStart(for: .heartRate) }
 
     /// The next authority change during a local query. The journal rechecks it before advancing a cursor.
-    var acquisitionDeadline: Date? { plans.compactMap(\.endsAt).min() }
+    var acquisitionDeadline: Date? { reconciliationExpiresAt ?? plans.compactMap(\.endsAt).min() }
 
     /// Input must contain exactly one response for each requested enrollment.
     public init(plans: [Components.Schemas.ParticipantCollectionPlan], enrollmentIDs: [UUID]) throws {
@@ -62,7 +64,34 @@ public struct ParticipantCollectionSnapshot: Sendable {
             try Self.validate(plan, consentIDs: &consentIDs)
         }
         self.plans = plans.sorted { $0.enrollmentId < $1.enrollmentId }
+        self.reconciliation = nil
     }
+
+    private init(reconciledPlan: Components.Schemas.ParticipantCollectionPlan, reconciliation: NativeCollectionReconciliation) {
+        self.plans = [reconciledPlan]
+        self.reconciliation = reconciliation
+    }
+
+    /// A temporary exact scope; the original enrollment end is preserved and cannot become an offline plan.
+    func reconciling(_ authority: NativeCollectionReconciliation) throws -> Self {
+        guard reconciliationExpiresAt == nil,
+              var selected = plans.first(where: { UUID(uuidString: $0.enrollmentId) == authority.enrollmentID }) else {
+            throw CollectionError.collectionNotAuthorized
+        }
+        let value = authority.instruction
+        selected.windows = selected.windows.filter { $0.consentId == value.consentId }.map { window in
+            var window = window
+            window.requirements = window.requirements.filter {
+                authority.definition.stream.includes($0) && $0.start == value.start && $0.end == value.end
+            }
+            return window
+        }
+        guard selected.windows.count == 1, selected.windows[0].requirements.count == 1 else {
+            throw CollectionError.collectionNotAuthorized
+        }
+        return Self(reconciledPlan: selected, reconciliation: authority)
+    }
+
 
     /// Uses exact half-open measurement windows. A point may be attributable to several studies.
     public func consentIDs(forHeartRateAt instant: Date) throws -> [UUID] {
@@ -87,6 +116,13 @@ public struct ParticipantCollectionSnapshot: Sendable {
               Self.validDate(start), end.map({ Self.validDate($0) && $0 >= start }) ?? true else {
             throw CollectionError.invalidPlan
         }
+        if let authority = reconciliation {
+            guard profile == authority.definition.profile,
+                  requiresWorkoutRoute == (authority.definition.stream == .workoutRoute),
+                  requiresWorkoutRoute || sourceTypeIdentifier == authority.instruction.sourceTypeIdentifier else {
+                return []
+            }
+        }
         // Select the latest eligible consent once per enrollment, including intervals crossing revisions.
         return try plans.compactMap { plan in
             guard let window = plan.windows.reversed().first(where: { window in
@@ -108,13 +144,18 @@ public struct ParticipantCollectionSnapshot: Sendable {
     /// Evaluate the retained enrollment ends locally. Measurement windows alone never expire enrollment.
     public func active(at instant: Date = .now) throws -> Self {
         guard Self.validDate(instant) else { throw CollectionError.invalidPlan }
+        if let deadline = reconciliationExpiresAt {
+            guard instant < deadline else { throw CollectionError.collectionNotAuthorized }
+            return self
+        }
         let active = plans.filter { $0.endsAt.map { instant < $0 } ?? true }
         return try Self(plans: active, enrollmentIDs: active.compactMap { UUID(uuidString: $0.enrollmentId) })
     }
 
     /// Server observation time naturally changes on refresh; enrollment versions and policy must not.
     public func hasSameAuthority(as other: Self) -> Bool {
-        guard plans.count == other.plans.count else {
+        guard reconciliation?.id == other.reconciliation?.id, reconciliation?.definition == other.reconciliation?.definition,
+              reconciliationExpiresAt == other.reconciliationExpiresAt, plans.count == other.plans.count else {
             return false
         }
         return zip(plans, other.plans).allSatisfy { previous, current in
@@ -213,7 +254,11 @@ extension ParticipantCollectionSnapshot {
     }
     /// Whether a current accepted window requests this measurement.
     public func permitsAcquisition(of profile: CollectionObservationProfile, sourceTypeIdentifier: String? = nil) -> Bool {
-        plans.contains { plan in
+        if let authority = reconciliation {
+            return authority.definition.profile == profile && authority.definition.stream != .workoutRoute
+                && sourceTypeIdentifier == authority.instruction.sourceTypeIdentifier
+        }
+        return plans.contains { plan in
             plan.windows.last?.requirements.contains {
                 $0.sourceKind == .participantApp && $0.profile == profile.rawValue
                     && Self.sourceMatches($0, sourceTypeIdentifier: sourceTypeIdentifier ?? profile.nativeSourceTypeIdentifier)
@@ -223,13 +268,19 @@ extension ParticipantCollectionSnapshot {
 
     /// Whether the current accepted requirements request this independently queried stream.
     public func permitsAcquisition(stream: HealthKitQueryDefinition.Stream) -> Bool {
-        plans.contains { $0.windows.last?.requirements.contains(where: stream.includes) == true }
+        if let authority = reconciliation, authority.definition.stream != stream {
+            return false
+        }
+        return plans.contains { $0.windows.last?.requirements.contains(where: stream.includes) == true }
     }
 
     /// A previous accepted requirement can maintain existing records after that requirement is disabled.
     /// Call `active` first; locally stopped enrollments are already absent from the retained snapshot.
     public func permitsRetractions(stream: HealthKitQueryDefinition.Stream) -> Bool {
-        plans.contains { plan in plan.windows.contains { $0.requirements.contains(where: stream.includes) } }
+        if let authority = reconciliation, authority.definition.stream != stream {
+            return false
+        }
+        return plans.contains { plan in plan.windows.contains { $0.requirements.contains(where: stream.includes) } }
     }
 
     /// Earliest nonempty measurement window for a currently requested profile.

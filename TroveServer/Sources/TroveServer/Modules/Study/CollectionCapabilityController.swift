@@ -44,7 +44,7 @@ enum NativeCollectionCapabilities {
         profile: CollectionObservationProfile, source: HealthKitSourceDefinition
     ) throws -> Components.Schemas.CollectionCapability {
         let temporal: Components.Schemas.CollectionCapability.EffectiveTimePayload
-        if profile == .healthKitRecording || profile == .clinicalDocument {
+        if profile == .healthKitRecording || profile == .clinicalDocument || profile == .electrocardiogram {
             temporal = .interval
         } else if let measurement = profile.measurement {
             temporal = switch measurement.effective {

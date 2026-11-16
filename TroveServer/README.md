@@ -138,6 +138,30 @@ per download, defaults to 536870912 (512 MiB), and accepts positive decimal inte
 up to 2147483647. Invalid settings prevent startup. Capacity failure is explicit
 and does not change upload or collection authority.
 
+### Ended sleep and workout windows
+
+`POST /participant/enrollments/{enrollmentId}/collection-reconciliations` lets an
+installation finish a bounded sweep for sessions that were finalized after the
+enrollment ended. The request names the participant's HealthKit source and carries
+the installation proof. Under the participant and enrollment locks the server checks
+ownership, an active source and installation, and that the enrollment has ended and
+is not withdrawn. It then resolves the accepted consent timeline exactly as the
+collection plan does and issues one instruction per closed sleep or workout
+requirement, plus one for workout routes where that consent accepted them. Heart
+rate and other point streams are not eligible. `native_collection_reconciliations`
+keeps one row per source, enrollment and exact scope; a repeated request renews the
+lease of an unfinished row under the same identity, and
+`.../{reconciliationId}/complete` marks it complete idempotently. A completed scope
+is never issued again. Both operations record a study-scoped audit event
+(`collection.reconciliation.issued`, `collection.reconciliation.completed`).
+Issuance grants no upload authority: admission still checks every submitted record
+against its consent window.
+
+`NATIVE_RECONCILIATION_LEASE_SECONDS` sets the lease, 900 seconds by default. It
+must be a positive finite number; an invalid value prevents startup. A lease only
+bounds how long one online request authorizes local querying; unfinished work
+resumes at its retained position after the next request.
+
 The development SeaweedFS service receives the same `S3_ACCESS_KEY` and
 `S3_SECRET_KEY` as the server, through its standard AWS credential variables.
 Authentication is required to verify signed streaming chunks. Its health probe
@@ -537,13 +561,27 @@ a refusal; there is no structural-only fallback. See the [validator setup](../Tr
 
 The receiver supports immutable, single-owner Mobile heart-rate point quantities
 sleep-stage intervals, and complete workout sessions with their segments and statistics, including supported HealthKit and questionnaire-derived
-source graphs, and whole-source-record retractions. Revision selection first removes versions
+source graphs, and whole-source-record retractions. A HealthKit ECG is one source record: a waveform Observation with
+one lead of millivolt SampledData, one classification, an optional algorithm version and its symptoms status and source
+period, plus at most one average heart rate derived from it over exactly its period. The waveform names correlated
+symptoms only by output identity; each symptom is its own record with its own requirement. Revision selection first removes versions
 dominated by a higher writer version under the same complete writer-record identity.
 It then selects the latest exact `Provenance.recorded`; equal instants use the
 bytewise-greater record-version identifier value, then system. Selection preserves
 complete output membership and never carries an earlier study grant forward.
 Retractions suppress every output version of that source record, including later
-arrivals, without reserving unrelated output identities. Other clinical profiles
+arrivals, without reserving unrelated output identities. Because a source record is
+shared by all of the participant's studies and installations, a retraction is
+admitted only as HealthKit's deletion report: from the authenticated owner, through
+an active installation of the participant's HealthKit source. Retractions from any
+other repository are refused, and no server process derives one from missing data.
+A retraction is a tombstone over retained custody; no event, fact or grant is
+removed. `reverse-retraction --event <retraction event ID>` is the operator command
+that lifts one tombstone by appending to `clinical_retraction_reversals`, with a
+mandatory `clinical.retraction.reversed` audit event. It is idempotent, rewrites no
+history, and is not reachable through HTTP. The retraction of a source record has
+one identity, so a repeated report of the same deletion replays the retained
+receipt and does not suppress a reversed record again. Other clinical profiles
 and arbitrary supporting reference shapes remain unsupported.
 Unsupported input is refused,
 even when it is otherwise valid FHIR. A study must explicitly publish the matching collection
@@ -570,7 +608,9 @@ end define a fixed measurement range. Heart-rate points must lie inside the half
 window. A sleep interval or workout session is included whole when it overlaps the window; an interval
 that only touches a boundary is excluded. The receiver preserves the original
 start and end without clipping or changing the source identity. Workout selection includes every segment,
-including segments outside the selected window. Partial workout grants and exports are rejected.
+including segments outside the selected window. Partial workout grants and exports are rejected. An ECG's
+average heart rate is collected under the ECG requirement and its waveform's interval; partial ECG grants and
+exports are rejected in the same way.
 
 Acceptance resolves relative bounds once and stores them atomically in the
 append-only consent record. Later uploads and plan reads use those literal bounds,

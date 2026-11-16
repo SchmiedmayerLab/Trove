@@ -33,4 +33,12 @@ extension AuditEvent.Context {
             applicationRevision: configuration?.applicationRevision
         )
     }
+
+    /// The operator command is the actor; a shell invocation does not establish a human initiator.
+    static func retractionReversal(configuration: AuditConfiguration? = nil) -> Self {
+        .init(
+            actor: .init(issuer: "urn:trove:system", subject: "retraction-reversal"),
+            applicationRevision: configuration?.applicationRevision
+        )
+    }
 }

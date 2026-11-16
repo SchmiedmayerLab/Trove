@@ -125,7 +125,7 @@ extension StudyDataQuery {
             JOIN clinical_events event ON event.id = n.event_id
             JOIN source_bindings s ON s.id = n.source_id AND s.participant_id = e.participant_id
             WHERE g.study_id = \(bind: studyID) AND e.withdrawn_at IS NULL
-                AND NOT EXISTS (SELECT 1 FROM clinical_record_retractions t WHERE t.record_id = f.record_id)
+                AND NOT \(ClinicalRecordStore.retracted("f.record_id"))
                 AND \(selection) AND \(ClinicalGraphStore.disclosurePredicate)
             """
     }

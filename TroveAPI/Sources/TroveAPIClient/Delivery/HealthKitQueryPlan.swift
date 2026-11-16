@@ -96,7 +96,8 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
     private func collectionQueries(
         for sourceID: UUID, coverage: [HealthKitQueryCoverage], snapshot: ParticipantCollectionSnapshot
     ) throws -> [HealthKitQueryPlan.Query] {
-        try checkpoints(for: sourceID).compactMap { value in
+        let reconciliationIDs = try nativeReconciliationQueryIDs(for: sourceID)
+        return try checkpoints(for: sourceID).filter { !reconciliationIDs.contains($0.queryID) }.compactMap { value in
             var checkpoint = value
             checkpoint.acquisitionDeadline = snapshot.acquisitionDeadline
             let query = try HealthKitQueryPlan.Query(checkpoint)
@@ -153,7 +154,8 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
 
 
     private func validatedQueries(for sourceID: UUID, primary: Checkpoint) throws -> [HealthKitQueryPlan.Query] {
-        let existing = try checkpoints(for: sourceID).map { try HealthKitQueryPlan.Query($0) }
+        let reconciliationIDs = try nativeReconciliationQueryIDs(for: sourceID)
+        let existing = try checkpoints(for: sourceID).filter { !reconciliationIDs.contains($0.queryID) }.map { try HealthKitQueryPlan.Query($0) }
         let lives = existing.filter { $0.definition.kind == .live }
         let groups = Dictionary(grouping: lives, by: \.definition.stream)
         guard try HealthKitQueryDefinition(bytes: primary.queryDefinition).kind == .live,

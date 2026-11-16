@@ -58,7 +58,7 @@ extension ConsentService {
         return publication.metadata.title
     }
 
-    private static func collectionWindows(
+    static func collectionWindows(
         _ timeline: [ConsentCollectionTimeline.Window], studyID: UUID, on database: any Database
     ) async throws -> [Components.Schemas.ConsentCollectionWindow] {
         guard !timeline.isEmpty else {

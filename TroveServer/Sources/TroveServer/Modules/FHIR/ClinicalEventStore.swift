@@ -200,6 +200,11 @@ struct ClinicalEventStore: Sendable {
         case .serverWorker:
             nativeIdentifiersMatch = event.nativeRecordIdentifiers.isEmpty
         }
+        // A shared record is retracted only on HealthKit's own deletion report for it. No other repository reports
+        // deletions, and a sample that is merely absent on one installation produces no event at all.
+        guard event.retraction == nil || source.repositoryKind == .healthKit else {
+            throw ServerError.forbidden("Only a HealthKit source can retract a source record")
+        }
         guard event.eventIdentifierSystem == lifecycleSystem.rawValue,
               event.deploymentIdentifiers.matches(namespaces, provider: source.kind == .serverWorker),
               nativeIdentifiersMatch,

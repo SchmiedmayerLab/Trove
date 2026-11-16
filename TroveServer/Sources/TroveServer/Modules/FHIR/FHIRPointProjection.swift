@@ -59,6 +59,7 @@ enum FHIRPointProjection {
         let (nodes, resources) = try index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
         try FHIRWorkoutProjection.validate(resources: resources)
+        try FHIRHealthKitECGBoundary.validate(resources: resources)
         try FHIRRecordingSourcePeriod.validate(resources: resources)
         let clinical = try clinicalOutputs(nodes, resources: resources, quantities: quantities, recordings: recordings)
         try validateOutputs(

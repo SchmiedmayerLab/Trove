@@ -56,7 +56,9 @@ struct FHIRObservationValueProjection {
         let workout = profile == CollectionObservationProfile.workout.rawValue || profile == FHIRWorkoutProjection.segmentProfile
         guard observation.focus?.isEmpty != false else { throw FHIRValidationClient.invalid }
         let measurement = capability?.measurement
-        guard workout || capability == .food || observation.hasMember?.isEmpty != false else { throw FHIRValidationClient.invalid }
+        guard workout || capability == .food || capability == .electrocardiogram || observation.hasMember?.isEmpty != false else {
+            throw FHIRValidationClient.invalid
+        }
         if !workout, capability != .food, let measurement, measurement.valueShape != .components {
             try FHIRComponentProjection.validateSupplemental(observation, measurement: measurement)
         }
@@ -68,6 +70,10 @@ struct FHIRObservationValueProjection {
             try FHIRFoodProjection.validate(observation)
             measurementBounds = try Self.effectiveTime(observation, capability: capability)
             value = .group
+        } else if let capability, capability == .electrocardiogram {
+            try FHIRHealthKitECGBoundary.validateWaveform(observation)
+            measurementBounds = try Self.effectiveTime(observation, capability: capability)
+            value = .components
         } else if let capability, let measurement, measurement.valueShape == .quantity {
             guard case .quantity(let quantity)? = observation.value, let quantityText,
                   quantity.value?.value != nil, quantity.comparator == nil,

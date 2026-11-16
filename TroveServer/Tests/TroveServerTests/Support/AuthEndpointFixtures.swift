@@ -322,6 +322,18 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/studies/\(studyId)/enrollments", successStatus: .notFound, body: jsonData([String: String]())),
             participant(.GET, "\(base)/participant/enrollments", successStatus: .ok),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/collection-plan", successStatus: .notFound),
+            participant(
+                .POST,
+                "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.NativeCollectionReconciliationRequest(sourceId: dummyId.uuidString))
+            ),
+            participant(
+                .POST,
+                "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations/\(dummyId)/complete",
+                successStatus: .notFound,
+                body: jsonData(Components.Schemas.NativeCollectionReconciliationRequest(sourceId: dummyId.uuidString))
+            ),
             participant(.POST, "\(base)/participant/enrollments/\(dummyId)/withdraw", successStatus: .notFound),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consent-presentation?locale=en-US", successStatus: .notFound),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/consents", successStatus: .notFound),

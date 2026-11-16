@@ -32,13 +32,14 @@ enum DatabaseRuntimePrivileges {
                         'source_identity_keys', 'source_identity_key_envelopes',
                         'clinical_events',
                         'clinical_event_representations', 'clinical_source_records', 'clinical_record_events', 'clinical_output_bindings',
-                        'clinical_record_retractions', 'clinical_questionnaire_contexts', 'clinical_point_derivations',
+                        'clinical_record_retractions', 'clinical_retraction_reversals',
+                        'clinical_questionnaire_contexts', 'clinical_point_derivations',
                         'clinical_event_nodes', 'clinical_point_facts', 'study_data_grants', 'clinical_attribution_commands',
                         'recording_transfers', 'recording_transfer_attempts', 'recording_transfer_receipts', 'clinical_recording_attachments',
                         'provider_global_scopes', 'provider_query_coverage', 'provider_conversion_instants')
             )
             SELECT
-                (SELECT count(*) FROM protected_relations) = 29
+                (SELECT count(*) FROM protected_relations) = 30
                 AND current_user = session_user
                 AND NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_auth_members membership

@@ -29,6 +29,7 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateInvitationCodes())
     app.migrations.add(CreateEnrollments())
     app.migrations.add(CreateEnrollmentConsents())
+    app.migrations.add(CreateNativeReconciliations())
     app.migrations.add(CreateAuditEvents())
     app.migrations.add(CreateClinicalEvents())
     app.migrations.add(CreateRecordingTransfers())

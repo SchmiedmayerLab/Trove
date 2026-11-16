@@ -30,7 +30,7 @@ struct SensorKitJournalMigrationTests {
             #expect(retry.commitment.receiptLookup == original.commitment.receiptLookup)
             #expect(retry.custodyWasUncertain)
             await reopened.close()
-            #expect(try schemaVersion(url) == 19)
+            #expect(try schemaVersion(url) == 20)
             let second = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .openExisting)
             #expect(try await second.pendingDeliveryIDs() == ids)
             await second.close()
@@ -117,6 +117,7 @@ struct SensorKitJournalMigrationTests {
         let database = try DeliverySQLite(url: url)
         defer { database.close() }
         try database.transaction {
+            try database.execute("DROP TABLE native_collection_reconciliation")
             try database.execute("DROP TABLE sensorkit_recording_slice")
             try database.execute("DROP TABLE sensorkit_batch_evidence")
             try database.execute("PRAGMA user_version = 17")

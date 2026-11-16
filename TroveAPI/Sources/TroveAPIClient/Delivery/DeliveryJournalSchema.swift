@@ -29,10 +29,10 @@ enum DeliveryJournalSchema {
     }
 
     static let maximumPayloadBytes = EventSubmissionLimits.maximumEventBytes
-    /// An empty journal of the current format occupies 31 pages of 4 KiB (124 KiB). A smaller budget cannot hold
+    /// An empty journal of the current format occupies 33 pages of 4 KiB (132 KiB). A smaller budget cannot hold
     /// the schema, so it is rejected as configuration and not left to fail inside SQLite.
-    static let minimumDatabaseBytes = 128 * 1024
-    private static let version: Int64 = 19
+    static let minimumDatabaseBytes = 136 * 1024
+    private static let version: Int64 = 20
 
     static func checkByteLimit(_ database: DeliverySQLite, maximumBytes: Int) throws {
         let sizes = try database.query("""
@@ -52,6 +52,7 @@ enum DeliveryJournalSchema {
                 + (SELECT coalesce(sum(length(content) + length(source_type_identifier) + length(device_product_type)
                     + length(coordinate) + 192), 0) FROM sensorkit_batch_evidence)
                 + (SELECT count(*) * 96 FROM sensorkit_recording_slice)
+                + (SELECT coalesce(sum(length(instruction) + 80), 0) FROM native_collection_reconciliation)
             """) { sqlite3_column_int64($0, 0) }
         guard let size = sizes.first, size <= maximumBytes else { throw DeliveryJournalError.capacityExceeded }
     }
@@ -132,9 +133,7 @@ enum DeliveryJournalSchema {
     ) throws {
         if create {
             try database.transaction {
-                for statement in statements { try database.execute(statement) }
-                for statement in replayStatements { try database.execute(statement) }
-                for statement in sliceStatements { try database.execute(statement) }
+                for statement in statements + upgrades.flatMap(\.statements) { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
                 try database.execute("PRAGMA user_version = \(Self.version)")
             }
@@ -142,11 +141,8 @@ enum DeliveryJournalSchema {
             // This additive migration leaves every queued payload, source binding, receipt and cursor intact.
             // Scope was verified before any pragma or schema mutation; SQLite rolls back all DDL on failure.
             try database.transaction {
-                if priorVersion < 18 {
-                    for statement in replayStatements { try database.execute(statement) }
-                }
-                if priorVersion < 19 {
-                    for statement in sliceStatements { try database.execute(statement) }
+                for upgrade in upgrades where priorVersion < upgrade.version {
+                    for statement in upgrade.statements { try database.execute(statement) }
                 }
                 try checkByteLimit(database, maximumBytes: maximumBytes)
                 try database.execute("PRAGMA user_version = \(Self.version)")
@@ -167,6 +163,21 @@ enum DeliveryJournalSchema {
 
 
 extension DeliveryJournalSchema {
+    /// Additive tables in the order their formats introduced them; a new journal creates all of them.
+    private static let upgrades: [(version: Int64, statements: [String])] = [
+        (18, replayStatements), (19, sliceStatements), (20, reconciliationStatements)
+    ]
+
+    private static let reconciliationStatements = [
+        """
+        CREATE TABLE native_collection_reconciliation (
+            id TEXT PRIMARY KEY NOT NULL CHECK (length(id) = 36) REFERENCES acquisition_query(id) ON DELETE RESTRICT,
+            instruction BLOB NOT NULL CHECK (length(instruction) BETWEEN 1 AND 16384),
+            server_acknowledged INTEGER NOT NULL DEFAULT 0 CHECK (server_acknowledged IN (0, 1))
+        ) STRICT
+        """
+    ]
+
     private static let sliceStatements = [
         """
         CREATE TABLE sensorkit_recording_slice (

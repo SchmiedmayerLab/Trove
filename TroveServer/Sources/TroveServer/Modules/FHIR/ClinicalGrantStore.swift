@@ -163,7 +163,7 @@ extension ClinicalGrantStore {
               let study = try await Study.find(enrollment.$study.id, on: database) else {
             throw ServerError.forbidden("Exact reviewed publication is required for study data")
         }
-        let selection = try FHIRWorkoutProjection.collectionOutputs(outputs)
+        let selection = try FHIRHealthKitECGBoundary.collectionOutputs(FHIRWorkoutProjection.collectionOutputs(outputs))
         let permitted = Set(selection.filter { output in
             guard let profile = output.collectionProfile else {
                 return false
@@ -189,6 +189,7 @@ extension ClinicalGrantStore {
         .map(\.fullURL))
         let selected = Set(target.outputFullURLs)
         try FHIRWorkoutProjection.requireCompleteSelection(selected, outputs: outputs)
+        try FHIRHealthKitECGBoundary.requireCompleteSelection(selected, outputs: outputs)
         guard selected.isSubset(of: permitted) else {
             throw ServerError.forbidden("Requested output is absent or outside the exact consent's collection interval")
         }

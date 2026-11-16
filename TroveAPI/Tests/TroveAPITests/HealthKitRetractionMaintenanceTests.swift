@@ -45,6 +45,22 @@ struct HealthKitRetractionMaintenanceTests {
     }
 
     @Test
+    func collectedSampleAbsentFromALaterPageIsNotRetracted() async throws {
+        try await Self.withCollectedRoute { journal, _, _ in
+            let pending = try await journal.pendingDeliveryIDs()
+            let acquisition = try HealthKitAcquisition(journal: journal, scope: DeliveryFixture.scope) {}
+            // HealthKit reports neither the route nor a deletion, as on a phone that never received the sample.
+            let page = try await acquisition.collect(
+                localID: DeliveryFixture.epoch,
+                application: .init(name: "Trove Test", bundleIdentifier: "org.trove.test", version: "1"),
+                host: .init(operatingSystemVersion: "27.2")
+            ) { _, _ in .init(added: [], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 2))) }
+            #expect(page.eventIDs.isEmpty && page.isCaughtUp)
+            #expect(try await journal.pendingDeliveryIDs() == pending)
+        }
+    }
+
+    @Test
     func withdrawalDuringMaintenancePreventsRetractionAndCursorAdvance() async throws {
         try await Self.withCollectedRoute { journal, _, collected in
             _ = try await Fixture.retain([Fixture.adopt(collected.plan, at: 200, start: nil)], in: journal)

@@ -44,6 +44,7 @@ public struct HealthKitAcquisition: Sendable {
         let readHeartbeatSeries: @Sendable (HKHeartbeatSeriesSample) async throws -> HealthKitRecordingFile
         let readDocument: @Sendable (HKSample) async throws -> HealthKitRecordingFile
         let readRoute: @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile
+        let readElectrocardiogram: @Sendable (HKElectrocardiogram) async throws -> HealthKitFHIRExporter.Record
 
         init(
             added: [HKSample],
@@ -53,7 +54,10 @@ public struct HealthKitAcquisition: Sendable {
                 throw AcquisitionError.unsupportedDelta
             },
             readDocument: @escaping @Sendable (HKSample) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta },
-            readRoute: @escaping @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta }
+            readRoute: @escaping @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta },
+            readElectrocardiogram: @escaping @Sendable (HKElectrocardiogram) async throws -> HealthKitFHIRExporter.Record = { _ in
+                throw AcquisitionError.unsupportedDelta
+            }
         ) {
             self.added = added
             self.deletedIDs = deletedIDs
@@ -61,12 +65,21 @@ public struct HealthKitAcquisition: Sendable {
             self.readHeartbeatSeries = readHeartbeatSeries
             self.readDocument = readDocument
             self.readRoute = readRoute
+            self.readElectrocardiogram = readElectrocardiogram
         }
     }
 
     struct Selection: Sendable {
+        enum Kind: Sendable { case ordinary, reconciliation }
         let queryID: UUID
         let state: ParticipantCollectionState
+        let kind: Kind
+
+        init(queryID: UUID, state: ParticipantCollectionState, kind: Kind = .ordinary) {
+            self.queryID = queryID
+            self.state = state
+            self.kind = kind
+        }
     }
 
     /// One atomic journal page, including independently authorized companion records.
@@ -160,10 +173,7 @@ public struct HealthKitAcquisition: Sendable {
         }
         let state: ParticipantCollectionState
         if let selection { state = selection.state } else { state = try await journal.collectionState() }
-        guard let snapshot = try state.snapshot?.active(), !snapshot.retainedStreams.isEmpty else {
-            throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized
-        }
-        let checkpoint = try await journal.collectionCheckpoint(for: sourceID, state: state, queryID: selection?.queryID)
+        let (snapshot, checkpoint) = try await collectionAuthority(for: sourceID, state: state, selection: selection)
         let definition = try HealthKitQueryDefinition(bytes: checkpoint.queryDefinition)
         guard snapshot.permitsAcquisition(stream: definition.stream)
                 || (snapshot.permitsRetractions(stream: definition.stream) && checkpoint.cursor != nil) else {

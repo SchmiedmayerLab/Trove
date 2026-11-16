@@ -37,6 +37,7 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
     public static let food = Self(knownProfile: Profile.healthkitFoodCorrelation)
     public static let healthKitRecording = Self(knownProfile: Profile.healthkitRecordingDocument)
     public static let audiogram = Self(knownProfile: Profile.healthkitAudiogramPanel)
+    public static let electrocardiogram = Self(knownProfile: Profile.healthkitEcgObservation)
     public static let onWrist = Self(knownProfile: Profile.sensorkitOnWristObservation)
 
     /// Native quantities and categories with implemented scalar/coded conversion and declared components.
@@ -59,7 +60,8 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
         }
         .map { Self(knownProfile: $0) }
         let structured: [Self] = [
-            .sleepStage, .workout, .bloodPressure, .stateOfMind, .gad7, .phq9, .audiogram, .healthKitRecording, .clinicalDocument, .food, .onWrist
+            .sleepStage, .workout, .bloodPressure, .stateOfMind, .gad7, .phq9, .audiogram, .electrocardiogram, .healthKitRecording, .clinicalDocument,
+            .food, .onWrist
         ]
         let sensors = SensorKitCollectionCapabilities.sources.flatMap { source in
             SensorKitCollectionCapabilities.outputs(for: source.sourceToken).map { Self($0.profile) }
@@ -73,6 +75,9 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
     public var nativeSources: [HealthKitSourceDefinition] {
         if self == .clinicalDocument {
             return FHIRMeasurementCatalog.healthKitSources.filter { $0.profiles.contains(Profile.healthkitClinicalRecordDocument) }
+        }
+        if self == .electrocardiogram {
+            return FHIRMeasurementCatalog.healthKitSources.filter { $0.profiles.contains(Profile.healthkitEcgObservation) }
         }
         if self == .healthKitRecording {
             let identifiers = [SampleType.heartbeatSeries.hkSampleType.identifier, HKDocumentType(.CDA).identifier]
@@ -123,7 +128,8 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
 
     /// Whether the contract requires a whole period. Dual-shape query versions handle both forms explicitly.
     public var isInterval: Bool {
-        self == .sleepStage || self == .workout || self == .healthKitRecording || self == .clinicalDocument || measurement?.effective == .period
+        self == .sleepStage || self == .workout || self == .healthKitRecording || self == .clinicalDocument || self == .electrocardiogram
+            || measurement?.effective == .period
             || (!sensorKitSources.isEmpty && sensorKitSources.allSatisfy { source in
                 SensorKitCollectionCapabilities.outputs(for: source.sourceToken)
                     .filter { $0.profile == rawValue }
@@ -195,6 +201,7 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
         case .gad7: SampleType.gad7.localizedTitle(in: language)
         case .phq9: SampleType.phq9.localizedTitle(in: language)
         case .audiogram: SampleType.audiogram.localizedTitle(in: language)
+        case .electrocardiogram: SampleType.electrocardiogram.localizedTitle(in: language)
         case .healthKitRecording: SampleType.heartbeatSeries.localizedTitle(in: language)
         default: nil
         }
@@ -233,7 +240,7 @@ public struct CollectionObservationProfile: RawRepresentable, CaseIterable, Hash
 
     /// Receiver and consent checks preserve the actual effective datatype, including dual-shape profiles.
     public func permitsEffectiveTime(hasEnd: Bool) -> Bool {
-        if self == .healthKitRecording || self == .clinicalDocument {
+        if self == .healthKitRecording || self == .clinicalDocument || self == .electrocardiogram {
             return hasEnd
         }
         let sensors = sensorKitSources
