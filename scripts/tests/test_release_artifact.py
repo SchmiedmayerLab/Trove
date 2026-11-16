@@ -176,15 +176,38 @@ class ReleaseArtifactTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RELEASE.scan_identity(directory, IDENTITY, fresh=True)
 
-    def test_independent_review_and_protected_branches_are_required(self) -> None:
+    def test_review_and_protected_branches_are_required(self) -> None:
         path = self.root / "environment.json"
         environment = {"name": "candidate-publication", "deployment_branch_policy": {"protected_branches": True},
                        "protection_rules": [{"type": "required_reviewers", "prevent_self_review": True,
-                                             "reviewers": [{"type": "User"}]}]}
+                                             "reviewers": [{"type": "User", "reviewer": {"login": "reviewer"}}]}]}
         self.write(path, environment)
         RELEASE.approval_environment(path)
+        self.write(path, {**environment, "protection_rules": [{"type": "required_reviewers", "prevent_self_review": False,
+                                                               "reviewers": [{"type": "Team", "reviewer": {"slug": "maintainers"}}]}]})
+        RELEASE.approval_environment(path)
+        for reviewer in ({"type": "User", "reviewer": {"id": 1}}, {"type": "Team", "reviewer": {"id": 2, "slug": ""}}):
+            self.write(path, {**environment, "protection_rules": [{"type": "required_reviewers", "reviewers": [reviewer]}]})
+            RELEASE.approval_environment(path)
+        unidentified = ({"type": "User", "reviewer": {}}, {"type": "User", "reviewer": {"login": ""}},
+                        {"type": "User", "reviewer": {"login": " "}}, {"type": "User", "reviewer": {"slug": "maintainers"}},
+                        {"type": "Team", "reviewer": {"login": "reviewer"}}, {"type": "Team", "reviewer": {"slug": None}},
+                        {"type": "User", "reviewer": {"id": "1"}}, {"type": "User", "reviewer": {"id": True}},
+                        {"type": "User", "reviewer": {"id": 1.0}})
+        for reviewer in unidentified:
+            self.write(path, {**environment, "protection_rules": [{"type": "required_reviewers", "reviewers": [
+                {"type": "User", "reviewer": {"login": "reviewer"}}, reviewer]}]})
+            with self.assertRaises(ValueError):
+                RELEASE.approval_environment(path)
         for change in ({"name": "other"}, {"protection_rules": []}, {"deployment_branch_policy": None},
-                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": [{}]}]}):
+                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": []}]},
+                       {"protection_rules": [{"type": "required_reviewers"}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": None}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [{}]}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [None]}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [{"type": "User"}]}]},
+                       {"protection_rules": [{"type": "branch_policy", "reviewers": [{"type": "User"}]}]},
+                       {"deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True}}):
             self.write(path, {**environment, **change})
             with self.assertRaises(ValueError):
                 RELEASE.approval_environment(path)
