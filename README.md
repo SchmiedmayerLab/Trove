@@ -126,7 +126,7 @@ Follow the [local stack instructions](TroveInfrastructure/docker/README.md) to b
 current images and start the server, dashboard, Keycloak, database and object storage
 with Docker Compose on a fresh development database.
 
-[`TroveInfrastructure/docker/smoke-test.sh`](TroveInfrastructure/docker/smoke-test.sh) checks the stack end to end — services healthy, realm imported, protected routes rejecting anonymous callers, and the server answering an authenticated request with the groups it synced from Keycloak.
+[`TroveInfrastructure/docker/smoke-test.sh`](TroveInfrastructure/docker/smoke-test.sh) checks the stack end to end: services are healthy, the realm is imported, protected routes reject anonymous callers, and the server answers an authenticated request with the groups it synced from Keycloak.
 
 ## Documentation
 
