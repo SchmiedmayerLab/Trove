@@ -91,6 +91,7 @@ class Verification:
         self.network = False
         self.results = {"image": json.loads(command("docker", "image", "inspect", image))[0]["Id"], "checks": [], "passed": False}
         self.context = ssl.create_default_context(cafile=str(fixtures.ca_file))
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     def container(self, name, *, identity=None, environment=None, image=None, arguments=(), mounts=(), serving=True):
         options = ["docker", "create", "--name", self.name + "-" + name, "--network", self.name,
