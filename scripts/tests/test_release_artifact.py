@@ -180,16 +180,19 @@ class ReleaseArtifactTests(unittest.TestCase):
         path = self.root / "environment.json"
         environment = {"name": "candidate-publication", "deployment_branch_policy": {"protected_branches": True},
                        "protection_rules": [{"type": "required_reviewers", "prevent_self_review": True,
-                                             "reviewers": [{"type": "User"}]}]}
+                                             "reviewers": [{"type": "User", "reviewer": {"login": "reviewer"}}]}]}
         self.write(path, environment)
         RELEASE.approval_environment(path)
         self.write(path, {**environment, "protection_rules": [{"type": "required_reviewers", "prevent_self_review": False,
-                                                               "reviewers": [{"type": "User"}]}]})
+                                                               "reviewers": [{"type": "Team", "reviewer": {"slug": "maintainers"}}]}]})
         RELEASE.approval_environment(path)
         for change in ({"name": "other"}, {"protection_rules": []}, {"deployment_branch_policy": None},
                        {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": []}]},
                        {"protection_rules": [{"type": "required_reviewers"}]},
                        {"protection_rules": [{"type": "required_reviewers", "reviewers": None}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [{}]}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [None]}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": [{"type": "User"}]}]},
                        {"protection_rules": [{"type": "branch_policy", "reviewers": [{"type": "User"}]}]},
                        {"deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True}}):
             self.write(path, {**environment, **change})

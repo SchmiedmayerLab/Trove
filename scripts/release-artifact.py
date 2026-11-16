@@ -200,7 +200,10 @@ def approval_environment(path: Path) -> None:
     rules = environment.get("protection_rules")
     if not isinstance(rules, list) or not any(
         isinstance(rule, dict) and rule.get("type") == "required_reviewers"
-        and isinstance(rule.get("reviewers"), list) and len(rule["reviewers"]) > 0 for rule in rules
+        and isinstance(rule.get("reviewers"), list) and len(rule["reviewers"]) > 0
+        and all(isinstance(reviewer, dict) and reviewer.get("type") in ("User", "Team")
+                and isinstance(reviewer.get("reviewer"), dict) for reviewer in rule["reviewers"])
+        for rule in rules
     ):
         raise ValueError("Environment review must be configured")
     policy = environment.get("deployment_branch_policy")
