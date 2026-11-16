@@ -42,4 +42,21 @@ struct RecordedInstantTests {
         let instant = try Instant("2016-12-31T23:59:60Z")
         #expect(throws: (any Error).self) { try RecordedInstant(instant) }
     }
+
+    @Test("Calendar normalization cannot change source or provenance evidence", arguments: [
+        "2026-02-31T12:00:00.123456789Z", "2026-02-29T12:00:00+08:00", "2024-02-30T12:00:00-08:00",
+        "2026-04-31T00:00:00Z", "2026-11-01T00:00:00-00:00"
+    ])
+    func rejectsInvalidCalendarAndUnknownOffset(_ value: String) {
+        #expect(throws: (any Error).self) { try RecordedInstant(Instant(value)) }
+        #expect(throws: (any Error).self) { try ClinicalMeasurementBounds(sourceStart: value) }
+    }
+
+    @Test("Gregorian leap days preserve exact source fractional ordering")
+    func leapDay() throws {
+        let first = try ClinicalMeasurementBounds(sourceStart: "2024-02-29T23:59:59.999999999+08:00")
+        let second = try ClinicalMeasurementBounds(sourceStart: "2024-03-01T00:00:00+08:00")
+        #expect(first.start < second.start)
+        #expect(first.start.fraction == "999999999")
+    }
 }

@@ -13,6 +13,8 @@ enum ClinicalOutputValue: Sendable, Equatable {
     case quantity(value: String, system: String, code: String)
     case coded(system: String, code: String)
     case components
+    case group
+    case sampledData
     case recording
 
     var resourceType: String {
@@ -24,6 +26,8 @@ enum ClinicalOutputValue: Sendable, Equatable {
         case .quantity: "quantity"
         case .coded: "coded"
         case .components: "components"
+        case .group: "group"
+        case .sampledData: "sampled-data"
         case .recording: "recording"
         }
     }

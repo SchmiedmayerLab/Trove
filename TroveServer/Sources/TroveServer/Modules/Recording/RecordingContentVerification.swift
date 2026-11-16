@@ -19,16 +19,19 @@ struct RecordingContentVerification: Sendable {
     let attachmentSHA1: Data
 
     /// The caller authorizes storage access and supplies the retained declaration before reading.
-    /// No output is returned until both representations, the complete CSV and the Zstandard frame match.
+    /// No output is returned until both representations, the complete registered payload and the Zstandard frame match.
     static func verify(
         _ body: HTTPBody, declaration: RecordingTransferDeclaration, maximumWindowByteCount: Int
     ) async throws -> Self {
-        guard declaration.output.code == RegisteredRecordingFormat.locationTrackSamples.rawValue else {
+        guard let code = declaration.output.code, let format = RegisteredRecordingFormat(rawValue: code) else {
             throw FHIRValidationClient.invalid
         }
         do {
+            if format.csvColumns == nil {
+                return try await native(body, declaration: declaration, format: format, maximumWindowByteCount: maximumWindowByteCount)
+            }
             var input = StoredReader(body: body, content: declaration.content)
-            var source = try SourceReader(content: declaration.content)
+            var source = try SourceReader(content: declaration.content, format: format)
             switch declaration.content.encoding {
             case .identity:
                 while let chunk = try await input.next() { try source.read(chunk) }
@@ -49,6 +52,10 @@ struct RecordingContentVerification: Sendable {
             try Task.checkCancellation()
             if error is CancellationError { throw CancellationError() }
             if let error = error as? ServerError { throw error }
+            if let error = error as? RecordingFile.FileError,
+               [.sourceUnavailable, .stagingUnavailable, .readFailed, .writeFailed].contains(error) {
+                throw ServerError(status: .serviceUnavailable, title: "Recording Unavailable", detail: "Retry the unchanged record")
+            }
             // Parser and decoder diagnostics may contain source values.
             throw FHIRValidationClient.invalid
         }
@@ -105,15 +112,17 @@ extension RecordingContentVerification {
     private struct SourceReader {
         private var reader: RecordingCSVReader.Stream
         private var bounds = RecordingRouteBounds()
+        private let format: RegisteredRecordingFormat
         private var count = 0
         private var hasher = SHA256()
         private var attachmentHasher = Insecure.SHA1()
         private let content: RecordingTransferDeclaration.Content
 
-        init(content: RecordingTransferDeclaration.Content) throws {
+        init(content: RecordingTransferDeclaration.Content, format: RegisteredRecordingFormat) throws {
             self.content = content
+            self.format = format
             let limits = RecordingCSVReader.Limits.default
-            reader = try .init(format: .locationTrackSamples, limits: .init(
+            reader = try .init(format: format, limits: .init(
                 maximumByteCount: content.sourceByteCount,
                 maximumRecordByteCount: limits.maximumRecordByteCount,
                 maximumFieldByteCount: limits.maximumFieldByteCount
@@ -126,7 +135,11 @@ extension RecordingContentVerification {
             hasher.update(data: bytes)
             // R4 Attachment.hash is SHA-1; SHA-256 independently binds the source and stored representations.
             attachmentHasher.update(data: bytes)
-            try reader.read(bytes) { try bounds.include($0) }
+            // The row callback may not touch `self` while the reader is being mutated.
+            var bounds = bounds
+            let format = format
+            try reader.read(bytes) { try bounds.include($0, format: format) }
+            self.bounds = bounds
         }
 
         mutating func finish() throws -> RecordingContentVerification {

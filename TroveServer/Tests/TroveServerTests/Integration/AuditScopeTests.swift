@@ -38,10 +38,7 @@ struct AuditScopeTests {
     @Test(arguments: AuditEvent.Action.allCases)
     func everyDeclaredActionHasOnePersistableScope(action: AuditEvent.Action) async throws {
         try await TestApp.withApp { app, _ in
-            let scope: AuditEvent.Scope = action.scopeKind == .participantSource
-                ? .participantSource(participantID: UUID(), sourceBindingID: UUID())
-                : .study(studyID: UUID(), groupID: UUID())
-            let event = Self.event(action: action, scope: scope)
+            let event = Self.event(action: action, scope: Self.scope(of: action.scopeKind))
             if action.isDisclosure {
                 try await AuditRepository.disclose(event, on: app.db) { _ in }
             } else {
@@ -163,6 +160,15 @@ struct AuditScopeTests {
 
 
 extension AuditScopeTests {
+    private static func scope(of kind: AuditEvent.Scope.Kind) -> AuditEvent.Scope {
+        switch kind {
+        case .study: .study(studyID: UUID(), groupID: UUID())
+        case .participantSource: .participantSource(participantID: UUID(), sourceBindingID: UUID())
+        case .providerRegistration: .providerRegistration(registrationID: UUID())
+        case .participantProvider: .participantProvider(participantID: UUID(), registrationID: UUID())
+        }
+    }
+
     private static func event(action: AuditEvent.Action, scope: AuditEvent.Scope) -> AuditEvent {
         .init(
             context: .init(actor: .init(issuer: "https://identity.example/realm", subject: "participant")),

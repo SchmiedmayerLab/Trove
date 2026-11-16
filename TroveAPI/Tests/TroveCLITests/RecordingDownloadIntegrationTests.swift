@@ -6,6 +6,9 @@
 // SPDX-License-Identifier: MIT
 //
 
+// The CLI loopback server uses desktop subprocess APIs.
+#if os(macOS) || os(Linux)
+
 import Foundation
 import Testing
 @testable import TroveCLI
@@ -147,3 +150,5 @@ struct RecordingDownloadIntegrationTests {
         #expect(try !server.entries().contains(where: { $0.hasPrefix(".trove-recording-") }))
     }
 }
+
+#endif

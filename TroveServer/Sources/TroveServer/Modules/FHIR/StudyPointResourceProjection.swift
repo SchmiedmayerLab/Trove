@@ -76,7 +76,13 @@ struct StudyPointResourceProjection {
             resource["content"] = .array(contents)
         }
         if var context = resource["context"]?.object {
-            context["related"] = nil
+            let companions = try (context["related"]?.array ?? []).compactMap { reference -> StudyProjectionJSON? in
+                guard let address = reference["reference"]?.string,
+                      let type = resources[address]?["resourceType"]?.string,
+                      ["Observation", "DocumentReference"].contains(type) else { return nil }
+                return try outputReference(address, type: type)
+            }
+            context["related"] = companions.isEmpty ? nil : .array(companions)
             resource["context"] = .object(context)
         }
     }
@@ -87,7 +93,14 @@ struct StudyPointResourceProjection {
             resource["performer"] = try .array(performers.map { _ in try participant() })
         }
         if let dependencies = resource["derivedFrom"]?.array {
-            resource["derivedFrom"] = try .array(dependencies.map { try questionnaireReference($0) })
+            resource["derivedFrom"] = try .array(dependencies.map { reference in
+                if let address = reference["reference"]?.string,
+                   let type = resources[address]?["resourceType"]?.string,
+                   ["Observation", "DocumentReference"].contains(type) {
+                    return try outputReference(address, type: type)
+                }
+                return try questionnaireReference(reference)
+            })
         }
     }
 
@@ -95,6 +108,30 @@ struct StudyPointResourceProjection {
         try .object([
             "type": .string("Patient"),
             "identifier": .object(["system": .string(subject.system.rawValue), "value": .string(subject.value)])
+        ])
+    }
+
+    private func outputReference(_ address: String, type: String) throws -> StudyProjectionJSON {
+        if outputs.contains(address) {
+            return try .object(["type": .string(type), "reference": .string(address)])
+        }
+        let identities = resources[address]?["identifier"]?.array?.filter { identity in
+            identity["type"]?["coding"]?.array?.contains {
+                $0["system"]?.string == Self.roleSystem && $0["code"]?.string == "source-output"
+            } == true
+        } ?? []
+        guard identities.count == 1, let identity = identities.first,
+              let system = identity["system"]?.string, let value = identity["value"]?.string else {
+            throw FHIRValidationClient.invalid
+        }
+        return try .object([
+            "type": .string(type),
+            "identifier": .object([
+                "system": .string(system), "value": .string(value),
+                "type": .object([
+                    "coding": .array([.object(["system": .string(Self.roleSystem), "code": .string("source-output")])])
+                ])
+            ])
         ])
     }
 

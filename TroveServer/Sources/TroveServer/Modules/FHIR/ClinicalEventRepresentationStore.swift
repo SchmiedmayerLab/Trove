@@ -20,7 +20,19 @@ struct ClinicalEventRepresentationStore {
 
     let database: any Database
     let source: SourceBinding
-    let context: AuthContext
+    let auditContext: AuditEvent.Context
+    let providerRegistrationID: UUID?
+
+    init(database: any Database, source: SourceBinding, context: AuthContext) {
+        self.init(database: database, source: source, auditContext: context.auditContext)
+    }
+
+    init(database: any Database, source: SourceBinding, auditContext: AuditEvent.Context, providerRegistrationID: UUID? = nil) {
+        self.database = database
+        self.source = source
+        self.auditContext = auditContext
+        self.providerRegistrationID = providerRegistrationID
+    }
 
     /// Receipt recovery deliberately omits clinical bytes and does not re-evaluate authority.
     static func receipt(eventID: UUID, digest: String, on sql: any SQLDatabase) async throws -> ClinicalEventReceipt? {
@@ -95,18 +107,15 @@ extension ClinicalEventRepresentationStore {
         let receivedAt = Date()
         // A new representation is new custody, even though its clinical version is retained.
         // Producer enrollment snapshots confer no authority and cannot refresh existing grants.
-        let grants = ClinicalGrantStore(database: database, source: source, context: context, acceptedAt: receivedAt)
+        let grants = ClinicalGrantStore(
+            database: database,
+            source: source,
+            auditContext: auditContext,
+            acceptedAt: receivedAt,
+            providerRegistrationID: providerRegistrationID
+        )
         _ = try await grants.authorities(
-            outputs: event.outputs.map {
-                .init(
-                            fullURL: $0.fullURL,
-                            profile: $0.profile,
-                            effectiveAt: $0.effectiveAt,
-                            effectiveEnd: $0.effectiveEnd,
-                            codeSystem: $0.codeSystem,
-                            code: $0.code
-                        )
-            },
+            outputs: event.collectionOutputs,
             intent: intent,
             requireCustodyCoverage: true
         )
@@ -117,7 +126,7 @@ extension ClinicalEventRepresentationStore {
             """)
             .run()
         try await AuditRepository.recordMutation(.init(
-            context: context.auditContext,
+            context: auditContext,
             action: .clinicalEventAccepted,
             scope: .participantSource(participantID: source.participantID, sourceBindingID: source.id),
             target: .init(id: eventID)

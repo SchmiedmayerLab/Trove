@@ -111,7 +111,7 @@ struct ClinicalRecordSchemaTests {
                     targets: fixture.targets,
                     installation: fixture.installation
                 )
-                let secondEvent = ClinicalRecordStoreTests.event(
+                let secondEvent = try ClinicalRecordStoreTests.event(
                     source: fixture.source, sequence: 2, version: "1", record: "another", outputs: ["other"]
                 )
                 let second = try await store.accept(

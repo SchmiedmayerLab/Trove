@@ -21,7 +21,7 @@ struct CreateClinicalEvents: AsyncMigration {
         "clinical_events", "clinical_event_representations", "clinical_source_records", "clinical_record_events", "clinical_output_bindings",
         "clinical_record_retractions",
         "clinical_event_nodes", "clinical_point_facts", "clinical_questionnaire_contexts", "clinical_point_derivations",
-        "study_data_grants", "clinical_attribution_commands"
+        "clinical_output_dependencies", "study_data_grants", "clinical_attribution_commands"
     ]
 
     func prepare(on database: any Database) async throws {
@@ -32,6 +32,7 @@ struct CreateClinicalEvents: AsyncMigration {
             try await createNodes(on: transaction)
             try await createFacts(on: transaction)
             try await ClinicalGraphSchema.create(on: transaction)
+            try await ClinicalOutputDependencySchema.create(on: transaction)
             try await createGrants(on: transaction)
             try await transaction.schema("clinical_attribution_commands")
                 .id()
@@ -115,7 +116,7 @@ struct CreateClinicalEvents: AsyncMigration {
     }
 
     private func createFacts(on database: any Database) async throws {
-        try await database.schema("clinical_point_facts")
+        try await ClinicalMeasurementSchema.fields(database.schema("clinical_point_facts"))
             .field("node_id", .uuid, .required)
             .compositeIdentifier(over: "node_id")
             .field("source_id", .uuid, .required)
@@ -123,6 +124,12 @@ struct CreateClinicalEvents: AsyncMigration {
             .field("record_id", .uuid, .required)
             .field("output_binding_id", .uuid, .required)
             .field("profile", .string, .required, boundedText("profile"))
+            .field("source_type_identifier", .string, boundedText("source_type_identifier"))
+            .field("source_repository_kind", .string, .sql(unsafeRaw: """
+                CHECK ((source_type_identifier IS NULL AND source_repository_kind IS NULL)
+                    OR (source_type_identifier IS NOT NULL AND source_repository_kind IS NOT NULL
+                        AND source_repository_kind IN ('healthkit', 'sensorkit', 'withings', 'oura', 'google-health-api')))
+                """))
             .field("effective_at", .datetime, .required)
             .field("effective_end", .datetime, .sql(unsafeRaw: "CHECK (effective_end IS NULL OR effective_end >= effective_at)"))
             .field("value_kind", .string, .required, observationValueConstraint)
@@ -225,7 +232,7 @@ struct CreateClinicalEvents: AsyncMigration {
                         clinical_record_events, clinical_output_bindings,
                         clinical_record_retractions,
                         clinical_event_nodes, clinical_point_facts, clinical_questionnaire_contexts, clinical_point_derivations,
-                        study_data_grants, clinical_attribution_commands IN ACCESS EXCLUSIVE MODE
+                        clinical_output_dependencies, study_data_grants, clinical_attribution_commands IN ACCESS EXCLUSIVE MODE
                     """)
                     .run()
             }
@@ -278,7 +285,8 @@ extension CreateClinicalEvents {
                     AND value_code_system IS NULL AND value_code IS NULL)
                 OR (value_kind = 'coded' AND quantity_value IS NULL AND quantity_system IS NULL AND quantity_code IS NULL
                     AND value_code_system IS NOT NULL AND value_code IS NOT NULL)
-                OR (value_kind IN ('components', 'recording') AND quantity_value IS NULL AND quantity_system IS NULL AND quantity_code IS NULL
+                OR (value_kind IN ('components', 'group', 'sampled-data', 'recording') AND quantity_value IS NULL
+                    AND quantity_system IS NULL AND quantity_code IS NULL
                     AND value_code_system IS NULL AND value_code IS NULL)
             )
             """)

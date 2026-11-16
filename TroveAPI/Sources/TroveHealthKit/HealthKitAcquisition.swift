@@ -34,23 +34,32 @@ public struct HealthKitAcquisition: Sendable {
         case authenticationRequired
         case invalidQueryDefinition
         case unsupportedDelta
+        case documentReviewRequired
     }
 
     struct Delta: Sendable {
         let added: [HKSample]
         let deletedIDs: [UUID]
         let nextAnchor: QueryAnchor
+        let readHeartbeatSeries: @Sendable (HKHeartbeatSeriesSample) async throws -> HealthKitRecordingFile
+        let readDocument: @Sendable (HKSample) async throws -> HealthKitRecordingFile
         let readRoute: @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile
 
         init(
             added: [HKSample],
             deletedIDs: [UUID],
             nextAnchor: QueryAnchor,
+            readHeartbeatSeries: @escaping @Sendable (HKHeartbeatSeriesSample) async throws -> HealthKitRecordingFile = { _ in
+                throw AcquisitionError.unsupportedDelta
+            },
+            readDocument: @escaping @Sendable (HKSample) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta },
             readRoute: @escaping @Sendable (HKWorkoutRoute) async throws -> HealthKitRecordingFile = { _ in throw AcquisitionError.unsupportedDelta }
         ) {
             self.added = added
             self.deletedIDs = deletedIDs
             self.nextAnchor = nextAnchor
+            self.readHeartbeatSeries = readHeartbeatSeries
+            self.readDocument = readDocument
             self.readRoute = readRoute
         }
     }
@@ -59,6 +68,9 @@ public struct HealthKitAcquisition: Sendable {
         let queryID: UUID
         let state: ParticipantCollectionState
     }
+
+    /// One atomic journal page, including independently authorized companion records.
+    static let maximumPageOutputs = 128
 
     let journal: EventDeliveryJournal
     let scope: EventDeliveryJournal.Scope
@@ -102,11 +114,11 @@ public struct HealthKitAcquisition: Sendable {
         try await checkSession()
         let state = try await journal.collectionState()
         try await checkSession()
-        guard let snapshot = try state.snapshot?.active(at: now), let profile = snapshot.acquisitionProfiles.first,
-              let start = snapshot.queryStart(for: profile) else {
+        guard let snapshot = try state.snapshot?.active(at: now), let stream = snapshot.acquisitionStreams.first,
+              let start = snapshot.queryStart(forStream: stream) else {
             throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized
         }
-        return try Self.queryDefinition(start: max(start, now), profile: profile)
+        return try HealthKitQueryDefinition(stream: stream, kind: .live, start: max(start, now)).encoded()
     }
 
     /// Uses Grove's caller-owned anchored query. It neither prompts for permission nor enables background collection.
@@ -122,10 +134,14 @@ public struct HealthKitAcquisition: Sendable {
 
     /// Advances at most eight pages, reserving one for each live measurement. Remaining pages visit the
     /// oldest pending query; the durable sweep survives restarts and revisits history for late imports.
-    public func catchUp(localID: UUID, healthKit: GroveHealthKit.HealthKit) async throws -> Progress {
+    public func catchUp(localID: UUID, healthKit: GroveHealthKit.HealthKit, reviewDocuments: Bool = false) async throws -> Progress {
         let maximumRecordingBytes = await journal.recordingByteLimit
-        return try await catchUp(localID: localID, application: ApplicationDevice(bundle: .main), host: .current()) { definition, previous in
-            try await Self.query(healthKit, definition: definition, anchor: previous, maximumRecordingBytes: maximumRecordingBytes)
+        return try await catchUp(
+            localID: localID, application: ApplicationDevice(bundle: .main), host: .current(), reviewDocuments: reviewDocuments
+        ) { definition, previous in
+            try await Self.query(
+                healthKit, definition: definition, anchor: previous, maximumRecordingBytes: maximumRecordingBytes, reviewDocuments: reviewDocuments
+            )
         }
     }
 
@@ -159,7 +175,7 @@ public struct HealthKitAcquisition: Sendable {
         let delta = try await query(definition, anchor)
         try await checkSession()
         let changeCount = delta.added.count + delta.deletedIDs.count
-        guard changeCount <= 128, delta.nextAnchor != QueryAnchor(),
+        guard changeCount <= Self.maximumPageOutputs, delta.nextAnchor != QueryAnchor(),
               changeCount == 0 || delta.nextAnchor != anchor else {
             throw AcquisitionError.unsupportedDelta
         }

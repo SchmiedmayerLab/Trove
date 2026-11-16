@@ -89,7 +89,8 @@ struct AuthIntegrationTests {
     @Test
     func researcherAllowedActions() async throws {
         let endpoints = Self.allEndpoints(.dummy)
-        for index in endpoints.indices where endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
+        for index in endpoints.indices where endpoints[index].requiresAuthenticationOnly
+            || endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
             guard !endpoints[index].requiresDataReader else { continue }
             try await withFixtures(token: .researcher(groups: ["/Test Group/researcher"])) { app, token, endpoints in
                 let endpoint = endpoints[index]
@@ -146,7 +147,7 @@ struct AuthIntegrationTests {
         try await TestApp.withApp(token: .participant(subject: "participant-test-user")) { app, token in
             let endpoints = Self.allEndpoints(.dummy)
 
-            for endpoint in endpoints where !endpoint.isParticipant {
+            for endpoint in endpoints where !endpoint.isParticipant && !endpoint.requiresAuthenticationOnly {
                 try await self.expectStatus(.forbidden, for: endpoint, token: token, on: app)
             }
         }
@@ -166,7 +167,7 @@ struct AuthIntegrationTests {
     @Test
     func participantAllowedActions() async throws {
         try await withFixtures(token: .participant(subject: "participant-test-user")) { app, token, endpoints in
-            for endpoint in endpoints where endpoint.isParticipant {
+            for endpoint in endpoints where endpoint.isParticipant || endpoint.requiresAuthenticationOnly {
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
             }
         }

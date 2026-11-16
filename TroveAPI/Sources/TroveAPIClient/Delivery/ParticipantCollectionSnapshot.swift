@@ -27,7 +27,7 @@ public struct ParticipantCollectionSnapshot: Sendable {
     }
 
     public var acquisitionProfiles: [CollectionObservationProfile] {
-        CollectionObservationProfile.allCases.filter { permitsAcquisition(of: $0) }
+        acquisitionStreams.filter { $0 != .workoutRoute }.map(\.profile)
     }
 
     public var acquisitionStreams: [HealthKitQueryDefinition.Stream] {
@@ -76,9 +76,14 @@ public struct ParticipantCollectionSnapshot: Sendable {
 
     /// Select one accepted consent per study for a complete measurement of the requested profile.
     public func consentIDs(
-        profile: CollectionObservationProfile, start: Date, end: Date?, requiresWorkoutRoute: Bool = false
+        profile: CollectionObservationProfile,
+        start: Date,
+        end: Date?,
+        requiresWorkoutRoute: Bool = false,
+        sourceTypeIdentifier: String? = nil,
+        timeBasis: CollectionTimeBasis = .measurementTime
     ) throws -> [UUID] {
-        guard !requiresWorkoutRoute || profile == .workout, profile.isInterval == (end != nil),
+        guard !requiresWorkoutRoute || profile == .workout, profile.permitsEffectiveTime(hasEnd: end != nil),
               Self.validDate(start), end.map({ Self.validDate($0) && $0 >= start }) ?? true else {
             throw CollectionError.invalidPlan
         }
@@ -86,7 +91,10 @@ public struct ParticipantCollectionSnapshot: Sendable {
         return try plans.compactMap { plan in
             guard let window = plan.windows.reversed().first(where: { window in
                 window.requirements.contains {
-                    $0.profile == profile.rawValue && (!requiresWorkoutRoute || $0.includeWorkoutRoutes == true)
+                    $0.sourceKind == .participantApp && $0.profile == profile.rawValue
+                        && Self.sourceMatches($0, sourceTypeIdentifier: sourceTypeIdentifier, requiresWorkoutRoute: requiresWorkoutRoute)
+                        && ($0.timeBasis ?? .measurementTime) == timeBasis
+                        && (!requiresWorkoutRoute || $0.includeWorkoutRoutes == true)
                         && CollectionMeasurementSelection.includes(
                         sampleStart: start, sampleEnd: end, windowStart: $0.start, windowEnd: $0.end
                     )
@@ -119,6 +127,20 @@ public struct ParticipantCollectionSnapshot: Sendable {
 
 
 extension ParticipantCollectionSnapshot {
+    private struct RequirementIdentity: Hashable {
+        let profile: String
+        let sourceKind: String
+        let providerRegistrationID: UUID?
+        let sourceTypeIdentifier: String?
+
+        init(_ requirement: Components.Schemas.CollectionPlanRequirement) {
+            profile = requirement.profile
+            sourceKind = requirement.sourceKind.rawValue
+            providerRegistrationID = requirement.providerRegistrationId.flatMap(UUID.init(uuidString:))
+            sourceTypeIdentifier = requirement.sourceTypeIdentifier
+        }
+    }
+
     /// Grove profile for a point heart-rate measurement.
     public static let heartRateProfile = CollectionObservationProfile.heartRate.rawValue
     /// Grove profile for a complete sleep-stage interval.
@@ -141,11 +163,13 @@ extension ParticipantCollectionSnapshot {
             if let previous {
                 guard previous.end == window.start, previous.revision < window.revision else { throw CollectionError.invalidPlan }
             }
-            guard window.requirements.count <= CollectionObservationProfile.allCases.count,
-                  Set(window.requirements.map(\.profile)).count == window.requirements.count else { throw CollectionError.invalidPlan }
+            guard window.requirements.count <= CollectionObservationProfile.maximumRequirements,
+                  Set(window.requirements.map(RequirementIdentity.init)).count == window.requirements.count else { throw CollectionError.invalidPlan }
             guard window.requirements.allSatisfy({
-                CollectionObservationProfile(rawValue: $0.profile) != nil && $0.sourceKind == .participantApp
-                    && ($0.includeWorkoutRoutes != true || $0.profile == CollectionObservationProfile.workout.rawValue)
+                CollectionObservationProfile(rawValue: $0.profile) != nil && Self.validSource($0)
+                    && CollectionTimeBasis.accepts($0.timeBasis, profile: $0.profile, sourceTypeIdentifier: $0.sourceTypeIdentifier)
+                    && ($0.includeWorkoutRoutes != true
+                        || ($0.profile == CollectionObservationProfile.workout.rawValue && $0.sourceKind == .participantApp))
             }) else {
                 throw CollectionError.unsupportedRequirement
             }
@@ -153,6 +177,17 @@ extension ParticipantCollectionSnapshot {
             previous = window
         }
         guard previous == nil || previous?.end == plan.endsAt else { throw CollectionError.invalidPlan }
+    }
+
+    private static func validSource(_ requirement: Components.Schemas.CollectionPlanRequirement) -> Bool {
+        switch requirement.sourceKind {
+        case .participantApp:
+            requirement.providerRegistrationId == nil
+                && CollectionObservationProfile(rawValue: requirement.profile)?.permitsNativeSource(requirement.sourceTypeIdentifier) == true
+        case .serverWorker:
+            requirement.providerRegistrationId.flatMap(UUID.init(uuidString:)) != nil
+                && requirement.sourceTypeIdentifier.map { !$0.isEmpty && $0.utf8.count <= 256 } == true
+        }
     }
 
     private static func validateRequirements(_ window: Components.Schemas.ConsentCollectionWindow) throws {
@@ -165,12 +200,25 @@ extension ParticipantCollectionSnapshot {
         }
     }
 
+    private static func sourceMatches(
+        _ requirement: Components.Schemas.CollectionPlanRequirement, sourceTypeIdentifier: String?, requiresWorkoutRoute: Bool = false
+    ) -> Bool {
+        CollectionObservationProfile(rawValue: requirement.profile)?.matchesSource(
+            expected: requirement.sourceTypeIdentifier, actual: sourceTypeIdentifier, requiresWorkoutRoute: requiresWorkoutRoute
+        ) == true
+    }
+
     private static func validDate(_ date: Date) -> Bool {
         (-62_135_596_800...253_402_300_799).contains(date.timeIntervalSince1970)
     }
     /// Whether a current accepted window requests this measurement.
-    public func permitsAcquisition(of profile: CollectionObservationProfile) -> Bool {
-        plans.contains { $0.windows.last?.requirements.contains { $0.profile == profile.rawValue } == true }
+    public func permitsAcquisition(of profile: CollectionObservationProfile, sourceTypeIdentifier: String? = nil) -> Bool {
+        plans.contains { plan in
+            plan.windows.last?.requirements.contains {
+                $0.sourceKind == .participantApp && $0.profile == profile.rawValue
+                    && Self.sourceMatches($0, sourceTypeIdentifier: sourceTypeIdentifier ?? profile.nativeSourceTypeIdentifier)
+            } == true
+        }
     }
 
     /// Whether the current accepted requirements request this independently queried stream.
@@ -186,15 +234,21 @@ extension ParticipantCollectionSnapshot {
 
     /// Earliest nonempty measurement window for a currently requested profile.
     public func queryStart(for profile: CollectionObservationProfile) -> Date? {
-        guard permitsAcquisition(of: profile) else {
+        guard let stream = try? HealthKitQueryDefinition.Stream(profile) else {
+            return nil
+        }
+        return queryStart(forStream: stream)
+    }
+
+    /// Earliest authorized window for this exact native stream, independent of streams sharing its profile.
+    public func queryStart(forStream stream: HealthKitQueryDefinition.Stream) -> Date? {
+        guard permitsAcquisition(stream: stream) else {
             return nil
         }
         return plans
             .flatMap(\.windows)
             .flatMap(\.requirements)
-            .filter { requirement in
-                requirement.profile == profile.rawValue && (requirement.end.map { $0 > requirement.start } ?? true)
-            }
+            .filter { requirement in stream.includes(requirement) && (requirement.end.map { $0 > requirement.start } ?? true) }
             .map(\.start)
             .min()
     }

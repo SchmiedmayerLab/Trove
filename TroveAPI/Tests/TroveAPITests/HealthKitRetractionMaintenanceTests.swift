@@ -115,7 +115,7 @@ extension HealthKitRetractionMaintenanceTests {
             _ = try await Fixture.retain([plan], in: journal)
             let route = try WorkoutRouteFixture.sample(start: Fixture.date(25), end: Fixture.date(150), count: 1)
             let page = try await collect(
-                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1))) { route in
+                .init(added: [route], deletedIDs: [], nextAnchor: QueryAnchor(HKQueryAnchor(fromValue: 1)), readRoute: { route in
                     let locations = AsyncThrowingStream<CLLocation, any Error> { continuation in
                         continuation.yield(WorkoutRouteFixture.location(at: Fixture.date(75)))
                         continuation.finish()
@@ -123,7 +123,7 @@ extension HealthKitRetractionMaintenanceTests {
                     return try await HealthKitRecordingFile.workoutRoute(
                         route, locations: locations, relativePath: "recordings/route.csv", maximumByteCount: 4096
                     )
-                },
+                }),
                 journal: journal
             )
             let id = try #require(page.eventIDs.first)

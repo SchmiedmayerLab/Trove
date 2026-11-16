@@ -160,7 +160,7 @@ struct AuthoringClient: Sendable {
             try await client.getStudyRecording(.init(
                 path: .init(studyId: study.uuidString, grantId: grant.uuidString),
                 query: .init(versions: versions)
-            )).ok.body.csv
+            )).ok.body.binary
         }
     }
 

@@ -162,7 +162,7 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
         at now: Date = .now
     ) throws -> Checkpoint {
         guard state.scope == scope else { throw JournalError.wrongScope }
-        guard let active = try state.snapshot?.active(at: now), !active.retainedStreams.isEmpty else {
+        guard let active = try state.snapshot?.active(at: now), !active.retainedStreams.isEmpty || active.permitsSensorKitAcquisition else {
             throw ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized
         }
         var checkpoint = try queryID.map { try self.checkpoint(for: sourceID, queryID: $0) } ?? self.checkpoint(for: sourceID)

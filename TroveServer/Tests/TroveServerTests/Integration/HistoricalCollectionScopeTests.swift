@@ -53,7 +53,7 @@ struct HistoricalCollectionScopeTests {
     func newlyAcceptedHistoryGrantsExistingDataWithoutAnotherUpload() async throws {
         try await PublicationWorkflowFixtures.withApp { app, token in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app, consentCount: 1)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 try await ClinicalEventStore(database: app.db).accept(
                     event, sourceID: fixture.source.id, targets: [fixture.targets[0]], installation: fixture.installation
@@ -109,12 +109,12 @@ extension HistoricalCollectionScopeTests {
     ) async throws {
         let targets = [ClinicalEventTarget(consentID: try consent.requireID(), outputFullURLs: ["urn:uuid:point"])]
         let store = ClinicalEventStore(database: app.db)
-        let outside = ClinicalEventStoreTests.event(source: fixture.source, sequence: 1, effectiveAt: lower.addingTimeInterval(-0.001))
+        let outside = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 1, effectiveAt: lower.addingTimeInterval(-0.001))
         await #expect {
             try await store.accept(outside, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
         } throws: { ($0 as? ServerError)?.status.code == 403 }
         try await ClinicalEventStoreTests.expectRows(events: 0, nodes: 0, facts: 0, grants: 0, on: app.db)
-        let inside = ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: lower)
+        let inside = try ClinicalEventStoreTests.event(source: fixture.source, sequence: 2, effectiveAt: lower)
         _ = try await store.accept(inside, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
         try await ClinicalEventStoreTests.expectRows(events: 1, nodes: 2, facts: 1, grants: 1, on: app.db)
     }

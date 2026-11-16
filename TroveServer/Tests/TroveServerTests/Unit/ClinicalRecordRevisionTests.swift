@@ -26,8 +26,8 @@ struct ClinicalRecordRevisionTests {
         Claim(version: "2"),
         Claim(output: "primary")
     ], [false, true])
-    func mixedRevisionOrDuplicateOutputIsRejected(claim: Claim, reversed: Bool) {
-        let points = [Self.point(), Self.point(record: claim.record, writer: claim.writer, version: claim.version, output: claim.output)]
+    func mixedRevisionOrDuplicateOutputIsRejected(claim: Claim, reversed: Bool) throws {
+        let points = try [Self.point(), Self.point(record: claim.record, writer: claim.writer, version: claim.version, output: claim.output)]
         #expect {
             try ClinicalRecordRevision(Self.event(reversed ? Array(points.reversed()) : points))
         } throws: { ($0 as? ServerError)?.status.code == 400 }
@@ -54,11 +54,11 @@ struct ClinicalRecordRevisionTests {
 extension ClinicalRecordRevisionTests {
     private static func point(
         record: String = "record", writer: String? = "writer", version: String? = "1", output: String = "primary"
-    ) -> ValidatedExchangeEvent.Output {
-        .init(
+    ) throws -> ValidatedExchangeEvent.Output {
+        try .init(
             fullURL: "urn:point:" + output,
             profile: CollectionRequirement.supportedProfile,
-            effectiveAt: Date(),
+            measurementBounds: .init(start: Date()),
             sourceRecordIdentifier: .init(system: "urn:record", value: record),
             sourceOutputIdentifier: .init(system: "urn:output", value: output),
             writerIdentifier: writer.map { .init(system: "urn:writer", value: $0) },

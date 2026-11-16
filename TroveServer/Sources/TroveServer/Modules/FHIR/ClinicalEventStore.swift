@@ -20,7 +20,8 @@ struct ClinicalEventStore: Sendable {
         let source: SourceBinding
         let intent: String
         let digest: String
-        let context: AuthContext
+        let auditContext: AuditEvent.Context
+        let providerRegistrationID: UUID?
     }
 
     let database: any Database
@@ -43,51 +44,74 @@ struct ClinicalEventStore: Sendable {
         _ event: ValidatedExchangeEvent, sourceID: UUID, targets: [ClinicalEventTarget], installation: SourceInstallationProof
     ) async throws -> ClinicalEventReceipt {
         let context = try AuthContext.checkIsParticipant()
+        do {
+            return try await database.transaction { transaction in
+                let source = try await self.lockSourceOwner(sourceID: sourceID, context: context, on: transaction)
+                _ = try await installation.validate(source: source, on: transaction)
+                return try await self.acceptAuthorized(
+                    event, source: source, targets: targets, auditContext: context.auditContext, on: transaction
+                )
+            }
+        } catch where (error as? any DatabaseError)?.isConstraintFailure == true {
+            throw ServerError.conflict("Clinical event identity or scoped output binding conflicts with retained history")
+        }
+    }
+
+    private func acceptAuthorized(
+        _ event: ValidatedExchangeEvent,
+        source: SourceBinding,
+        targets: [ClinicalEventTarget],
+        auditContext: AuditEvent.Context,
+        on transaction: any Database,
+        providerRegistrationID: UUID? = nil
+    ) async throws -> ClinicalEventReceipt {
+        guard transaction.inTransaction else { throw AuditError.transactionRequired }
         try validateBounds(event)
         try ClinicalGraphStore.validate(event)
+        try validateSource(event, source: source)
         let revision = try ClinicalRecordRevision(event)
         let intent = try ClinicalEventIntent(targets: targets)
         guard event.retraction == nil ? !targets.isEmpty : targets.isEmpty else {
             throw ServerError.badRequest("Active events require study targets; retractions must not grant study access")
         }
         let digest = SHA256.hash(data: event.rawBytes).map { String(format: "%02x", $0) }.joined()
-        do {
-            return try await database.transaction { transaction in
-                let source = try await self.lockSourceOwner(sourceID: sourceID, context: context, on: transaction)
-                _ = try await installation.validate(source: source, on: transaction)
-                try self.validateSource(event, source: source)
-                let representations = ClinicalEventRepresentationStore(database: transaction, source: source, context: context)
-                if let receipt = try await representations.replay(event, intent: intent, digest: digest) {
-                    return receipt
-                }
-                let receivedAt = Date()
-                let grants = ClinicalGrantStore(database: transaction, source: source, context: context, acceptedAt: receivedAt)
-                let authorities = try await grants.authorities(
-                    outputs: event.collectionOutputs,
-                    intent: intent,
-                    requireCustodyCoverage: true
-                )
-                let receipt = ClinicalEventReceipt(
-                    eventID: UUID(),
-                    sourceID: sourceID,
-                    producerEventIdentifier: .init(system: event.eventIdentifierSystem, value: event.eventIdentifierValue),
-                    payloadSHA256: digest,
-                    targetIntentSHA256: intent.sha256,
-                    receivedAt: receivedAt,
-                    nodeCount: event.nodes.count
-                )
-                let acceptance = Acceptance(receipt: receipt, source: source, intent: intent.serialized, digest: digest, context: context)
-                try await self.insert(event, revision: revision, acceptance: acceptance, authorities: authorities, on: transaction)
-                // Return the persisted timestamp precision on the first response as well as replay.
-                let persisted = try await representations.replay(event, intent: intent, digest: digest)
-                guard let persisted else {
-                    throw ServerError.unexpectedError
-                }
-                return persisted
-            }
-        } catch where (error as? any DatabaseError)?.isConstraintFailure == true {
-            throw ServerError.conflict("Clinical event identity or scoped output binding conflicts with retained history")
+        let representations = ClinicalEventRepresentationStore(
+            database: transaction, source: source, auditContext: auditContext, providerRegistrationID: providerRegistrationID
+        )
+        if let receipt = try await representations.replay(event, intent: intent, digest: digest) {
+            return receipt
         }
+        let receivedAt = Date()
+        let grants = ClinicalGrantStore(
+            database: transaction,
+            source: source,
+            auditContext: auditContext,
+            acceptedAt: receivedAt,
+            providerRegistrationID: providerRegistrationID
+        )
+        let authorities = try await grants.authorities(outputs: event.collectionOutputs, intent: intent, requireCustodyCoverage: true)
+        let receipt = ClinicalEventReceipt(
+            eventID: UUID(),
+            sourceID: source.id,
+            producerEventIdentifier: .init(system: event.eventIdentifierSystem, value: event.eventIdentifierValue),
+            payloadSHA256: digest,
+            targetIntentSHA256: intent.sha256,
+            receivedAt: receivedAt,
+            nodeCount: event.nodes.count
+        )
+        let acceptance = Acceptance(
+            receipt: receipt,
+            source: source,
+            intent: intent.serialized,
+            digest: digest,
+            auditContext: auditContext,
+            providerRegistrationID: providerRegistrationID
+        )
+        try await insert(event, revision: revision, acceptance: acceptance, authorities: authorities, on: transaction)
+        guard let persisted = try await representations.replay(event, intent: intent, digest: digest) else {
+            throw ServerError.unexpectedError
+        }
+        return persisted
     }
 
     private func validateBounds(_ event: ValidatedExchangeEvent) throws {
@@ -133,10 +157,20 @@ struct ClinicalEventStore: Sendable {
         let namespaces = try SourceIdentityNamespaces.assign(root: source.identifierRoot, keyID: source.keyID, epoch: source.keyEpoch)
         // Registered source ownership establishes authority; knowledge of an opaque version does not.
         let lifecycleSystem = event.retraction == nil ? namespaces.recordVersion : namespaces.recordRetraction
-        let nativeSystem = try Components.Schemas.ParticipantSource(source).nativeRecordIdentifierSystem().rawValue
+        let nativeIdentifiersMatch: Bool
+        switch source.kind {
+        case .participantApp:
+            let nativeSystem = try Components.Schemas.ParticipantSource(source).nativeRecordIdentifierSystem().rawValue
+            nativeIdentifiersMatch = event.nativeRecordIdentifiers.allSatisfy { $0.system == nativeSystem }
+        case .serverWorker:
+            nativeIdentifiersMatch = event.nativeRecordIdentifiers.isEmpty
+        }
         guard event.eventIdentifierSystem == lifecycleSystem.rawValue,
-              event.deploymentIdentifiers.matches(namespaces),
-              event.nativeRecordIdentifiers.allSatisfy({ $0.system == nativeSystem }),
+              event.deploymentIdentifiers.matches(namespaces, provider: source.kind == .serverWorker),
+              nativeIdentifiersMatch,
+              event.outputs.allSatisfy({ output in
+                  output.sourceRepositoryKind.map { $0 == source.repositoryKind } ?? (source.kind == .participantApp)
+              }),
               event.retraction == nil ? event.participants == [participant] : event.participants.isEmpty else {
             throw ServerError.forbidden("Event identity does not match the registered participant source")
         }
@@ -160,7 +194,13 @@ struct ClinicalEventStore: Sendable {
             """)
             .run()
         let records = ClinicalRecordStore(sql: sql)
-        let grants = ClinicalGrantStore(database: transaction, source: acceptance.source, context: acceptance.context, acceptedAt: receipt.receivedAt)
+        let grants = ClinicalGrantStore(
+            database: transaction,
+            source: acceptance.source,
+            auditContext: acceptance.auditContext,
+            acceptedAt: receipt.receivedAt,
+            providerRegistrationID: acceptance.providerRegistrationID
+        )
         let recordID = try await records.insert(revision, eventID: receipt.eventID, sourceID: receipt.sourceID)
         if event.retraction != nil {
             try await records.retract(recordID: recordID, sourceID: receipt.sourceID, eventID: receipt.eventID)
@@ -187,7 +227,7 @@ struct ClinicalEventStore: Sendable {
         try await ClinicalRecordingStore.retain(event.recordings, nodes: nodeIDs, source: acceptance.source, on: transaction)
         try await ClinicalGraphStore(sql: sql).insert(event, nodeIDs: nodeIDs, receipt: receipt)
         try await AuditRepository.recordMutation(.init(
-            context: acceptance.context.auditContext,
+            context: acceptance.auditContext,
             action: .clinicalEventAccepted,
             scope: .participantSource(participantID: acceptance.source.participantID, sourceBindingID: receipt.sourceID),
             target: .init(id: receipt.eventID)

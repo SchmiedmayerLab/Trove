@@ -15,6 +15,7 @@ struct ClinicalGraphStore: Sendable {
     let sql: any SQLDatabase
 
     static func validate(_ event: ValidatedExchangeEvent) throws {
+        try ClinicalOutputDependencyStore.validate(event)
         let contexts = event.questionnaireContexts
         let contextURLs = Set(contexts.map(\.fullURL))
         let outputURLs = Set(event.outputs.map(\.fullURL))
@@ -43,6 +44,7 @@ struct ClinicalGraphStore: Sendable {
     }
 
     func insert(_ event: ValidatedExchangeEvent, nodeIDs: [String: UUID], receipt: ClinicalEventReceipt) async throws {
+        try await ClinicalOutputDependencyStore(sql: sql).insert(event, nodeIDs: nodeIDs, receipt: receipt)
         for context in event.questionnaireContexts {
             guard let nodeID = nodeIDs[context.fullURL] else { throw ServerError.unexpectedError }
             try await sql.raw("""

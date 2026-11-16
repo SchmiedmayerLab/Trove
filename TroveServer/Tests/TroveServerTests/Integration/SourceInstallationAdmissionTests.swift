@@ -78,7 +78,7 @@ struct SourceInstallationAdmissionTests {
             #expect(other.id == fixture.source.id)
             let proof = try SourceBindingFixture.proof(installationID)
             let store = ClinicalEventStore(database: app.db)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             let receipt = try await store.accept(
                 event, sourceID: other.id, targets: fixture.targets, installation: fixture.installation
             )

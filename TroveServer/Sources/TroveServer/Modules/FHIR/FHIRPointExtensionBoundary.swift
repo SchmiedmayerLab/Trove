@@ -7,24 +7,44 @@
 //
 
 import Foundation
+import GroveFHIRContract
 
 
 private enum PointExtensionLocation {
-    case bundle, entries, entry, resource, targets, target, entities, entity, documentContext, period, temporalPrimitive, codedValue, other
+    case bundle, entries, entry, resource, resourceExtensions, resourceExtension, targets, target, entities, entity
+    case components, component, componentExtensions, componentExtension
+    case documentContext, period, temporalPrimitive, codedValue, other
 
     var element: Self {
         switch self {
         case .entries: .entry
         case .targets: .target
         case .entities: .entity
+        case .resourceExtensions: .resourceExtension
+        case .components: .component
+        case .componentExtensions: .componentExtension
         default: .other
         }
     }
 
     var allowsExtensions: Bool {
         switch self {
-        case .entry, .resource, .target, .entity, .temporalPrimitive, .codedValue: true
+        case .entry, .resource, .target, .entity, .temporalPrimitive, .codedValue, .component: true
         default: false
+        }
+    }
+
+    private static func resourceMember(_ name: String) -> Self {
+        switch name {
+        case "extension": .resourceExtensions
+        case "target": .targets
+        case "entity": .entities
+        case "valueCodeableConcept": .codedValue
+        case "context": .documentContext
+        case "component": .components
+        case "effectivePeriod", "occurredPeriod": .period
+        case "_effectiveDateTime", "_issued", "_authored", "_occurredDateTime": .temporalPrimitive
+        default: .other
         }
     }
 
@@ -32,14 +52,11 @@ private enum PointExtensionLocation {
         switch (self, name) {
         case (.bundle, "entry"): .entries
         case (.entry, "resource"): .resource
-        case (.resource, "target"): .targets
-        case (.resource, "entity"): .entities
-        case (.resource, "valueCodeableConcept"): .codedValue
-        case (.resource, "context"): .documentContext
+        case (.resource, _): Self.resourceMember(name)
         case (.documentContext, "period"): .period
-        case (.resource, "effectivePeriod"), (.resource, "occurredPeriod"): .period
-        case (.resource, "_effectiveDateTime"), (.resource, "_issued"), (.resource, "_authored"),
-             (.resource, "_occurredDateTime"), (.period, "_start"), (.period, "_end"): .temporalPrimitive
+        case (.component, "extension"): .componentExtensions
+        case (.component, "valuePeriod"): .period
+        case (.period, "_start"), (.period, "_end"): .temporalPrimitive
         default: .other
         }
     }
@@ -65,26 +82,42 @@ extension FHIRPointSupportBoundary {
         }
     }
 
+    private static func isRetainedMetadata(_ object: [String: Any], at location: PointExtensionLocation) -> Bool {
+        location == .resourceExtension && object["url"] as? String == FHIRHealthKitMetadataBoundary.url
+    }
+
     private static func inspectExtensionLocations(_ value: Any, at location: PointExtensionLocation, depth: Int) throws {
         if let object = value as? [String: Any] {
             guard depth < ValidatedQuantityLexemes.maximumDepth else { throw FHIRValidationClient.invalid }
-            for (key, child) in object {
-                guard key != "modifierExtension" else { throw FHIRValidationClient.invalid }
-                if key == "extension" {
-                    guard location.allowsExtensions, child is [Any] else { throw FHIRValidationClient.invalid }
-                    if location == .entity {
-                        try sourceRevision(child)
-                        continue
-                    }
-                    try validateNestedExtensions(child, at: location)
-                }
-                try inspectExtensionLocations(child, at: location.member(key), depth: depth + 1)
+            if location == .componentExtension {
+                try FHIRHealthKitAudiogramBoundary.validateLocations(object)
+                return
             }
+            if isRetainedMetadata(object, at: location) {
+                try FHIRHealthKitMetadataBoundary.validateLocations(object)
+                return
+            }
+            try inspectObjectMembers(object, at: location, depth: depth)
         } else if let array = value as? [Any] {
             guard depth < ValidatedQuantityLexemes.maximumDepth else { throw FHIRValidationClient.invalid }
             for child in array {
                 try inspectExtensionLocations(child, at: location.element, depth: depth + 1)
             }
+        }
+    }
+
+    private static func inspectObjectMembers(_ object: [String: Any], at location: PointExtensionLocation, depth: Int) throws {
+        for (key, child) in object {
+            guard key != "modifierExtension" else { throw FHIRValidationClient.invalid }
+            if key == "extension" {
+                guard location.allowsExtensions, child is [Any] else { throw FHIRValidationClient.invalid }
+                if location == .entity {
+                    try sourceEntityExtensions(child)
+                    continue
+                }
+                try validateNestedExtensions(child, at: location)
+            }
+            try inspectExtensionLocations(child, at: location.member(key), depth: depth + 1)
         }
     }
 
@@ -94,6 +127,30 @@ extension FHIRPointSupportBoundary {
         case .codedValue: try unmappedSourceValues(value)
         default: break
         }
+    }
+
+    private static func sourceEntityExtensions(_ value: Any) throws {
+        guard let extensions = value as? [[String: Any]], extensions.count <= 2 else { throw FHIRValidationClient.invalid }
+        var seen: Set<String> = []
+        for item in extensions {
+            guard let url = item["url"] as? String, seen.insert(url).inserted else { throw FHIRValidationClient.invalid }
+            if url == HealthKitSourceDocumentTime.extensionURL.value?.url.absoluteString {
+                try sourceDocumentTime(item)
+            } else {
+                try sourceRevision([item])
+            }
+        }
+    }
+
+    private static func sourceDocumentTime(_ item: [String: Any]) throws {
+        guard Set(item.keys) == ["url", "extension"], let children = item["extension"] as? [[String: Any]], children.count == 2,
+              let basis = children.first(where: { $0["url"] as? String == "basis" }), Set(basis.keys) == ["url", "valueCode"],
+              let code = basis["valueCode"] as? String, HealthKitSourceDocumentTime.Basis(rawValue: code) != nil,
+              let period = children.first(where: { $0["url"] as? String == "period" }), Set(period.keys) == ["url", "valuePeriod"],
+              let bounds = period["valuePeriod"] as? [String: Any], bounds["start"] is String, bounds["end"] is String else {
+            throw FHIRValidationClient.invalid
+        }
+        try inspectExtensionLocations(bounds, at: .period, depth: 0)
     }
 
     private static func sourceRevision(_ value: Any) throws {

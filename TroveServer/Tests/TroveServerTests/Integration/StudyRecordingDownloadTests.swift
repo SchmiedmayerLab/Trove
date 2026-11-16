@@ -36,13 +36,17 @@ struct StudyRecordingDownloadTests {
             #expect(location == StudyRecordingLocation.path(studyID: study, grantID: fixture.grantID, versions: .current))
             let response = try await client.getStudyRecording(.init(path: .init(studyId: study.uuidString, grantId: fixture.grantID.uuidString))).ok
             #expect(response.headers.cacheControl == .noStore)
-            let bytes = try await Data(collecting: response.body.csv, upTo: 1024 * 1024)
+            #expect(response.headers.xRecordingContentType == .textCsv)
+            #expect(response.headers.contentDisposition == "attachment; filename=recording.csv")
+            let bytes = try await Data(collecting: response.body.binary, upTo: 1024 * 1024)
             #expect(Int64(bytes.count) == fixture.recording.declaration.content.sourceByteCount)
             #expect(ArtifactStore.digest(bytes) == fixture.recording.declaration.content.sourceSHA256)
             #expect(Data(Insecure.SHA1.hash(data: bytes)).base64EncodedString() == attachment["hash"] as? String)
             try await app.test(.GET, location, beforeRequest: { $0.bearerAuth(readerToken) }) { result in
                 #expect(result.status == .ok && result.body.readableBytesView.elementsEqual(bytes))
                 #expect(result.headers.first(name: .cacheControl) == "no-store")
+                #expect(result.headers.first(name: .contentType) == "application/octet-stream")
+                #expect(result.headers.first(name: "X-Recording-Content-Type") == "text%2Fcsv")
             }
             #expect(try await StudyRecordingFixture.disclosureCount(on: app) == 2)
         }

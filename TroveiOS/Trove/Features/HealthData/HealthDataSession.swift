@@ -74,7 +74,7 @@ struct HealthDataSession {
                 return .revoked
             }
             let streams = try await requestedStreams(journal)
-            let types = streams.map { HealthKitAcquisition.sampleType(for: $0) as HKObjectType }
+            let types = try streams.map { try HealthKitAcquisition.sampleType(for: $0) as HKObjectType }
             try await healthKit.askForAuthorization(for: .init(read: types))
             try checkSession()
             return .permissionRequested
@@ -152,19 +152,10 @@ struct HealthDataSession {
     }
 
     private func hasRequestedAccess(_ journal: EventDeliveryJournal) async throws -> Bool {
-        for stream in try await requestedStreams(journal) {
-            let requested: Bool
-            switch stream {
-            case .heartRate: requested = await healthKit.didAskForAuthorization(toRead: SampleType.heartRate)
-            case .sleepStage: requested = await healthKit.didAskForAuthorization(toRead: SampleType.sleepAnalysis)
-            case .workout: requested = await healthKit.didAskForAuthorization(toRead: SampleType.workout)
-            case .workoutRoute: requested = await healthKit.didAskForAuthorization(toRead: SampleType.workoutRoute)
-            }
-            if !requested {
-                return false
-            }
+        let types = try await requestedStreams(journal).map { stream in
+            try HealthKitAcquisition.sampleType(for: stream) as HKObjectType
         }
-        return true
+        return await healthKit.didAskForAuthorization(toRead: Set(types))
     }
 
     private func queueStatus(

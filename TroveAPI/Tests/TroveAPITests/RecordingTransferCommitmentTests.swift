@@ -8,11 +8,73 @@
 
 import Foundation
 import GroveFHIRContract
+import GroveHealthKit
+import GroveSensorKitFHIR
 import Testing
 import TroveAPITypes
 
 
 struct RecordingTransferCommitmentTests {
+    private static let retainedRouteEvidence = Data([
+        "{\"attachmentPath\":\"recordings/route.csv\",\"content\":{\"encoding\":\"identity\",\"sourceByteCount\":3,\"sourc",
+        "eSHA256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"storedByteCount\":3,\"sto",
+        "redSHA256\":\"1111111111111111111111111111111111111111111111111111111111111111\"},\"effectiveAt\":8216928",
+        "00,\"effectiveEnd\":821692860,\"format\":\"location-track-samples\",\"outputFullURL\":\"urn:uuid:00000000-000",
+        "0-4000-8000-000000000001\",\"profile\":\"https://grovealliance.org/fhir/healthkit/StructureDefinition/he",
+        "althkit-recording-document\",\"targetIntent\":\"[{\\\"consentId\\\":\\\"00000000-0000-4000-8000-000000000002\\\"",
+        ",\\\"outputFullUrls\\\":[\\\"urn:uuid:00000000-0000-4000-8000-000000000001\\\"]}]\",\"version\":1}"
+    ].joined().utf8)
+
+    @Test
+    func retainedRouteEvidenceRestoresByteForByteWithoutInventingASourceToken() throws {
+        let bytes = Self.retainedRouteEvidence
+        let restored = try RecordingTransferCommitment(
+            restoring: bytes, sha256: "0d02fcb1a02c6d357177c538d73dbc7161b8b50d192a9b20e3b29282235b9744"
+        )
+        #expect(restored.serialized == bytes && restored.declaration.sourceTypeIdentifier == nil)
+        var explicit = restored.declaration
+        explicit.sourceTypeIdentifier = SampleType.workoutRoute.hkSampleType.identifier
+        let changed = try RecordingTransferCommitment(explicit)
+        #expect(changed.sha256 != restored.sha256)
+        #expect(try RecordingTransferCommitment(restoring: changed.serialized, sha256: changed.sha256).declaration == explicit)
+    }
+
+    @Test
+    func heartbeatRecordingRequiresItsExactSourceRatherThanRouteAuthority() throws {
+        var declaration = try Self.declaration()
+        declaration.format = RegisteredRecordingFormat.beatIntervalSeries.rawValue
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+        declaration.sourceTypeIdentifier = SampleType.workoutRoute.hkSampleType.identifier
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+        declaration.sourceTypeIdentifier = SampleType.heartbeatSeries.hkSampleType.identifier
+        let commitment = try RecordingTransferCommitment(declaration)
+        #expect(commitment.declaration.sourceTypeIdentifier == declaration.sourceTypeIdentifier)
+        declaration.format = RegisteredRecordingFormat.locationTrackSamples.rawValue
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+    }
+
+    @Test
+    func sensorRecordingDeclarationUsesItsExactCatalogSourceProfileAndFormat() throws {
+        let entry = try #require(SensorKitCatalog.current.entries.first {
+            $0.implementedOutput != nil && $0.rawFormats.contains(.triaxialAccelerationSamples)
+        })
+        var declaration = try Self.declaration()
+        declaration.profile = SensorKitContract.recordingDocumentProfile
+        declaration.format = RegisteredRecordingFormat.triaxialAccelerationSamples.rawValue
+        declaration.sourceTypeIdentifier = entry.sourceToken
+        let commitment = try RecordingTransferCommitment(declaration)
+        #expect(commitment.declaration.sourceTypeIdentifier == entry.sourceToken)
+        #expect(commitment.declaration.format == declaration.format)
+        #expect(try RecordingTransferCommitment(restoring: commitment.serialized, sha256: commitment.sha256).declaration == commitment.declaration)
+        declaration.sourceTypeIdentifier = nil
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+        declaration.sourceTypeIdentifier = "unknown-sensor"
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+        declaration.sourceTypeIdentifier = entry.sourceToken
+        declaration.format = RegisteredRecordingFormat.clinicalDocument.rawValue
+        #expect(throws: (any Error).self) { try RecordingTransferCommitment(declaration) }
+    }
+
     @Test
     func canonicalEvidenceSurvivesWireDatePrecisionAndTargetOrdering() throws {
         var declaration = try Self.declaration()

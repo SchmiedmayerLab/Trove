@@ -15,6 +15,12 @@ import ModelsR4
 /// This is a receiver capability boundary, not an alternative implementation of the IG validator.
 enum FHIRPointProjection {
     private typealias Identity = ValidatedExchangeEvent.Identifier
+    private struct ClinicalOutputs {
+        let participants: Set<Identity>
+        let outputs: [ValidatedExchangeEvent.Output]
+        let nativeIdentifiers: [Identity]
+    }
+
     private struct Header: Decodable {
         struct Meta: Decodable { let profile: [String] }
         let meta: Meta?
@@ -53,6 +59,36 @@ enum FHIRPointProjection {
         let (nodes, resources) = try index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
         try FHIRWorkoutProjection.validate(resources: resources)
+        try FHIRRecordingSourcePeriod.validate(resources: resources)
+        let clinical = try clinicalOutputs(nodes, resources: resources, quantities: quantities, recordings: recordings)
+        try validateOutputs(
+            clinical.outputs, participants: clinical.participants, nativeIdentifiers: clinical.nativeIdentifiers, recordings: recordings
+        )
+        var result = ValidatedExchangeEvent(
+            rawBytes: bytes,
+            recorded: try RecordedInstant.extract(from: resources),
+            validatorIdentity: validatorIdentity,
+            eventIdentifierSystem: record.version.identifier.identifier.system.rawValue,
+            eventIdentifierValue: record.version.identifier.identifier.value,
+            deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
+            participants: clinical.participants,
+            nodes: nodes,
+            outputs: clinical.outputs,
+            nativeRecordIdentifiers: clinical.nativeIdentifiers,
+            recordings: recordings
+        )
+        _ = try ClinicalRecordRevision(result)
+        try FHIRClinicalDerivations.extract(resources: resources, into: &result)
+        try FHIRSensorKitCompanions.validateDependencies(result)
+        return result
+    }
+
+    private static func clinicalOutputs(
+        _ nodes: [ValidatedExchangeEvent.Node],
+        resources: [String: ResourceProxy],
+        quantities: [Int: String],
+        recordings: [ClinicalRecordingAttachment]
+    ) throws -> ClinicalOutputs {
         var participants: Set<Identity> = []
         var outputs: [ValidatedExchangeEvent.Output] = []
         var nativeIdentifiers: [ValidatedExchangeEvent.Identifier] = []
@@ -68,26 +104,12 @@ enum FHIRPointProjection {
             } else if case .documentReference(let document) = resource {
                 let identifiers = try FHIRNativeRecordIdentifiers.output(document.identifier ?? [])
                 nativeIdentifiers.append(contentsOf: identifiers.native)
-                outputs.append(try recording(document, identifiers: identifiers.roles, fullURL: node.fullURL, recordings: recordings))
+                outputs.append(try recording(
+                    document, identifiers: identifiers.roles, fullURL: node.fullURL, recordings: recordings, resources: resources
+                ))
             }
         }
-        try validateOutputs(outputs, participants: participants, nativeIdentifiers: nativeIdentifiers, recordings: recordings)
-        var result = ValidatedExchangeEvent(
-            rawBytes: bytes,
-            recorded: try RecordedInstant.extract(from: resources),
-            validatorIdentity: validatorIdentity,
-            eventIdentifierSystem: record.version.identifier.identifier.system.rawValue,
-            eventIdentifierValue: record.version.identifier.identifier.value,
-            deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
-            participants: participants,
-            nodes: nodes,
-            outputs: outputs,
-            nativeRecordIdentifiers: nativeIdentifiers,
-            recordings: recordings
-        )
-        _ = try ClinicalRecordRevision(result)
-        try FHIRClinicalDerivations.extract(resources: resources, into: &result)
-        return result
+        return .init(participants: participants, outputs: outputs, nativeIdentifiers: nativeIdentifiers)
     }
 
     private static func validateOutputs(
@@ -100,7 +122,8 @@ enum FHIRPointProjection {
               Set(recordings.map { $0.declaration.output.fullURL }).count == recordings.count,
               recordings.allSatisfy({ attachment in
                   outputs.contains { $0.fullURL == attachment.declaration.output.fullURL && $0.value == .recording }
-              }), !outputs.contains(where: { $0.value == .recording }) || outputs.count == 1 else { throw FHIRValidationClient.invalid }
+              }) else { throw FHIRValidationClient.invalid }
+        try FHIRSensorKitCompanions.validate(outputs)
     }
 
     static func index(_ entries: [BundleEntry]) throws -> ([ValidatedExchangeEvent.Node], [String: ResourceProxy]) {
@@ -145,43 +168,51 @@ enum FHIRPointProjection {
         _ observation: Observation, identifiers: [RoledIdentifier], fullURL: String, quantityText: String?
     ) throws -> ValidatedExchangeEvent.Output {
         let value = try FHIRObservationValueProjection(observation: observation, quantityText: quantityText)
+        let sourceType = try FHIRSourceTypeEvidence.extract(observation.extension ?? [])
         let writer = try writerRevision(identifiers: identifiers, extensions: observation.extension ?? [])
         return try .init(
             fullURL: fullURL,
             profile: value.profile,
-            effectiveAt: value.start,
-            effectiveEnd: value.end,
+            measurementBounds: value.measurementBounds,
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
             writerIdentifier: writer.identifier,
             writerVersion: writer.version,
             value: value.value,
             codeSystem: value.codeSystem,
-            code: value.code
+            code: value.code,
+            sourceTypeIdentifier: sourceType?.identifier,
+            sourceRepositoryKind: sourceType?.repository
         )
     }
 
     private static func recording(
-        _ document: DocumentReference, identifiers: [RoledIdentifier], fullURL: String, recordings: [ClinicalRecordingAttachment]
+        _ document: DocumentReference,
+        identifiers: [RoledIdentifier],
+        fullURL: String,
+        recordings: [ClinicalRecordingAttachment],
+        resources: [String: ResourceProxy]
     ) throws -> ValidatedExchangeEvent.Output {
         let external = recordings.first { $0.declaration.output.fullURL == fullURL }
-        let bounds = try FHIRRecordingProjection.routeBounds(document, external: external)
+        let period = try FHIRRecordingSourcePeriod.period(document, fullURL: fullURL, resources: resources)
+        let facts = try FHIRRecordingProjection.project(document, external: external, selectionPeriod: period)
         // The exact source-artifact identity remains in the immutable document and study view.
         _ = try oneIdentifier(identifiers, role: .sourceArtifact)
         // A recording record's sole document is its primary output and states the writer revision like an Observation.
         let writer = try writerRevision(identifiers: identifiers, extensions: document.extension ?? [])
         return try .init(
             fullURL: fullURL,
-            profile: FHIRRecordingProjection.profile,
-            effectiveAt: bounds.0,
-            effectiveEnd: bounds.1,
+            profile: facts.profile,
+            measurementBounds: facts.bounds,
             sourceRecordIdentifier: oneIdentifier(identifiers, role: .sourceRecord),
             sourceOutputIdentifier: oneIdentifier(identifiers, role: .sourceOutput),
             writerIdentifier: writer.identifier,
             writerVersion: writer.version,
             value: .recording,
             codeSystem: FHIRRecordingProjection.formatSystem,
-            code: FHIRRecordingProjection.routeFormat
+            code: facts.format.rawValue,
+            sourceTypeIdentifier: facts.source.identifier,
+            sourceRepositoryKind: facts.source.repository
         )
     }
 

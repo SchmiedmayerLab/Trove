@@ -62,6 +62,7 @@ let package = Package(
                 .product(name: "GroveFoundation", package: "Grove"),
                 .product(name: "GroveConsent", package: "Grove"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveProviderFHIR", package: "Grove"),
                 .product(name: "GroveSensorKitFHIR", package: "Grove"),
                 .product(name: "GroveQuestionnaireFHIR", package: "Grove"),
                 .target(name: "GroveVapor"),
@@ -91,6 +92,8 @@ let package = Package(
                 .product(name: "TroveAPIClient", package: "TroveAPI"),
                 .product(name: "VaporTesting", package: "vapor"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveProviderFHIR", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
                 .product(name: "CryptoExtras", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
@@ -100,12 +103,15 @@ let package = Package(
             exclude: [
                 "Resources/ImmutablePointEvent.json.license", "Resources/HealthKitPointEvent.json.license",
                 "Resources/HealthKitSleepEvent.json.license", "Resources/HealthKitWorkoutEvent.json.license",
-                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json.license"
+                "Resources/HealthKitWorkoutRouteEvent.json.license", "Resources/HealthKitBodyWeightEvent.json.license",
+                "Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json.license"
             ],
             resources: [
                 .copy("Resources/ImmutablePointEvent.json"), .copy("Resources/HealthKitPointEvent.json"),
                 .copy("Resources/HealthKitSleepEvent.json"), .copy("Resources/HealthKitWorkoutEvent.json"),
-                .copy("Resources/HealthKitWorkoutRouteEvent.json"), .copy("Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json")
+                .copy("Resources/HealthKitWorkoutRouteEvent.json"), .copy("Resources/HealthKitBodyWeightEvent.json"),
+                .copy("Resources/HealthKitComponentEvents"), .copy("Resources/HealthKitClinicalDocuments"),
+                .copy("Resources/HealthKitHeartbeatSeriesWriterRecordEvent.json")
             ],
             swiftSettings: swiftSettings,
             plugins: [] + swiftLintPlugin()

@@ -57,18 +57,22 @@ struct PublishedCollectionPolicyTests {
         ))
     }
 
-    @Test
-    func pointPolicyDoesNotDiscardAnIntervalEnd() throws {
-        let policy = try PublishedCollectionPolicy.compile(studyID: Self.studyID, revision: 2, requirements: [Self.requirement])
-        #expect(!policy.permits(
+    /// Heart rate may be a point or a period, so a strictly instantaneous profile exercises the refusal.
+    @Test(arguments: [nil, TimeInterval(60)])
+    func pointPolicyDoesNotDiscardAnIntervalEnd(duration: TimeInterval?) throws {
+        let profile = CollectionObservationProfile.bodyWeight.rawValue
+        let policy = try PublishedCollectionPolicy.compile(
+            studyID: Self.studyID, revision: 2, requirements: [.init(profile: profile, sourceKind: .participantApp)]
+        )
+        #expect(policy.permits(
             studyID: Self.studyID,
             revision: 2,
-            profile: Self.requirement.profile,
+            profile: profile,
             sourceKind: .participantApp,
             effectiveAt: Self.acceptedAt,
             consentAcceptedAt: Self.acceptedAt,
-            effectiveEnd: Self.acceptedAt.addingTimeInterval(60)
-        ))
+            effectiveEnd: duration.map(Self.acceptedAt.addingTimeInterval)
+        ) == (duration == nil))
     }
 
     @Test(arguments: ["contractVersion", "contractRevision", "valueShape", "collectionWindow", "schemaVersion", "legacy-contract"])

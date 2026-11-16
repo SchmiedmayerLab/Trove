@@ -34,7 +34,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         size = {"small": 1024, "large": 128 * 1024 * 1024, "unknown": 128 * 1024 * 1024,
                 "slow": 8 * 1024 * 1024}.get(mode, 1024)
         self.send_response(200)
-        self.send_header("Content-Type", "text/csv")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("X-Recording-Content-Type", "text/csv")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Disposition", "attachment; filename=ignored.csv")
         if mode != "unknown":

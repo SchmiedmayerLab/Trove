@@ -15,14 +15,14 @@ extension Controller {
         _ input: Operations.GetParticipantSourceInstallation.Input
     ) async throws -> Operations.GetParticipantSourceInstallation.Output {
         let registration = try await sourceInstallationService.find(registrationID: input.path.registrationId.requireId())
-        return .ok(.init(body: .json(.init(registration))))
+        return try .ok(.init(body: .json(.init(registration))))
     }
 
     func revokeParticipantSourceInstallation(
         _ input: Operations.RevokeParticipantSourceInstallation.Input
     ) async throws -> Operations.RevokeParticipantSourceInstallation.Output {
         let registration = try await sourceInstallationService.revoke(registrationID: input.path.registrationId.requireId())
-        return .ok(.init(body: .json(.init(registration))))
+        return try .ok(.init(body: .json(.init(registration))))
     }
 
     func recoverParticipantSourceIdentity(
@@ -32,7 +32,7 @@ extension Controller {
         let recovered = try await sourceInstallationService.recover(
             registrationID: input.path.registrationId.requireId(), credential: SourceInstallationCredential(base64: body.credentialBase64)
         )
-        return .ok(.init(
+        return try .ok(.init(
             headers: .init(cacheControl: "no-store"),
             body: .json(.init(
                 registration: .init(recovered.registration),
@@ -44,8 +44,8 @@ extension Controller {
 
 
 extension Components.Schemas.ParticipantSourceRegistration {
-    init(_ registration: SourceInstallationService.Registration) {
-        self.init(
+    init(_ registration: SourceInstallationService.Registration) throws {
+        try self.init(
             source: .init(registration.source),
             installation: .init(
                 registrationID: registration.installation.registrationID.uuidString.lowercased(),
@@ -60,9 +60,12 @@ extension Components.Schemas.ParticipantSourceRegistration {
 
 extension SourceRepositoryKind {
     var apiValue: Components.Schemas.NativeSourceRepository {
-        switch self {
-        case .healthKit: .healthkit
-        case .sensorKit: .sensorkit
+        get throws {
+            switch self {
+            case .healthKit: .healthkit
+            case .sensorKit: .sensorkit
+            case .withings, .oura, .googleHealthAPI: throw ServerError.notFound("Native source binding not found")
+            }
         }
     }
 

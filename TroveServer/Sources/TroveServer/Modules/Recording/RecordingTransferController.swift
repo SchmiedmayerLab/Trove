@@ -76,7 +76,8 @@ extension RecordingTransferDeclaration {
                 sourceSHA256: value.content.sourceSHA256,
                 encoding: encoding
             ),
-            targets: value.targets.map { try $0.domainTarget }
+            targets: value.targets.map { try $0.domainTarget },
+            sourceTypeIdentifier: value.sourceTypeIdentifier
         )
     }
 }

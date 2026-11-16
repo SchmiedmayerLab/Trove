@@ -54,7 +54,7 @@ GRANT SELECT, INSERT ON public.audit_events TO :"runtime_name";
 GRANT SELECT, INSERT ON public.clinical_events, public.clinical_event_representations, public.clinical_event_nodes,
     public.clinical_point_facts, public.study_data_grants, public.clinical_source_records,
     public.clinical_record_events, public.clinical_output_bindings, public.clinical_record_retractions,
-    public.clinical_questionnaire_contexts, public.clinical_point_derivations,
+    public.clinical_questionnaire_contexts, public.clinical_point_derivations, public.clinical_output_dependencies,
     public.clinical_attribution_commands TO :"runtime_name";
 GRANT SELECT, INSERT ON public.recording_transfers, public.recording_transfer_attempts, public.recording_transfer_receipts,
     public.clinical_recording_attachments TO :"runtime_name";

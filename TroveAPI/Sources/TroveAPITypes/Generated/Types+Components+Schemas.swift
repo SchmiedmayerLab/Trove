@@ -1032,7 +1032,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/profile`.
             public var profile: Swift.String
-            /// Registered Grove recording-format code. Current collection admission supports HealthKit location-track samples.
+            /// Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Registered Grove recording-format code, checked with the exact source token and output profile.
             ///
             /// - Remark: Generated from `#/components/schemas/RecordingTransferDeclaration/format`.
             public var format: Swift.String
@@ -1054,7 +1058,8 @@ extension Components {
             ///   - attachmentPath: Stable relative attachment path; no empty, dot or parent segments, escapes, query or fragment.
             ///   - outputFullUrl: Exact recording DocumentReference address in its immutable clinical record.
             ///   - profile: Supported recording-document profile, independently checked against collection authority.
-            ///   - format: Registered Grove recording-format code. Current collection admission supports HealthKit location-track samples.
+            ///   - sourceTypeIdentifier: Exact native or provider catalog source token, independently verified against the final recording's source evidence. Required for new declarations; absent only in retained HealthKit workout-route evidence.
+            ///   - format: Registered Grove recording-format code, checked with the exact source token and output profile.
             ///   - effectiveAt:
             ///   - effectiveEnd: Inclusive measurement end, at or after effectiveAt; actual recording bounds are checked at clinical admission.
             ///   - content:
@@ -1063,6 +1068,7 @@ extension Components {
                 attachmentPath: Swift.String,
                 outputFullUrl: Swift.String,
                 profile: Swift.String,
+                sourceTypeIdentifier: Swift.String? = nil,
                 format: Swift.String,
                 effectiveAt: Foundation.Date,
                 effectiveEnd: Foundation.Date,
@@ -1072,6 +1078,7 @@ extension Components {
                 self.attachmentPath = attachmentPath
                 self.outputFullUrl = outputFullUrl
                 self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
                 self.format = format
                 self.effectiveAt = effectiveAt
                 self.effectiveEnd = effectiveEnd
@@ -1082,6 +1089,7 @@ extension Components {
                 case attachmentPath
                 case outputFullUrl
                 case profile
+                case sourceTypeIdentifier
                 case format
                 case effectiveAt
                 case effectiveEnd
@@ -1101,6 +1109,10 @@ extension Components {
                 self.profile = try container.decode(
                     Swift.String.self,
                     forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
                 )
                 self.format = try container.decode(
                     Swift.String.self,
@@ -1126,6 +1138,7 @@ extension Components {
                     "attachmentPath",
                     "outputFullUrl",
                     "profile",
+                    "sourceTypeIdentifier",
                     "format",
                     "effectiveAt",
                     "effectiveEnd",
@@ -2260,6 +2273,14 @@ extension Components {
                 ])
             }
         }
+        /// Time basis used by the retained collection window. Omission means measurement-time for existing measurement scopes. Clinical and CDA document requirements must explicitly preserve their source-date basis; embedded care dates are not inferred or used for selection.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionTimeBasis`.
+        @frozen public enum CollectionTimeBasis: String, Codable, Hashable, Sendable, CaseIterable {
+            case measurementTime = "measurement-time"
+            case clinicalRecordDownload = "clinical-record-download"
+            case cdaSourceDocumentPeriod = "cda-source-document-period"
+        }
         /// Exact measurement scope retained for an accepted publication.
         ///
         /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement`.
@@ -2270,9 +2291,18 @@ extension Components {
             public var includeWorkoutRoutes: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/profile`.
             public var profile: Swift.String
+            /// Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/providerRegistrationId`.
+            public var providerRegistrationId: Swift.String?
             /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
             @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case participantApp = "participant-app"
+                case serverWorker = "server-worker"
             }
             /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/sourceKind`.
             public var sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload
@@ -2284,33 +2314,47 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/end`.
             public var end: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/CollectionPlanRequirement/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
             /// Creates a new `CollectionPlanRequirement`.
             ///
             /// - Parameters:
             ///   - includeWorkoutRoutes: Whether this accepted requirement includes precise workout routes. Only valid for the workout profile; omission means false.
             ///   - profile:
+            ///   - sourceTypeIdentifier: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///   - providerRegistrationId: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
             ///   - sourceKind:
             ///   - start: Inclusive window start; may precede consent adoption. Sleep records are included whole when they overlap the window.
             ///   - end: Exclusive window end, bounded by the next adoption when applicable. Overlapping sleep records may end after this boundary.
+            ///   - timeBasis:
             public init(
                 includeWorkoutRoutes: Swift.Bool? = nil,
                 profile: Swift.String,
+                sourceTypeIdentifier: Swift.String? = nil,
+                providerRegistrationId: Swift.String? = nil,
                 sourceKind: Components.Schemas.CollectionPlanRequirement.SourceKindPayload,
                 start: Foundation.Date,
-                end: Foundation.Date? = nil
+                end: Foundation.Date? = nil,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
             ) {
                 self.includeWorkoutRoutes = includeWorkoutRoutes
                 self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.providerRegistrationId = providerRegistrationId
                 self.sourceKind = sourceKind
                 self.start = start
                 self.end = end
+                self.timeBasis = timeBasis
             }
             public enum CodingKeys: String, CodingKey {
                 case includeWorkoutRoutes
                 case profile
+                case sourceTypeIdentifier
+                case providerRegistrationId
                 case sourceKind
                 case start
                 case end
+                case timeBasis
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2321,6 +2365,14 @@ extension Components {
                 self.profile = try container.decode(
                     Swift.String.self,
                     forKey: .profile
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.providerRegistrationId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .providerRegistrationId
                 )
                 self.sourceKind = try container.decode(
                     Components.Schemas.CollectionPlanRequirement.SourceKindPayload.self,
@@ -2334,16 +2386,170 @@ extension Components {
                     Foundation.Date.self,
                     forKey: .end
                 )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "includeWorkoutRoutes",
                     "profile",
+                    "sourceTypeIdentifier",
+                    "providerRegistrationId",
                     "sourceKind",
                     "start",
-                    "end"
+                    "end",
+                    "timeBasis"
                 ])
             }
         }
-        /// Explicit backend collection permission, independent of native HealthKit components. The receiver supports Grove Mobile heart-rate point quantities and sleep-stage intervals and workout sessions from participant-app streams. A point must be inside the accepted half-open measurement window. A sleep interval or workout session is collected in full if it overlaps that window, including all workout segments and statistics; touching a boundary alone is insufficient. Omitting the window starts collection at consent adoption. This does not attest the source device.
+        /// - Remark: Generated from `#/components/schemas/CollectionCapability`.
+        public struct CollectionCapability: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/repositoryKind`.
+            @frozen public enum RepositoryKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case healthkit = "healthkit"
+                case sensorkit = "sensorkit"
+            }
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/repositoryKind`.
+            public var repositoryKind: Components.Schemas.CollectionCapability.RepositoryKindPayload
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/displayNameEnglish`.
+            public var displayNameEnglish: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/displayNameGerman`.
+            public var displayNameGerman: Swift.String
+            /// Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/effectiveTime`.
+            @frozen public enum EffectiveTimePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case point = "point"
+                case interval = "interval"
+                case pointOrInterval = "point-or-interval"
+            }
+            /// Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/effectiveTime`.
+            public var effectiveTime: Components.Schemas.CollectionCapability.EffectiveTimePayload
+            /// Whether precise workout route collection can be opted into independently for this measurement.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/supportsWorkoutRoutes`.
+            public var supportsWorkoutRoutes: Swift.Bool
+            /// This output includes an original source recording, separately selected from structured summaries.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/isOriginalRecording`.
+            public var isOriginalRecording: Swift.Bool?
+            /// Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/requiredCompanionProfiles`.
+            public var requiredCompanionProfiles: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/CollectionCapability/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
+            /// Creates a new `CollectionCapability`.
+            ///
+            /// - Parameters:
+            ///   - profile:
+            ///   - repositoryKind:
+            ///   - sourceTypeIdentifier:
+            ///   - displayNameEnglish:
+            ///   - displayNameGerman:
+            ///   - effectiveTime: Effective-time shapes accepted for the complete FHIR output, before study-window filtering.
+            ///   - supportsWorkoutRoutes: Whether precise workout route collection can be opted into independently for this measurement.
+            ///   - isOriginalRecording: This output includes an original source recording, separately selected from structured summaries.
+            ///   - requiredCompanionProfiles: Other output profiles from this exact source that need collection authority to retain the complete producer record. They are not implicitly selected or granted to this study.
+            ///   - timeBasis:
+            public init(
+                profile: Swift.String,
+                repositoryKind: Components.Schemas.CollectionCapability.RepositoryKindPayload,
+                sourceTypeIdentifier: Swift.String,
+                displayNameEnglish: Swift.String,
+                displayNameGerman: Swift.String,
+                effectiveTime: Components.Schemas.CollectionCapability.EffectiveTimePayload,
+                supportsWorkoutRoutes: Swift.Bool,
+                isOriginalRecording: Swift.Bool? = nil,
+                requiredCompanionProfiles: [Swift.String]? = nil,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
+            ) {
+                self.profile = profile
+                self.repositoryKind = repositoryKind
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.displayNameEnglish = displayNameEnglish
+                self.displayNameGerman = displayNameGerman
+                self.effectiveTime = effectiveTime
+                self.supportsWorkoutRoutes = supportsWorkoutRoutes
+                self.isOriginalRecording = isOriginalRecording
+                self.requiredCompanionProfiles = requiredCompanionProfiles
+                self.timeBasis = timeBasis
+            }
+            public enum CodingKeys: String, CodingKey {
+                case profile
+                case repositoryKind
+                case sourceTypeIdentifier
+                case displayNameEnglish
+                case displayNameGerman
+                case effectiveTime
+                case supportsWorkoutRoutes
+                case isOriginalRecording
+                case requiredCompanionProfiles
+                case timeBasis
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.repositoryKind = try container.decode(
+                    Components.Schemas.CollectionCapability.RepositoryKindPayload.self,
+                    forKey: .repositoryKind
+                )
+                self.sourceTypeIdentifier = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.displayNameEnglish = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameEnglish
+                )
+                self.displayNameGerman = try container.decode(
+                    Swift.String.self,
+                    forKey: .displayNameGerman
+                )
+                self.effectiveTime = try container.decode(
+                    Components.Schemas.CollectionCapability.EffectiveTimePayload.self,
+                    forKey: .effectiveTime
+                )
+                self.supportsWorkoutRoutes = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .supportsWorkoutRoutes
+                )
+                self.isOriginalRecording = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .isOriginalRecording
+                )
+                self.requiredCompanionProfiles = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .requiredCompanionProfiles
+                )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "profile",
+                    "repositoryKind",
+                    "sourceTypeIdentifier",
+                    "displayNameEnglish",
+                    "displayNameGerman",
+                    "effectiveTime",
+                    "supportsWorkoutRoutes",
+                    "isOriginalRecording",
+                    "requiredCompanionProfiles",
+                    "timeBasis"
+                ])
+            }
+        }
+        /// Explicit backend collection permission, independent of native HealthKit components. The receiver supports Grove Mobile heart-rate and body-weight point quantities and sleep-stage intervals and workout sessions from participant-app streams. A point must be inside the accepted half-open measurement window. A sleep interval or workout session is collected in full if it overlaps that window, including all workout segments and statistics; touching a boundary alone is insufficient. Omitting the window starts collection at consent adoption. This does not attest the source device.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/CollectionRequirement`.
@@ -2356,35 +2562,58 @@ extension Components {
             public var measurementWindow: Components.Schemas.CollectionMeasurementWindow?
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/profile`.
             public var profile: Swift.String
+            /// Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/providerRegistrationId`.
+            public var providerRegistrationId: Swift.String?
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
             @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case participantApp = "participant-app"
+                case serverWorker = "server-worker"
             }
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
             public var sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/timeBasis`.
+            public var timeBasis: Components.Schemas.CollectionTimeBasis?
             /// Creates a new `CollectionRequirement`.
             ///
             /// - Parameters:
             ///   - includeWorkoutRoutes: Request precise workout routes in addition to workout sessions. Only valid for the workout profile; defaults to false and requires participant acceptance of the published revision.
             ///   - measurementWindow:
             ///   - profile:
+            ///   - sourceTypeIdentifier: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
+            ///   - providerRegistrationId: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
             ///   - sourceKind:
+            ///   - timeBasis:
             public init(
                 includeWorkoutRoutes: Swift.Bool? = nil,
                 measurementWindow: Components.Schemas.CollectionMeasurementWindow? = nil,
                 profile: Swift.String,
-                sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
+                sourceTypeIdentifier: Swift.String? = nil,
+                providerRegistrationId: Swift.String? = nil,
+                sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload,
+                timeBasis: Components.Schemas.CollectionTimeBasis? = nil
             ) {
                 self.includeWorkoutRoutes = includeWorkoutRoutes
                 self.measurementWindow = measurementWindow
                 self.profile = profile
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.providerRegistrationId = providerRegistrationId
                 self.sourceKind = sourceKind
+                self.timeBasis = timeBasis
             }
             public enum CodingKeys: String, CodingKey {
                 case includeWorkoutRoutes
                 case measurementWindow
                 case profile
+                case sourceTypeIdentifier
+                case providerRegistrationId
                 case sourceKind
+                case timeBasis
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2400,15 +2629,30 @@ extension Components {
                     Swift.String.self,
                     forKey: .profile
                 )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.providerRegistrationId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .providerRegistrationId
+                )
                 self.sourceKind = try container.decode(
                     Components.Schemas.CollectionRequirement.SourceKindPayload.self,
                     forKey: .sourceKind
+                )
+                self.timeBasis = try container.decodeIfPresent(
+                    Components.Schemas.CollectionTimeBasis.self,
+                    forKey: .timeBasis
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "includeWorkoutRoutes",
                     "measurementWindow",
                     "profile",
-                    "sourceKind"
+                    "sourceTypeIdentifier",
+                    "providerRegistrationId",
+                    "sourceKind",
+                    "timeBasis"
                 ])
             }
         }

@@ -96,9 +96,12 @@ extension ConsentService {
                     .init(
                         includeWorkoutRoutes: $0.includeWorkoutRoutes,
                         profile: $0.profile,
-                        sourceKind: .participantApp,
+                        sourceTypeIdentifier: $0.sourceTypeIdentifier,
+                        providerRegistrationId: $0.providerRegistrationID?.uuidString.lowercased(),
+                        sourceKind: $0.sourceKind == .participantApp ? .participantApp : .serverWorker,
                         start: $0.start,
-                        end: $0.end
+                        end: $0.end,
+                        timeBasis: $0.timeBasis
                     )
                 }
             )

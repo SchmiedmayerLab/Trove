@@ -113,7 +113,7 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
 
     /// A concurrent refresh, withdrawal or new sweep cannot be completed by a stale caller.
     public func finishHealthKitQuerySweep(
-        _ plan: HealthKitQueryPlan, state: ParticipantCollectionState, at now: Date = .now
+        _ plan: HealthKitQueryPlan, state: ParticipantCollectionState, at now: Date = .now, reviewDocuments: Bool = false
     ) throws -> Bool {
         try Task.checkCancellation()
         guard plan.scope == scope else { throw JournalError.wrongScope }
@@ -128,7 +128,9 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
             let current = try checkpoints(for: plan.sourceID)
             guard let snapshot = try state.snapshot?.active(at: now) else { throw JournalError.staleCollectionState }
             let coverage = snapshot.acquisitionStreams.map { HealthKitQueryCoverage(stream: $0, snapshot: snapshot, reconciled: stored.consents) }
-            let activeIDs = try Set(collectionQueries(for: plan.sourceID, coverage: coverage, snapshot: snapshot).map { $0.checkpoint.queryID })
+            let activeIDs = try Set(collectionQueries(for: plan.sourceID, coverage: coverage, snapshot: snapshot)
+                .filter { ($0.definition.stream.timeBasis == .cdaSourceDocumentPeriod) == reviewDocuments }
+                .map { $0.checkpoint.queryID })
             guard current.filter({ activeIDs.contains($0.queryID) }).allSatisfy({
                 $0.lastServedSequence > plan.sweepStart && $0.queryExhausted
             }) else { return false }
@@ -153,8 +155,9 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
     private func validatedQueries(for sourceID: UUID, primary: Checkpoint) throws -> [HealthKitQueryPlan.Query] {
         let existing = try checkpoints(for: sourceID).map { try HealthKitQueryPlan.Query($0) }
         let lives = existing.filter { $0.definition.kind == .live }
+        let groups = Dictionary(grouping: lives, by: \.definition.stream)
         guard try HealthKitQueryDefinition(bytes: primary.queryDefinition).kind == .live,
-              Set(lives.map { $0.definition.stream }).count == lives.count else { throw JournalError.corruptJournal }
+              groups.values.allSatisfy({ Set($0.map { $0.definition.version }).count == $0.count }) else { throw JournalError.corruptJournal }
         return existing
     }
 
@@ -165,7 +168,9 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
         firstSetup: Bool,
         at now: Date
     ) throws -> Bool {
-        let previous = existing.first { $0.definition.stream == coverage.stream && $0.definition.kind == .live }
+        let previous = existing.first {
+            $0.definition.hasCurrentSemantics && $0.definition.stream == coverage.stream && $0.definition.kind == .live
+        }
         let live: HealthKitQueryDefinition
         if let previous {
             live = previous.definition

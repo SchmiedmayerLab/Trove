@@ -52,7 +52,7 @@ struct ClinicalEventStoreTests {
     func rejectsForeignDeploymentNamespacesBeforePersisting(role: GroveIdentifierRole) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await Self.prepare(on: app)
-            var event = Self.event(source: fixture.source)
+            var event = try Self.event(source: fixture.source)
             event.deploymentIdentifiers.systems[role] = ["https://foreign.example/identity"]
             let candidate = event
             try await AuthContext.$current.withValue(Self.participant) {
@@ -73,7 +73,7 @@ struct ClinicalEventStoreTests {
             let sourceID = fixture.source.id, proof = fixture.installation
             try await AuthContext.$current.withValue(Self.participant) {
                 let store = ClinicalEventStore(database: app.db)
-                let event = Self.event(source: fixture.source)
+                let event = try Self.event(source: fixture.source)
                 async let first = store.accept(event, sourceID: sourceID, targets: fixture.targets, installation: proof)
                 async let concurrentRetry = store.accept(event, sourceID: sourceID, targets: fixture.targets, installation: proof)
                 let (receipt, sameReceipt) = try await (first, concurrentRetry)
@@ -114,12 +114,12 @@ struct ClinicalEventStoreTests {
             try await AuthContext.$current.withValue(Self.participant) {
                 let store = ClinicalEventStore(database: app.db)
                 let outputID = UUID().uuidString
-                let event = Self.event(source: fixture.source, outputID: outputID)
+                let event = try Self.event(source: fixture.source, outputID: outputID)
                 _ = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation)
                 if change == "revoked-source" {
                     _ = try await app.grove[SourceBindingService.self].revoke(id: fixture.source.id)
                 }
-                let candidate = change == "bytes" ? Self.event(source: fixture.source, outputID: outputID, rawSuffix: "altered") : event
+                let candidate = change == "bytes" ? try Self.event(source: fixture.source, outputID: outputID, rawSuffix: "altered") : event
                 let targets = change == "targets" ? [fixture.targets[0]] : fixture.targets
                 await #expect {
                     try await store.accept(candidate, sourceID: fixture.source.id, targets: targets, installation: fixture.installation)
@@ -137,7 +137,8 @@ struct ClinicalEventStoreTests {
                 if failure == "withdrawal" {
                     _ = try await app.grove[ParticipantEnrollmentService.self].withdraw(enrollmentId: fixture.enrollmentIDs[1])
                 }
-                let event = Self.event(source: fixture.source, effectiveAt: failure == "collection-time" ? .distantPast : Date())
+                let effectiveAt = failure == "collection-time" ? Date(timeIntervalSince1970: 0) : Date()
+                let event = try Self.event(source: fixture.source, effectiveAt: effectiveAt)
                 await #expect {
                     try await ClinicalEventStore(database: app.db).accept(
                         event, sourceID: fixture.source.id, targets: fixture.targets, installation: fixture.installation
@@ -315,9 +316,9 @@ extension ClinicalEventStoreTests {
                 await #expect {
                     try await sql.raw("""
                         INSERT INTO clinical_point_facts (node_id, source_id, event_id, record_id, output_binding_id, profile, effective_at,
-                            value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
-                        SELECT n.id, n.source_id, f.event_id, f.record_id, f.output_binding_id, \(bind: profile), CURRENT_TIMESTAMP,
-                            'quantity', \(bind: quantity), 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4'
+                            effective_seconds, effective_fraction, value_kind, quantity_value, quantity_system, quantity_code, code_system, code)
+                        SELECT n.id, n.source_id, f.event_id, f.record_id, f.output_binding_id, \(bind: profile), f.effective_at,
+                            f.effective_seconds, f.effective_fraction, 'quantity', \(bind: quantity), 'http://unitsofmeasure.org', '/min', 'http://loinc.org', '8867-4'
                         FROM clinical_event_nodes n JOIN clinical_point_facts f ON f.event_id = n.event_id WHERE n.ordinal = 0
                         """)
                         .run()
@@ -377,7 +378,9 @@ extension ClinicalEventStoreTests {
         secondPolicy: Bool = true,
         profile: String = CollectionRequirement.supportedProfile,
         measurementWindow: CollectionMeasurementWindow? = nil,
-        routeStudies: Set<Int> = []
+        routeStudies: Set<Int> = [],
+        requirements: [[CollectionRequirement]] = [],
+        repositoryKind: SourceRepositoryKind = .healthKit
     ) async throws -> Fixture {
         try await ParticipantFixtures.createParticipant(on: app.db)
         let group = try await GroupFixtures.createGroup(on: app.db)
@@ -387,14 +390,14 @@ extension ClinicalEventStoreTests {
                 let study = try await StudyFixtures.createStudy(on: app.db, groupId: group.requireId())
                 study.consent[.enUS] = ConsentContent(title: "Consent", content: "<toggle id=\"agree\" expected-value=\"true\">I agree.</toggle>")
                 if index == 0 || secondPolicy {
-                    study.collectionRequirements = [
+                    study.collectionRequirements = requirements.isEmpty ? [
                         .init(
                             profile: profile,
                             sourceKind: .participantApp,
                             measurementWindow: measurementWindow,
                             includeWorkoutRoutes: routeStudies.contains(index)
                         )
-                    ]
+                    ] : requirements[index]
                 }
                 try await study.save(on: app.db)
                 try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study.requireId())
@@ -416,7 +419,7 @@ extension ClinicalEventStoreTests {
                 enrollmentIDs.append(id)
             }
             let installationID = UUID()
-            let source = try await app.grove[SourceBindingService.self].registerSource(registrationID: installationID)
+            let source = try await app.grove[SourceBindingService.self].registerSource(registrationID: installationID, repositoryKind: repositoryKind)
             return try Fixture(
                 source: source,
                 installationID: installationID,
@@ -448,9 +451,10 @@ extension ClinicalEventStoreTests {
         outputID: String = UUID().uuidString,
         rawSuffix: String = "",
         effectiveAt: Date = Date(),
+        measurementBounds: ClinicalMeasurementBounds? = nil,
         value: ClinicalOutputValue? = nil
-    ) -> ValidatedExchangeEvent {
-        .init(
+    ) throws -> ValidatedExchangeEvent {
+        try .init(
             rawBytes: Data("Synthetic prevalidated storage projection \(sequence) \(rawSuffix)".utf8),
             recorded: .init(seconds: Int64(sequence), fraction: ""),
             validatorIdentity: "storage-unit-fixture-not-official-validation",
@@ -466,7 +470,7 @@ extension ClinicalEventStoreTests {
                 .init(
                     fullURL: "urn:uuid:point",
                     profile: CollectionRequirement.supportedProfile,
-                    effectiveAt: effectiveAt,
+                    measurementBounds: measurementBounds ?? .init(start: effectiveAt),
                     sourceRecordIdentifier: .init(system: "https://example.test/source-record", value: "source-" + outputID),
                     sourceOutputIdentifier: .init(system: "https://example.test/output", value: outputID),
                     writerIdentifier: nil,

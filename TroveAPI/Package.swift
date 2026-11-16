@@ -47,6 +47,8 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "GroveFHIRContract", package: "Grove"),
+                .product(name: "GroveSensorKitFHIR", package: "Grove"),
+                .product(name: "GroveProviderFHIR", package: "Grove"),
                 .product(name: "GroveLocalization", package: "Grove"),
                 .product(name: "GroveHealthKit", package: "Grove"),
                 .product(name: "GroveStudyDefinition", package: "Grove")

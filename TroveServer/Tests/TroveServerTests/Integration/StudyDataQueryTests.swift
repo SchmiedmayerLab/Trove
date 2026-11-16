@@ -20,7 +20,7 @@ struct StudyDataQueryTests {
     func pagesKeepCompleteRecordsAndOnlyExactGrantedOutputs() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalRecordStoreTests.event(
+            let event = try ClinicalRecordStoreTests.event(
                 source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "second", "third"]
             )
             let targets = [
@@ -28,7 +28,7 @@ struct StudyDataQueryTests {
                 ClinicalEventTarget(consentID: fixture.consentIDs[1], outputFullURLs: [event.outputs[1].fullURL])
             ]
             _ = try await Self.accept(event, fixture: fixture, targets: targets, on: app)
-            let otherRecord = ClinicalRecordStoreTests.event(
+            let otherRecord = try ClinicalRecordStoreTests.event(
                 source: fixture.source, sequence: 2, version: "1", writer: "other-writer", record: "other-record", outputs: ["fourth", "fifth"]
             )
             _ = try await Self.accept(
@@ -58,8 +58,8 @@ struct StudyDataQueryTests {
     func currentSelectionCannotFallBackToAnOlderGrantedRecord() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let older = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "removed"])
-            let newer = ClinicalRecordStoreTests.event(source: fixture.source, sequence: 2, version: "2")
+            let older = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 1, version: "1", outputs: ["primary", "removed"])
+            let newer = try ClinicalRecordStoreTests.event(source: fixture.source, sequence: 2, version: "2")
             let oldReceipt = try await Self.accept(older, fixture: fixture, targets: fixture.targets(for: older, studies: [0]), on: app)
             let newReceipt = try await Self.accept(newer, fixture: fixture, targets: fixture.targets(for: newer, studies: [1]), on: app)
             let query = StudyDataQuery(database: app.db)
@@ -80,7 +80,7 @@ struct StudyDataQueryTests {
     func lateAttributionReusesTheSameEventAndStableOutputBinding() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             let receipt = try await Self.accept(event, fixture: fixture, targets: [fixture.targets[0]], on: app)
             let query = StudyDataQuery(database: app.db)
             #expect(try await query.page(studyID: fixture.studyIDs[1]).outputs.isEmpty)
@@ -106,7 +106,7 @@ struct StudyDataQueryTests {
     func enrollmentEndRetainsHistoryButWithdrawalAndRetractionRemoveAccess() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             _ = try await Self.accept(event, fixture: fixture, targets: fixture.targets, on: app)
             let enrollment = try #require(try await Enrollment.find(fixture.enrollmentIDs[0], on: app.db))
             enrollment.endsAt = Date(timeIntervalSince1970: 1)
@@ -120,7 +120,7 @@ struct StudyDataQueryTests {
             #expect(try await query.page(studyID: fixture.studyIDs[1]).outputs.count == 1)
             await #expect { try await query.page(studyID: fixture.studyIDs[0], before: first.nodeID) }
                 throws: { ($0 as? ServerError)?.status.code == 400 }
-            var removed = ClinicalRetractionTests.retraction(source: fixture.source)
+            var removed = try ClinicalRetractionTests.retraction(source: fixture.source)
             removed.retraction = .init(sourceRecordIdentifier: event.outputs[0].sourceRecordIdentifier)
             _ = try await Self.accept(removed, fixture: fixture, targets: [], on: app)
             #expect(try await query.page(studyID: fixture.studyIDs[1]).outputs.isEmpty)
@@ -132,8 +132,8 @@ struct StudyDataQueryTests {
     func logicalContextNeedsThisStudysGrantBeforeItsDependentCanBeSelected() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let context = ClinicalGraphStoreTests.event(source: fixture.source, sequence: 1, includesContext: true)
-            let dependent = ClinicalGraphStoreTests.event(source: fixture.source, sequence: 2, includesContext: false)
+            let context = try ClinicalGraphStoreTests.event(source: fixture.source, sequence: 1, includesContext: true)
+            let dependent = try ClinicalGraphStoreTests.event(source: fixture.source, sequence: 2, includesContext: false)
             let receipt = try await Self.accept(context, fixture: fixture, targets: fixture.targets(for: context, studies: [1]), on: app)
             _ = try await Self.accept(dependent, fixture: fixture, targets: fixture.targets(for: dependent, studies: [0]), on: app)
             let query = StudyDataQuery(database: app.db)
@@ -157,7 +157,7 @@ struct StudyDataQueryTests {
     func overlappingConsentRevisionsDoNotDuplicateTheMeasurement() async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let event = ClinicalEventStoreTests.event(source: fixture.source)
+            let event = try ClinicalEventStoreTests.event(source: fixture.source)
             let receipt = try await Self.accept(event, fixture: fixture, targets: [fixture.targets[0]], on: app)
             try await Self.addHistoricalGrant(fixture: fixture, receipt: receipt, on: app)
             let query = StudyDataQuery(database: app.db)
@@ -179,7 +179,7 @@ struct StudyDataQueryTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             for index in 1...3 {
-                let event = ClinicalRecordStoreTests.event(
+                let event = try ClinicalRecordStoreTests.event(
                     source: fixture.source,
                     sequence: index,
                     version: "1",
