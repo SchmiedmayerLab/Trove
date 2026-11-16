@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ARGOCD_CHART_VERSION = "9.5.1"
+ARGOCD_CHART_VERSION = "10.18.0"
 APPLICATION_SYNC_TIMEOUT = int(os.environ.get("APPLICATION_SYNC_TIMEOUT", "1200"))
 TARGET_REVISION_PLACEHOLDER = '"__TARGET_REVISION__"'
 KIND_API_CIDR_PLACEHOLDER = '"__KIND_API_CIDR__"'

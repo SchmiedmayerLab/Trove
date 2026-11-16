@@ -5,6 +5,7 @@
 """Check the rendered deployment contract, not just individual YAML fragments."""
 
 import json
+import re
 from pathlib import Path
 import subprocess
 import unittest
@@ -413,6 +414,30 @@ class DeploymentContractTests(unittest.TestCase):
                          ["trove-server", "trove-web"])
         self.assertIn({"to": [{"podSelector": {"matchLabels": {"app": "keycloak"}}}],
                        "ports": [{"protocol": "TCP", "port": 8443}]}, egress)
+
+    def test_cluster_traefik_runs_the_verified_image_by_digest(self):
+        verifier = (ROOT / "tools/verify_web_image.py").read_text()
+        reference = re.search(r'^TRAEFIK = "traefik:(v[0-9.]+)@(sha256:[0-9a-f]{64})"$', verifier, re.MULTILINE)
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                values = yaml.safe_load((ROOT / f"argocd-apps/{environment}/traefik-values.yaml").read_text())
+                self.assertEqual(values["image"], {"digest": reference.group(2)})
+                self.assertEqual(values["versionOverride"], reference.group(1))
+
+    def test_operator_and_argocd_images_are_pinned_by_digest(self):
+        digest = r"sha256:[0-9a-f]{64}"
+        manager = yaml.safe_load((ROOT / "argocd-apps/base/cert-manager.yaml").read_text())["spec"]["source"]["helm"]["valuesObject"]
+        self.assertRegex(manager["image"]["digest"], f"^{digest}$")
+        for component in ("webhook", "cainjector", "acmesolver", "startupapicheck"):
+            self.assertRegex(manager[component]["image"]["digest"], f"^{digest}$")
+        secrets = yaml.safe_load((ROOT / "argocd-apps/base/external-secrets-operator.yaml").read_text())
+        values = secrets["spec"]["source"]["helm"]["valuesObject"]
+        version = secrets["spec"]["source"]["targetRevision"]
+        for image in (values["image"], values["webhook"]["image"], values["certController"]["image"]):
+            self.assertRegex(image["tag"], f"^v{re.escape(version)}@{digest}$")
+        bootstrap = yaml.safe_load((ROOT / "bootstrap/helm-values/base.yaml").read_text())
+        for image in (bootstrap["global"]["image"], bootstrap["dex"]["image"], bootstrap["redis"]["image"]):
+            self.assertRegex(image["tag"], f"@{digest}$")
 
     def test_ingress_access_logs_exclude_headers_urls_and_participant_identifiers(self):
         for environment in ("dev", "prod"):
