@@ -3,30 +3,47 @@
 
 name: Documentation
 
+# Pull requests and main pushes only build and check the site. The latest stable release
+# whose commit is on main deploys the documentation of its tag; a manual run on that tag
+# redeploys it.
 on:
   pull_request:
     paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
   push:
     branches: [main]
     paths: ["docs/**", "documentation/**", "zensical.toml", ".github/workflows/documentation.yml"]
+  release:
+    types: [released]
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: documentation-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
     name: Build Documentation
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    concurrency:
+      group: documentation-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Require the latest stable release of a commit on main
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          release="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease --jq '"\(.isDraft) \(.isPrerelease)"')"
+          test "$release" = "false false"
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          test "$latest" = "$TAG"
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
@@ -40,23 +57,37 @@ jobs:
           python documentation/check_site.py
           python -m unittest discover -s documentation -p 'test_*.py'
       - uses: actions/upload-pages-artifact@v5
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
         with:
           path: site
 
   deploy:
     name: Publish Documentation
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    concurrency:
+      group: documentation-deployment
+      cancel-in-progress: false
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Checked again here so an older run that reaches deployment after a newer
+      # release cannot replace the newer documentation.
+      - name: Require the release to still be the latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          test "$latest" = "$TAG"
       - name: Deploy the checked site
         id: deployment
         uses: actions/deploy-pages@v5
