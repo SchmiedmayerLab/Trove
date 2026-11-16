@@ -1135,12 +1135,12 @@ extension Components {
                 ])
             }
         }
-        /// Durable custody acknowledgement for one source-record version or retraction, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt.
+        /// Durable custody acknowledgement for one source-record version or retraction, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt. Accepted byte representations of the same clinical version share eventId; payloadSHA256, receivedAt and nodeCount describe the specific retained representation. Additional representations do not create new clinical facts, versions or study grants.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/EventReceipt`.
         public struct EventReceipt: Codable, Hashable, Sendable {
-            /// Server-assigned immutable custody record ID, not the producer's event identifier.
+            /// Server-assigned clinical version or retraction ID, shared by its accepted byte representations.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/eventId`.
             public var eventId: Swift.String
@@ -1206,7 +1206,7 @@ extension Components {
             /// Creates a new `EventReceipt`.
             ///
             /// - Parameters:
-            ///   - eventId: Server-assigned immutable custody record ID, not the producer's event identifier.
+            ///   - eventId: Server-assigned clinical version or retraction ID, shared by its accepted byte representations.
             ///   - sourceId:
             ///   - producerEventIdentifier: Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///   - payloadSHA256: Lowercase SHA-256 of the accepted event bytes, before any JSON normalization.

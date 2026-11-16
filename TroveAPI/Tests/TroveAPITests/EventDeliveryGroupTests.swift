@@ -101,15 +101,22 @@ struct EventDeliveryGroupTests {
     }
 
     @Test
-    func duplicateEventIdentityCannotCommitTwoQueueRows() async throws {
-        try await DeliveryFixture.withJournal { journal, _ in
+    func exactDuplicateCommitmentsReuseOneQueueRowAtCapacity() async throws {
+        try await DeliveryFixture.withJournal(limits: .init(maximumEvents: 1)) { journal, _ in
             let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
             let payload = try DeliveryFixture.payload(sequence: 1, changes: ["sample"])
-            await #expect(throws: DeliverySQLite.Failure.self) {
-                try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload, payload])
-            }
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [payload, payload])
+            try #require(ids.count == 2)
+            #expect(ids[0] == ids[1])
+            #expect(try await journal.pendingDeliveryIDs() == [ids[0]])
+            #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID).cursor == Data([1]))
+            let attempt = try #require(await journal.prepareAttempt(ids[0]))
+            let receipt = DeliveryFixture.receipt(attempt)
+            try await journal.recordReceipt(receipt, for: ids[0])
+            let next = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            #expect(try await journal.stage(from: next, nextCursor: Data([2]), payloads: [payload]) == [ids[0]])
             #expect(try await journal.pendingDeliveryIDs().isEmpty)
-            #expect(try await journal.checkpoint(for: DeliveryFixture.sourceID) == checkpoint)
+            #expect(try await journal.receipt(for: ids[0]) == receipt)
         }
     }
 }

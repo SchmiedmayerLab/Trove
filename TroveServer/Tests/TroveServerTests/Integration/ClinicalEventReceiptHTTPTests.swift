@@ -85,7 +85,7 @@ struct ClinicalEventReceiptHTTPTests {
     }
 
     @Test(arguments: [
-        (Mutation.digest, HTTPStatus.conflict), (.intent, .conflict), (.missingEvent, .notFound),
+        (Mutation.digest, HTTPStatus.notFound), (.intent, .conflict), (.missingEvent, .notFound),
         (.namespace, .badRequest), (.malformedEvent, .badRequest), (.uppercaseDigest, .badRequest),
         (.duplicateIntent, .badRequest), (.excessiveIntent, .badRequest)
     ])

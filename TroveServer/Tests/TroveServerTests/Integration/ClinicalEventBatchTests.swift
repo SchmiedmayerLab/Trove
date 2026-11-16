@@ -21,12 +21,12 @@ struct ClinicalEventBatchTests {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             let bytes = try LocalPointEventFixture.bytes(source: fixture.source)
-            let first = try Self.submission(bytes, fixture: fixture)
-            let conflict = try Self.submission(bytes + Data(" ".utf8), fixture: fixture)
+            let conflict = try Self.changedSubmission(bytes, fixture: fixture)
             let second = try Self.submission(LocalPointEventFixture.bytes(source: fixture.source, sequence: 2), fixture: fixture)
             let missingConsent = Components.Schemas.EventSubmission(eventBase64: second.eventBase64, targets: [
                 .init(consentId: UUID().uuidString, outputFullUrls: second.targets[0].outputFullUrls)
             ])
+            let first = try Self.submission(bytes, fixture: fixture)
             let submissions = [first, .init(eventBase64: "not-base64", targets: []), conflict, missingConsent, second]
             let outcomes = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
                 let service = ClinicalEventService(database: app.db, validator: Self.validator())
@@ -199,6 +199,11 @@ extension ClinicalEventBatchTests {
             "contractRevision": FHIRValidationClient.contractRevision,
             "validatorIdentity": identity
         ]))
+    }
+
+    private static func changedSubmission(_ bytes: Data, fixture: ClinicalEventStoreTests.Fixture) throws -> Components.Schemas.EventSubmission {
+        let changed = try #require(String(data: bytes, encoding: .utf8)).replacingOccurrences(of: "\"value\":72", with: "\"value\":73")
+        return try submission(Data(changed.utf8), fixture: fixture)
     }
 
     static func submission(_ bytes: Data, fixture: ClinicalEventStoreTests.Fixture) throws -> Components.Schemas.EventSubmission {

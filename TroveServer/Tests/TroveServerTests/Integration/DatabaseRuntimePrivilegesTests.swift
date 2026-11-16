@@ -70,6 +70,8 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
         "DELETE FROM study_publication_candidates WHERE false", "TRUNCATE study_publication_candidates",
         "UPDATE clinical_events SET raw_sha256 = raw_sha256 WHERE false", "DELETE FROM clinical_events WHERE false", "TRUNCATE clinical_events",
+        "UPDATE clinical_event_representations SET raw_sha256 = raw_sha256 WHERE false",
+        "DELETE FROM clinical_event_representations WHERE false", "TRUNCATE clinical_event_representations",
         "UPDATE clinical_event_nodes SET ordinal = ordinal WHERE false",
         "DELETE FROM clinical_event_nodes WHERE false", "TRUNCATE clinical_event_nodes",
         "UPDATE clinical_point_facts SET quantity_value = quantity_value WHERE false",
@@ -170,6 +172,8 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
         "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "DELETE ON public.study_publication_candidates", "TRUNCATE ON public.study_publication_candidates",
+        "UPDATE ON public.clinical_event_representations", "UPDATE (raw_bytes) ON public.clinical_event_representations",
+        "DELETE ON public.clinical_event_representations", "TRUNCATE ON public.clinical_event_representations",
         "UPDATE ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
         "TRUNCATE ON public.clinical_point_facts", "MAINTAIN ON public.study_data_grants",
         "UPDATE (raw_sha256) ON public.clinical_events", "UPDATE (ordinal) ON public.clinical_event_nodes",
@@ -195,6 +199,7 @@ struct DatabaseRuntimePrivilegesTests {
         "SELECT ON public.source_bindings", "INSERT (participant_id) ON public.source_bindings",
         "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
         "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
+        "SELECT ON public.clinical_event_representations", "INSERT ON public.clinical_event_representations",
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
         "SELECT (quantity_value) ON public.clinical_point_facts", "INSERT (consent_id) ON public.study_data_grants",
         "INSERT ON public.clinical_source_records", "SELECT ON public.clinical_record_events", "INSERT ON public.clinical_output_bindings",
@@ -224,6 +229,7 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (client_id) ON public.study_delegations", "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "UPDATE (participant_id) ON public.source_bindings",
         "UPDATE (raw_sha256) ON public.clinical_events", "DELETE ON public.clinical_event_nodes",
+        "UPDATE (raw_bytes) ON public.clinical_event_representations",
         "UPDATE (quantity_value) ON public.clinical_point_facts", "TRUNCATE ON public.study_data_grants"
     ])
     func excessivePublicGrantsAreRejected(grant: String) async throws {
@@ -248,7 +254,9 @@ struct DatabaseRuntimePrivilegesTests {
         }
     }
 
-    @Test(arguments: ["audit_events", "clinical_events", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"])
+    @Test(arguments: [
+        "audit_events", "clinical_events", "clinical_event_representations", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"
+    ])
     func indirectOwnershipThroughNonInheritedGroupIsRejected(table: String) async throws {
         try await Self.withRuntime { fixture in
             try await Self.withGroup(on: fixture) { group in
@@ -260,10 +268,13 @@ struct DatabaseRuntimePrivilegesTests {
             }
         }
     }
+}
 
+
+extension DatabaseRuntimePrivilegesTests {
     @Test(arguments: [
         "public.audit_events", "public._fluent_migrations", "public.published_studies",
-        "public.enrollment_consents", "public.source_bindings", "public.clinical_events",
+        "public.enrollment_consents", "public.source_bindings", "public.clinical_events", "public.clinical_event_representations",
         "public.study_delegations", "public.study_publication_candidates",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
@@ -345,7 +356,7 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("""
             GRANT SELECT, INSERT ON public.audit_events, public.published_studies,
                 public.study_delegations, public.study_publication_candidates,
-                public.enrollment_consents, public.source_bindings, public.clinical_events,
+                public.enrollment_consents, public.source_bindings, public.clinical_events, public.clinical_event_representations,
                 public.clinical_event_nodes, public.clinical_point_facts, public.study_data_grants,
                 public.clinical_source_records, public.clinical_record_events, public.clinical_output_bindings,
                 public.clinical_record_retractions,
@@ -371,6 +382,12 @@ extension DatabaseRuntimePrivilegesTests {
             """)
             .run()
         try await sql.raw("""
+            INSERT INTO clinical_event_representations (event_id, raw_sha256, raw_bytes, validator_identity, received_at, node_count)
+            VALUES (\(bind: eventID), \(bind: String(repeating: "b", count: 64)), \(bind: Data("synthetic-variant".utf8)),
+                'role-test', CURRENT_TIMESTAMP, 1)
+            """)
+            .run()
+        try await sql.raw("""
             INSERT INTO clinical_event_nodes (id, event_id, source_id, full_url, ordinal, resource_type)
             VALUES (\(bind: nodeID), \(bind: eventID), \(bind: sourceID), 'urn:runtime-fixture:point', 0, 'Observation')
             """)
@@ -392,7 +409,7 @@ extension DatabaseRuntimePrivilegesTests {
                 \(bind: consent.requireID()), \(bind: publication.requireID()), \(bind: publication.revision), CURRENT_TIMESTAMP)
             """)
             .run()
-        for table in ["clinical_events", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"] {
+        for table in ["clinical_events", "clinical_event_representations", "clinical_event_nodes", "clinical_point_facts", "study_data_grants"] {
             let row = try #require(try await sql.raw("SELECT COUNT(*) AS count FROM \(ident: table)").first())
             #expect(try row.decode(column: "count", as: Int.self) == 1)
         }

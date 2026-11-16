@@ -84,7 +84,7 @@ struct SharedDeliveryJournalTests {
         }
     }
 
-    @Test(arguments: [4, 5, 999])
+    @Test(arguments: [4, 5, 6, 7, 999])
     func incompatibleSchemaIsRejectedWithoutRecreatingState(version: Int64) async throws {
         try await withJournal { journal, url, _ in
             await journal.close()

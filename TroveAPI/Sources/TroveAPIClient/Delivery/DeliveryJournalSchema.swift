@@ -83,7 +83,7 @@ enum DeliveryJournalSchema {
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
         if !create {
             let version = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard version == [7] else { throw DeliveryJournalError.unsupportedFormat }
+            guard version == [8] else { throw DeliveryJournalError.unsupportedFormat }
             let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
             guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
         }
@@ -114,7 +114,7 @@ enum DeliveryJournalSchema {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
-                try database.execute("PRAGMA user_version = 7")
+                try database.execute("PRAGMA user_version = 8")
             }
         }
     }
@@ -157,7 +157,7 @@ extension DeliveryJournalSchema {
             blocked BLOB CHECK (blocked IS NULL OR length(blocked) BETWEEN 1 AND 128),
             receipt BLOB CHECK (receipt IS NULL OR length(receipt) BETWEEN 1 AND 8192),
             UNIQUE (source_id, sequence),
-            UNIQUE (source_id, event_system, event_value),
+            UNIQUE (source_id, event_system, event_value, payload_digest, target_digest),
             CHECK ((payload IS NOT NULL AND length(payload) BETWEEN 1 AND 4194304 AND receipt IS NULL)
                 OR (payload IS NULL AND receipt IS NOT NULL AND blocked IS NULL AND retry_after = 0))
         ) STRICT

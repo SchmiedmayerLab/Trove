@@ -63,7 +63,8 @@ struct ClinicalEventStore: Sendable {
             return try await database.transaction { transaction in
                 let source = try await self.lockSourceOwner(sourceID: sourceID, context: context, on: transaction)
                 try self.validateSource(event, source: source)
-                if let receipt = try await self.replay(event, sourceID: sourceID, intent: intent.serialized, digest: digest, on: transaction) {
+                let representations = ClinicalEventRepresentationStore(database: transaction, source: source, context: context)
+                if let receipt = try await representations.replay(event, intent: intent, digest: digest) {
                     return receipt
                 }
                 let receivedAt = Date()
@@ -85,7 +86,7 @@ struct ClinicalEventStore: Sendable {
                 let acceptance = Acceptance(receipt: receipt, source: source, intent: intent.serialized, digest: digest, context: context)
                 try await self.insert(event, revision: revision, acceptance: acceptance, authorities: authorities, on: transaction)
                 // Return the persisted timestamp precision on the first response as well as replay.
-                let persisted = try await self.replay(event, sourceID: sourceID, intent: intent.serialized, digest: digest, on: transaction)
+                let persisted = try await representations.replay(event, intent: intent, digest: digest)
                 guard let persisted else {
                     throw ServerError.unexpectedError
                 }
@@ -144,26 +145,6 @@ struct ClinicalEventStore: Sendable {
               event.retraction == nil ? event.participants == [participant] : event.participants.isEmpty else {
             throw ServerError.forbidden("Event identity does not match the registered participant source")
         }
-    }
-
-    private func replay(
-        _ event: ValidatedExchangeEvent, sourceID: UUID, intent: String, digest: String, on transaction: any Database
-    ) async throws -> ClinicalEventReceipt? {
-        let row = try await sql(on: transaction).raw("""
-            SELECT * FROM clinical_events WHERE identifier_system = \(bind: event.eventIdentifierSystem)
-                AND identifier_value = \(bind: event.eventIdentifierValue)
-            """)
-            .first()
-        guard let row else {
-            return nil
-        }
-        guard try row.decode(column: "source_id", as: UUID.self) == sourceID,
-              try row.decode(column: "target_intent", as: String.self) == intent,
-              try row.decode(column: "raw_sha256", as: String.self) == digest,
-              try row.decode(column: "raw_bytes", as: Data.self) == event.rawBytes else {
-            throw ServerError.conflict("Event identity already exists with different bytes or study targets")
-        }
-        return try ClinicalEventReceipt(row: row)
     }
 
     private func insert(

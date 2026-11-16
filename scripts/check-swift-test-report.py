@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 
 
 FULL_VALIDATOR_TESTS = {
+    ("TroveServerTests.RecordRepresentationConformanceTests", "fullValidatorAcceptsEnrollmentSnapshotsAndRepeatedRetractions()"),
     ("TroveServerTests.ClinicalEventBatchHTTPTests", "fullValidatorAdmitsAndReplaysAroundARejectedMember()"),
     ("TroveServerTests.ClientDeliveryRecoveryTests", "fullValidatorClientAndReceiverRecovery()"),
     ("TroveServerTests.RecordBundleRecoveryTests", "fullValidatorAcceptsPackedRecordsAndRetractions()"),

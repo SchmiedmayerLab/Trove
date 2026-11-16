@@ -49,6 +49,11 @@ public struct ExchangeRecordBytes: Sendable {
         self.version = record.version
     }
 
+    /// Exact canonical entry tokens, for comparisons that must not round FHIR numbers.
+    public func entryBytes(for fullURL: String) -> Data? {
+        entries[fullURL]
+    }
+
     /// The sender names the original ordered entries; these names confer no collection or study authority.
     /// Revalidation requires a complete record closure and rejects unrelated or missing required nodes.
     public func restoring(entryFullURLs: [String]) throws -> ExchangeRecord {
