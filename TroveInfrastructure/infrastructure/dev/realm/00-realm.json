@@ -231,7 +231,7 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "protocol": "openid-connect",
-      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "email", "groups", "kc-admin-api"],
       "optionalClientScopes": ["address", "microprofile-jwt", "offline_access", "phone"]
     },
     {

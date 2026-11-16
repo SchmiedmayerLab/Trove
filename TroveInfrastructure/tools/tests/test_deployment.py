@@ -56,6 +56,20 @@ class DeploymentContractTests(unittest.TestCase):
                         self.assertFalse(any(value.endswith("/" + capability) for value in user.get("groups", [])))
                     self.assertFalse(any(value.endswith("/" + capability) for value in realm.get("defaultGroups", [])))
 
+    def test_only_the_server_client_can_obtain_admin_api_tokens(self):
+        # Keycloak 26.8.2 rejects Admin REST API tokens without the kc-admin-api scope.
+        for path in (ROOT / "docker/keycloak/realm.json", ROOT / "infrastructure/base/keycloak/realm/00-realm.json",
+                     ROOT / "infrastructure/dev/realm/00-realm.json"):
+            with self.subTest(path=path):
+                realm = json.loads(path.read_text())
+                admin_clients = {client["clientId"] for client in realm["clients"]
+                                 if "kc-admin-api" in client.get("defaultClientScopes", [])
+                                 + client.get("optionalClientScopes", [])}
+                self.assertEqual(admin_clients, {"trove-server"})
+                account = next(user for user in realm["users"] if user.get("serviceAccountClientId") == "trove-server")
+                self.assertEqual(account["clientRoles"], {"realm-management": ["query-groups", "view-users"]})
+                self.assertNotIn("realmRoles", account)
+
     def test_local_cluster_uses_the_verified_extension_compatible_node(self):
         configuration = yaml.safe_load((ROOT / "tools/kind-config.yaml").read_text())
         self.assertEqual(configuration["nodes"][0]["image"],

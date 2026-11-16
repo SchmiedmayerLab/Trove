@@ -279,7 +279,8 @@
         "acr",
         "profile",
         "email",
-        "groups"
+        "groups",
+        "kc-admin-api"
       ],
       "optionalClientScopes": [
         "address",
