@@ -103,6 +103,31 @@ jobs:
       path: TroveAPI
       artifact-name: Trove-API-Tests.lcov
 
+  # The Linux job cannot build the HealthKit and SensorKit acquisition targets or run their tests.
+  api-macos:
+    name: API (macOS)
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["xcode-27"]' || '["self-hosted", "macOS"]') }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '27.2'
+      - name: Verify and use stable Xcode
+        run: |
+          DEVELOPER_DIR="$MD_APPLE_SDK_ROOT/Contents/Developer" bash scripts/check-xcode.sh
+          echo "DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Build and test the API package natively
+        working-directory: TroveAPI
+        run: |
+          set -euo pipefail
+          swift build --build-tests --force-resolved-versions
+          swift test --skip-build --force-resolved-versions
+
   server:
     name: Server
     needs: changes
@@ -333,7 +358,7 @@ jobs:
 
   verification:
     name: Required Verification
-    needs: [changes, api, server, ios, ios-ui, web, infrastructure, dev-stack, native-line-coverage, coverage, secret-scan, vulnerability-scan]
+    needs: [changes, api, api-macos, server, ios, ios-ui, web, infrastructure, dev-stack, native-line-coverage, coverage, secret-scan, vulnerability-scan]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

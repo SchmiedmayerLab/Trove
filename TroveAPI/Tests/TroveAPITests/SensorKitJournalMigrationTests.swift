@@ -79,7 +79,16 @@ struct SensorKitJournalMigrationTests {
     @Test
     func physicalBudgetFailurePreservesQueuedVersion17() async throws {
         try await DeliveryFixture.withJournal { journal, url in
-            let ids = try await DeliveryFixture.stage(journal, changes: ["retained"])
+            // The retained record is large enough that the format 17 file alone reaches the smallest accepted budget.
+            let record = try RecordFixture.make(
+                sourceID: DeliveryFixture.sourceID,
+                registrationID: DeliveryFixture.epoch,
+                seed: "retained",
+                note: String(repeating: "x", count: 64 * 1024)
+            )
+            let targets = [EventTargetIntent.Target(consentID: DeliveryFixture.consentID, outputFullURLs: record.outputFullURLs)]
+            let checkpoint = try await journal.checkpoint(for: DeliveryFixture.sourceID)
+            let ids = try await journal.stage(from: checkpoint, nextCursor: Data([1]), payloads: [.init(bytes: record.json, targets: targets)])
             await journal.close()
             try makeVersion17(url)
             let database = try DeliverySQLite(url: url)
@@ -88,7 +97,7 @@ struct SensorKitJournalMigrationTests {
             let pageSize = try #require(database.query("PRAGMA page_size") { sqlite3_column_int64($0, 0) }.first)
             database.close()
             let byteLimit = Int(pages * pageSize)
-            try #require(byteLimit >= 65_536)
+            try #require(byteLimit >= DeliveryJournalSchema.minimumDatabaseBytes)
             let original = try Data(contentsOf: url)
             #expect(throws: DeliverySQLite.Failure.self) {
                 try EventDeliveryJournal(

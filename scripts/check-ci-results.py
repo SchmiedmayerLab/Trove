@@ -29,7 +29,7 @@ COMPONENTS = {
     "infrastructure": "infrastructure",
 }
 SELECTORS = {*COMPONENTS, "devstack"}
-JOBS = {"changes", *COMPONENTS.values(), "dev-stack", "native-line-coverage", "coverage", "secret-scan", "vulnerability-scan"}
+JOBS = {"changes", *COMPONENTS.values(), "api-macos", "dev-stack", "native-line-coverage", "coverage", "secret-scan", "vulnerability-scan"}
 
 
 def object_fields(value: object, label: str) -> dict[str, object]:
@@ -65,6 +65,9 @@ def verify(value: object) -> list[str]:
         selected[name] = raw == "true"
 
     required = {"changes", "secret-scan", "vulnerability-scan", *(job for selector, job in COMPONENTS.items() if selected[selector])}
+    if selected["api"]:
+        # The Apple-only acquisition targets and tests are part of the API package.
+        required.add("api-macos")
     if any(selected[name] for name in ("server", "web", "infrastructure", "devstack")):
         required.add("dev-stack")
     if selected["ios"] or selected["ios_ui"]:

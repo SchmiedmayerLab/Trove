@@ -244,6 +244,23 @@ extension EventDeliveryJournalTests {
     }
 
     @Test
+    func emptyJournalFitsTheSmallestAcceptedDatabaseBudget() async throws {
+        let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent("trove-delivery-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("delivery.sqlite")
+        let minimum = DeliveryJournalSchema.minimumDatabaseBytes
+        #expect(throws: DeliveryJournalError.invalidConfiguration) {
+            try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .createNew, limits: .init(maximumDatabaseBytes: minimum - 1))
+        }
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        let journal = try EventDeliveryJournal(url: url, scope: DeliveryFixture.scope, mode: .createNew, limits: .init(maximumDatabaseBytes: minimum))
+        #expect(try await journal.pendingDeliveryIDs().isEmpty)
+        await journal.close()
+    }
+
+    @Test
     func sqliteFullPreservesPreviouslyStagedEventsAndRollsBackTheNewSequence() async throws {
         try await DeliveryFixture.withJournal(limits: .init(maximumDatabaseBytes: 160 * 1024)) { journal, url in
             let existing = try await DeliveryFixture.stage(journal, changes: ["add:a"])
