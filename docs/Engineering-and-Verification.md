@@ -79,7 +79,7 @@ triggers and required checks.
 The [Dev Stack](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/dev-stack.yml) workflow builds the server and
 dashboard images once on AMD64 and ARM64 runners, scans and tests them, and keeps
 the tested archives with their provenance and SBOMs. When candidate publication is
-enabled, [Publish Images](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/publish-images.yml) publishes these
+enabled, [Publish Verified Images](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/publish-images.yml) publishes these
 exact archives to `ghcr.io/schmiedmayerlab/trove-server` and
 `ghcr.io/schmiedmayerlab/trove-web` after required verification on `main`;
 `Trove-Published-Candidate/candidate.json` records their digests. Publishing a
