@@ -1089,9 +1089,10 @@ paths:
         idempotency key scoped to that participant. Repeating it returns the same
         stream, including its revoked state; it never reactivates a stream.
         Registration grants no study access and does not attest the data origin.
-        The server assigns all identity namespaces. Preserve the event sequence
-        and exact retry bytes across restarts; register a new stream if that
-        journal is lost, including after reinstalling the app.
+        The server assigns all identity namespaces. Preserve the identity key and
+        canonical staged record bytes across restarts. Server-backed identity
+        recovery is not yet implemented; losing the journal currently requires
+        a new stream and does not preserve cross-install deduplication.
       requestBody:
         required: true
         content:
@@ -2190,7 +2191,7 @@ components:
           type: string
           minLength: 4
           maxLength: 5592408
-          description: RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+          description: RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. At most 4 MiB decoded.
         targets:
           $ref: '#/components/schemas/EventTargets'
 
@@ -2279,7 +2280,7 @@ components:
       type: object
       additionalProperties: false
       description: >
-        Durable custody acknowledgement for one original producer event, not a
+        Durable custody acknowledgement for one source-record version or retraction, not a
         statement of current study access or graph visibility. Before retiring
         staged bytes, the client must match the source, complete producer event
         identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP
@@ -2303,7 +2304,7 @@ components:
         producerEventIdentifier:
           type: object
           additionalProperties: false
-          description: Complete identifier from the accepted original Bundle.
+          description: Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
           required:
             - system
             - value
@@ -2436,7 +2437,7 @@ components:
         eventIdentifierSystem:
           type: string
           format: uri
-          description: Immutable namespace for event identifiers only, not HMAC identifiers.
+          description: Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
         identifierRoot:
           type: string
           format: uri
@@ -2444,9 +2445,9 @@ components:
           description: >
             Immutable, server-assigned root for this source's Grove identifiers.
             Derive DeploymentIdentifierSystems with registrationID as keyID and
-            epoch 1. The derived event system must equal eventIdentifierSystem.
-            The client persists its privacy key and Grove producer ledger together;
-            producer instances are allocated by that ledger, not by the server.
+            epoch 1. The derived recordVersion system must equal eventIdentifierSystem.
+            The client persists its identity key, pending conversion instant and
+            canonical record bytes in its account-scoped delivery journal.
         participantIdentifier:
           type: object
           additionalProperties: false

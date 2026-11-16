@@ -97,8 +97,8 @@ extension ClinicalGraphStore {
                         JOIN study_data_grants purpose ON purpose.node_id = direct.node_id
                         JOIN clinical_point_facts parent ON parent.node_id = purpose.node_id
                         WHERE \(match) AND purpose.enrollment_id = g.enrollment_id AND purpose.source_id = g.source_id
-                            AND NOT EXISTS (SELECT 1 FROM clinical_output_retractions removed
-                                WHERE removed.output_binding_id = parent.output_binding_id)
+                            AND NOT EXISTS (SELECT 1 FROM clinical_record_retractions removed
+                                WHERE removed.record_id = parent.record_id)
                     )
                 )
             )

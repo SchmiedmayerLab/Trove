@@ -170,9 +170,10 @@ enum TestDatabase {
         guard let admin = app.db(adminID) as? any SQLDatabase else {
             throw Abort(.internalServerError, reason: "PostgreSQL test cleanup unavailable")
         }
-        // Tests have completed. FORCE closes this application's idle pools before removal.
-        // Targets are only the exact names successfully created by this invocation.
+        // Tests have completed. Prevent idle pools or Timescale workers from reconnecting
+        // while FORCE closes their sessions. Only this invocation's exact owned names are affected.
         for name in names {
+            try await admin.raw("ALTER DATABASE \(ident: name) ALLOW_CONNECTIONS false").run()
             try await admin.raw("DROP DATABASE IF EXISTS \(ident: name) WITH (FORCE)").run()
         }
         app.storage[CreatedDatabases.self] = nil

@@ -37,6 +37,21 @@ def unpack_package(archive, cache):
         tar.extractall(target, filter="data")
 
 
+def verify_dependency_closure(cache):
+    """Every exact package dependency must be present before the worker goes offline."""
+    packages = list(cache.glob("*/package/package.json"))
+    identities = {path.parent.parent.name for path in packages}
+    missing = set()
+    for path in packages:
+        metadata = json.loads(path.read_bytes())
+        for name, version in metadata.get("dependencies", {}).items():
+            identity = f"{name}#{version}"
+            if identity not in identities:
+                missing.add(identity)
+    if missing:
+        raise ValueError("Missing pinned package dependencies: " + ", ".join(sorted(missing)))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--grove-fhir", type=Path, required=True)
@@ -75,9 +90,10 @@ def main():
         verified_copy(artifact, destination, package["sha256"])
         with tarfile.open(destination) as tar:
             metadata = json.load(tar.extractfile("package/package.json"))
-        if metadata["name"] != package["packageId"] or metadata["version"] != "0.6.0":
+        if metadata["name"] != package["packageId"] or metadata["version"] != manifest["guideRelease"]["tag"]:
             raise ValueError("Unexpected Grove package identity")
         unpack_package(destination, assets / "cache")
+    verify_dependency_closure(assets / "cache")
     shutil.copyfile(HERE / "manifest.json", assets / "manifest.json")
     verified_copy(HERE / "worker.py", assets / "worker.py", manifest["workerSHA256"])
     shutil.copyfile(HERE / "Dockerfile", args.output / "Dockerfile")

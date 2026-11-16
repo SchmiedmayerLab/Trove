@@ -156,7 +156,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         guard (1...65_536).contains(nextCursor.count), payloads.count <= 128,
               observedDeletions.count <= 128 else { throw JournalError.invalidConfiguration }
         return try database.transaction {
-            _ = try activeSource(expected.sourceID)
+            let registered = try activeDeliverySource(expected.sourceID)
             guard try checkpoint(for: expected.sourceID) == expected else { throw JournalError.staleCheckpoint }
             let source = try database.query(
                 "SELECT next_sequence, producer_system FROM source_state WHERE source_id = ?", [.text(expected.sourceID.lowercase)]
@@ -172,7 +172,9 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
                 guard sequence < Int64.max else { throw JournalError.sequenceExhausted }
                 let commitment = try Contract.commitment(sourceID: expected.sourceID, originalBytes: payload.bytes, targets: payload.targets)
                 let metadata = Contract.metadata(for: commitment)
-                guard metadata.sourceID == expected.sourceID, metadata.eventSystem.utf8.elementsEqual(system.utf8) else {
+                guard metadata.sourceID == expected.sourceID,
+                      metadata.eventSystem.utf8.elementsEqual(system.utf8)
+                        || metadata.eventSystem.utf8.elementsEqual(registered.systems.recordRetraction.rawValue.utf8) else {
                     throw JournalError.eventIdentityMismatch
                 }
                 let id = UUID()
@@ -181,9 +183,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
                 deliveryIDs.append(id)
             }
             try retireDeletionDetections(observedDeletions, sourceID: expected.sourceID)
-            // Retire this checkpoint's opaque ledger only after all payloads are durable.
-            // A crash after COMMIT cannot strand reservations behind the advanced cursor.
-            // The new checkpoint mints a fresh producer instance, never reusing its counter.
+            // Retire the conversion instant only after record bytes and the cursor are durable.
             try database.execute("DELETE FROM producer_ledger WHERE source_id = ?", [.text(expected.sourceID.lowercase)])
             try database.execute(
                 "UPDATE source_state SET cursor = ?, checkpoint_revision = ? WHERE source_id = ?",
@@ -334,11 +334,12 @@ extension DeliveryJournal {
         guard let count = count.first, count < limits.maximumEvents else { throw JournalError.capacityExceeded }
         try database.execute(
             """
-            INSERT INTO delivery(id, source_id, sequence, event_value, payload, targets, payload_digest, target_digest, node_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO delivery(id, source_id, sequence, event_system, event_value, payload, targets, payload_digest, target_digest, node_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                .text(id.lowercase), .text(sourceID.lowercase), .integer(sequence), .text(metadata.eventValue), .blob(payload.bytes), .blob(intent),
+                .text(id.lowercase), .text(sourceID.lowercase), .integer(sequence), .text(metadata.eventSystem), .text(metadata.eventValue),
+                .blob(payload.bytes), .blob(intent),
                 .text(metadata.payloadSHA256), .text(metadata.targetSHA256), .integer(Int64(metadata.nodeCount))
             ]
         )
@@ -352,7 +353,7 @@ extension DeliveryJournal {
     private func storedReceipt(_ id: UUID) throws -> Contract.Receipt? {
         let rows = try database.query(
             """
-            SELECT d.receipt, d.source_id, s.producer_system, d.event_value, d.payload_digest, d.target_digest, d.node_count
+            SELECT d.receipt, d.source_id, d.event_system, d.event_value, d.payload_digest, d.target_digest, d.node_count
             FROM delivery d JOIN source_state s ON s.source_id = d.source_id WHERE d.id = ?
             """, [.text(id.lowercase)]
         ) { statement in
@@ -385,7 +386,7 @@ extension DeliveryJournal {
         let rows = try database.query(
             """
             SELECT d.source_id, d.payload, d.targets, d.payload_digest, d.target_digest,
-                d.node_count, d.attempt_count, d.event_value, s.producer_system
+                d.node_count, d.attempt_count, d.event_value, d.event_system
             FROM delivery d JOIN source_state s ON s.source_id = d.source_id WHERE d.id = ?
             """,
             [.text(id.lowercase)]

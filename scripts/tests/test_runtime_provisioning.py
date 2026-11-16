@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -80,3 +81,12 @@ esac
         source = (SCRIPT.parent / "grant-runtime.sql").read_text()
         self.assertNotIn("\\quit", source)
         self.assertEqual(source.count("RAISE EXCEPTION"), 2)
+
+    def test_runtime_grants_cover_exactly_the_clinical_custody_tables(self):
+        migration = (ROOT / "TroveServer/Sources/TroveServer/Migrations/Postgres/CreateClinicalEvents.swift").read_text()
+        inventory = migration.split("private static let tables = [", 1)[1].split("]", 1)[0]
+        expected = set(re.findall(r'"([a-z_]+)"', inventory))
+        source = (SCRIPT.parent / "grant-runtime.sql").read_text()
+        clinical_grants = source.split("GRANT SELECT, INSERT ON public.clinical_events,", 1)[1].split("TO", 1)[0]
+        actual = {"clinical_events", *re.findall(r"public\.([a-z_]+)", clinical_grants)}
+        self.assertEqual(actual, expected)

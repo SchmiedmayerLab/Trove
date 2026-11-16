@@ -130,8 +130,7 @@ struct ClinicalGraphStoreTests {
                 _ = try await store.accept(dependent, sourceID: fixture.source.id, targets: fixture.targets(for: dependent))
                 var retraction = ClinicalRetractionTests.retraction(source: fixture.source)
                 retraction.retraction = .init(
-                    sourceRecordIdentifier: target.outputs[0].sourceRecordIdentifier,
-                    outputIdentifiers: [target.outputs[0].sourceOutputIdentifier]
+                    sourceRecordIdentifier: target.outputs[0].sourceRecordIdentifier
                 )
                 _ = try await store.accept(retraction, sourceID: fixture.source.id, targets: [])
                 for study in fixture.studyIDs { #expect(try await store.effectiveGrantCount(studyID: study) == 0) }
@@ -209,10 +208,10 @@ extension ClinicalGraphStoreTests {
         if includesContext {
             event = .init(
                 rawBytes: event.rawBytes,
+                recorded: event.recorded,
                 validatorIdentity: event.validatorIdentity,
                 eventIdentifierSystem: event.eventIdentifierSystem,
                 eventIdentifierValue: event.eventIdentifierValue,
-                producerInstance: event.producerInstance,
                 deploymentIdentifiers: event.deploymentIdentifiers,
                 participants: event.participants,
                 nodes: event.nodes + [.init(ordinal: event.nodes.count, fullURL: contextURL, resourceType: "QuestionnaireResponse")],

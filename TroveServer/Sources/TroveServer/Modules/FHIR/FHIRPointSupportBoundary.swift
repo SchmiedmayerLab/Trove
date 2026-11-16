@@ -93,7 +93,18 @@ enum FHIRPointSupportBoundary {
 
     private static func provenanceContext(_ provenance: Provenance, resources: [String: ResourceProxy]) throws {
         guard provenance.location == nil, provenance.signature?.isEmpty != false else { throw FHIRValidationClient.invalid }
-        for target in provenance.target { try literal(target, type: "Observation", resources: resources) }
+        if provenance.meta?.profile?.contains(Profile.groveMobileRetractionProvenance) == true {
+            // The IG validates these informative logical targets. The entity identifies the whole
+            // retracted source record; target cardinality never limits which versions are suppressed.
+            for target in provenance.target {
+                guard target.reference == nil, let identifier = target.identifier,
+                      [.sourceRecord, .sourceOutput].contains(try RoledIdentifier(identifier).role) else {
+                    throw FHIRValidationClient.invalid
+                }
+            }
+        } else {
+            for target in provenance.target { try literal(target, type: "Observation", resources: resources) }
+        }
         for agent in provenance.agent {
             try provenanceAgent(agent, resources: resources)
         }
@@ -156,6 +167,9 @@ enum FHIRPointSupportBoundary {
                 try literal(reference, type: "ResearchStudy", resources: resources)
             case ("Observation", Canonicals.writerRecordVersion.value?.url.absoluteString, .string):
                 break // Complete pair, canonical text and cross-output consistency are checked by the revision projection.
+            case ("Provenance", Canonicals.recordVersion.value?.url.absoluteString, .identifier),
+                 ("QuestionnaireResponse", Canonicals.contextSnapshot.value?.url.absoluteString, .identifier):
+                break // Grove binds each identity extension to its resource's entry key.
             case ("Observation", healthKitSourceType, .code),
                  ("Observation", Canonicals.recordingMethod.value?.url.absoluteString, .coding):
                 // Full validation establishes the metadata; the location walk rejects nested extensions.

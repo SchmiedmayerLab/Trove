@@ -16,7 +16,7 @@ import SQLKit
 /// Receipt recovery does not admit data or re-evaluate study grants.
 struct ClinicalEventReceiptStore: Sendable {
     struct Lookup: Sendable {
-        let identifier: ExchangeEventIdentifier
+        let identifier: BusinessIdentifier
         let digest: String
         let intent: String
 
@@ -26,7 +26,7 @@ struct ClinicalEventReceiptStore: Sendable {
                 throw ServerError.badRequest("Invalid receipt lookup")
             }
             do {
-                identifier = try ExchangeEventIdentifier(BusinessIdentifier(system: IdentifierSystem(system), value: value))
+                identifier = try BusinessIdentifier(system: IdentifierSystem(system), value: value)
             } catch {
                 throw ServerError.badRequest("Invalid receipt lookup")
             }
@@ -41,7 +41,8 @@ struct ClinicalEventReceiptStore: Sendable {
         let context = try AuthContext.checkIsParticipant()
         // Ownership remains mandatory after revocation. This is not the admission path.
         let source = try await SourceBindingService(database: database).find(id: sourceID)
-        guard lookup.identifier.identifier.identifier.system.rawValue == source.eventIdentifierSystem else {
+        let systems = try SourceIdentityNamespaces.assign(root: source.identifierRoot, registrationID: source.registrationID)
+        guard [systems.recordVersion, systems.recordRetraction].contains(lookup.identifier.system) else {
             throw ServerError.notFound("Event receipt not found")
         }
         guard let sql = database as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
@@ -49,8 +50,8 @@ struct ClinicalEventReceiptStore: Sendable {
         guard let row = try await sql.raw("""
             SELECT id, source_id, identifier_system, identifier_value, raw_sha256, target_intent, received_at, node_count
             FROM clinical_events WHERE source_id = \(bind: sourceID)
-                AND identifier_system = \(bind: lookup.identifier.identifier.identifier.system.rawValue)
-                AND identifier_value = \(bind: lookup.identifier.identifier.identifier.value)
+                AND identifier_system = \(bind: lookup.identifier.system.rawValue)
+                AND identifier_value = \(bind: lookup.identifier.value)
             """)
             .first() else { throw ServerError.notFound("Event receipt not found") }
         guard try row.decode(column: "raw_sha256", as: String.self) == lookup.digest,

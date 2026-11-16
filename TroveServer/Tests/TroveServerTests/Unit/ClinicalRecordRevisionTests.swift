@@ -74,10 +74,10 @@ extension ClinicalRecordRevisionTests {
     private static func event(_ outputs: [ValidatedExchangeEvent.PointOutput]) -> ValidatedExchangeEvent {
         .init(
             rawBytes: Data([1]),
+            recorded: .init(seconds: 0, fraction: ""),
             validatorIdentity: "synthetic-projection",
             eventIdentifierSystem: "urn:event",
             eventIdentifierValue: "1",
-            producerInstance: UUID(),
             deploymentIdentifiers: .init(systems: [:]),
             participants: [],
             nodes: [],

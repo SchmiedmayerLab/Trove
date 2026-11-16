@@ -63,8 +63,9 @@ struct FHIRDeploymentIdentifiers: Decodable, Sendable {
         case .sourceContext: expected.sourceContext
         case .recordingDevice: expected.recordingDevice
         case .deviceSnapshot: expected.deviceSnapshot
-        case .event: expected.event
-        case .entryNode: expected.entryNode
+        case .contextSnapshot: expected.contextSnapshot
+        case .recordVersion: expected.recordVersion
+        case .recordRetraction: expected.recordRetraction
         }
     }
 
@@ -73,7 +74,8 @@ struct FHIRDeploymentIdentifiers: Decodable, Sendable {
     }
 
     func matches(_ expected: DeploymentIdentifierSystems) -> Bool {
-        guard systems[.event] == [expected.event.rawValue] else {
+        let lifecycleRoles = Set(systems.keys).intersection([.recordVersion, .recordRetraction])
+        guard lifecycleRoles.count == 1 else {
             return false
         }
         return systems.allSatisfy { role, values in

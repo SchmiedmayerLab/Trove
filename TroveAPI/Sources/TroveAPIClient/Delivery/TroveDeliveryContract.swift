@@ -18,7 +18,7 @@ public enum TroveDeliveryContract: DeliveryContract {
     public typealias Receipt = Components.Schemas.EventReceipt
     public typealias Commitment = EventSubmissionCommitment
 
-    public static let identifier = "trove.event-delivery.v2"
+    public static let identifier = "trove.record-delivery.v3"
 
     public static func commitment(sourceID: UUID, originalBytes: Data, targets: [Target]) throws -> Commitment {
         try Commitment(sourceID: sourceID, originalBytes: originalBytes, targets: targets)
@@ -73,9 +73,9 @@ public enum TroveDeliveryContract: DeliveryContract {
             let reserved = [
                 systems.sourceRecord, systems.sourceOutput, systems.writerRecord, systems.providerRecord,
                 systems.providerOutput, systems.sourceArtifact, systems.providerArtifact, systems.sourceContext,
-                systems.recordingDevice, systems.deviceSnapshot, systems.event, systems.entryNode
+                systems.recordingDevice, systems.deviceSnapshot, systems.contextSnapshot, systems.recordVersion, systems.recordRetraction
             ]
-            guard eventSystem == systems.event, !reserved.contains(participantSystem) else {
+            guard eventSystem == systems.recordVersion, !reserved.contains(participantSystem) else {
                 throw DeliveryJournalError.invalidSourceBinding
             }
             return DeliverySource(id: id, eventSystem: binding.eventIdentifierSystem, revokedAt: binding.revokedAt, systems: systems)

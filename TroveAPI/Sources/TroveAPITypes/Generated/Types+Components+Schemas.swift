@@ -2,15 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 @_spi(Generated) public import OpenAPIRuntime
-#if os(Linux)
-@preconcurrency public import struct Foundation.URL
-@preconcurrency public import struct Foundation.Data
-@preconcurrency public import struct Foundation.Date
-#else
 public import struct Foundation.URL
 public import struct Foundation.Data
 public import struct Foundation.Date
-#endif
 public import GroveLocalization
 public import GroveHealthKit
 public import GroveStudyDefinition
@@ -758,7 +752,7 @@ extension Components {
         public typealias EventTargets = [Components.Schemas.EventTarget]
         /// - Remark: Generated from `#/components/schemas/EventSubmission`.
         public struct EventSubmission: Codable, Hashable, Sendable {
-            /// RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+            /// RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. At most 4 MiB decoded.
             ///
             /// - Remark: Generated from `#/components/schemas/EventSubmission/eventBase64`.
             public var eventBase64: Swift.String
@@ -767,7 +761,7 @@ extension Components {
             /// Creates a new `EventSubmission`.
             ///
             /// - Parameters:
-            ///   - eventBase64: RFC 4648 standard padded base64, without whitespace, of the original Grove Mobile event bytes. At most 4 MiB decoded.
+            ///   - eventBase64: RFC 4648 standard padded base64, without whitespace, of one Grove Mobile record as a one-record Bundle. At most 4 MiB decoded.
             ///   - targets:
             public init(
                 eventBase64: Swift.String,
@@ -1059,7 +1053,7 @@ extension Components {
                 ])
             }
         }
-        /// Durable custody acknowledgement for one original producer event, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt.
+        /// Durable custody acknowledgement for one source-record version or retraction, not a statement of current study access or graph visibility. Before retiring staged bytes, the client must match the source, complete producer event identifier, payload SHA-256 and target-intent SHA-256 against its durable staging record. An HTTP success alone is insufficient. Exact retries return the persisted receipt.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/EventReceipt`.
@@ -1070,7 +1064,7 @@ extension Components {
             public var eventId: Swift.String
             /// - Remark: Generated from `#/components/schemas/EventReceipt/sourceId`.
             public var sourceId: Swift.String
-            /// Complete identifier from the accepted original Bundle.
+            /// Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/producerEventIdentifier`.
             public struct ProducerEventIdentifierPayload: Codable, Hashable, Sendable {
@@ -1110,7 +1104,7 @@ extension Components {
                     ])
                 }
             }
-            /// Complete identifier from the accepted original Bundle.
+            /// Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///
             /// - Remark: Generated from `#/components/schemas/EventReceipt/producerEventIdentifier`.
             public var producerEventIdentifier: Components.Schemas.EventReceipt.ProducerEventIdentifierPayload
@@ -1132,7 +1126,7 @@ extension Components {
             /// - Parameters:
             ///   - eventId: Server-assigned immutable custody record ID, not the producer's event identifier.
             ///   - sourceId:
-            ///   - producerEventIdentifier: Complete identifier from the accepted original Bundle.
+            ///   - producerEventIdentifier: Complete record-version or record-retraction identifier from the lifecycle Provenance entry key.
             ///   - payloadSHA256: Lowercase SHA-256 of the accepted event bytes, before any JSON normalization.
             ///   - targetIntentSHA256: SHA-256 of UTF-8 canonical target JSON: array sorted by consent ID, lowercase UUIDs, lexically sorted distinct ASCII output addresses, object keys consentId then outputFullUrls, compact JSON without escaped slashes. Bind this to the original staged intent, not later attribution.
             ///   - receivedAt:
@@ -1414,11 +1408,11 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/kind`.
             public var kind: Components.Schemas.ParticipantSource.KindPayload
-            /// Immutable namespace for event identifiers only, not HMAC identifiers.
+            /// Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/eventIdentifierSystem`.
             public var eventIdentifierSystem: Swift.String
-            /// Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
+            /// Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived recordVersion system must equal eventIdentifierSystem. The client persists its identity key, pending conversion instant and canonical record bytes in its account-scoped delivery journal.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantSource/identifierRoot`.
@@ -1479,8 +1473,8 @@ extension Components {
             ///   - id:
             ///   - registrationID:
             ///   - kind:
-            ///   - eventIdentifierSystem: Immutable namespace for event identifiers only, not HMAC identifiers.
-            ///   - identifierRoot: Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived event system must equal eventIdentifierSystem. The client persists its privacy key and Grove producer ledger together; producer instances are allocated by that ledger, not by the server.
+            ///   - eventIdentifierSystem: Immutable namespace for Grove record-version identifiers; retractions use the corresponding record-retraction namespace.
+            ///   - identifierRoot: Immutable, server-assigned root for this source's Grove identifiers. Derive DeploymentIdentifierSystems with registrationID as keyID and epoch 1. The derived recordVersion system must equal eventIdentifierSystem. The client persists its identity key, pending conversion instant and canonical record bytes in its account-scoped delivery journal.
             ///   - participantIdentifier: Complete FHIR Patient business identifier assigned to this participant.
             ///   - createdAt:
             ///   - revokedAt: Present only after permanent revocation; never cleared.

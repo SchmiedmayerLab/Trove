@@ -33,7 +33,8 @@ struct SourceBindingTests {
                 #expect(binding.participantID == participantID)
                 #expect(binding.identifierRoot == TestApp.issuer + "/trove/sources/" + binding.id.uuidString.lowercased())
                 #expect(binding.kind == .participantApp)
-                #expect(binding.eventIdentifierSystem == binding.identifierRoot + "/NamingSystem/grove-event-v0")
+                let versionSystem = binding.identifierRoot + "/NamingSystem/grove-record-version-v0/" + nonce.uuidString.lowercased() + "/1"
+                #expect(binding.eventIdentifierSystem == versionSystem)
                 #expect(binding.participantIdentifierSystem == TestApp.issuer + "/trove/participants")
                 #expect(binding.participantIdentifierValue == participantID.uuidString.lowercased())
                 #expect(binding.revokedAt == nil)

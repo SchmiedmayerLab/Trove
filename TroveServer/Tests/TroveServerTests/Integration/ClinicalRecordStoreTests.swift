@@ -49,7 +49,7 @@ struct ClinicalRecordStoreTests {
     }
 
     @Test(arguments: ["equal", "missing", "different"])
-    func competingEvidenceNeverUsesArrivalOrderToDisclose(kind: String) async throws {
+    func competingEvidenceUsesRecordedTime(kind: String) async throws {
         try await TestApp.withApp { app, _ in
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
             try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
@@ -62,10 +62,40 @@ struct ClinicalRecordStoreTests {
                     writer: kind == "missing" ? nil : kind == "different" ? "other" : "writer"
                 )
                 _ = try await store.accept(first, sourceID: fixture.source.id, targets: fixture.targets(for: first))
-                _ = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second))
-                #expect(try await Self.current(on: app.db).isEmpty)
-                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 0)
+                let selected = try await store.accept(second, sourceID: fixture.source.id, targets: fixture.targets(for: second))
+                #expect(try await Self.current(on: app.db) == [selected.eventID])
+                #expect(try await store.effectiveGrantCount(studyID: fixture.studyIDs[0]) == 1)
                 try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 4, facts: 2, grants: 4, on: app.db)
+            }
+        }
+    }
+
+    @Test(arguments: [false, true], ["fraction", "identity", "writer"])
+    func selectionSurvivesReverseArrivalAndRestart(reverse: Bool, ordering: String) async throws {
+        try await TestApp.withApp { app, _ in
+            let fixture = try await ClinicalEventStoreTests.prepare(on: app)
+            let expected = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                let store = ClinicalEventStore(database: app.db)
+                var first = Self.event(source: fixture.source, sequence: 1, version: "10")
+                var second = Self.event(source: fixture.source, sequence: 2, version: ordering == "writer" ? "11" : "10")
+                first.recorded = .init(seconds: 100, fraction: "000000000000000001")
+                second.recorded = .init(
+                    seconds: ordering == "writer" ? 99 : 100,
+                    fraction: ordering == "fraction" ? "000000000000000002" : "000000000000000001"
+                )
+                let events = reverse ? [second, first] : [first, second]
+                var selected: ClinicalEventReceipt?
+                for event in events {
+                    let receipt = try await store.accept(event, sourceID: fixture.source.id, targets: fixture.targets(for: event))
+                    if event.eventIdentifierValue == second.eventIdentifierValue { selected = receipt }
+                }
+                let receipt = try #require(selected)
+                #expect(try await Self.current(on: app.db) == [receipt.eventID])
+                return receipt
+            }
+            try await TestDatabase.withRestartedApplication(app) { reopened in
+                #expect(try await Self.current(on: reopened.db) == [expected.eventID])
+                try await ClinicalEventStoreTests.expectRows(events: 2, nodes: 4, facts: 2, grants: 4, on: reopened.db)
             }
         }
     }
@@ -213,10 +243,10 @@ extension ClinicalRecordStoreTests {
         }
         return .init(
             rawBytes: base.rawBytes,
+            recorded: base.recorded,
             validatorIdentity: base.validatorIdentity,
             eventIdentifierSystem: base.eventIdentifierSystem,
             eventIdentifierValue: base.eventIdentifierValue,
-            producerInstance: base.producerInstance,
             deploymentIdentifiers: base.deploymentIdentifiers,
             participants: base.participants,
             nodes: nodes,

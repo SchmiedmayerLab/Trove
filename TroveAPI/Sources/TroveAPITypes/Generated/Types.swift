@@ -2,15 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 @_spi(Generated) public import OpenAPIRuntime
-#if os(Linux)
-@preconcurrency public import struct Foundation.URL
-@preconcurrency public import struct Foundation.Data
-@preconcurrency public import struct Foundation.Date
-#else
 public import struct Foundation.URL
 public import struct Foundation.Data
 public import struct Foundation.Date
-#endif
 public import GroveLocalization
 public import GroveHealthKit
 public import GroveStudyDefinition
@@ -220,7 +214,7 @@ public protocol APIProtocol: Sendable {
     func putParticipantProfile(_ input: Operations.PutParticipantProfile.Input) async throws -> Operations.PutParticipantProfile.Output
     /// Register a participant-owned app data stream
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the event sequence and exact retry bytes across restarts; register a new stream if that journal is lost, including after reinstalling the app.
+    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.
@@ -861,7 +855,7 @@ extension APIProtocol {
     }
     /// Register a participant-owned app data stream
     ///
-    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the event sequence and exact retry bytes across restarts; register a new stream if that journal is lost, including after reinstalling the app.
+    /// Requires an existing participant profile. A registrationID is an idempotency key scoped to that participant. Repeating it returns the same stream, including its revoked state; it never reactivates a stream. Registration grants no study access and does not attest the data origin. The server assigns all identity namespaces. Preserve the identity key and canonical staged record bytes across restarts. Server-backed identity recovery is not yet implemented; losing the journal currently requires a new stream and does not preserve cross-install deduplication.
     ///
     ///
     /// - Remark: HTTP `POST /participant/sources`.

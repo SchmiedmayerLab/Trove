@@ -20,9 +20,9 @@ extension Components.Schemas.ParticipantSource {
             throw ExchangeIdentityError.invalidIdentifierSystem(identifierRoot)
         }
         let systems = try DeploymentIdentifierSystems.derived(
-            root: IdentifierSystem(identifierRoot), keyID: registrationID, epoch: EventSequence(1)
+            root: IdentifierSystem(identifierRoot), keyID: registrationID, epoch: KeyEpoch(1)
         )
-        guard systems.event.rawValue.utf8.elementsEqual(eventIdentifierSystem.utf8) else {
+        guard systems.recordVersion.rawValue.utf8.elementsEqual(eventIdentifierSystem.utf8) else {
             throw ExchangeIdentityError.invalidIdentifierSystem(eventIdentifierSystem)
         }
         return systems

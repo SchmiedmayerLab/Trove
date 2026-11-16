@@ -151,10 +151,11 @@ public struct HeartRateAcquisition: Sendable {
         let after = try await collectionSnapshot(enrollmentIDs)
         guard refreshed == source, before.hasSameAuthority(as: after) else { throw AcquisitionError.authorityChanged }
         let detections = try await journal.deletionDetections(for: delta.deletedIDs, from: checkpoint, at: Date())
-        let exporter = try await Self.exporter(
-            source: binding, privacy: privacy, application: application, host: host, storage: journal.producerStorage(from: checkpoint)
+        let instant = try await journal.conversionInstant(from: checkpoint)
+        let exporter = try Self.exporter(
+            source: binding, privacy: privacy, application: application, host: host
         )
-        let prepared = try await Self.prepare(delta, exporter: exporter, snapshot: after, detections: detections)
+        let prepared = try await Self.prepare(delta, exporter: exporter, snapshot: after, detections: detections, instant: instant)
         let cursor = try JSONEncoder().encode(delta.nextAnchor)
         try await checkSession()
         let finalSource = try await synchronize(localID)
@@ -166,7 +167,6 @@ public struct HeartRateAcquisition: Sendable {
         let ids = try await journal.stage(
             from: checkpoint, nextCursor: cursor, payloads: prepared.payloads, observedDeletions: delta.deletedIDs
         )
-        prepared.receipts.forEach { $0.release() }
         try await checkSession()
         return Page(eventIDs: ids, changeCount: changeCount)
     }

@@ -14,28 +14,28 @@ import VaporTesting
 
 
 /// Every step uses authenticated HTTP and the full pinned validator, including replay.
-/// Each case owns its database. The expected state is read from the IG corpus unchanged.
+/// Each case owns its database. The pinned IG generator rebinds only the identifier tie-break.
 struct ReceiverRevisionCorpusTests {
     @Test(
         .enabled(if: Environment.get("TROVE_TEST_LIFECYCLE_CORPUS") != nil, "Requires the pinned receiver lifecycle corpus and validator"),
-        arguments: 0..<35
+        arguments: 0..<43
     )
     func completeRevisionSequenceAndRestart(index: Int) async throws {
         try #require(Environment.get("TROVE_TEST_POSTGRES_PORT") != nil)
         try #require(Environment.get("FHIR_VALIDATOR_URL") != nil && Environment.get("FHIR_VALIDATOR_IDENTITY") != nil)
-        let (corpus, root) = try ReceiverRevisionCorpus.load()
-        let sequence = corpus.sequences[index]
         try await TestApp.withApp(token: .participant(subject: "test-participant")) { app, token in
-            app.logger.info("Receiver revision corpus: \(sequence.id)")
             let fixture = try await ClinicalEventStoreTests.prepare(on: app)
-            let prepared = try corpus.prepare(sequence: sequence, source: fixture.source, root: root)
+            let bound = try ReceiverRevisionCorpus.prepare(source: fixture.source)
+            let sequence = bound.corpus.sequences[index]
+            let prepared = bound.events
+            app.logger.info("Receiver revision corpus: \(sequence.id)")
             var receipts: [String: Components.Schemas.EventReceipt] = [:]
             var previouslyVisible: Set<String> = []
             for step in sequence.steps {
-                let event = try #require(prepared[step.event])
+                let event = try #require(prepared[step.bundle])
                 let receipt = try await Self.upload(event, fixture: fixture, token: token, on: app)
-                if let previous = receipts[step.event] { #expect(receipt == previous) }
-                receipts[step.event] = receipt
+                if let previous = receipts[step.bundle] { #expect(receipt == previous) }
+                receipts[step.bundle] = receipt
                 let assertion = ReceiverRevisionAssertions(fixture: fixture, prepared: prepared, receipts: receipts)
                 let visible = try await assertion.check(step.expect, on: app.db)
                 #expect(visible.subtracting(previouslyVisible) == assertion.keys(step.expect.newlyVisible))
@@ -51,8 +51,8 @@ struct ReceiverRevisionCorpusTests {
                 let assertion = ReceiverRevisionAssertions(fixture: fixture, prepared: prepared, receipts: accepted)
                 let before = try await assertion.check(final, on: reopened.db)
                 for step in sequence.steps {
-                    let receipt = try await Self.upload(try #require(prepared[step.event]), fixture: fixture, token: token, on: reopened)
-                    #expect(receipt == accepted[step.event])
+                    let receipt = try await Self.upload(try #require(prepared[step.bundle]), fixture: fixture, token: token, on: reopened)
+                    #expect(receipt == accepted[step.bundle])
                     #expect(try await assertion.check(final, on: reopened.db) == before)
                 }
             }
@@ -72,7 +72,7 @@ extension ReceiverRevisionCorpusTests {
         try await app.test(.POST, "\(apiBasePath)/participant/sources/\(fixture.source.id)/events", beforeRequest: {
             $0.bearerAuth(token)
             try $0.encodeJSONBody(Components.Schemas.EventSubmission(
-                eventBase64: event.bytes.base64EncodedString(),
+                eventBase64: try event.bytes.base64EncodedString(),
                 targets: [.init(consentId: fixture.consentIDs[0].uuidString, outputFullUrls: event.selected)]
             ))
         }) { response in

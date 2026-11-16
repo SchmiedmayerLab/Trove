@@ -44,7 +44,8 @@ enum FHIRPointProjection {
         let graph = try ExchangeGraph(validating: bytes, kind: .active)
         try FHIRPointSupportBoundary.validateExtensionLocations(in: bytes)
         guard let entries = graph.bundle.entry, (1...512).contains(entries.count) else { throw FHIRValidationClient.invalid }
-        let event = graph.event
+        let record = try ExchangeRecord(validating: bytes)
+        let identity = record.version.identifier.identifier
         let (nodes, resources) = try index(entries)
         try FHIRPointSupportBoundary.validate(resources: resources)
         var participants: Set<Identity> = []
@@ -60,10 +61,10 @@ enum FHIRPointProjection {
         guard participants.count == 1, !outputs.isEmpty else { throw FHIRValidationClient.invalid }
         var result = ValidatedExchangeEvent(
             rawBytes: bytes,
+            recorded: try RecordedInstant.extract(from: resources),
             validatorIdentity: validatorIdentity,
-            eventIdentifierSystem: event.system.rawValue,
-            eventIdentifierValue: event.value,
-            producerInstance: graph.eventIdentifier.producerInstance,
+            eventIdentifierSystem: identity.system.rawValue,
+            eventIdentifierValue: identity.value,
             deploymentIdentifiers: try JSONDecoder().decode(FHIRDeploymentIdentifiers.self, from: bytes),
             participants: participants,
             nodes: nodes,
@@ -74,7 +75,7 @@ enum FHIRPointProjection {
         return result
     }
 
-    private static func index(_ entries: [BundleEntry]) throws -> ([ValidatedExchangeEvent.Node], [String: ResourceProxy]) {
+    static func index(_ entries: [BundleEntry]) throws -> ([ValidatedExchangeEvent.Node], [String: ResourceProxy]) {
         var resources: [String: ResourceProxy] = [:]
         var nodes: [ValidatedExchangeEvent.Node] = []
         for (ordinal, entry) in entries.enumerated() {
@@ -164,7 +165,9 @@ enum FHIRPointProjection {
     }
 
     private static func patientIdentifier(_ patient: Patient) throws -> Identity {
-        guard patient.identifier?.count == 1, let first = patient.identifier?.first else { throw FHIRValidationClient.invalid }
+        // A context snapshot identifies this representation of the Patient, not the participant.
+        let identifiers = (patient.identifier ?? []).filter { (try? RoledIdentifier($0))?.role != .contextSnapshot }
+        guard identifiers.count == 1, let first = identifiers.first else { throw FHIRValidationClient.invalid }
         return try identifier(first)
     }
 

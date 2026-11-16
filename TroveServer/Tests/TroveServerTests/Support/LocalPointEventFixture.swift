@@ -14,16 +14,14 @@ import TroveAPIServer
 @testable import TroveServer
 
 
-/// Local boundary tests rekey the pinned synthetic fixture using the IG identity framing.
+/// Local boundary tests use synthetic identities to exercise graph shape and custody.
+/// These keys are not evidence of producer HMAC conformance.
 /// Full-validator tests retain ImmutablePointEventFixture and the independently pinned IG implementation.
 enum LocalPointEventFixture {
     static func bytes(source: SourceBinding, sequence: UInt64 = 50, recordID: String? = nil) throws -> Data {
         let url = try #require(Bundle.module.url(forResource: "ImmutablePointEvent", withExtension: "json"))
         let original = try Data(contentsOf: url)
         let previous = try ExchangeGraph(validating: original, kind: .active)
-        let event = try ExchangeEventIdentifier(
-            system: IdentifierSystem(source.eventIdentifierSystem), producerInstance: source.id, sequence: EventSequence(sequence)
-        )
         var document = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
         var entries = try #require(document["entry"] as? [[String: Any]])
         var replacements = try recordID.map { try recordReplacements(in: previous, source: source, recordID: $0) } ?? [:]
@@ -34,21 +32,19 @@ enum LocalPointEventFixture {
                 replacements[oldSystem] = FHIRDeploymentIdentifiers.system(for: role, in: systems).rawValue
             }
         }
-        try rekeyEntries(&entries, event: event, systems: systems, replacements: &replacements)
-        document["identifier"] = try object(event.identifier.fhirIdentifier)
+        try rekeyEntries(&entries, sequence: sequence, systems: systems, replacements: &replacements)
         document["entry"] = entries
         replacements["https://study.example.org/fhir/identifiers/participant"] = source.participantIdentifierSystem
         replacements["participant-001"] = source.participantIdentifierValue
         let timestamp = try TroveDateTranscoder().encode(Date())
         let transformed = transform(document, replacements: replacements, timestamp: timestamp)
         let bytes = try JSONSerialization.data(withJSONObject: transformed, options: [.sortedKeys, .withoutEscapingSlashes])
-        _ = try ExchangeGraph(validating: bytes, kind: .active)
-        return bytes
+        return try ExchangeRecord(validating: bytes).json
     }
 
     private static func rekeyEntries(
         _ entries: inout [[String: Any]],
-        event: ExchangeEventIdentifier,
+        sequence: UInt64,
         systems: DeploymentIdentifierSystems,
         replacements: inout [String: String]
     ) throws {
@@ -62,17 +58,13 @@ enum LocalPointEventFixture {
             ), role: originalKey.role)
             let newKey: RoledIdentifier
             switch key.role {
-            case .entryNode:
-                newKey = try nodeKey(replacing: key, event: event)
-            case .deviceSnapshot:
+            case .contextSnapshot, .deviceSnapshot, .recordVersion:
                 newKey = try FixtureIdentity.opaque(
                     system: key.identifier.system,
-                    role: .deviceSnapshot,
-                    components: [event.identifier.identifier.system.rawValue, event.identifier.identifier.value, "application", "fixture-app"]
+                    role: key.role,
+                    components: [key.identifier.system.rawValue, key.identifier.value, String(sequence)]
                 )
-                var resource = try #require(entries[index]["resource"] as? [String: Any])
-                resource["identifier"] = [try object(newKey.fhirIdentifier)]
-                entries[index]["resource"] = resource
+                replacements[originalKey.identifier.value] = newKey.identifier.value
             default:
                 newKey = .init(
                     identifier: try BusinessIdentifier(
@@ -93,13 +85,7 @@ enum LocalPointEventFixture {
         try JSONSerialization.jsonObject(with: JSONEncoder().encode(identifier))
     }
 
-    private static func nodeKey(replacing key: RoledIdentifier, event: ExchangeEventIdentifier) throws -> RoledIdentifier {
-        let parts = key.identifier.value.split(separator: ":")
-        try #require(parts.count == 4)
-        return try FixtureIdentity.node(system: key.identifier.system, event: event, role: String(parts[1]), ordinal: String(parts[2]))
-    }
-
-    /// Separate native records must have separate logical identities; event sequence alone
+    /// Separate native records must have separate logical identities; a conversion revision alone
     /// cannot turn an unversioned update into another measurement or choose a current winner.
     private static func recordReplacements(in graph: ExchangeGraph, source: SourceBinding, recordID: String) throws -> [String: String] {
         let observations = (graph.bundle.entry ?? []).compactMap { entry -> Observation? in

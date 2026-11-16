@@ -18,21 +18,19 @@ import TroveAPIClient
 extension HeartRateAcquisition {
     struct PreparedPage {
         let payloads: [EventDeliveryJournal.Payload]
-        let receipts: [ExchangeProducer.Receipt]
     }
 
     static func exporter(
         source: Components.Schemas.ParticipantSource,
         privacy: OpaqueIdentityScope,
         application: ApplicationDevice,
-        host: HostDevice,
-        storage: some ExchangeProducer.Storage
+        host: HostDevice
     ) throws -> HealthKitFHIRExporter {
         let participant = try BusinessIdentifier(
             system: IdentifierSystem(source.participantIdentifier.system), value: source.participantIdentifier.value
         )
         let producer = try ExchangeProducer(
-            identityScope: privacy, subject: .logical(participant), application: application, host: host, storage: storage
+            identityScope: privacy, subject: .logical(participant), application: application, host: host
         )
         return try HealthKitFHIRExporter(
             producer: producer,
@@ -46,7 +44,8 @@ extension HeartRateAcquisition {
         _ delta: Delta,
         exporter: HealthKitFHIRExporter,
         snapshot: ParticipantCollectionSnapshot,
-        detections: [UUID: Date]
+        detections: [UUID: Date],
+        instant: Date
     ) async throws -> PreparedPage {
         guard Set(delta.added.map(\.uuid)).count == delta.added.count else { throw AcquisitionError.unsupportedDelta }
         var nativeConsents: [UUID: Set<UUID>] = [:]
@@ -57,8 +56,9 @@ extension HeartRateAcquisition {
             return !consents.isEmpty
         }
         var payloads: [EventDeliveryJournal.Payload] = []
-        let exported = try await exporter.export(samples) { result in
-            guard case .graph(let graph) = result.outcome else { throw AcquisitionError.unsupportedDelta }
+        try await exporter.export(samples, at: instant) { result in
+            guard case .record(let record) = result.outcome else { throw AcquisitionError.unsupportedDelta }
+            let graph = try ExchangeGraph(validating: record.json, kind: .active)
             let observations = (graph.bundle.entry ?? []).compactMap { entry in
                 if case .observation(let observation)? = entry.resource { (entry, observation) } else { nil }
             }
@@ -72,17 +72,17 @@ extension HeartRateAcquisition {
             guard !consents.isEmpty else {
                 return
             }
-            payloads.append(.init(bytes: graph.json, targets: consents.map { .init(consentID: $0, outputFullURLs: [fullURL]) }))
+            payloads.append(.init(bytes: record.json, targets: consents.map { .init(consentID: $0, outputFullURLs: [fullURL]) }))
         }
         let deletions = try delta.deletedIDs.map { id in
             guard let detectedAt = detections[id] else { throw AcquisitionError.unsupportedDelta }
             return HealthKitFHIRExporter.Deletion(uuid: id, sourceType: .heartRate, deletedAfter: nil, detectedAt: detectedAt)
         }
-        let retracted = try await exporter.retract(deletions) { result in
-            guard case .graph(let graph) = result.outcome else { throw AcquisitionError.unsupportedDelta }
-            payloads.append(.init(bytes: graph.json, targets: []))
+        try await exporter.retract(deletions, at: instant) { result in
+            guard case .record(let record) = result.outcome else { throw AcquisitionError.unsupportedDelta }
+            payloads.append(.init(bytes: record.json, targets: []))
         }
-        return PreparedPage(payloads: payloads, receipts: [exported, retracted])
+        return PreparedPage(payloads: payloads)
     }
 }
 

@@ -230,6 +230,7 @@ class Validator:
         return result
 
     def validate(self, raw):
+        from Scripts.canonical_json import loads_lossless
         from Scripts.producer_validation.context import EXCHANGE_BUNDLE_PROFILE, RETRACTION_BUNDLE_PROFILE
         from Scripts.producer_validation.exchange_bundle import validate_exchange_bundle, validate_resource_profile_claims
         from Scripts.producer_validation.external_validator import reject_validator_errors
@@ -245,7 +246,9 @@ class Validator:
             ):
                 raise ProducerValidationError("exchange profile required")
             validate_resource_profile_claims(resource, "event", self.adapter_profiles)
-            validate_exchange_bundle(resource, "event", self.adapter_profiles)
+            # Content identities depend on the original number lexemes, including trailing
+            # zeros and exponent spelling; the semantic Decimal tree cannot supply those.
+            validate_exchange_bundle(resource, "event", self.adapter_profiles, lossless_resource=loads_lossless(raw))
         except (ProducerValidationError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
             return 422, self.response(raw, code="invalid_fhir")
         try:

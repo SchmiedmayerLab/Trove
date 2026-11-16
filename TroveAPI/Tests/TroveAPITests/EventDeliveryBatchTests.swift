@@ -174,10 +174,21 @@ extension EventDeliveryBatchTests {
         let checkpoint = try await journal.checkpoint(for: sourceID)
         let producer = UUID()
         let payloads = try (0..<count).map { index -> EventDeliveryJournal.Payload in
-            let payload = DeliveryFixture.payload(sequence: Int64(index + 1), changes: ["sample"], sourceID: sourceID, producerID: producer)
-            let size = byteCount ?? payload.bytes.count
-            try #require(size >= payload.bytes.count)
-            let bytes = payload.bytes + Data(repeating: 32, count: size - payload.bytes.count)
+            let seed = "\(producer):\(index)"
+            let record = try RecordFixture.make(sourceID: sourceID, registrationID: checkpoint.epoch, seed: seed, note: "x")
+            let bytes: Data
+            if let byteCount {
+                try #require(byteCount >= record.json.count)
+                bytes = try RecordFixture.make(
+                    sourceID: sourceID,
+                    registrationID: checkpoint.epoch,
+                    seed: seed,
+                    note: String(repeating: "x", count: byteCount - record.json.count + 1)
+                ).json
+                try #require(bytes.count == byteCount)
+            } else {
+                bytes = record.json
+            }
             return .init(bytes: bytes, targets: targets)
         }
         return try await journal.stage(from: checkpoint, nextCursor: Data(UUID().uuidString.utf8), payloads: payloads)

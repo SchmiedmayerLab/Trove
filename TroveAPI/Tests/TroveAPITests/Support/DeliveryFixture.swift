@@ -49,7 +49,7 @@ enum DeliveryFixture {
         return try await journal.stage(
             from: checkpoint,
             nextCursor: Data(UUID().uuidString.utf8),
-            payloads: [payload(sequence: 1, changes: changes, producerID: UUID())]
+            payloads: [try payload(sequence: 1, changes: changes, producerID: UUID())]
         )
     }
 
@@ -63,7 +63,7 @@ enum DeliveryFixture {
             id: sourceID.uuidString.lowercased(),
             registrationID: registrationID.uuidString.lowercased(),
             kind: .participantApp,
-            eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-event-v0",
+            eventIdentifierSystem: identifierRoot(sourceID) + "/NamingSystem/grove-record-version-v0/\(registrationID.uuidString.lowercased())/1",
             identifierRoot: identifierRoot(sourceID),
             participantIdentifier: .init(system: scope.issuer + "/trove/participants", value: consentID.uuidString.lowercased()),
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
@@ -75,14 +75,18 @@ enum DeliveryFixture {
     }
 
     static func payload(
-        sequence: Int64, changes: [String], sourceID: UUID = DeliveryFixture.sourceID, producerID: UUID? = nil
-    ) -> EventDeliveryJournal.Payload {
-        // These are commitment envelopes, not claimed FHIR-conformant clinical fixtures.
-        let entries = Array(repeating: "{}", count: changes.count).joined(separator: ",")
-        let bytes = Data("""
-            {"identifier":{"system":"\(identifierRoot(sourceID))/NamingSystem/grove-event-v0","value":"e0:\((producerID ?? sourceID).uuidString.lowercased()):\(sequence)"},"entry":[\(entries)]}
-            """.utf8)
-        return .init(bytes: bytes, targets: [.init(consentID: consentID, outputFullURLs: ["urn:output:a"])])
+        sequence: Int64,
+        changes: [String],
+        sourceID: UUID = DeliveryFixture.sourceID,
+        producerID: UUID? = nil,
+        registrationID: UUID = epoch
+    ) throws -> EventDeliveryJournal.Payload {
+        let record = try RecordFixture.make(
+            sourceID: sourceID,
+            registrationID: registrationID,
+            seed: "\(sequence):\((producerID ?? sourceID).uuidString):\(changes.joined(separator: ","))"
+        )
+        return .init(bytes: record.json, targets: [.init(consentID: consentID, outputFullURLs: record.outputFullURLs)])
     }
 
     static func identifierRoot(_ sourceID: UUID) -> String {

@@ -14,7 +14,7 @@ enum SourceIdentityNamespaces {
     /// Namespace assignment is public metadata, never evidence of source ownership.
     static func assign(root: String, registrationID: UUID) throws -> DeploymentIdentifierSystems {
         try .derived(
-            root: IdentifierSystem(root), keyID: registrationID.uuidString.lowercased(), epoch: EventSequence(1)
+            root: IdentifierSystem(root), keyID: registrationID.uuidString.lowercased(), epoch: KeyEpoch(1)
         )
     }
 }

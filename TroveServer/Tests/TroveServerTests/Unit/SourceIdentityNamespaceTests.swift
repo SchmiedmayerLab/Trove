@@ -24,13 +24,13 @@ struct SourceIdentityNamespaceTests {
             (systems.writerRecord, "writer-record"), (systems.providerRecord, "provider-record"),
             (systems.providerOutput, "provider-output"), (systems.sourceArtifact, "source-artifact"),
             (systems.providerArtifact, "provider-artifact"), (systems.sourceContext, "source-context"),
-            (systems.recordingDevice, "recording-device"), (systems.deviceSnapshot, "device-snapshot")
+            (systems.recordingDevice, "recording-device"), (systems.deviceSnapshot, "device-snapshot"),
+            (systems.contextSnapshot, "context-snapshot"), (systems.recordVersion, "record-version"),
+            (systems.recordRetraction, "record-retraction")
         ]
         for (system, kind) in opaque {
             #expect(system.rawValue == root + "/NamingSystem/grove-\(kind)-v0/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/1")
         }
-        #expect(systems.event.rawValue == root + "/NamingSystem/grove-event-v0")
-        #expect(systems.entryNode.rawValue == root + "/NamingSystem/grove-entry-node-v0")
-        #expect(Set(opaque.map(\.0) + [systems.event, systems.entryNode]).count == 12)
+        #expect(Set(opaque.map(\.0)).count == 13)
     }
 }

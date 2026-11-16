@@ -411,11 +411,11 @@ extension ClinicalEventStoreTests {
     ) -> ValidatedExchangeEvent {
         .init(
             rawBytes: Data("Synthetic prevalidated storage projection \(sequence) \(rawSuffix)".utf8),
+            recorded: .init(seconds: Int64(sequence), fraction: ""),
             validatorIdentity: "storage-unit-fixture-not-official-validation",
             eventIdentifierSystem: source.eventIdentifierSystem,
             eventIdentifierValue: "e0:\(source.id.uuidString.lowercased()):\(sequence)",
-            producerInstance: source.id,
-            deploymentIdentifiers: .init(systems: [.event: [source.eventIdentifierSystem]]),
+            deploymentIdentifiers: .init(systems: [.recordVersion: [source.eventIdentifierSystem]]),
             participants: [.init(system: source.participantIdentifierSystem, value: source.participantIdentifierValue)],
             nodes: [
                 .init(ordinal: 0, fullURL: "urn:uuid:patient", resourceType: "Patient"),
