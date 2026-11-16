@@ -7,7 +7,7 @@
 #
 
 # ---- Build stage ----
-FROM node:26-alpine AS builder
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ COPY TroveAPI/openapi.yaml /TroveAPI/openapi.yaml
 RUN npm run generate:api && npm run build
 
 # ---- Serve stage ----
-FROM nginx:alpine
+FROM nginx:alpine@sha256:fed7e14be83cbd2661a75cdc5b872d936cf155d46c327084d30b8df19ae88d72
 
 ENV APP_ENVIRONMENT=production
 

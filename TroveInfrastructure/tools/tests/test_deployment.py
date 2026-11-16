@@ -276,12 +276,12 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertEqual(len(engine["extensions"]), 1)
         extension = engine["extensions"][0]
         self.assertEqual(extension["name"], "timescaledb-oss")
-        self.assertRegex(extension["image"]["reference"], r"timescaledb-oss:2\.29\.2-18-trixie@sha256:[a-f0-9]{64}$")
+        self.assertRegex(extension["image"]["reference"], r"timescaledb-oss:2\.32\.0-18-trixie@sha256:[a-f0-9]{64}$")
         self.assertNotIn("extensions", identity.get("postgresql", {}))
         installation = named(documents, "Database", "trove")["spec"]
         self.assertEqual(installation["cluster"], {"name": "trove-db"})
         self.assertEqual(installation["owner"], database["bootstrap"]["initdb"]["owner"])
-        self.assertEqual(installation["extensions"], [{"name": "timescaledb", "version": "2.29.2"}])
+        self.assertEqual(installation["extensions"], [{"name": "timescaledb", "version": "2.32.0"}])
         self.assertFalse(any(item["kind"] == "Database" for item in self.rendered["infrastructure", "dev"]))
 
     def test_only_the_schema_owner_can_provision_runtime_roles(self):

@@ -16,4 +16,4 @@ spec:
     name: trove-db
   extensions:
     - name: timescaledb
-      version: "2.29.2"
+      version: "2.32.0"

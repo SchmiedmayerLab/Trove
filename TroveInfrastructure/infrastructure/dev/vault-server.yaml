@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: vault
-          image: hashicorp/vault:1.15
+          image: hashicorp/vault:2.2.2@sha256:dfa48c2fa2b0099ccb47681ec5c4804bf5aec9d6879ecfee07ad4b92a5427ad6
           args:
             - vault
             - server

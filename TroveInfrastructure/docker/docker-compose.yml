@@ -32,7 +32,7 @@ services:
       retries: 5
 
   keycloak-db:
-    image: postgres:18-alpine
+    image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     volumes:
       - keycloak_db_data:/var/lib/postgresql
     environment:
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.2-2
+    image: quay.io/keycloak/keycloak:26.8.2-2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     command: start-dev --health-enabled=true
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
@@ -91,7 +91,7 @@ services:
       retries: 5
 
   keycloak-config-cli:
-    image: quay.io/adorsys/keycloak-config-cli:6.5.1-26.5.5
+    image: quay.io/adorsys/keycloak-config-cli:6.5.1-26.5.5@sha256:0955d98c8a341898b7aa177477edf8a1e90569ae50bbe7598141c1270b773274
     environment:
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_USER: ${KEYCLOAK_ADMIN_USERNAME}
