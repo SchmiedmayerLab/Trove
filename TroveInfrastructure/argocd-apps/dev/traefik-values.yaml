@@ -8,25 +8,24 @@
 
 service:
   enabled: true
-  type: NodePort
-logs:
-  general:
-    level: WARN
-  access:
-    enabled: true
-    format: json
-    fields:
-      general:
-        defaultmode: drop
-        names:
-          StartUTC: keep
-          RequestMethod: keep
-          DownstreamStatus: keep
-          Duration: keep
-          RouterName: keep
-          ServiceName: keep
-      headers:
-        defaultmode: drop
+  spec:
+    type: NodePort
+log:
+  level: WARN
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    defaultMode: drop
+    names:
+      StartUTC: keep
+      RequestMethod: keep
+      DownstreamStatus: keep
+      Duration: keep
+      RouterName: keep
+      ServiceName: keep
+    headers:
+      defaultMode: drop
 persistence:
   enabled: true
   name: traefik-data
@@ -64,8 +63,9 @@ ports:
     nodePort: 30443
     expose:
       default: true
-    tls:
-      enabled: true
+    http:
+      tls:
+        enabled: true
 ingressRoute:
   dashboard:
     enabled: true

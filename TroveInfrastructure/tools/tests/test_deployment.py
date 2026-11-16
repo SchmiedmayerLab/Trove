@@ -417,15 +417,16 @@ class DeploymentContractTests(unittest.TestCase):
     def test_ingress_access_logs_exclude_headers_urls_and_participant_identifiers(self):
         for environment in ("dev", "prod"):
             values = yaml.safe_load((ROOT / f"argocd-apps/{environment}/traefik-values.yaml").read_text())
-            self.assertEqual(values["logs"]["general"]["level"], "WARN")
-            access = values["logs"]["access"]
+            self.assertNotIn("logs", values)
+            self.assertEqual(values["log"], {"level": "WARN"})
+            access = values["accessLog"]
             self.assertTrue(access["enabled"])
             self.assertEqual(access["format"], "json")
-            self.assertEqual(access["fields"]["headers"], {"defaultmode": "drop"})
-            self.assertEqual(access["fields"]["general"], {
-                "defaultmode": "drop",
+            self.assertEqual(access["fields"], {
+                "defaultMode": "drop",
                 "names": dict.fromkeys(("StartUTC", "RequestMethod", "DownstreamStatus", "Duration",
                                         "RouterName", "ServiceName"), "keep"),
+                "headers": {"defaultMode": "drop"},
             })
 
     def test_runtime_secret_is_distinct_and_production_secrets_have_no_seed_values(self):

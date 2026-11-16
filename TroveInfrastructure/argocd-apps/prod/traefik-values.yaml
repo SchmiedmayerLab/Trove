@@ -8,27 +8,25 @@
 
 service:
   enabled: true
-  type: LoadBalancer
   spec:
+    type: LoadBalancer
     loadBalancerIP: "34.182.76.103"
-logs:
-  general:
-    level: WARN
-  access:
-    enabled: true
-    format: json
-    fields:
-      general:
-        defaultmode: drop
-        names:
-          StartUTC: keep
-          RequestMethod: keep
-          DownstreamStatus: keep
-          Duration: keep
-          RouterName: keep
-          ServiceName: keep
-      headers:
-        defaultmode: drop
+log:
+  level: WARN
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    defaultMode: drop
+    names:
+      StartUTC: keep
+      RequestMethod: keep
+      DownstreamStatus: keep
+      Duration: keep
+      RouterName: keep
+      ServiceName: keep
+    headers:
+      defaultMode: drop
 persistence:
   enabled: true
   name: traefik-data
