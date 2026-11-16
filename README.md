@@ -19,15 +19,13 @@ Define a study in the web dashboard, then make it available to participants in t
 iOS app. Trove brings study information, eligibility, enrollment, consent and
 health-data collection into one platform.
 
-[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#running-it-locally) · [Read the Documentation](https://troveplatform.org)
+[Take a Tour](docs/Platform-Tour.md) · [Run Locally](#local-development) · [Read the Documentation](https://troveplatform.org)
 
 ## Capabilities
 
 - **Study definition.** Study information, eligibility, enrollment, consent,
   questionnaires and health-data collection are configured in one study and
   published as a numbered revision.
-- **Revisioned consent.** Enrollments reference the published revision a participant
-  accepted; later draft edits do not change it.
 - **Health-data collection.** The iOS app collects HealthKit data, and SensorKit data
   where a deployment enables it, and continues collecting offline. Deployments with
   approved provider registrations also collect data from participants' linked
@@ -42,7 +40,7 @@ health-data collection into one platform.
 - **Open source.** The server, CLI and iOS app are written in Swift and share a
   generated OpenAPI contract with the web dashboard. Trove is MIT licensed.
 
-## For Research Teams
+## Research Dashboard
 
 Set up eligibility and enrollment, edit consent documents, and add study components.
 Preview what participants will see before publishing. Each published revision keeps
@@ -53,7 +51,7 @@ authorized data and recordings from the results page or the [CLI](TroveAPI/CLI.m
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details.png#gh-light-mode-only)
 ![Trove dashboard: editing study information beside a participant preview](docs/images/web/study-details~dark.png#gh-dark-mode-only)
 
-## For Participants
+## Participant App
 
 Discover a study, review its requirements, and enroll. Review and sign its consent
 document before authorizing health-data collection. Collection continues offline
@@ -74,10 +72,10 @@ under the accepted study settings, and withdrawal stops it on the device at once
 
 Trove is in beta and is being actively tested and used at Stanford.
 These screenshots use a fictional Daily Activity
-Study and synthetic participant data. The [tour](docs/Platform-Tour.md) shows the
-current flows.
+Study and synthetic participant data. The [tour](docs/Platform-Tour.md) walks through
+each workflow.
 
-## How it fits together
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -95,8 +93,8 @@ flowchart TB
 [`TroveAPI/openapi.yaml`](TroveAPI/openapi.yaml) defines the HTTP contract.
 The server conforms to its generated `APIProtocol`; the iOS app and CLI use the
 generated Swift client, and the dashboard uses the generated TypeScript client.
-The [CLI](TroveAPI/CLI.md) currently accepts an already-issued token rather than
-providing its own login flow.
+The [CLI](TroveAPI/CLI.md) uses an already-issued access token and has no login
+flow of its own.
 
 See [Data and Platform Architecture](docs/Data-and-Platform-Architecture.md)
 for storage, authorization and synchronization details.
@@ -104,25 +102,25 @@ for storage, authorization and synchronization details.
 | Path | What it is | Stack |
 |------|-----------|-------|
 | [`TroveAPI/`](TroveAPI) | The shared OpenAPI contract and the Swift libraries generated from it | Swift, swift-openapi-generator |
-| [`TroveServer/`](TroveServer) | Study lifecycle, enrolment, consent, and clinical data authority | Swift, Vapor, Fluent |
+| [`TroveServer/`](TroveServer) | Study lifecycle, enrollment, consent, and clinical data authority | Swift, Vapor, Fluent |
 | [`TroveWeb/`](TroveWeb) | The researcher portal for composing and publishing studies and retrieving study data | React, TypeScript, Vite |
-| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrolment, consent and health-data collection | Swift, SwiftUI |
+| [`TroveiOS/`](TroveiOS) | The participant app: identity, study discovery, enrollment, consent and health-data collection | Swift, SwiftUI |
 | [`TroveInfrastructure/`](TroveInfrastructure) | GitOps deployment onto Kubernetes | Kustomize, ArgoCD, OpenTofu |
 
-## Studies and revisions
+## Studies and Revisions
 
-A study is a set of components a researcher configures and combines: informational content, questionnaires, and health-data collection, each with its own schedule and eligibility rules. Publishing freezes the current definition into a numbered revision. Enrolments point at a revision rather than at the mutable study, so the terms a participant accepted stay fixed even as the researcher keeps editing.
+A study is a set of components a researcher configures and combines: informational content, questionnaires, and health-data collection, each with its own schedule and eligibility rules. Publishing freezes the current definition into a numbered revision. Enrollments point at a revision rather than at the editable study, so later edits do not change the terms a participant accepted.
 
-## Storing the data
+## Data Storage
 
-One **PostgreSQL database with TimescaleDB** holds study definitions, enrolments, consent,
+One **PostgreSQL database with TimescaleDB** holds study definitions, enrollments, consent,
 audit records and clinical data. **S3-compatible object storage** holds immutable study
 bundles, collected recordings and signed consent PDFs. A measurement relevant to several
 studies is stored once, and withdrawal from one study does not change another study's data.
 
 Keycloak is the sole authority for identities, roles, and group membership; all three applications authenticate against it over OpenID Connect and the server validates tokens against its JWKS.
 
-## Running it locally
+## Local Development
 
 Follow the [local stack instructions](TroveInfrastructure/docker/README.md) to build the
 current images and start the server, dashboard, Keycloak, database and object storage
@@ -132,10 +130,9 @@ with Docker Compose on a fresh development database.
 
 ## Documentation
 
-The [Trove documentation](https://troveplatform.org) walks through the platform and
-explains its design: the study model, data architecture and integration contracts.
-Its contributor guides cover engineering and verification, collection acceptance
-and the documentation site itself.
+The [Trove documentation](https://troveplatform.org) contains the platform tour,
+the study model, the data architecture and the integration contracts, and the
+contributor guides for engineering, verification and collection acceptance.
 
 ## Contributing
 
