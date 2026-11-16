@@ -104,8 +104,7 @@ The [verification commands](https://github.com/SchmiedmayerLab/Trove/blob/main/A
 `static-analysis.yml` runs SwiftLint and Swift CodeQL analysis; `codeql.yml` covers
 JavaScript and TypeScript. Both scans run on every pull request, including stacked
 pull requests. GitHub's default CodeQL setup must remain disabled to avoid
-conflicting uploads. Swift CodeQL runs on hosted macOS 26 with Xcode 26.6 because
-its [build tracer does not support Xcode 27](https://github.com/github/codeql/issues/22742).
+conflicting uploads.
 
 `repository-standards.yml` runs the organization checks and the verification-script
 tests; coverage is uploaded to Codecov. Repository standards and security checks
