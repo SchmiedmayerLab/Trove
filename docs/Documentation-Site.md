@@ -32,19 +32,10 @@ HTML images that Markdown validation may not cover. Repository files outside
 
 ## Publishing
 
-The Documentation workflow builds and checks the site for pull requests and for
-changes on `main` without deploying them. Publishing a GitHub release deploys the
-documentation of the release tag: the workflow uploads the exact checked `site/`
-output and deploys it through the `github-pages` environment, which accepts
-deployments from release tags. A manual run on a release tag deploys that release's
-documentation again. GitHub Pages must use **GitHub Actions** as its
-source in the repository settings, with `troveplatform.org` as its custom domain
-and HTTPS enforced. The site is served at `https://troveplatform.org/`; the
-domain's apex A and AAAA records point to GitHub Pages.
-
-Only the deployment job receives Pages write and identity-token permissions.
-This publishes public documentation, not application images or study services;
-it does not bypass the independent candidate-image approval boundary.
+The [Documentation workflow](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/documentation.yml)
+builds and checks the site for pull requests and for changes on `main`. Publishing
+a stable GitHub release deploys the documentation of that release to
+`https://troveplatform.org/` through GitHub Pages.
 
 ## Maintaining Content
 
