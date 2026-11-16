@@ -29,7 +29,7 @@ enum DeliveryJournalSchema {
     }
 
     static let maximumPayloadBytes = EventSubmissionLimits.maximumEventBytes
-    private static let version: Int64 = 17
+    private static let version: Int64 = 19
 
     static func checkByteLimit(_ database: DeliverySQLite, maximumBytes: Int) throws {
         let sizes = try database.query("""
@@ -46,6 +46,9 @@ enum DeliveryJournalSchema {
                 + (SELECT coalesce(sum(256 + length(relative_path)), 0) FROM recording_file)
                 + (SELECT coalesce(sum(length(declaration) + 64 + coalesce(length(registration), 0) + coalesce(length(receipt), 0)), 0)
                     FROM recording_transfer)
+                + (SELECT coalesce(sum(length(content) + length(source_type_identifier) + length(device_product_type)
+                    + length(coordinate) + 192), 0) FROM sensorkit_batch_evidence)
+                + (SELECT count(*) * 96 FROM sensorkit_recording_slice)
             """) { sqlite3_column_int64($0, 0) }
         guard let size = sizes.first, size <= maximumBytes else { throw DeliveryJournalError.capacityExceeded }
     }
@@ -88,16 +91,13 @@ enum DeliveryJournalSchema {
         #endif
     }
 
-    static func configure(_ database: DeliverySQLite, scope: DeliveryScope, contract: String, create: Bool, maximumBytes: Int) throws {
+    static func configure(
+        _ database: DeliverySQLite, scope: DeliveryScope, contract: String, create: Bool, limits: (databaseBytes: Int, contentBytes: Int)
+    ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let scopeBytes = try encoder.encode(Identity(scope: scope, contract: contract))
-        if !create {
-            let storedVersion = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
-            guard storedVersion == [Self.version] else { throw DeliveryJournalError.unsupportedFormat }
-            let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
-            guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
-        }
+        let priorVersion = try create ? Self.version : validateExisting(database, scopeBytes: scopeBytes)
         let journalMode = try database.query("PRAGMA journal_mode = DELETE") { try DeliverySQLite.text($0, 0) }
         guard journalMode == ["delete"] else { throw DeliveryJournalError.invalidConfiguration }
         try database.execute("PRAGMA synchronous = EXTRA")
@@ -117,22 +117,86 @@ enum DeliveryJournalSchema {
         guard let pageSize = try database.query("PRAGMA page_size", read: { sqlite3_column_int64($0, 0) }).first, pageSize > 0 else {
             throw DeliveryJournalError.corruptJournal
         }
-        let maximumPages = Int64(maximumBytes) / pageSize
+        let maximumPages = Int64(limits.databaseBytes) / pageSize
         // Only a checked integer derived from configuration is interpolated into this pragma.
         let acceptedPages = try database.query("PRAGMA max_page_count = \(maximumPages)") { sqlite3_column_int64($0, 0) }
         guard acceptedPages == [maximumPages] else { throw DeliveryJournalError.capacityExceeded }
+        try initializeStorage(database, scopeBytes: scopeBytes, create: create, priorVersion: priorVersion, maximumBytes: limits.contentBytes)
+    }
+
+    private static func initializeStorage(
+        _ database: DeliverySQLite, scopeBytes: Data, create: Bool, priorVersion: Int64, maximumBytes: Int
+    ) throws {
         if create {
             try database.transaction {
                 for statement in statements { try database.execute(statement) }
+                for statement in replayStatements { try database.execute(statement) }
+                for statement in sliceStatements { try database.execute(statement) }
                 try database.execute("INSERT INTO journal_identity(id, scope) VALUES (1, ?)", [.blob(scopeBytes)])
                 try database.execute("PRAGMA user_version = \(Self.version)")
             }
+        } else if priorVersion < Self.version {
+            // This additive migration leaves every queued payload, source binding, receipt and cursor intact.
+            // Scope was verified before any pragma or schema mutation; SQLite rolls back all DDL on failure.
+            try database.transaction {
+                if priorVersion < 18 {
+                    for statement in replayStatements { try database.execute(statement) }
+                }
+                if priorVersion < 19 {
+                    for statement in sliceStatements { try database.execute(statement) }
+                }
+                try checkByteLimit(database, maximumBytes: maximumBytes)
+                try database.execute("PRAGMA user_version = \(Self.version)")
+            }
         }
+    }
+
+    private static func validateExisting(_ database: DeliverySQLite, scopeBytes: Data) throws -> Int64 {
+        let storedVersion = try database.query("PRAGMA user_version") { sqlite3_column_int64($0, 0) }
+        guard storedVersion.count == 1, let prior = storedVersion.first, (17...Self.version).contains(prior) else {
+            throw DeliveryJournalError.unsupportedFormat
+        }
+        let stored = try database.query("SELECT scope FROM journal_identity WHERE id = 1") { try DeliverySQLite.blob($0, 0) }
+        guard stored == [scopeBytes] else { throw DeliveryJournalError.wrongScope }
+        return prior
     }
 }
 
 
 extension DeliveryJournalSchema {
+    private static let sliceStatements = [
+        """
+        CREATE TABLE sensorkit_recording_slice (
+            batch_id INTEGER NOT NULL REFERENCES sensorkit_batch_evidence(id),
+            row_start INTEGER NOT NULL CHECK (row_start >= 0),
+            row_end INTEGER NOT NULL CHECK (row_end > row_start AND row_end <= 2147483647),
+            source_record_id TEXT NOT NULL CHECK (length(source_record_id) = 36),
+            sha256 BLOB NOT NULL CHECK (length(sha256) = 32),
+            PRIMARY KEY(batch_id, row_start),
+            UNIQUE(source_record_id)
+        ) STRICT
+        """
+    ]
+
+    private static let replayStatements = [
+        """
+        CREATE TABLE sensorkit_batch_evidence (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL REFERENCES source_state(source_id),
+            source_type_identifier TEXT NOT NULL CHECK (length(source_type_identifier) BETWEEN 1 AND 512),
+            device_product_type TEXT NOT NULL CHECK (length(device_product_type) BETWEEN 1 AND 256),
+            coordinate TEXT NOT NULL CHECK (length(coordinate) BETWEEN 1 AND 1024),
+            effective_start REAL NOT NULL,
+            effective_end REAL NOT NULL CHECK (effective_end >= effective_start),
+            content BLOB NOT NULL CHECK (length(content) BETWEEN 1 AND 131072),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            staged_authority TEXT CHECK (staged_authority IS NULL OR length(staged_authority) = 64),
+            UNIQUE (source_id, source_type_identifier, device_product_type, coordinate)
+        ) STRICT
+        """,
+        "CREATE INDEX sensorkit_evidence_window ON sensorkit_batch_evidence(source_id, source_type_identifier, effective_start, effective_end)"
+    ]
+
     private static let statements = [
         """
         CREATE TABLE collection_state (

@@ -8,6 +8,7 @@
 
 import Foundation
 import GroveHealthKit
+import GroveSensorKit
 import HealthKit
 import TroveAPIClient
 import TroveHealthKit
@@ -18,13 +19,11 @@ import TroveHealthKit
 struct HealthDataSession {
     let api: TroveAPIModule
     let healthKit: GroveHealthKit.HealthKit
+    let sensorKit: GroveSensorKit.SensorKit
     let session: KeycloakSessionSnapshot
 
     func run(_ action: HealthDataModel.Action) async throws -> HealthDataStatus {
         try checkSession()
-        guard HKHealthStore.isHealthDataAvailable() else {
-            return .unavailable
-        }
         let scope = EventDeliveryJournal.Scope(
             backend: Config.apiBaseURL.absoluteString, issuer: session.issuer.absoluteString, subject: session.subject
         )
@@ -45,13 +44,68 @@ struct HealthDataSession {
     }
 
     private func perform(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus {
+        let refreshed = try await refreshPlansIfNeeded(action, journal: journal)
+        var statuses: [HealthDataStatus] = []
+        if HKHealthStore.isHealthDataAvailable(), let status = try await performHealthKit(action, journal: journal) {
+            statuses.append(status)
+        }
+        if GroveSensorKit.SensorKit.isAvailable {
+            if let status = try await performSensorKit(action, journal: journal) { statuses.append(status) }
+        } else if try await journal.collectionState().snapshot?.active().permitsSensorKitAcquisition == true {
+            statuses.append(.sensorConfigurationRequired)
+        }
+        try checkSession()
+        // Both adapters stage into one journal before its one shared upload/recovery pass.
+        if action == .sync {
+            let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
+            _ = try await drainer.drain(limit: 128)
+            _ = try await journal.pruneDelivered()
+        }
+        let pending = try await journal.pendingDeliveryIDs(limit: 128)
+        for id in pending {
+            if case .blocked = try await journal.status(for: id) {
+                return .blocked
+            }
+        }
+        return HealthDataStatus.combining(statuses, pending: !pending.isEmpty, synchronized: action == .sync && refreshed)
+    }
+
+    private func performSensorKit(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus? {
+        do {
+            return try await SensorDataSession(api: api, sensorKit: sensorKit, session: session).perform(action, journal: journal)
+        } catch EventDeliveryJournal.JournalError.capacityExceeded {
+            return .storageFull
+        } catch ParticipantCollectionSnapshot.CollectionError.collectionNotAuthorized {
+            return .notAuthorized
+        } catch EventDeliveryJournal.JournalError.sourceRevoked {
+            return .revoked
+        }
+    }
+
+    private func refreshPlansIfNeeded(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> Bool {
+        guard action == .setUp || action == .sync else {
+            return false
+        }
+        do {
+            try await api.refreshCollectionPlans(journal: journal, for: session)
+            try checkSession()
+            return true
+        } catch ParticipantCollectionRefresh.RefreshError.unavailable where action == .sync {
+            try checkSession()
+            return false
+        }
+    }
+
+    private func performHealthKit(_ action: HealthDataModel.Action, journal: EventDeliveryJournal) async throws -> HealthDataStatus? {
         let acquisition = try api.makeHealthKitAcquisition(journal: journal, for: session)
-        var sources = try await journal.sourceSetups()
+        var sources = try await journal.sourceSetups().filter {
+            $0.binding?.source.repositoryKind == .healthkit || (try? HealthKitQueryDefinition(bytes: $0.queryDefinition)) != nil
+        }
+        if sources.isEmpty, try await requestedStreams(journal).isEmpty {
+            return nil
+        }
         try checkSession()
         guard sources.count <= 1 else { throw EventDeliveryJournal.JournalError.sourceConflict }
-        if action == .setUp {
-            try await api.refreshCollectionPlans(journal: journal, for: session)
-        }
         if action == .setUp, sources.isEmpty {
             let definition = try await acquisition.prepareQueryDefinition()
             try checkSession()
@@ -99,7 +153,9 @@ struct HealthDataSession {
             if currentSource.binding?.isRevoked == true { throw EventDeliveryJournal.JournalError.sourceRevoked }
             if try await hasRequestedAccess(journal) {
                 try checkSession()
-                progress = try await acquisition.catchUp(localID: source.localID, healthKit: healthKit)
+                progress = try await acquisition.catchUp(
+                    localID: source.localID, healthKit: healthKit, reviewDocuments: action == .reviewDocuments
+                )
                 if try await requestedStreams(journal).isEmpty { collectionStatus = .notAuthorized }
             } else {
                 collectionStatus = .permissionNeeded
@@ -111,12 +167,6 @@ struct HealthDataSession {
             collectionStatus = .notAuthorized
         } catch EventDeliveryJournal.JournalError.sourceRevoked {
             collectionStatus = .revoked
-        }
-        // Receipt recovery and server disposition remain useful even after collection has stopped.
-        if action == .sync {
-            let drainer = try api.makeDeliveryDrainer(journal: journal, for: session)
-            _ = try await drainer.drain(limit: 128)
-            _ = try await journal.pruneDelivered()
         }
         let status = try await queueStatus(journal, source: currentSource, finished: action == .sync && refreshed, progress: progress)
         if status == .blocked {
@@ -131,7 +181,6 @@ struct HealthDataSession {
     private func refreshAuthority(_ journal: EventDeliveryJournal, localID: UUID) async throws -> Bool {
         do {
             _ = try await api.synchronizeSource(localID: localID, journal: journal, for: session)
-            try await api.refreshCollectionPlans(journal: journal, for: session)
             try checkSession()
             return true
         } catch SourceRegistration.RegistrationError.unavailable {

@@ -109,8 +109,7 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
     /// Immutable principal/backend binding used when constructing the authenticated drain.
     nonisolated public let scope: Scope
 
-    /// The caller supplies an owner-only (0700) application directory. Existing files must be owner-only (0600).
-    /// Missing established journals are never recreated; unsafe permissions are never silently repaired.
+    /// Requires a private (0700) directory and owner-only (0600) files; never recreates missing journals or repairs unsafe permissions.
     public init(url: URL, scope: Scope, mode: OpenMode, limits: Limits = .init()) throws {
         guard url.isFileURL, !url.path.utf8.contains(0),
               [Contract.identifier, scope.backend, scope.issuer, scope.subject].allSatisfy({ (1...2048).contains($0.utf8.count) }) else {
@@ -131,8 +130,9 @@ public actor DeliveryJournal<Contract: DeliveryContract> {
         }
         try DeliveryJournalSchema.checkProtection(of: url)
         let database = try DeliverySQLite(url: url)
+        let budget = (limits.maximumDatabaseBytes, limits.maximumBytes)
         try DeliveryJournalSchema.configure(
-            database, scope: scope, contract: Contract.identifier, create: mode == .createNew, maximumBytes: limits.maximumDatabaseBytes
+            database, scope: scope, contract: Contract.identifier, create: mode == .createNew, limits: budget
         )
         let recordingFiles = try DeliveryFileStore(directory: url.appendingPathExtension("recordings"), create: mode == .createNew)
         self.database = database

@@ -17,16 +17,7 @@ struct HealthDataView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Heart Rate") {
-                    Text(model.status.message)
-                    if model.isBusy { ProgressView("Working…") }
-                    Button("Set Up This Device") { action = .setUp }
-                        .disabled(model.isBusy || model.status != .notSetUp)
-                    Button("Review Health Access") { action = .requestAccess }
-                        .disabled(model.isBusy || model.status == .notSetUp || model.status == .revoked)
-                    Button("Sync Available Data") { action = .sync }
-                        .disabled(model.isBusy || model.status == .notSetUp)
-                }
+                healthKitSection
                 SavedCollectionSection()
                 HealthDataExplanationView()
             }
@@ -48,6 +39,29 @@ struct HealthDataView: View {
                 await model.refreshCollectionSettings()
                 self.action = nil
             }
+        }
+    }
+
+    private var healthKitSection: some View {
+        Section("HealthKit Data") {
+            Text(model.status.message)
+            if model.isReviewingDocuments {
+                ProgressView("Reviewing Health Documents…")
+                Button("Cancel Document Review", role: .cancel) { model.cancelDocumentReview() }
+            } else if model.isBusy {
+                ProgressView("Working…")
+            }
+            Button("Set Up This Device") { action = .setUp }
+                .disabled(model.isBusy || model.status != .notSetUp)
+            Button("Review Health Access") { action = .requestAccess }
+                .disabled(model.isBusy || model.status == .notSetUp || model.status == .revoked)
+            Button("Review Health Documents") { action = .reviewDocuments }
+                .disabled(model.isBusy || model.status == .notSetUp || model.status == .revoked)
+            Text("Health may ask you to approve individual documents requested by your studies.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Sync Available Data") { action = .sync }
+                .disabled(model.isBusy || model.status == .notSetUp)
         }
     }
 }

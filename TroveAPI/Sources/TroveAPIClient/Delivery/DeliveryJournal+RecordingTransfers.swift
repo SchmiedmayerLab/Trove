@@ -37,6 +37,27 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
         observedDeletions: [UUID] = [],
         queryExhausted: Bool = false
     ) throws -> [UUID] {
+        try stageRecordingPayloads(
+            from: expected,
+            nextCursor: nextCursor,
+            payloads: payloads,
+            recordingDeclarations: recordingDeclarations,
+            observedDeletions: observedDeletions,
+            queryExhausted: queryExhausted,
+            finalizingDeliveries: { _ in }
+        )
+    }
+
+    /// Adapter-specific evidence joins the same transaction after every recording commitment is bound.
+    func stageRecordingPayloads(
+        from expected: Checkpoint,
+        nextCursor: Data,
+        payloads: [Payload],
+        recordingDeclarations: [[Components.Schemas.RecordingTransferDeclaration]],
+        observedDeletions: [UUID] = [],
+        queryExhausted: Bool = false,
+        finalizingDeliveries: ([UUID]) throws -> Void
+    ) throws -> [UUID] {
         guard recordingDeclarations.count == payloads.count else { throw JournalError.invalidConfiguration }
         let commitments = try zip(payloads, recordingDeclarations).map { payload, declarations in
             guard declarations.count == payload.recordings.count,
@@ -59,6 +80,7 @@ extension DeliveryJournal where Contract == TroveDeliveryContract {
                     _ = try retainRecordingDeclaration(commitment, recordingID: file.id)
                 }
             }
+            try finalizingDeliveries(ids)
         }
     }
 

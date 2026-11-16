@@ -8,6 +8,7 @@
 
 import Grove
 import GroveHealthKit
+import GroveSensorKit
 import SwiftUI
 import TroveAPIClient
 
@@ -15,7 +16,7 @@ import TroveAPIClient
 @MainActor
 @Observable
 final class HealthDataModel: Module, EnvironmentAccessible {
-    enum Action: Equatable { case refresh, setUp, requestAccess, sync, capture }
+    enum Action: Equatable { case refresh, setUp, requestAccess, reviewDocuments, sync, capture }
     enum WakeContext { case foreground, background }
 
     struct Transport {
@@ -29,6 +30,7 @@ final class HealthDataModel: Module, EnvironmentAccessible {
 
     @ObservationIgnored @Dependency(TroveAPIModule.self) private var api
     @ObservationIgnored @Dependency(GroveHealthKit.HealthKit.self) private var healthKit
+    @ObservationIgnored @Dependency(GroveSensorKit.SensorKit.self) private var sensorKit
     @ObservationIgnored private let transport: Transport?
     @ObservationIgnored private let waitForCaptureDeadline: @Sendable () async -> Void
     @ObservationIgnored private var operationTask: Task<Void, Never>?
@@ -48,6 +50,7 @@ final class HealthDataModel: Module, EnvironmentAccessible {
     var isBusy: Bool {
         currentSession != nil && (currentSession == pendingWithdrawal || currentSession == operationSession && operationID != nil)
     }
+    var isReviewingDocuments: Bool { isBusy && operationAction == .reviewDocuments }
     var sessionSnapshot: KeycloakSessionSnapshot? { currentSession }
     var savedCollections: LoadingState<[ParticipantCollectionState.Collection]> {
         currentSession != nil && currentSession == settingsSession ? storedSettings : .idle
@@ -127,14 +130,36 @@ final class HealthDataModel: Module, EnvironmentAccessible {
         }
         try Task.checkCancellation()
         guard currentSession == captured else { throw CancellationError() }
+        try await persistStop(enrollmentId: enrollmentId, for: captured)
+        guard currentSession == captured else { throw CancellationError() }
+        session = captured
+        storedStatus = .refreshNeeded
+    }
+
+    private func persistStop(enrollmentId: String, for captured: KeycloakSessionSnapshot) async throws {
         if let transport {
             try await transport.stopCollection(enrollmentId, captured)
         } else {
             try await api.stopCollection(enrollmentId: enrollmentId, for: captured)
+            guard currentSession == captured else { throw CancellationError() }
+            // Stop device recording immediately after the durable local withdrawal.
+            // A later pass can restart only sensors still covered by other active studies.
+            storedStatus = .refreshNeeded
+            do {
+                try await SensorDataConfiguration.stopRecording()
+            } catch {
+                if currentSession == captured { storedStatus = .blocked }
+                throw error
+            }
         }
-        guard currentSession == captured else { throw CancellationError() }
-        session = captured
-        storedStatus = .refreshNeeded
+    }
+
+    func cancelDocumentReview() {
+        guard isReviewingDocuments else {
+            return
+        }
+        storedStatus = .documentReviewCancelled
+        operationTask?.cancel()
     }
 
     func run(_ action: Action) async {
@@ -207,7 +232,7 @@ final class HealthDataModel: Module, EnvironmentAccessible {
             if let transport {
                 result = try await transport.run(action, captured)
             } else {
-                result = try await HealthDataSession(api: api, healthKit: healthKit, session: captured).run(action)
+                result = try await HealthDataSession(api: api, healthKit: healthKit, sensorKit: sensorKit, session: captured).run(action)
             }
         } catch is CancellationError {
             return

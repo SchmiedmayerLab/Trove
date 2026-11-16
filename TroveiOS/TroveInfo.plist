@@ -4,8 +4,40 @@
 <!-- SPDX-License-Identifier: MIT -->
 <plist version="1.0">
 <dict>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array><string>org.trove.sensorkit.collection</string></array>
+    <key>UIBackgroundModes</key>
+    <array><string>processing</string></array>
+    <key>TroveSensorKitEnabled</key>
+    <string>$(TROVE_SENSORKIT_ENABLED)</string>
+    <key>TroveSensorKitSources</key>
+    <array>
+        <string>onWrist</string>
+        <string>visits</string>
+        <string>messagesUsage</string>
+        <string>phoneUsage</string>
+    </array>
+    <key>NSSensorKitPrivacyPolicyURL</key>
+    <string>$(TROVE_SENSORKIT_PRIVACY_POLICY_URL)</string>
+    <key>NSSensorKitUsageDescription</key>
+    <string>Trove collects the sensor data you authorize for your enrolled research studies.</string>
+    <key>NSSensorKitUsageDetail</key>
+    <dict>
+        <key>SRSensorUsageWristDetection</key>
+        <dict><key>Description</key><string>Your studies use watch-wearing periods to interpret the measurements you share.</string></dict>
+        <key>SRSensorUsageVisits</key>
+        <dict><key>Description</key><string>Your studies use the visits you authorize to study your activity and routines.</string></dict>
+        <key>SRSensorUsageMessageUsage</key>
+        <dict><key>Description</key><string>Your studies use messaging usage counts to study communication patterns.</string></dict>
+        <key>SRSensorUsagePhoneUsage</key>
+        <dict><key>Description</key><string>Your studies use call counts and durations to study communication patterns.</string></dict>
+    </dict>
+	<key>TroveProviderRedirectURI</key>
+	<string>$(TROVE_PROVIDER_REDIRECT_URI)</string>
+	<key>NSHealthClinicalHealthRecordsShareUsageDescription</key>
+	<string>Trove reads the clinical records you authorize to share with your enrolled research studies.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Trove reads heart rate data to share measurements covered by your study consents.</string>
+	<string>Trove reads the health data you authorize for your enrolled studies, including any requested history and workout routes.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
