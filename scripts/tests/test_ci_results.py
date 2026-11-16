@@ -181,6 +181,7 @@ class CIResultTests(unittest.TestCase):
         self.assertIn(workflow["jobs"]["verification"]["name"], contexts)
         self.assertFalse(contexts.intersection({"API / Swift Test", "Server / Swift Test", "Web / Lint & Build"}))
         self.assertTrue(rule["parameters"]["strict_required_status_checks_policy"])
+        self.assertNotIn("bypass_actors", ruleset)
 
     def test_public_repository_scanning_is_unconditional_and_required(self) -> None:
         ruleset = json.loads((ROOT / ".github/rulesets/main.json").read_text())
