@@ -44,6 +44,10 @@ updates:
     directory: "/TroveWeb"
     schedule:
       interval: "weekly"
+    ignore:
+      # grove-design-system's DataTable is built on react-table 8; remove once it supports 9.
+      - dependency-name: "@tanstack/react-table"
+        versions: [">=9"]
     groups:
       compatible-updates:
         patterns: ["*"]
@@ -60,6 +64,10 @@ updates:
     directory: "/TroveInfrastructure/validator"
     schedule:
       interval: "weekly"
+    ignore:
+      # botocore requires python-dateutil<3.0.0; remove once botocore allows a newer major version.
+      - dependency-name: "python-dateutil"
+        versions: [">=3"]
     groups:
       compatible-updates:
         patterns: ["*"]
