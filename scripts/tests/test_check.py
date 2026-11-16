@@ -296,6 +296,17 @@ class VerificationInputTests(unittest.TestCase):
         self.assertLess(setup, install)
         self.assertIn(f'node-version: {package["engines"]["node"]}', workflow[setup:install])
 
+    def test_opentofu_uses_the_committed_provider_lock(self):
+        workflow = (ROOT / ".github/workflows/infrastructure.yml").read_text()
+        self.assertIn("tofu init -backend=false -lockfile=readonly", workflow)
+        self.assertRegex(workflow, r"setup-opentofu@[0-9a-f]{40} # v[0-9.]+\n\s+with:\n\s+tofu_version: \d+\.\d+\.\d+\n")
+        lock = (ROOT / "TroveInfrastructure/terraform/.terraform.lock.hcl").read_text()
+        for provider in ("hashicorp/google", "hashicorp/google-beta"):
+            block = lock.split(f'provider "registry.opentofu.org/{provider}"', 1)[1].split("\n}\n", 1)[0]
+            self.assertRegex(block, r'version\s+= "\d+\.\d+\.\d+"')
+            self.assertIn('"h1:', block)
+            self.assertIn('"zh:', block)
+
     def test_e2e_coverage_preserves_test_and_report_failures(self):
         command = json.loads((ROOT / "TroveWeb/package.json").read_text())["scripts"]["test:e2e:coverage"]
         for test_status, coverage_status, expected in ((0, 0, 0), (23, 0, 23), (0, 29, 29), (23, 29, 23)):

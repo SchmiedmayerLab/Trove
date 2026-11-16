@@ -76,10 +76,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.9
       - name: Check formatting
         run: tofu fmt -check -diff
       - name: Initialize
-        run: tofu init -backend=false
+        # The committed lock file fixes provider versions and checksums.
+        run: tofu init -backend=false -lockfile=readonly
       - name: Validate
         run: tofu validate
 

@@ -73,7 +73,6 @@ yarn-error.log*
 
 # Infrastructure
 /TroveInfrastructure/terraform/.terraform/
-/TroveInfrastructure/terraform/.terraform.lock.hcl
 /TroveInfrastructure/terraform/*.tfstate
 /TroveInfrastructure/terraform/*.tfstate.*
 /TroveInfrastructure/terraform/terraform.tfvars
