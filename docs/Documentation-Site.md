@@ -44,6 +44,9 @@ the latest release's tag deploys it again.
   in the design pages. Describe what exists; do not record project status, plans,
   history or issue tracking in the documentation.
   Keep API instructions aligned with the documented revision.
+- Keep published URLs working. When a page is renamed or removed, keep a static
+  HTML file at its old path in `docs/` that is excluded from indexing and forwards
+  to the replacement, as `Roadmap-and-Engineering-Principles.html` does.
 - Keep the component diagrams in the root README and architecture page identical.
 - Use only synthetic study and participant data. Follow the
   [capture instructions](images/README.md) when refreshing screenshots.

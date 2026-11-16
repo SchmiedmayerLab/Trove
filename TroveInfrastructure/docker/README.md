@@ -89,8 +89,8 @@ connection and `SOURCE_IDENTITY_KEYRING_FILE` for its keyring, as described in t
 
 ## Development Database Lifecycle
 
-`server_authority_data` is mounted at `/pgdata`. Trove has no production deployment yet:
-schema changes update the initial table definitions, not a chain of data upgrades.
+`server_authority_data` is mounted at `/pgdata`. Schema changes update the initial
+table definitions; there are no data upgrade migrations.
 Recreate the explicitly identified disposable development database after such a change.
 Verify the Compose project and volume before removing it; resetting the application
 database need not delete Keycloak identities or object-storage data. The setup never

@@ -9,9 +9,8 @@ SPDX-License-Identifier: MIT
 # Project Scope
 
 Trove provides study management for digital health research: study definitions,
-participant enrollment and consent, and collection of health data. The aim is to
-let studies share these services while retaining their own participant interfaces
-and specialized procedures.
+participant enrollment and consent, and collection of health data. One deployment
+serves several studies.
 
 The [platform tour](Platform-Tour.md) shows the interfaces.
 
@@ -19,12 +18,12 @@ The [platform tour](Platform-Tour.md) shows the interfaces.
 
 A study definition describes participant-facing content, activities, collection
 requirements and execution rules. Collection requirements identify the data needed
-and permitted sources, rather than the internals of one operating system.
-Applications report the capabilities they support.
+and the permitted sources independently of any one operating system. Applications
+report the capabilities they support.
 
 Published revisions preserve the content a participant accepted. The server owns
-enrollment, consent and accepted results. Clients can cache state and queue work,
-but they cannot independently establish consent or task completion.
+enrollment, consent and accepted results. Clients can cache state and queue work;
+consent and task completion are established only by the server.
 
 [Grove](https://github.com/SchmiedmayerLab/Grove) supplies reusable application
 components. The [Grove FHIR implementation guides](https://schmiedmayerlab.github.io/grove-fhir/)
@@ -36,18 +35,20 @@ One measurement can be relevant to several studies. Trove stores its source even
 once and records each study's authorization separately. Withdrawal from one study
 does not change another study's evidence or grant it additional access.
 
-FHIR is the exchange format; database rows are not FHIR resources. PostgreSQL and TimescaleDB provide transactional and time-series
+Health data is exchanged as FHIR resources, and questionnaires are stored as FHIR
+JSON resources. PostgreSQL and TimescaleDB provide transactional and time-series
 storage; object storage holds larger artifacts.
 
 ## Researcher Interfaces
 
-The dashboard and Swift CLI use the same typed API and permission checks. Visual editing is useful for reviewing consent wording,
-questionnaire structure and branching. Command-line and assisted workflows reduce
-repetitive configuration without introducing a separate study model.
+The dashboard and Swift CLI use the same typed API and permission checks. The
+dashboard edits consent documents visually or in Markdown and questionnaires as
+FHIR JSON. The CLI creates and edits studies, imports questionnaires, publishes
+revisions and retrieves study data.
 
-Assistance produces reviewable drafts. Publication, participant contact and access
-to study data require their own permissions. Scientific validity, institutional
-approval and intervention suitability remain research responsibilities.
+Publication, participant contact and access to study data require their own
+permissions. Scientific validity, institutional approval and intervention
+suitability are the research team's responsibility.
 
 ## Scope Limits
 
@@ -56,9 +57,9 @@ environment or arbitrary application-hosting service. Research analysis uses
 authorized exports in separate tools.
 
 Specialized assessments, such as a six-minute walk test or guided ECG capture,
-remain in study applications. They can use Trove's configuration and result
-contracts without moving their acquisition UI or scoring into the core platform.
-A component can move into Grove when multiple applications need the same behavior.
+remain in study applications. They use Trove's configuration and result contracts
+and keep their acquisition UI and scoring in the study application. Grove holds
+the components that several applications share.
 
 ## Design Documents
 
@@ -67,6 +68,6 @@ A component can move into Grove when multiple applications need the same behavio
 - [Data and Platform Architecture](Data-and-Platform-Architecture.md):
   components, storage, authorization and synchronization.
 - [Applications and Integrations](Applications-and-Integrations.md):
-  mobile clients, wearables, conversation tasks and custom services.
+  mobile clients, collection recovery, wearables and other research systems.
 - [Engineering and Verification](Engineering-and-Verification.md):
   implementation, testing and deployment requirements.
