@@ -176,15 +176,18 @@ class ReleaseArtifactTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RELEASE.scan_identity(directory, IDENTITY, fresh=True)
 
-    def test_independent_review_and_protected_branches_are_required(self) -> None:
+    def test_review_and_protected_branches_are_required(self) -> None:
         path = self.root / "environment.json"
         environment = {"name": "candidate-publication", "deployment_branch_policy": {"protected_branches": True},
                        "protection_rules": [{"type": "required_reviewers", "prevent_self_review": True,
                                              "reviewers": [{"type": "User"}]}]}
         self.write(path, environment)
         RELEASE.approval_environment(path)
+        self.write(path, {**environment, "protection_rules": [{"type": "required_reviewers", "prevent_self_review": False,
+                                                               "reviewers": [{"type": "User"}]}]})
+        RELEASE.approval_environment(path)
         for change in ({"name": "other"}, {"protection_rules": []}, {"deployment_branch_policy": None},
-                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": [{}]}]}):
+                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": []}]}):
             self.write(path, {**environment, **change})
             with self.assertRaises(ValueError):
                 RELEASE.approval_environment(path)

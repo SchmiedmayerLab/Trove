@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Require the configured independent approval boundary
+      - name: Require the configured approval boundary
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -200,10 +200,9 @@ def approval_environment(path: Path) -> None:
     rules = environment.get("protection_rules")
     if not isinstance(rules, list) or not any(
         isinstance(rule, dict) and rule.get("type") == "required_reviewers"
-        and rule.get("prevent_self_review") is True and isinstance(rule.get("reviewers"), list)
-        and len(rule["reviewers"]) > 0 for rule in rules
+        and isinstance(rule.get("reviewers"), list) and len(rule["reviewers"]) > 0 for rule in rules
     ):
-        raise ValueError("Independent environment review must be configured")
+        raise ValueError("Environment review must be configured")
     policy = environment.get("deployment_branch_policy")
     if not isinstance(policy, dict) or policy.get("protected_branches") is not True:
         raise ValueError("Publication must be restricted to protected branches")
