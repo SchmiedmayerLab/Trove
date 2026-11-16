@@ -9,7 +9,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:6.4.0-noble@sha256:31d14d727f4451f25e29bac9c42563a098c39ac66415e8bad970f48038e38aca AS build
+FROM swift:6.4.2-noble@sha256:23d9b28ad97fb1cf1999edc3a0cb265ee915ed42299a9344e7173d5a6d2b05f4 AS build
 ARG TARGETARCH
 
 # Install OS updates
