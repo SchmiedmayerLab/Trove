@@ -13,11 +13,7 @@ participant enrollment and consent, and collection of health data. The aim is to
 let studies share these services while retaining their own participant interfaces
 and specialized procedures.
 
-Trove is in beta and is being actively tested and used at Stanford.
-The [platform tour](Platform-Tour.md) shows the current interfaces.
-The design pages describe both implemented contracts and planned extensions;
-[GitHub milestones](https://github.com/SchmiedmayerLab/Trove/milestones) and
-[issues](https://github.com/SchmiedmayerLab/Trove/issues) track delivery.
+The [platform tour](Platform-Tour.md) shows the interfaces.
 
 ## Study Definitions
 
@@ -40,14 +36,12 @@ One measurement can be relevant to several studies. Trove stores its source even
 once and records each study's authorization separately. Withdrawal from one study
 does not change another study's evidence or grant it additional access.
 
-FHIR is the exchange format, not a requirement to represent every database row as
-a FHIR resource. PostgreSQL and TimescaleDB provide transactional and time-series
+FHIR is the exchange format; database rows are not FHIR resources. PostgreSQL and TimescaleDB provide transactional and time-series
 storage; object storage holds larger artifacts.
 
 ## Researcher Interfaces
 
-The dashboard, Swift CLI and planned authoring assistants use the same typed API
-and permission checks. Visual editing is useful for reviewing consent wording,
+The dashboard and Swift CLI use the same typed API and permission checks. Visual editing is useful for reviewing consent wording,
 questionnaire structure and branching. Command-line and assisted workflows reduce
 repetitive configuration without introducing a separate study model.
 
