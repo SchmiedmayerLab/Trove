@@ -253,3 +253,20 @@ later using a newly authenticated, correctly scoped drainer.
 The caller schedules passes. There is no internal timer, independent token manager
 or separate collector checkpoint authority. Journal format changes currently require a
 fresh development journal; no migration or automatic replacement is provided.
+
+## Grove Development Dependency
+
+API, server and iOS pin Grove commit
+`6e40cfbffcecafd59b253d6d1d9e2cfbdc89b1d0` from
+[Grove #118](https://github.com/SchmiedmayerLab/Grove/pull/118). This revision
+includes the merged consent validation and rendering changes from Grove #119
+and #120. The server uses `GroveConsent` for the shared document format.
+Resolve each package and the Xcode project with their checked-in lockfiles;
+local editable overrides are not adoption evidence.
+
+This remains a development revision. Grove's producer conformance source and
+Trove's validator source/package closure have separate identities. The validator
+manifest is not advanced merely because the Swift dependency builds. The
+[released-dependency gate](https://github.com/SchmiedmayerLab/Trove/issues/82)
+still requires reviewed releases, matching package inventories and the affected
+producer/receiver and consent/collection checks on that final graph.

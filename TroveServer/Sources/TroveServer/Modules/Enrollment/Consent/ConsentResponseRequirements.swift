@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import GroveFoundation
+import GroveConsent
 
 
 /// Compiles Grove's validated control definitions into server-side response requirements.
@@ -19,7 +19,7 @@ struct ConsentResponseRequirements: Sendable {
 
     private enum Requirement: Sendable {
         case toggle(expected: Bool?) // swiftlint:disable:this discouraged_optional_boolean - absent differs from required false
-        case select(GroveFoundation.ConsentDocumentFormat.Selection)
+        case select(ConsentDocumentFormat.Selection)
         case signature
 
         var requiresExplicitResponse: Bool {
