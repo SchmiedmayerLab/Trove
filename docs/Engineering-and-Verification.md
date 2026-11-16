@@ -151,9 +151,10 @@ After required verification succeeds on `main`, enabled publication consumes
 these archives without rebuilding. It requires the `candidate-publication`
 environment to have required reviewers, prevent self-review and allow only
 protected branches. An administrator must configure this environment and branch
-protection before publication; missing configuration fails closed. Disable
-administrator bypass as part of that setup. The API check verifies configuration,
-not the absence of a privileged administrator override.
+protection before publication; missing configuration fails closed. The `main`
+ruleset allows organization and repository administrators to bypass it; remove that
+bypass as part of that setup. The API check verifies configuration, not the absence
+of a privileged administrator override.
 
 Candidates go to `ghcr.io/schmiedmayerlab/trove-server` and
 `ghcr.io/schmiedmayerlab/trove-web` under source/run/attempt-specific tags. Publication
