@@ -64,13 +64,31 @@ jobs:
           fi
           docker build --provenance=mode=max --sbom=true --label "org.opencontainers.image.revision=$SOURCE_REVISION" \
             -f TroveWeb/Dockerfile -t ghcr.io/schmiedmayerlab/trove-web:main .
+      - name: Prepare the pinned offline FHIR validator
+        run: |
+          set -euo pipefail
+          manifest=TroveInfrastructure/validator/manifest.json
+          source="$RUNNER_TEMP/grove-fhir"
+          git init "$source"
+          git -C "$source" remote add origin https://github.com/SchmiedmayerLab/grove-fhir.git
+          git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")"
+          python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
+            --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context"
+          # Only the runtime base needs the network; the validator build adds verified assets offline.
+          docker build -t trove-fhir-validator-runtime:ci TroveInfrastructure/validator/runtime
+          docker build --network=none --build-arg RUNTIME_IMAGE=trove-fhir-validator-runtime:ci \
+            -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
+          echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect trove-fhir-validator:ci --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-trivy
-      - name: Scan the application images used by this stack
+      - name: Scan the application and validator images used by this stack
         run: |
           set -euo pipefail
           result=0
-          for component in server web; do
-            bash scripts/check vulnerabilities image --image "ghcr.io/schmiedmayerlab/trove-$component:main" \
+          for component in server web validator; do
+            image="ghcr.io/schmiedmayerlab/trove-$component:main"
+            if [ "$component" = validator ]; then image=trove-fhir-validator:ci; fi
+            bash scripts/check vulnerabilities image --image "$image" \
               --output "$RUNNER_TEMP/trove-image-scans/$component" --cache "$RUNNER_TEMP/trivy-cache" || result=1
           done
           exit "$result"
@@ -87,19 +105,6 @@ jobs:
         run: |
           docker builder prune --all --force
           df -h /
-      - name: Prepare the pinned offline FHIR validator
-        run: |
-          set -euo pipefail
-          manifest=TroveInfrastructure/validator/manifest.json
-          source="$RUNNER_TEMP/grove-fhir"
-          git init "$source"
-          git -C "$source" remote add origin https://github.com/SchmiedmayerLab/grove-fhir.git
-          git -C "$source" fetch --depth=1 origin "$(jq -r '.contractRevision' "$manifest")"
-          python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
-            --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context"
-          docker build --network=none -t trove-fhir-validator:ci "$RUNNER_TEMP/validator-context"
-          echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect trove-fhir-validator:ci --format '{{.Id}}')" >> "$GITHUB_ENV"
-          echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       # The server syncs Keycloak groups on boot and exits if the schema is not there yet, so the
       # migration has to run first. It starts the backing services it depends on.
       - name: Initialize the fresh keyring and apply migrations

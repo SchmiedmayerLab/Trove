@@ -40,11 +40,12 @@ Prepare from a local Grove FHIR checkout containing the pinned commit, `.build/f
 python3 TroveInfrastructure/validator/prepare.py \
   --grove-fhir /absolute/path/to/grove-fhir \
   --output /private/tmp/trove-validator-build
+docker build --tag trove-fhir-validator-runtime:local TroveInfrastructure/validator/runtime
 docker build --network=none --tag trove-fhir-validator:local /private/tmp/trove-validator-build
 python3 -m unittest discover -s TroveInfrastructure/validator -p test_worker.py
 ```
 
-The two base images are digest-pinned; Docker may fetch those bases when they are not cached. No build step resolves FHIR packages online. Keep the prepared context outside the repository; it contains approximately 1.4 GB of tooling and package data.
+The runtime image (`runtime/Dockerfile`) installs pinned Wolfi packages for Python 3.15 and the OpenJDK 21 runtime on a digest-pinned base, and is the only step that uses the network. The validator build then adds the verified assets with `--network=none`; pass `--build-arg RUNTIME_IMAGE=<tag>` to use another runtime tag. No build step resolves FHIR packages online. Keep the prepared context outside the repository; it contains approximately 1.4 GB of tooling and package data.
 
 If the checkout's build outputs have changed, pass
 `--artifacts /absolute/path/to/locked-artifacts` to preparation. That directory

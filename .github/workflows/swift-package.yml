@@ -94,7 +94,11 @@ jobs:
           python3 TroveInfrastructure/validator/prepare.py --grove-fhir "$source" \
             --artifacts "$RUNNER_TEMP/validator-artifacts" --output "$RUNNER_TEMP/validator-context" \
             --include-lifecycle-corpus
-          docker build --network=none -t "trove-fhir-validator:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$RUNNER_TEMP/validator-context"
+          # Only the runtime base needs the network; the validator build adds verified assets offline.
+          runtime="trove-fhir-validator-runtime:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker build -t "$runtime" TroveInfrastructure/validator/runtime
+          docker build --network=none --build-arg RUNTIME_IMAGE="$runtime" \
+            -t "trove-fhir-validator:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$RUNNER_TEMP/validator-context"
           echo "FHIR_VALIDATOR_IMAGE=$(docker image inspect "trove-fhir-validator:$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --format '{{.Id}}')" >> "$GITHUB_ENV"
           echo "FHIR_VALIDATOR_IDENTITY=sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
       - name: Start the isolated offline validator

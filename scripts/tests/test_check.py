@@ -130,7 +130,7 @@ class VerificationInputTests(unittest.TestCase):
         self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
-        self.assertIn(("docker", "/TroveInfrastructure/validator"), updates)
+        self.assertIn(("docker", "/TroveInfrastructure/validator/runtime"), updates)
         manifests = {
             "github-actions": ".github/workflows/*.yml",
             "swift": "Package.swift",
@@ -150,13 +150,25 @@ class VerificationInputTests(unittest.TestCase):
                 self.assertTrue(found)
 
     def test_validator_runtime_images_match_the_manifest(self):
-        # Dependabot updates only the Dockerfile; the manifest identity must change with it.
-        dockerfile = (ROOT / "TroveInfrastructure/validator/Dockerfile").read_text()
-        images = re.findall(r"^FROM (\S+)", dockerfile, re.MULTILINE)
-        manifest = json.loads((ROOT / "TroveInfrastructure/validator/manifest.json").read_text())
-        self.assertEqual(images, [manifest["runtimeImages"]["java"], manifest["runtimeImages"]["python"]])
-        for image in images:
-            self.assertRegex(image, r"@sha256:[0-9a-f]{64}$")
+        # Dependabot updates only the runtime Dockerfile; the manifest identity must change with it.
+        runtime = (ROOT / "TroveInfrastructure/validator/runtime/Dockerfile").read_text()
+        manifest = json.loads((ROOT / "TroveInfrastructure/validator/manifest.json").read_text())["runtimeImages"]
+        self.assertEqual(re.findall(r"^FROM (\S+)", runtime, re.MULTILINE), [manifest["base"]])
+        self.assertRegex(manifest["base"], r"^cgr\.dev/chainguard/wolfi-base:latest@sha256:[0-9a-f]{64}$")
+        installed = re.search(r"apk add --no-cache((?:\s+\\\n\s+\S+)+)", runtime).group(1)
+        self.assertEqual(sorted(re.findall(r"(\S+=\S+)", installed)), sorted(manifest["packages"]))
+        for package in manifest["packages"]:
+            self.assertRegex(package, r"^[a-z0-9.-]+=[0-9][^=\s]*-r\d+$")
+        self.assertTrue(any(package.startswith("python-3.15=") for package in manifest["packages"]))
+        self.assertTrue(any(package.startswith("openjdk-21-jre=") for package in manifest["packages"]))
+        validator = (ROOT / "TroveInfrastructure/validator/Dockerfile").read_text()
+        self.assertEqual(re.findall(r"^FROM (\S+)", validator, re.MULTILINE), ["${RUNTIME_IMAGE}"])
+        self.assertNotIn("RUN ", validator)
+        for workflow in ("dev-stack.yml", "swift-package.yml"):
+            text = (ROOT / ".github/workflows" / workflow).read_text()
+            runtime_build = text.index("TroveInfrastructure/validator/runtime")
+            offline_build = text.index("docker build --network=none --build-arg RUNTIME_IMAGE=")
+            self.assertLess(runtime_build, offline_build)
 
     def test_ui_stack_rejects_invalid_prebuilt_binary_before_startup(self):
         for binary in ("relative/server", str(ROOT / "TroveServer"), str(ROOT / "TroveServer/Package.swift")):
