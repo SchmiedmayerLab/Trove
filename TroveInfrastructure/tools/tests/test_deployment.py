@@ -291,9 +291,9 @@ class DeploymentContractTests(unittest.TestCase):
             "ALTER ROLE trove CREATEROLE", "GRANT pg_read_all_settings TO trove",
         ])
         chart = yaml.safe_load((ROOT / "argocd-apps/base/cnpg-operator.yaml").read_text())
-        self.assertEqual(chart["spec"]["source"]["targetRevision"], "0.29.0")
+        self.assertEqual(chart["spec"]["source"]["targetRevision"], "0.29.1")
         self.assertRegex(chart["spec"]["source"]["helm"]["valuesObject"]["image"]["tag"],
-                         r"^1\.30\.0@sha256:[a-f0-9]{64}$")
+                         r"^1\.30\.1@sha256:[a-f0-9]{64}$")
 
     def test_production_identity_tls_is_consistent(self):
         documents = self.rendered["infrastructure", "prod"]

@@ -78,7 +78,7 @@ not identity recovery. Production never uses this development seeder.
 
 ### Production Database
 
-Production uses CloudNativePG 1.30.0 (chart 0.29.0), PostgreSQL 18.6 and TimescaleDB
+Production uses CloudNativePG 1.30.1 (chart 0.29.1), PostgreSQL 18.6 and TimescaleDB
 2.32.0, with immutable multi-architecture image references. Its supported
 [image-volume extension mechanism](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/)
 requires Kubernetes 1.35 or later and a compatible runtime (containerd 2.1+ or
