@@ -187,7 +187,9 @@ class ReleaseArtifactTests(unittest.TestCase):
                                                                "reviewers": [{"type": "User"}]}]})
         RELEASE.approval_environment(path)
         for change in ({"name": "other"}, {"protection_rules": []}, {"deployment_branch_policy": None},
-                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": []}]}):
+                       {"protection_rules": [{"type": "required_reviewers", "prevent_self_review": False, "reviewers": []}]},
+                       {"protection_rules": [{"type": "required_reviewers"}]},
+                       {"protection_rules": [{"type": "required_reviewers", "reviewers": None}]}):
             self.write(path, {**environment, **change})
             with self.assertRaises(ValueError):
                 RELEASE.approval_environment(path)

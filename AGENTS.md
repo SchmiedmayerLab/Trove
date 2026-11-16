@@ -127,7 +127,8 @@ unchanged components; do not present editable dependencies as a released build.
   `codeql.yml` upload the scans, and a second setup produces conflicting uploads.
 - `.github/rulesets/main.json` records the required checks and review rules but
   does not apply them. When it changes, report that the hosted `main` ruleset must
-  be updated to match; that is a repository-administration step, not a commit.
+  be updated to match. Updating it is a repository-administration step. Bypass actors
+  are configured only on the hosted ruleset; keep them when updating it.
 - Review workflow changes and the code that will execute before approving a fork
   run; runner selection is not an isolation boundary. Never give self-hosted
   runners or untrusted pull requests production credentials, signing material or
