@@ -1,0 +1,121 @@
+{
+  "description": "Participant source identities a server-assigned identity context must reproduce on every implementation and injection path. Computed independently from the Grove v0 identity preimage: HMAC-SHA-256 under the source key over length-framed UTF-8 parts (label, kind, components), base64url without padding.",
+  "context": {
+    "identifierRoot": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37",
+    "keyID": "4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12",
+    "keyEpoch": "1",
+    "keyHex": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+    "repositoryKind": "healthkit",
+    "repositoryScope": {
+      "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/repository",
+      "value": "healthkit"
+    },
+    "participantIdentifier": {
+      "system": "https://identity.trove.test/trove/participants",
+      "value": "6b1e0f4c-2d3a-4b5c-8e9f-0a1b2c3d4e5f"
+    }
+  },
+  "systems": {
+    "sourceRecord": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "sourceOutput": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-output-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "writerRecord": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-writer-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "providerRecord": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-provider-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "providerOutput": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-provider-output-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "sourceArtifact": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-artifact-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "providerArtifact": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-provider-artifact-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "sourceContext": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-context-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "recordingDevice": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-recording-device-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "deviceSnapshot": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-device-snapshot-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "contextSnapshot": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-context-snapshot-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "recordVersion": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-record-version-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+    "recordRetraction": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-record-retraction-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1"
+  },
+  "nativeRecordIdentifierSystem": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/healthkit-native-record",
+  "sourceRecords": [
+    {
+      "adapterID": "healthkit",
+      "sourceType": "HKQuantityTypeIdentifierHeartRate",
+      "repositoryScope": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/repository",
+        "value": "healthkit"
+      },
+      "nativeRecordID": "3a7e5c10-0000-4000-8000-000000000038",
+      "sourceRecord": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+        "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:JD3UVxzAgAAqRK_RM-TWmT434IokrxX064Cvsyw-FVM"
+      },
+      "outputs": [
+        {
+          "role": "heart-rate",
+          "discriminator": "value",
+          "identifier": {
+            "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-output-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+            "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:vDDk31MRr6ZGVuZ-OIp2MPtiSP4CXcNTKCxFKkpib4I"
+          }
+        }
+      ]
+    },
+    {
+      "adapterID": "healthkit",
+      "sourceType": "HKQuantityTypeIdentifierHeartRate",
+      "repositoryScope": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/repository",
+        "value": "healthkit"
+      },
+      "nativeRecordID": "3a7e5c10-0000-4000-8000-000000000039",
+      "sourceRecord": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+        "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:CEEFglXZCA4GvOfIIe510CvCaEcdvvuRaraUV3-M-r8"
+      },
+      "outputs": [
+        {
+          "role": "heart-rate",
+          "discriminator": "value",
+          "identifier": {
+            "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-output-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+            "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:NwTaHRerb0ihBuxsgw8zGE_cBO9ef3RYJN5-SvgEH2Y"
+          }
+        }
+      ]
+    },
+    {
+      "adapterID": "healthkit",
+      "sourceType": "HKCategoryTypeIdentifierSleepAnalysis",
+      "repositoryScope": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/repository",
+        "value": "healthkit"
+      },
+      "nativeRecordID": "9d2f61b4-7c3e-4a15-8b06-e1f2a3b4c5d6",
+      "sourceRecord": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+        "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:F-QiCV0jXeVhdD2bnSWy35Pq4OYkEmKEVHH_1ExLSw8"
+      },
+      "outputs": [
+        {
+          "role": "sleep-stage",
+          "discriminator": "asleep-core",
+          "identifier": {
+            "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-source-output-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+            "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:5r26g8g00MzPBr23PgToOqEI9C8F2XT8T2StOuIe93Y"
+          }
+        }
+      ]
+    }
+  ],
+  "providerRecords": [
+    {
+      "provider": "oura",
+      "sourceType": "vO2_max",
+      "providerScope": {
+        "system": "https://trove.test/provider-scopes/oura",
+        "value": "deployment"
+      },
+      "scope": "global",
+      "nativeRecordID": "oura-vo2-max-2027-01-15",
+      "providerRecord": {
+        "system": "https://trove.test/sources/7c0f3a2e-5b1d-4e8a-9f60-2d4b8c1e0a37/NamingSystem/grove-provider-record-v0/4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12/1",
+        "value": "v0:4e2b9d61-8a3c-4f07-b5e1-c9d8a7f60b12:1:H0pX4VzXI13UFuSFvxfQzpSVM1FnZghHBGBJQZpKYX0"
+      }
+    }
+  ]
+}
