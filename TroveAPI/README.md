@@ -623,6 +623,17 @@ The larger bounded options are not claims of
 measured peak-memory suitability. Verify representative complete-record and
 continued-collection workloads before selecting larger deployment values.
 
+`CollectionBacklogWorkloadTests` runs a backlog above 64 MiB when
+`TROVE_TEST_LARGE_BACKLOG=1` is set. It uses the real generated client, journal
+and drainer against a synthetic HTTP peer, with an 80 MiB pending budget and a
+256 MiB database budget. On macOS 27.2 (Apple silicon, Swift 6.4.2, debug build) it
+staged 107 records with 83,387,850 pending payload bytes beside live capture
+(83,742,720 database and WAL bytes), recovered two lost replies after reopening
+the journal and drained the rest without duplicate submissions. The largest
+envelope was 4,225,283 bytes with at most 4 records per batch, and peak resident
+memory was 281,886,720 bytes. Filling took 109 s, recovery 13 s and draining 299 s.
+This is not a device or HealthKit measurement.
+
 ## Delivery Journal
 
 The journal lives in `TroveAPIClient`, alongside the authenticated delivery adapter.
