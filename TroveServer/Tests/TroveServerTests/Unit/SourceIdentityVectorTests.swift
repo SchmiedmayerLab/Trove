@@ -75,7 +75,9 @@ struct SourceIdentityVectorTests {
         func contains(column: String) -> Bool { values[column] != nil }
 
         func decodeNil(column: String) throws -> Bool {
-            guard let value = values[column] else { return true }
+            guard let value = values[column] else {
+                return true
+            }
             let mirror = Mirror(reflecting: value)
             return mirror.displayStyle == .optional && mirror.children.isEmpty
         }

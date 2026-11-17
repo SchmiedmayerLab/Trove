@@ -49,6 +49,10 @@ struct SourceIdentityVectorTests {
         ].mapValues(\.rawValue)
     }
 
+    private static func identifier(_ value: RoledIdentifier) -> SourceIdentityVectors.Identifier {
+        .init(system: value.identifier.system.rawValue, value: value.identifier.value)
+    }
+
     @Test
     func recoveredInstallationsReproduceTheSharedVectors() async throws {
         let vectors = try Self.vectors()
@@ -93,9 +97,5 @@ struct SourceIdentityVectorTests {
             await journal.close()
         }
         #expect(Set(vectors.sourceRecords.map(\.sourceRecord.value)).count == vectors.sourceRecords.count)
-    }
-
-    private static func identifier(_ value: RoledIdentifier) -> SourceIdentityVectors.Identifier {
-        .init(system: value.identifier.system.rawValue, value: value.identifier.value)
     }
 }

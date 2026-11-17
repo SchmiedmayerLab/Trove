@@ -17,11 +17,12 @@ import VaporTesting
 /// Grove's writer-record golden with typed source metadata, admitted for one of two consented studies and read back
 /// through both study exports.
 struct SourceFidelityExportTests {
+    /// Each selected element is compared as canonical JSON with sorted keys.
     private struct Facts: Equatable {
-        let metadata: NSArray
-        let writerVersion: NSArray
-        let identifiers: NSArray
-        let sourceRevision: NSArray
+        let metadata: [Data]
+        let writerVersion: [Data]
+        let identifiers: [Data]
+        let sourceRevision: [Data]
     }
 
     private static let roleSystem = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
@@ -111,15 +112,21 @@ extension SourceFidelityExportTests {
             // Native and sync identifiers carry no Grove role; writer records carry the writer-record role.
             return roles.isEmpty || roles.contains { $0["code"] as? String == "writer-record" }
         }
-        let revisions = resources.filter { $0["resourceType"] as? String == "Provenance" }.flatMap { provenance in
-            (provenance["entity"] as? [[String: Any]] ?? []).flatMap { $0["extension"] as? [[String: Any]] ?? [] }
-        }.filter { $0["url"] as? String == sourceRevisionURL }
-        return Facts(
-            metadata: extensions.filter { $0["url"] as? String == FHIRHealthKitMetadataBoundary.url } as NSArray,
-            writerVersion: extensions.filter { $0["url"] as? String == writerVersionURL } as NSArray,
-            identifiers: identifiers as NSArray,
-            sourceRevision: revisions as NSArray
+        let provenances = resources.filter { $0["resourceType"] as? String == "Provenance" }
+        let entities = provenances.flatMap { $0["entity"] as? [[String: Any]] ?? [] }
+        let revisions = entities
+            .flatMap { $0["extension"] as? [[String: Any]] ?? [] }
+            .filter { $0["url"] as? String == sourceRevisionURL }
+        return try Facts(
+            metadata: canonical(extensions.filter { $0["url"] as? String == FHIRHealthKitMetadataBoundary.url }),
+            writerVersion: canonical(extensions.filter { $0["url"] as? String == writerVersionURL }),
+            identifiers: canonical(identifiers),
+            sourceRevision: canonical(revisions)
         )
+    }
+
+    private static func canonical(_ elements: [[String: Any]]) throws -> [Data] {
+        try elements.map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) }
     }
 
     private static func page(study: UUID, app: Application, bearer: String?) async throws -> Components.Schemas.StudyDataPage {

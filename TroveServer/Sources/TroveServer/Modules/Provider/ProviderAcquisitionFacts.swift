@@ -36,15 +36,6 @@ struct ProviderAcquisitionFacts: Codable, Sendable {
         manufacturer = host.manufacturer
     }
 
-    func validate() throws {
-        let required = [applicationName, bundleIdentifier, version, operatingSystemVersion]
-        let optional = [build, operatingSystemName, operatingSystemBuild, productType, model, manufacturer].compactMap { $0 }
-        guard (required + optional).allSatisfy({ !$0.isEmpty && $0.utf8.count <= 512 }),
-              try ProviderSQL.encode(self, maximumBytes: 16_384).utf8.count <= 16_384 else {
-            throw ProviderFailure.invalidConfiguration
-        }
-    }
-
     /// The participant identity scope this worker mints under; it must match the participant app's recovered scope.
     static func identityScope(source: SourceBinding, identity: SourceIdentityKeyStore.Recovered) throws -> OpaqueIdentityScope {
         try .init(
@@ -53,6 +44,15 @@ struct ProviderAcquisitionFacts: Codable, Sendable {
             epoch: source.keyEpoch,
             key: identity.key
         )
+    }
+
+    func validate() throws {
+        let required = [applicationName, bundleIdentifier, version, operatingSystemVersion]
+        let optional = [build, operatingSystemName, operatingSystemBuild, productType, model, manufacturer].compactMap { $0 }
+        guard (required + optional).allSatisfy({ !$0.isEmpty && $0.utf8.count <= 512 }),
+              try ProviderSQL.encode(self, maximumBytes: 16_384).utf8.count <= 16_384 else {
+            throw ProviderFailure.invalidConfiguration
+        }
     }
 
     func producer(source: SourceBinding, identity: SourceIdentityKeyStore.Recovered) throws -> ExchangeProducer {
