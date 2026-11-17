@@ -36,6 +36,16 @@ struct ProviderAcquisitionFacts: Codable, Sendable {
         manufacturer = host.manufacturer
     }
 
+    /// The participant identity scope this worker mints under; it must match the participant app's recovered scope.
+    static func identityScope(source: SourceBinding, identity: SourceIdentityKeyStore.Recovered) throws -> OpaqueIdentityScope {
+        try .init(
+            root: IdentifierSystem(source.identifierRoot),
+            keyID: source.keyID.uuidString.lowercased(),
+            epoch: source.keyEpoch,
+            key: identity.key
+        )
+    }
+
     func validate() throws {
         let required = [applicationName, bundleIdentifier, version, operatingSystemVersion]
         let optional = [build, operatingSystemName, operatingSystemBuild, productType, model, manufacturer].compactMap { $0 }
@@ -47,12 +57,7 @@ struct ProviderAcquisitionFacts: Codable, Sendable {
 
     func producer(source: SourceBinding, identity: SourceIdentityKeyStore.Recovered) throws -> ExchangeProducer {
         try .init(
-            identityScope: .init(
-                root: IdentifierSystem(source.identifierRoot),
-                keyID: source.keyID.uuidString.lowercased(),
-                epoch: source.keyEpoch,
-                key: identity.key
-            ),
+            identityScope: Self.identityScope(source: source, identity: identity),
             subject: .logical(.init(system: IdentifierSystem(source.participantIdentifierSystem), value: source.participantIdentifierValue)),
             application: .init(name: applicationName, bundleIdentifier: bundleIdentifier, version: version, build: build),
             host: .init(
