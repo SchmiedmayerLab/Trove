@@ -1,14 +1,14 @@
 {
-  "contractRevision": "cde0cdb92e4f63e96b463085f2a5765a77f5211f",
-  "sourceArchiveSHA256": "59f8eafd59fb68410bd204acf356dfb5481122b1b95fa0980ee923dfde5b284c",
+  "contractRevision": "8c18d9b8ba36eff3f6003c65cdc9cae74a6d3228",
+  "sourceArchiveSHA256": "0ad9db59768d1a50b0c6084616a98779ca9cb33f30e464847a4bd9482fc5322e",
   "guideRelease": {
     "repository": "SchmiedmayerLab/grove-fhir",
-    "tag": "0.8.0",
-    "sourceRevision": "cde0cdb92e4f63e96b463085f2a5765a77f5211f",
-    "releaseID": 442091241
+    "tag": "0.8.2",
+    "sourceRevision": "8c18d9b8ba36eff3f6003c65cdc9cae74a6d3228",
+    "releaseID": 446952470
   },
-  "validatorVersion": "6.10.4",
-  "validatorSHA256": "1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc",
+  "validatorVersion": "7.0.6",
+  "validatorSHA256": "2686590539f0b3ba7683149b25d78249f6886c04e2c326e884c5049d8947df89",
   "bootstrap": [
     {
       "file": "hl7.fhir.pubpack-0.2.5.tgz",
@@ -93,68 +93,96 @@
     {
       "file": "hl7.terminology.r4-7.5.0.tgz",
       "sha256": "1da3004587602c3f5120061abc2309fef1f96668a477a9964354fa9af6fa6e60"
+    },
+    {
+      "file": "hl7.fhir.pubpack-0.2.12.tgz",
+      "sha256": "b370ee35f5bd1ad83c64f0ccef935cb1324fd72e50a01b37fac75d51a46b609f"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions.r4-5.4.0.tgz",
+      "sha256": "e93eb1ece7d14e6b3dfaa7af5ac510577957cb5fd2b61ef95cdcfbbdca81c96d"
+    },
+    {
+      "file": "hl7.fhir.uv.extensions-5.4.0.tgz",
+      "sha256": "9e72cb92118a3e64babf442394fdc300b97f5d53b295469aee5ed34f216a830e"
+    },
+    {
+      "file": "hl7.fhir.uv.tools.r4-1.3.0.tgz",
+      "sha256": "0dca1944e9e6b6157e524b7f7449b565600fcce3607861778a5ab160d8d6cb1b"
+    },
+    {
+      "file": "hl7.terminology.r4-7.4.0.tgz",
+      "sha256": "1dc558c204f5ee1f2b96ab9a8cd83d0811475b08a4e06a7c2bcea55d1ab116ed"
+    },
+    {
+      "file": "hl7.terminology.r5-7.5.0.tgz",
+      "sha256": "cabae9ff7828c05173369bd2244ab6eabafe19d65b02c140a76638c1f3a56bf9"
+    },
+    {
+      "file": "hl7.terminology-7.5.0.tgz",
+      "sha256": "c54ebe534cd3f2474459eaed68e54c34f09b003766605b19e5552db376f2cc42"
     }
   ],
   "guides": [
     {
       "source": "mobile",
       "packageId": "org.grovealliance.fhir.mobile",
-      "file": "mobile-0.8.0.tgz",
-      "sha256": "8ab8bb20377d4b1495069fd9f311c17ef96218f563e2ae7b1e7e11504b65b0ed"
+      "file": "mobile-0.8.2.tgz",
+      "sha256": "fee547bc3b7a6e82e242690cfe90680f18e3642326c1d8c1a8a19b02f57d2c4a"
     },
     {
       "source": "questionnaire",
       "packageId": "org.grovealliance.fhir.questionnaire",
-      "file": "questionnaire-0.8.0.tgz",
-      "sha256": "2cfbc969b3a0062c6028f942fa1a4a9299d492eb4ddbb6101b44d6ecf2bcf8b1"
+      "file": "questionnaire-0.8.2.tgz",
+      "sha256": "ce60df2789a65e3abdd3678f814be197f77e27604f7fd1e31afc6667a47d526d"
     },
     {
       "source": "sensor",
       "packageId": "org.grovealliance.fhir.sensor",
-      "file": "sensor-0.8.0.tgz",
-      "sha256": "2df5a8cb45714e66db472b2da9e37fad7c113a55eddd18f6a126b26fc6fceee1"
+      "file": "sensor-0.8.2.tgz",
+      "sha256": "25c824d954bee63b7a7f2e868d214db78536dac2b62885f98825e0f7fcf75f66"
     },
     {
       "source": "sensorkit",
       "packageId": "org.grovealliance.fhir.sensorkit",
-      "file": "sensorkit-0.8.0.tgz",
-      "sha256": "7542775a8f8d6ffd3a4c054699ed73a7ab468fab18d98b89f7930d11feba6c13"
+      "file": "sensorkit-0.8.2.tgz",
+      "sha256": "dbedd3cf3250e0ae3675437d975006609b628b5bb4fa0be1e87b2ea5aef74057"
     },
     {
       "source": "healthkit",
       "packageId": "org.grovealliance.fhir.healthkit",
-      "file": "healthkit-0.8.0.tgz",
-      "sha256": "54a08f6c27473f2207c17a77ad4e73db01e3e02cfa88d13cf60f1457a8c734a0"
+      "file": "healthkit-0.8.2.tgz",
+      "sha256": "9faa4dd7d566047ce83028c5922b512d26568537985bf08114a5e4898c9379fe"
     },
     {
       "source": "health-connect",
       "packageId": "org.grovealliance.fhir.health-connect",
-      "file": "health-connect-0.8.0.tgz",
-      "sha256": "e463d65803efc069b6fc05cbff883ff5f3a524142dc182158de34b9560b4e19c"
+      "file": "health-connect-0.8.2.tgz",
+      "sha256": "e585a57b4c2d42f2a4474224fcac4272b609f468a1d9978e048b21f35132a7a9"
     },
     {
       "source": "providers",
       "packageId": "org.grovealliance.fhir.providers",
-      "file": "providers-0.8.0.tgz",
-      "sha256": "5c5b8f7ced01bbcd51d11395eb41d449b4add6952d6933aae2e73e8b9901c731"
+      "file": "providers-0.8.2.tgz",
+      "sha256": "d659662002e5c96e230f89e9ae4e4c774b3db4b174567e217a7ee19155d7089c"
     },
     {
       "source": "withings",
       "packageId": "org.grovealliance.fhir.withings",
-      "file": "withings-0.8.0.tgz",
-      "sha256": "1499d6c65f895e58033277d0e423cffac94670b239482b0d1703007f8f9a7b87"
+      "file": "withings-0.8.2.tgz",
+      "sha256": "2bb9a64100d973f21a22dfcfd9ddce0a0aa84de558e1256a379d928c0ad0edd0"
     },
     {
       "source": "oura",
       "packageId": "org.grovealliance.fhir.oura",
-      "file": "oura-0.8.0.tgz",
-      "sha256": "258f541dd911d767ab7ee4ac04bed1f194437e55075feec84fd3f03b7280da3b"
+      "file": "oura-0.8.2.tgz",
+      "sha256": "3268d93c741ffbe67921d4aba5b7101d3bd3df2491367f0cef7fd21e9df1db71"
     },
     {
       "source": "google-health",
       "packageId": "org.grovealliance.fhir.google-health",
-      "file": "google-health-0.8.0.tgz",
-      "sha256": "d7519a5d723336c64ac258b149874474995f057b878ac86d7125bbb32b358cd4"
+      "file": "google-health-0.8.2.tgz",
+      "sha256": "c5e6a8599a18ac791ef25cb503b9fc3c31ea867a5b69669c093f085f81c68e40"
     }
   ],
   "workerSHA256": "3df1de656e5e19be8654a9bed841be77a1c45299012f38cc99c1a90f5da9bad4",
