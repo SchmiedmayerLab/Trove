@@ -59,6 +59,13 @@ reconnect. Sleep and workout sessions that finalize after an enrollment ended ar
 collected once through a bounded, server-issued reconciliation instruction rather
 than by ordinary planning.
 
+Uploads can arrive after collection stops. The server admits a record measured
+inside an accepted collection window after the enrollment has ended; a record at
+or after the end is refused. Records for an enrollment the participant has
+withdrawn from are refused. When the server refuses a record, the app blocks it
+with the response status and keeps it on the device; it does not delete the
+record or retry it automatically.
+
 The server keeps one logical source per participant and native repository.
 Each installation registers its own credential and recovers the server-held
 identity context, so a reinstall or second iPhone produces the same source and
