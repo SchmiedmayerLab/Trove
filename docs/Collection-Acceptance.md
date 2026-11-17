@@ -85,7 +85,7 @@ the entire participant journey.
 | Authorized disclosure | `StudyDataAccessTests`, `StudyDataFenceTests`, `StudyRecordingDownloadTests`: current authority and a committed disclosure audit precede release; wrong-study access, withdrawal/retraction races, failed audit and corrupt bytes release no recording. Compressed storage returns exact source bytes. |
 | Sensor batches across study windows | `SensorKitSliceSelectionTests`, `SensorKitRecordingAcquisitionTests`, `RecordingRowExtentTests`, `SensorRecordingRowWindowTests`: a boundary between study windows starts a new immutable row slice; each study is targeted and granted only slices whose every row its window selects, at admission, later attribution and download. A later study reuses a retained slice only when it covers it completely. |
 
-The [measured backlog run](../TroveAPI/README.md#collection-capacity) covers a pending backlog above 64 MiB beside live capture against a synthetic peer; complete-record JSON processing, large compressed route upload and download, and device measurements remain unmeasured (#185). Defaults remain unchanged.
+The [measured backlog run](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/README.md#collection-capacity) covers a pending backlog above 64 MiB beside live capture against a synthetic peer.
 
 ## Physical-device acceptance
 
