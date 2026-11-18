@@ -91,7 +91,11 @@ Dependency checks cover every input in `scripts/check-vulnerabilities.py`, inclu
 development dependencies and separately named recovery requirements. Image checks
 resolve the local image ID and scan that identity without pulling a replacement.
 Both require an executed negative control, complete package inventories and no
-reported vulnerabilities at any severity. Keep caches out of uploaded evidence.
+reported vulnerabilities at any severity. The only exception is an unexpired entry in
+`scripts/vulnerability-exceptions.json` for an advisory without a fix, naming its
+advisory, CVE, package, version and manifest with a reason, expiry date and tracking
+issue. Dependency checks report applied entries and fail on expired, incomplete or
+unmatched entries; image checks ignore the file. Keep caches out of uploaded evidence.
 These inventories do not establish signed provenance or coverage of editable
 upstream source changes; verify those separately before release.
 

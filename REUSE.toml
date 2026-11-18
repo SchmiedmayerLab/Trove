@@ -15,6 +15,7 @@ path = [
     "TroveInfrastructure/tools/requirements.txt",
     "TroveInfrastructure/validator/recovery-requirements.txt",
     "TroveInfrastructure/terraform/.terraform.lock.hcl",
+    "scripts/vulnerability-exceptions.json",
 ]
 SPDX-FileCopyrightText = "2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)"
 SPDX-License-Identifier = "MIT"
