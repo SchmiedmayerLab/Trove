@@ -23,7 +23,7 @@ import { LocaleSuffix } from "./LocaleSuffix";
 
 interface GeneralFormProps {
   form: GeneralFormType;
-  locale: string;
+  language: string;
   onSubmit: () => void;
   onFieldFocus?: (fieldName: string) => void;
   onFieldBlur?: () => void;
@@ -31,7 +31,7 @@ interface GeneralFormProps {
 
 export const GeneralForm = ({
   form,
-  locale,
+  language,
   onSubmit,
   onFieldFocus,
   onFieldBlur,
@@ -46,7 +46,7 @@ export const GeneralForm = ({
             title={
               <>
                 Title
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="Be descriptive but keep it under 100 characters."
@@ -66,7 +66,7 @@ export const GeneralForm = ({
           title={
             <>
               Study icon & name
-              <LocaleSuffix locale={locale} />
+              <LocaleSuffix locale={language} />
             </>
           }
           description="Used in tight spaces where the full title won't fit."
@@ -113,7 +113,7 @@ export const GeneralForm = ({
             title={
               <>
                 Explanation
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="This helps participants decide if they want to join."
@@ -136,7 +136,7 @@ export const GeneralForm = ({
             title={
               <>
                 Short explanation
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="A short summary for preview cards and search results."
