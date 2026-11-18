@@ -4190,8 +4190,9 @@ components:
       description: >
         BCP 47 language tag of written content in canonical case: a language,
         optionally followed by a script and a region. Distinct tags stay distinct;
-        a region is not required.
-      pattern: '^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$'
+        a region is not required. The special codes und, mul, zxx, mis and
+        qaa–qtz name no written language and are rejected.
+      pattern: '^(?!(und|mul|zxx|mis|q[a-t][a-z])(-|$))[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$'
       examples:
         - 'de'
         - 'zh-Hant'

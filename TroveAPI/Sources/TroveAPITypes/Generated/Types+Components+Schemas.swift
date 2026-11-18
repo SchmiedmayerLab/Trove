@@ -3882,7 +3882,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/LocalizationKey`.
         public typealias LocalizationKey = GroveLocalization.LocalizationKey
-        /// BCP 47 language tag of written content in canonical case: a language, optionally followed by a script and a region. Distinct tags stay distinct; a region is not required.
+        /// BCP 47 language tag of written content in canonical case: a language, optionally followed by a script and a region. Distinct tags stay distinct; a region is not required. The special codes und, mul, zxx, mis and qaa–qtz name no written language and are rejected.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/LanguageTag`.

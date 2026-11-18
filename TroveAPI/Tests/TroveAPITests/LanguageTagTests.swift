@@ -12,16 +12,31 @@ import TroveAPITypes
 
 
 struct LanguageTagTests {
-    @Test(arguments: ["de", "zh-Hant", "pt-BR", "ar", "es-419", "sr-Latn-RS", "yue"])
+    /// Accepted and rejected tags shared with the TypeScript tests.
+    private struct Cases: Decodable {
+        static let shared: Self = {
+            let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../Fixtures/language-tags.json")
+            // A missing shared file fails every test that uses it.
+            return (try? JSONDecoder().decode(Self.self, from: Data(contentsOf: url))) ?? Self(accept: [], reject: [])
+        }()
+
+        let accept: [String]
+        let reject: [String]
+    }
+
+    @Test
+    func sharedCasesAreAvailable() {
+        #expect(!Cases.shared.accept.isEmpty && !Cases.shared.reject.isEmpty)
+    }
+
+    @Test(arguments: Cases.shared.accept)
     func acceptsLanguageWithOptionalScriptAndRegion(tag: String) throws {
         let language = try #require(LanguageTag(rawValue: tag))
         #expect(language.rawValue == tag)
         #expect(try JSONDecoder().decode(LanguageTag.self, from: JSONEncoder().encode(language)) == language)
     }
 
-    @Test(arguments: [
-        "", "DE", "de-de", "zh-hant", "en_US", "de-", "-de", "e", "deutsch", "pt-BRA", "en-US-x-private", "zh-Hant-TW-x", "dé", "de-DE "
-    ])
+    @Test(arguments: Cases.shared.reject)
     func rejectsOtherForms(tag: String) {
         #expect(LanguageTag(rawValue: tag) == nil)
         #expect(throws: DecodingError.self) {
