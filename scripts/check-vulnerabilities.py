@@ -5,6 +5,7 @@
 """Verify declared dependencies or an exact local image with the pinned Trivy scanner."""
 
 import argparse
+from datetime import date, datetime, timezone
 import hashlib
 import json
 import os
@@ -29,6 +30,9 @@ INPUTS = {
     "TroveInfrastructure/tools/requirements.txt": ("tools/requirements.txt", "pip"),
     "TroveInfrastructure/validator/recovery-requirements.txt": ("recovery/requirements.txt", "pip"),
 }
+# Dated exceptions for advisories without a fix. They apply only to dependency checks.
+EXCEPTIONS = "scripts/vulnerability-exceptions.json"
+EXCEPTION_FIELDS = ("advisory", "cve", "package", "version", "manifest", "reason", "expires", "trackingIssue")
 
 
 def digest(path: Path) -> str:
@@ -81,6 +85,59 @@ def inspect_report(path: Path, targets: dict[str, str] | None = None, image: str
     return count
 
 
+def load_exceptions(path: Path, today: date) -> list[dict[str, str]]:
+    """Return valid, unexpired exceptions; an entry is valid through its expiry date (UTC)."""
+    entries = json.loads(path.read_text())
+    if not isinstance(entries, list):
+        raise ValueError("Vulnerability exceptions must be a list")
+    identities = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != set(EXCEPTION_FIELDS) or any(
+            not isinstance(entry[key], str) or not entry[key].strip() for key in EXCEPTION_FIELDS
+        ):
+            raise ValueError(f"Vulnerability exceptions need exactly these nonempty fields: {', '.join(EXCEPTION_FIELDS)}")
+        if entry["manifest"] not in INPUTS:
+            raise ValueError(f"Vulnerability exception names an undeclared manifest: {entry['manifest']}")
+        if re.fullmatch(r"#(\d+|TBD)", entry["trackingIssue"]) is None:
+            raise ValueError("Vulnerability exception tracking issue must be #<number> or #TBD")
+        try:
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["expires"]) is None:
+                raise ValueError
+            expires = date.fromisoformat(entry["expires"])
+        except ValueError:
+            raise ValueError(f"Vulnerability exception expiry is not a YYYY-MM-DD date: {entry['expires']}") from None
+        if today > expires:
+            raise ValueError(f"Vulnerability exception for {entry['advisory']} in {entry['package']} "
+                             f"{entry['version']} expired after {entry['expires']}; fix or remove it")
+        identity = tuple(entry[key] for key in ("advisory", "package", "version", "manifest"))
+        if identity in identities:
+            raise ValueError("Repeated vulnerability exception")
+        identities.add(identity)
+    return entries
+
+
+def apply_exceptions(path: Path, exceptions: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Return the exception covering each excepted finding; every exception must cover one."""
+    applied = []
+    used = set()
+    for result in json.loads(path.read_text())["Results"]:
+        for vulnerability in result.get("Vulnerabilities", []):
+            vendor = vulnerability.get("VendorIDs")
+            identifiers = {vulnerability["VulnerabilityID"],
+                           *(item for item in (vendor if isinstance(vendor, list) else []) if isinstance(item, str))}
+            for index, entry in enumerate(exceptions):
+                if (entry["advisory"] in identifiers and entry["cve"] in identifiers
+                        and vulnerability["PkgName"] == entry["package"]
+                        and vulnerability.get("InstalledVersion") == entry["version"]
+                        and result["Target"] == INPUTS[entry["manifest"]][0]):
+                    applied.append(entry)
+                    used.add(index)
+                    break
+    if len(used) != len(exceptions):
+        raise ValueError("A vulnerability exception no longer matches a finding; remove it")
+    return applied
+
+
 def execute(binary: str, arguments: list[str], work: Path, cache: Path, log: Path) -> int:
     environment = {key: value for key, value in os.environ.items() if not key.startswith("TRIVY_")}
     with log.open("w") as stream:
@@ -98,6 +155,11 @@ def verify_status(status: int, count: int) -> None:
 
 
 def run(root: Path, mode: str, output: Path, cache: Path, image: str | None) -> int:
+    exceptions: list[dict[str, str]] = []
+    exception_digest: str | None = None
+    if mode == "dependencies":
+        exceptions = load_exceptions(root / EXCEPTIONS, datetime.now(timezone.utc).date())
+        exception_digest = digest(root / EXCEPTIONS)
     binary = shutil.which("trivy")
     if binary is None:
         raise ValueError("Trivy is required")
@@ -154,6 +216,8 @@ def run(root: Path, mode: str, output: Path, cache: Path, image: str | None) -> 
         status = execute(binary, [*arguments, *base, "--output", str(report)], work, cache, output / "scan.log")
         count = inspect_report(report, targets, identity)
         verify_status(status, count)
+        applied = apply_exceptions(report, exceptions)
+        remaining = count - len(applied)
         if any(digest(root / path) != checksum for path, checksum in inventory.items()):
             raise ValueError("Dependency inputs changed during the scan")
         # Conversion inventories the same analyzed packages; it is not another scan.
@@ -167,11 +231,16 @@ def run(root: Path, mode: str, output: Path, cache: Path, image: str | None) -> 
         (output / "result.json").write_text(json.dumps({
             "scanner": "trivy", "version": VERSION, "binarySHA256": digest(Path(binary)),
             "inputs": inventory, "image": identity, "vulnerabilities": count,
+            "exceptionsSHA256": exception_digest, "appliedExceptions": applied,
             "reportSHA256": digest(report), "sbomSHA256": digest(output / "sbom.cdx.json"),
-            "negativeControlPassed": True, "result": "failed" if count else "passed",
+            "negativeControlPassed": True, "result": "failed" if remaining else "passed",
         }, indent=2) + "\n")
-        print(f"Vulnerability check: {mode}, {count} findings; input coverage and negative control verified")
-        return status
+        print(f"Vulnerability check: {mode}, {count} findings, {len(applied)} covered by dated exceptions; "
+              "input coverage and negative control verified")
+        for entry in applied:
+            print(f"Exception applied: {entry['advisory']} ({entry['cve']}) in {entry['package']} {entry['version']}, "
+                  f"{entry['manifest']}, expires {entry['expires']}, tracked in {entry['trackingIssue']}")
+        return 1 if remaining else 0
 
 
 def main() -> int:
@@ -185,7 +254,10 @@ def main() -> int:
         parser.error("--image is required only for image checks")
     try:
         return run(ROOT.resolve(), args.mode, args.output.resolve(), args.cache.resolve(), args.image)
-    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+    except ValueError as error:
+        print(f"Vulnerability verification failed: {error}. No passing evidence was produced.", file=sys.stderr)
+        return 1
+    except (OSError, IndexError, subprocess.SubprocessError):
         print("Vulnerability verification failed; no passing evidence was produced.", file=sys.stderr)
         return 1
 
