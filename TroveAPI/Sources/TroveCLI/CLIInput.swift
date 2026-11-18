@@ -85,7 +85,8 @@ enum CLIInput {
         }
         do {
             let data = try data(file: file)
-            guard let text = String(data: data, encoding: .utf8),
+            // Decoding must not drop or replace bytes (for example a byte order mark), so export reproduces the file.
+            guard let text = String(data: data, encoding: .utf8), Data(text.utf8) == data,
                   try JSONDecoder().decode(ResourceHeader.self, from: data).resourceType == "Questionnaire" else {
                 throw CLIError.invalidInput
             }
@@ -125,10 +126,10 @@ enum CLIInput {
         }
     }
 
-    /// Writes the bytes to standard output unchanged, without a trailing newline.
-    static func writeExact(_ data: Data) throws {
+    /// Writes the bytes unchanged, without a trailing newline.
+    static func writeExact(_ data: Data, to output: FileHandle = .standardOutput) throws {
         do {
-            try FileHandle.standardOutput.write(contentsOf: data)
+            try output.write(contentsOf: data)
         } catch {
             throw CLIError.outputFailed
         }

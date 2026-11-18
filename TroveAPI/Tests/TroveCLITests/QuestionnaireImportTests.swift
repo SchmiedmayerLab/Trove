@@ -31,7 +31,10 @@ struct QuestionnaireImportTests {
         #expect(Data(input.data.questionnaire.utf8) == Data(raw.utf8))
     }
 
-    @Test(arguments: [Data([0xFF]), Data("not JSON".utf8), Data("{}".utf8), Data("{\"resourceType\":\"Patient\"}".utf8)])
+    @Test(arguments: [
+        Data([0xFF]), Data("not JSON".utf8), Data("{}".utf8), Data("{\"resourceType\":\"Patient\"}".utf8),
+        Data([0xEF, 0xBB, 0xBF]) + Data("{\"resourceType\":\"Questionnaire\"}".utf8)
+    ])
     func rejectsWrongResourceOrEncoding(data: Data) throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("trove-cli-questionnaire-\(UUID()).json")
         try data.write(to: file)

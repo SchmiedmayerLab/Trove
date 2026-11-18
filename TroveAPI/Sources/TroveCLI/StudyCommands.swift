@@ -86,25 +86,6 @@ struct PublishStudy: AsyncParsableCommand {
 }
 
 
-struct ExportQuestionnaire: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        commandName: "export",
-        abstract: "Write a draft questionnaire component's FHIR Questionnaire JSON to standard output exactly as stored.",
-        discussion: "The output is the resource itself, with every language, not a wrapping JSON document."
-    )
-    @OptionGroup var connection: ConnectionOptions
-    @OptionGroup var draft: DraftAccessOptions
-    @Option(transform: CLIInput.uuid) var study: UUID
-    @Option(help: "The questionnaire component ID.", transform: CLIInput.uuid) var component: UUID
-
-    mutating func run() async throws {
-        let client = try connection.client()
-        let response = try await client.getQuestionnaire(study, component: component, delegation: draft.delegation)
-        try CLIInput.writeExact(Data(response.data.questionnaire.utf8))
-    }
-}
-
-
 struct ImportQuestionnaire: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "import",
@@ -121,5 +102,33 @@ struct ImportQuestionnaire: AsyncParsableCommand {
         let input = try CLIInput.questionnaire(file: file, name: name)
         let client = try connection.client()
         try CLIInput.write(try await client.importQuestionnaire(study, revision: revision, delegation: draft.delegation, input: input))
+    }
+}
+
+
+struct ExportQuestionnaire: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "export",
+        abstract: "Write a draft questionnaire component's FHIR Questionnaire JSON to standard output exactly as stored.",
+        discussion: "The output is the resource itself, with every language, not a wrapping JSON document."
+    )
+    @OptionGroup var connection: ConnectionOptions
+    @OptionGroup var draft: DraftAccessOptions
+    @Option(transform: CLIInput.uuid) var study: UUID
+    @Option(help: "The questionnaire component ID.", transform: CLIInput.uuid) var component: UUID
+
+    static func export(
+        client: AuthoringClient,
+        study: UUID,
+        component: UUID,
+        delegation: UUID?,
+        to output: FileHandle = .standardOutput
+    ) async throws {
+        let response = try await client.getQuestionnaire(study, component: component, delegation: delegation)
+        try CLIInput.writeExact(Data(response.data.questionnaire.utf8), to: output)
+    }
+
+    mutating func run() async throws {
+        try await Self.export(client: connection.client(), study: study, component: component, delegation: draft.delegation)
     }
 }

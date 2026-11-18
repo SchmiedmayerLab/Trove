@@ -121,6 +121,34 @@ struct AuthoringClientTests {
     }
 
     @Test
+    func exportWritesTheStoredResourceExactly() async throws {
+        for fixture in try MultilingualQuestionnaireFixture.all() {
+            let bytes = try fixture.bytes()
+            let component = UUID()
+            let response = Components.Schemas.QuestionnaireComponentResponse(
+                id: component.uuidString,
+                name: "Wellbeing",
+                data: QuestionnaireContent(questionnaire: String(decoding: bytes, as: UTF8.self)),
+                language: fixture.language,
+                translationLanguages: fixture.translationLanguages
+            )
+            let output = FileManager.default.temporaryDirectory.appendingPathComponent("trove-cli-export-\(UUID()).json")
+            try Data().write(to: output)
+            defer { try? FileManager.default.removeItem(at: output) }
+            let handle = try FileHandle(forWritingTo: output)
+            try await ExportQuestionnaire.export(
+                client: client(AuthoringTransport(response: response)),
+                study: study,
+                component: component,
+                delegation: nil,
+                to: handle
+            )
+            try handle.close()
+            #expect(try Data(contentsOf: output) == bytes)
+        }
+    }
+
+    @Test
     func exportRejectsADifferentComponent() async throws {
         let response = Components.Schemas.QuestionnaireComponentResponse(
             id: UUID().uuidString, name: "Other", data: QuestionnaireContent(questionnaire: "{}"), translationLanguages: []

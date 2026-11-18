@@ -124,7 +124,7 @@ A questionnaire is one FHIR Questionnaire JSON file holding every language:
 `Questionnaire.language` names the base language, and standard `translation`
 extensions carry the others.
 `trove questionnaire import --study <study-id> --revision <draft-revision> --file questionnaire.json --name "Wellbeing"`
-accepts that raw UTF-8 file. The CLI checks the resource type and wraps its
+accepts that raw UTF-8 file without a byte order mark. The CLI checks the resource type and wraps its
 original text in the typed component input; it does not rewrite resource IDs,
 profiles, translations or whitespace. The server assigns the separate component
 ID and returns it with the base and translation languages it finds.
