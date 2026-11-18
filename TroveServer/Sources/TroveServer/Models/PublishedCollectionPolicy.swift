@@ -112,23 +112,30 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
     let valueShape: String
     let collectionWindow: String
     let requirements: [CollectionRequirement]
+    /// Whether study data released under this revision includes device unit identifiers; see ``StudyDeviceUnitDisclosure``.
+    let receivesDeviceUnitIdentifiers: Bool
 
     static func compile(
-        studyID: UUID, revision: Int, requirements: [CollectionRequirement], enrollmentPeriod: EnrollmentPeriod = .ongoing
+        studyID: UUID,
+        revision: Int,
+        requirements: [CollectionRequirement],
+        enrollmentPeriod: EnrollmentPeriod = .ongoing,
+        receivesDeviceUnitIdentifiers: Bool = false
     ) throws -> Self {
         guard revision > 0 else { throw ServerError.badRequest("Collection policy revision must be positive") }
         try enrollmentPeriod.validate()
         try CollectionRequirement.validate(requirements)
         return Self(
             enrollmentPeriod: enrollmentPeriod,
-            schemaVersion: 5,
+            schemaVersion: 6,
             contractVersion: FHIRValidationClient.contractVersion,
             contractRevision: FHIRValidationClient.contractRevision,
             studyID: studyID,
             revision: revision,
             valueShape: "profiled-observation",
             collectionWindow: "retained-measurement-window",
-            requirements: requirements
+            requirements: requirements,
+            receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers
         )
     }
 
@@ -159,7 +166,7 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
 
     /// Unknown policy fails; an empty array explicitly means no collection.
     func validatedRequirements(studyID: UUID, revision: Int) throws -> [CollectionRequirement] {
-        guard schemaVersion == 5, contractVersion == FHIRValidationClient.contractVersion,
+        guard schemaVersion == 6, contractVersion == FHIRValidationClient.contractVersion,
               contractRevision == FHIRValidationClient.contractRevision,
               self.studyID == studyID, self.revision == revision,
               revision > 0, valueShape == "profiled-observation", collectionWindow == "retained-measurement-window" else {
@@ -172,6 +179,12 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
             throw ServerError.internalServerError("Exact collection policy is unavailable")
         }
         return requirements
+    }
+
+    /// The retained disclosure setting of an exact, valid policy; an unknown policy fails instead of releasing unit facts.
+    func validatedDeviceUnitDisclosure(studyID: UUID, revision: Int) throws -> Bool {
+        _ = try validatedRequirements(studyID: studyID, revision: revision)
+        return receivesDeviceUnitIdentifiers
     }
 
     /// Resolves retained bounds without consulting the current draft, device clock or time-zone rules.

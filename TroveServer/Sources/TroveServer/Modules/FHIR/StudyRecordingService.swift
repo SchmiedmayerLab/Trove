@@ -32,6 +32,10 @@ extension StudyService {
                 throw ServerError.notFound("Study recording not found")
             }
             let media = try StudyRecordingMedia(event: event, outputFullURL: output.fullURL)
+            guard try await StudyDeviceUnitDisclosure.receives([grant], studyID: studyID, on: transaction)
+                || StudyDeviceUnitDisclosure.releasesUnchanged(media.format) else {
+                throw ServerError.forbidden("This study does not receive device unit identifiers, which this recording format can carry")
+            }
             return (candidate, attachment, media)
         }
         // Do not hold participant/enrollment locks during object reads and complete byte verification.

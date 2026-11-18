@@ -107,6 +107,8 @@ The important distinction is between physical deduplication and permission:
 - Access to a derived summary does not automatically include its raw recording.
 - Deduplication stays within a governed identity, controller and region. It is not a global search for matching people or measurements.
 
+Facts that identify one physical device unit, such as a serial number or a name a person gave a device, follow a separate disclosure rule. Each published study revision states whether its study receives them, and they are withheld by default. Withholding changes only the derived view; custody, identity and deduplication are unchanged. See [device unit identifiers](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveServer/README.md#device-unit-identifiers).
+
 Capacity measurements include the attribution metadata as well as payloads.
 
 ### Source Identity

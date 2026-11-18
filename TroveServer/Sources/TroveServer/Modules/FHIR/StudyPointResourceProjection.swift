@@ -10,7 +10,8 @@ import GroveFHIRContract
 
 
 /// Fixed, declared study-point-view-v1 policy. It preserves authorized measurement content,
-/// native UUIDs, readable sync identifiers and writer/conversion facts. It is not anonymization or free-text redaction.
+/// native UUIDs, readable sync identifiers and writer/conversion facts, and withholds device unit identifiers unless
+/// the study receives them. It is not anonymization or free-text redaction.
 struct StudyPointResourceProjection {
     private static let researchStudy = "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy"
     private static let roleSystem = Canonicals.root + "/mobile/CodeSystem/grove-identifier-role"
@@ -27,6 +28,7 @@ struct StudyPointResourceProjection {
     let subject: BusinessIdentifier
     let outputs: Set<String>
     let recordingURLs: [String: String]
+    let receivesDeviceUnitIdentifiers: Bool
 
     func resource(at address: String) throws -> StudyProjectionJSON {
         guard let original = resources[address], var resource = original.object,
@@ -52,6 +54,7 @@ struct StudyPointResourceProjection {
             resource["reason"] = nil
         default: throw FHIRValidationClient.invalid
         }
+        try restrictDeviceUnits(&resource)
         try markDerived(&resource)
         return .object(resource)
     }
@@ -160,6 +163,12 @@ struct StudyPointResourceProjection {
             $0["system"]?.string == Self.roleSystem
                 && ["device-snapshot", "context-snapshot", "record-version", "record-retraction"].contains($0["code"]?.string ?? "")
         } == true
+    }
+
+    private func restrictDeviceUnits(_ resource: inout [String: StudyProjectionJSON]) throws {
+        if !receivesDeviceUnitIdentifiers {
+            try StudyDeviceUnitDisclosure.withhold(from: &resource)
+        }
     }
 
     private func markDerived(_ resource: inout [String: StudyProjectionJSON]) throws {

@@ -80,6 +80,8 @@ struct StudyDataExportStore {
             )
         }
         let event = try await retainedEvent(id: first.eventID)
+        let recordGrants = evidence.grants.filter { nodes[$0.nodeID] != nil }
+        let receivesUnits = try await StudyDeviceUnitDisclosure.receives(recordGrants, studyID: studyID, on: database)
         for grant in evidence.grants {
             guard let output = nodes[grant.nodeID] else { continue }
             // A grant that lacks row proof fails the page; it is never silently narrowed or released.
@@ -98,6 +100,7 @@ struct StudyDataExportStore {
             grants: grants,
             context: identities.context(enrollmentID: enrollment.id, endsAt: enrollment.endsAt, recordedAt: recordedAt),
             recordingURLs: recordingURLs,
+            receivesDeviceUnitIdentifiers: receivesUnits,
             maximumBytes: limits.bundleBytes
         )
         let lineage = Dictionary(uniqueKeysWithValues: result.sourceEntries.map { ($0.originalFullURL, $0) })

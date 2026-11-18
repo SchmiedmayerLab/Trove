@@ -327,6 +327,9 @@ paths:
         not an authorization token. Changed eligibility can require restarting from
         the first page. Newly attributed historical data also requires a fresh first
         page. This is a live view, not a frozen dataset snapshot.
+        Device unit identifiers are withheld from a record unless each of its grants
+        comes from a publication that receives them; the derivation Provenance then
+        names the withholding policy.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - name: limit
@@ -377,6 +380,8 @@ paths:
         when the stored transport representation is compressed. X-Recording-Content-Type preserves the validated original attachment media type. Transfer expiry does
         not expire retained clinical custody. Storage, integrity or configured
         capacity failures return no partial successful response and can be retried.
+        A recording whose format can carry device unit identifiers returns 403 unless
+        the grant's publication receives them.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - name: grantId
@@ -4639,6 +4644,15 @@ components:
           description: Empty disables backend collection in the next publication; existing publications are unchanged.
           items:
             $ref: '#/components/schemas/CollectionRequirement'
+        receivesDeviceUnitIdentifiers:
+          type: boolean
+          description: >
+            Whether study data released under the next publication includes facts that
+            identify one physical device unit: serial numbers, UDI production identifiers,
+            device local identifiers and unit identities, names a person gave a device, and
+            per-device HealthKit source bundle identifiers. Recordings whose format can carry
+            such facts are released only to a study that receives them. False withholds
+            these facts from study data; retained custody is unchanged.
         locales:
           type: array
           uniqueItems: true
@@ -4670,6 +4684,7 @@ components:
       required:
         - enrollmentPeriod
         - collectionRequirements
+        - receivesDeviceUnitIdentifiers
         - draftRevision
         - id
         - locales
@@ -4692,6 +4707,9 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/CollectionRequirement'
+        receivesDeviceUnitIdentifiers:
+          type: boolean
+          description: Draft setting; see StudyPatchInput.receivesDeviceUnitIdentifiers.
         id:
           type: string
           format: uuid

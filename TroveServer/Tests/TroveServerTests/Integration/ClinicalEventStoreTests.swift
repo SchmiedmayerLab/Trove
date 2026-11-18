@@ -380,7 +380,8 @@ extension ClinicalEventStoreTests {
         measurementWindow: CollectionMeasurementWindow? = nil,
         routeStudies: Set<Int> = [],
         requirements: [[CollectionRequirement]] = [],
-        repositoryKind: SourceRepositoryKind = .healthKit
+        repositoryKind: SourceRepositoryKind = .healthKit,
+        deviceUnitStudies: Set<Int> = []
     ) async throws -> Fixture {
         try await ParticipantFixtures.createParticipant(on: app.db)
         let group = try await GroupFixtures.createGroup(on: app.db)
@@ -399,6 +400,7 @@ extension ClinicalEventStoreTests {
                         )
                     ] : requirements[index]
                 }
+                study.receivesDeviceUnitIdentifiers = deviceUnitStudies.contains(index)
                 try await study.save(on: app.db)
                 try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study.requireId())
                 ids.append(try study.requireId())

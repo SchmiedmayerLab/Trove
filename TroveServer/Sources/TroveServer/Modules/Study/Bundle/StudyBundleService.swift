@@ -64,7 +64,11 @@ final class StudyBundleService: Module, @unchecked Sendable {
         }
         guard capturedComponents.count <= 256 else { throw Self.resourceLimitExceeded }
         let collectionPolicy = try PublishedCollectionPolicy.compile(
-            studyID: studyId, revision: revision, requirements: study.collectionRequirements, enrollmentPeriod: study.enrollmentPeriod
+            studyID: studyId,
+            revision: revision,
+            requirements: study.collectionRequirements,
+            enrollmentPeriod: study.enrollmentPeriod,
+            receivesDeviceUnitIdentifiers: study.receivesDeviceUnitIdentifiers
         )
 
         var consentMarkdown = LocalizationsDictionary<String>()

@@ -16,7 +16,7 @@ import VaporTesting
 
 
 /// Grove's writer-record golden with typed source metadata, admitted for one of two consented studies and read back
-/// through both study exports.
+/// through both study exports. The authorized study receives device unit identifiers, so its source facts are unchanged.
 struct SourceFidelityExportTests {
     /// Each selected element is compared as canonical JSON with sorted keys.
     private struct Facts: Equatable {
@@ -51,7 +51,7 @@ struct SourceFidelityExportTests {
     @Test
     func sourceMetadataAndWriterFactsReachOnlyTheAuthorizedStudyExportUnchanged() async throws {
         try await TestApp.withApp(token: .participant(subject: "test-participant"), validator: ClinicalEventBatchTests.validator()) { app, token in
-            let fixture = try await ClinicalEventStoreTests.prepare(on: app)
+            let fixture = try await ClinicalEventStoreTests.prepare(on: app, deviceUnitStudies: [0])
             let nativeSystem = try Components.Schemas.ParticipantSource(fixture.source).nativeRecordIdentifierSystem().rawValue
             let golden = try SyncIdentifierFixture.changing(SyncIdentifierFixture.bytes()) { observation in
                 observation["extension"] = (observation["extension"] as? [[String: Any]] ?? []) + [Self.metadata]

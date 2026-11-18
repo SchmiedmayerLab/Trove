@@ -287,6 +287,36 @@ frozen dataset snapshot. The default response budget is 24 MiB, configurable up 
 and JSON overhead. Capacity failure returns HTTP 503 without a partial page or
 audit intent; request fewer outputs to reduce page size.
 
+### Device unit identifiers
+
+Each published revision states whether its study receives facts that identify one
+physical device unit. The study's collection configuration sets it, through the web
+editor or `receivesDeviceUnitIdentifiers` in a study patch, and it is off by default.
+These facts are a Device's serial number, UDI production identifier and UDI carrier
+strings, its device local identifier and keyed `recording-device` unit identity, a
+name a person gave a recording or host Device, the HealthKit source name, a source
+bundle identifier beginning with `com.apple.health.` (HealthKit assigns one to each
+iPhone or Apple Watch), and the HealthKit metadata entries `HKDeviceSerialNumber`,
+`HKDeviceName` and `HKUDIProductionIdentifier`. Manufacturer, model, product type,
+versions, the UDI device identifier and application names and bundle identifiers
+describe a kind of device or software and stay in the view.
+
+A record's derived Bundle carries these facts only when every grant behind it comes
+from a revision that receives them. Otherwise they are removed from the Bundle and its
+derivation Provenance adds the policy `urn:trove:device-unit-identifiers-withheld`.
+Only facts are removed, never references, so the graph stays closed. Tabular and
+photoplethysmogram recordings have closed sample grammars whose `device` column names
+a product type, and clinical-record documents are the care record rather than device
+context, so these are released unchanged. Native, provider and FHIR collection
+recordings are opaque payloads that can carry unit facts: for a study that does not
+receive them, their recording document keeps its description, size and hash but has
+no content or download location, and the download route returns HTTP 403 before
+reading storage or recording a disclosure.
+
+The rule applies only to disclosure. Retained bytes, record identity, deduplication,
+receipts and retractions never depend on it. A producer that already withholds these
+facts leaves nothing for it to remove.
+
 File-backed recording attachments in a derived Bundle point to a study recording
 download route, using one of that output's exact grant identifiers and the page's
 current/history selection. These locations require the same authenticated researcher
