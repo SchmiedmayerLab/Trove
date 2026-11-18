@@ -383,7 +383,7 @@ jobs:
     # Required Verification runs with always() above, so the implicit success() check would
     # also see the components it skipped; require the two direct results explicitly instead.
     if: >-
-      always() &&
+      !cancelled() &&
       needs.verification.result == 'success' &&
       needs.dev-stack.result == 'success' &&
       github.event_name == 'push' && github.ref == 'refs/heads/main'

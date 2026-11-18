@@ -85,7 +85,7 @@ class CIPathTests(unittest.TestCase):
         step = next(step for step in changes["steps"] if step.get("id") == "filter")
         self.assertEqual(step["if"], "github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'")
         condition = " ".join(workflow["jobs"]["publish-images"]["if"].split())
-        self.assertEqual(condition, "always() && needs.verification.result == 'success' && "
+        self.assertEqual(condition, "!cancelled() && needs.verification.result == 'success' && "
                          "needs.dev-stack.result == 'success' && "
                          "github.event_name == 'push' && github.ref == 'refs/heads/main'")
 
