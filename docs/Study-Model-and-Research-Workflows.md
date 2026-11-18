@@ -14,7 +14,7 @@ Specialized procedures remain in study applications.
 
 ## Study Definitions and Revisions
 
-A study definition contains components of three types: informational content, FHIR Questionnaires and health-data collection requirements. Each component carries its localized content.
+A study definition contains components of three types: informational content, FHIR Questionnaires and health-data collection requirements. An informational component holds one document per language-region locale; a questionnaire component holds one multilingual resource.
 
 Collection requirements refer to admitted Grove FHIR concepts, profiles, output forms and source capabilities. A requirement for granular step observations is different from a requirement for a daily total. A server-linked wearable route is different from a collector running on a participant's phone.
 
@@ -54,9 +54,9 @@ The server does not assign task occurrences, accept task completion or synchroni
 
 ## Questionnaires
 
-A questionnaire component holds one FHIR Questionnaire JSON resource for each language-region locale of the component. The dashboard edits the resource as JSON text and can upload, format and download it. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md) imports an unmodified UTF-8 file into a draft revision without rewriting identifiers, profiles or whitespace.
+A questionnaire component holds one FHIR Questionnaire JSON resource with every language of the instrument. `Questionnaire.language` names the base language; the other languages are standard [`translation` extensions](https://hl7.org/fhir/extensions/StructureDefinition-translation.html) on the strings a participant reads, as the Grove FHIR Questionnaire profile defines. The server stores, publishes and exports the resource's exact bytes, and the component API reports its base language and the translation languages it contains. The dashboard edits the resource as JSON text, lists those languages, and uploads and downloads the text unchanged; formatting it is a separate action. The [CLI](https://github.com/SchmiedmayerLab/Trove/blob/main/TroveAPI/CLI.md) imports an unmodified UTF-8 file into a draft revision and exports the stored resource byte for byte.
 
-Validation before publication runs each questionnaire through the pinned Grove validator. Its evidence binds the resource's SHA-256 digest, validator identity, contract revision and supported execution capability. A questionnaire that the supported study client cannot execute is rejected.
+Validation before publication runs each questionnaire through the pinned Grove validator, which checks the profile, including that a translation never repeats the base language and that a string carries at most one translation per language. Trove then checks the supported execution subset. A translation is admitted only on a displayed string: the title, the description, an item's text and prefix, and an answer option's display or string value. A translation anywhere else, and any other extension on those strings, is rejected. The evidence binds the resource's SHA-256 digest, its base and translation languages, the validator identity, contract revision and supported execution capability. A questionnaire that the supported study client cannot execute is rejected.
 
 There are three separate questions:
 
@@ -64,13 +64,17 @@ There are three separate questions:
 2. Does the selected application support all required behavior?
 3. Is the instrument appropriate, licensed and approved for the intended research use?
 
-A validator addresses the first, capability checks address the second, and researcher review addresses the third. None is a substitute for the others. A technically valid expression that the renderer cannot evaluate must not be presented as supported.
+A validator addresses the first, capability checks address the second, and researcher review addresses the third. None is a substitute for the others. A technically valid expression that the renderer cannot evaluate must not be presented as supported. A translation that validates is present, not approved for administration.
 
-Import does not change source wording, answer options, units, branching or scoring. A published instrument remains pinned to its revision.
+Import does not change source wording, translations, answer options, units, branching or scoring. A published instrument remains pinned to its revision, and the participant study bundle contains the one resource; a renderer selects the language to show.
 
 ## Localization
 
-Study content, consent documents and component content are stored per language-region locale, for example `en-US`. Consent binds the exact requested locale; it does not fall back to another language. The generated health-data collection and enrollment-period sections of a consent document are available in English and German; when a study collects health data, other consent locales are rejected.
+Study details (title, short title and explanations) are language-keyed values with an explicit source language. A language is a BCP 47 tag in canonical case: a language with an optional script and region, such as `de`, `zh-Hant` or `pt-BR`. A region is not required, and distinct tags stay distinct. The participant study bundle keys details by language and region, so publication gives a tag without a region its likely region (`de` as `de-DE`) and rejects tags that would share a locale or that no locale represents.
+
+A questionnaire carries its languages inside its one resource. The pinned Grove study bundle names the resource's file by its base language, so publication requires a base language with a region, such as `en-US`; translation languages need none.
+
+Consent documents and informational content are separate documents per language-region locale, for example `en-US`. Consent binds the exact requested locale; it does not fall back to another language. The generated health-data collection and enrollment-period sections of a consent document are available in English and German; when a study collects health data, other consent locales are rejected.
 
 ## Invitations
 
