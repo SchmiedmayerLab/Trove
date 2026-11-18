@@ -15,14 +15,23 @@ interface FixtureCase {
   translationLanguages: string[];
 }
 
-// Stored once and decoded by the Swift tests as well.
+interface DraftCase {
+  name: string;
+  text: string;
+  isJSON: boolean;
+  language?: string;
+  translationLanguages: string[];
+}
+
+// Stored once and read by the Swift tests as well.
 const fixtures = resolve(
   import.meta.dirname,
   "../../../TroveAPI/Tests/Fixtures/MultilingualQuestionnaires",
 );
-const cases = JSON.parse(
-  readFileSync(resolve(fixtures, "cases.json"), "utf8"),
-) as FixtureCase[];
+const read = (file: string): unknown =>
+  JSON.parse(readFileSync(resolve(fixtures, file), "utf8"));
+const cases = read("cases.json") as FixtureCase[];
+const drafts = read("draft-language-cases.json") as DraftCase[];
 
 describe("questionnaire languages", () => {
   it.each(cases.map((fixture) => [fixture.file, fixture] as const))(
@@ -44,28 +53,14 @@ describe("questionnaire languages", () => {
     ).toEqual(["ar", "de", "pt-BR", "zh-Hant"]);
   });
 
-  it("reports draft tags as written without validating them", () => {
-    const translation = (lang: string) => ({
-      url: "http://hl7.org/fhir/StructureDefinition/translation",
-      extension: [
-        { url: "lang", valueCode: lang },
-        { url: "content", valueString: "Text" },
-      ],
-    });
-    const draft = JSON.stringify({
-      language: "en-us",
-      _name: {
-        extension: [translation("en-us"), translation("de"), translation("de")],
-      },
-    });
-    expect(questionnaireLanguages(draft)).toEqual({
-      base: "en-us",
-      translations: ["de", "en-us"],
-    });
-    expect(questionnaireLanguages("not JSON")).toEqual({ translations: [] });
-    expect(questionnaireLanguages("[]")).toEqual({
-      base: undefined,
-      translations: [],
-    });
-  });
+  it.each(drafts.map((draft) => [draft.name, draft] as const))(
+    "reads draft text as the server does: %s",
+    (_, draft) => {
+      expect(questionnaireLanguages(draft.text)).toEqual(
+        draft.isJSON ?
+          { base: draft.language, translations: draft.translationLanguages }
+        : undefined,
+      );
+    },
+  );
 });

@@ -5,7 +5,6 @@ import type {
   StudyDetailContent,
   StudyDetailData,
 } from "@/lib/api/generated/types.gen";
-import { zLanguageTag } from "@/lib/api/generated/zod.gen";
 import { compareCodeUnits } from "@/lib/questionnaireLanguages";
 
 /** The source language first, then every other language with details, sorted. */
@@ -15,9 +14,6 @@ export const detailLanguages = (details: StudyDetailData): string[] => [
     .filter((language) => language !== details.sourceLanguage)
     .sort(compareCodeUnits),
 ];
-
-export const isLanguageTag = (value: string): boolean =>
-  zLanguageTag.safeParse(value).success;
 
 export const withDetailContent = (
   details: StudyDetailData,

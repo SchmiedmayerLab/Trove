@@ -11,6 +11,7 @@ import type { GeneralForm } from "../lib/useGeneralForm";
 
 interface GeneralPreviewProps {
   form: GeneralForm;
+  language: string;
   highlightedField?: string;
 }
 
@@ -27,6 +28,7 @@ const HighlightOverlay = () => (
 
 export const GeneralPreview = ({
   form,
+  language,
   highlightedField,
 }: GeneralPreviewProps) => {
   const [title, explanation] = form.watch(["title", "explanationText"]);
@@ -42,7 +44,9 @@ export const GeneralPreview = ({
           )}
         >
           {highlightedField === "title" && <HighlightOverlay />}
-          <span>{title || "Title"}</span>
+          <span lang={title ? language : undefined} dir="auto">
+            {title || "Title"}
+          </span>
         </div>
       </div>
       <div className="absolute top-1/2 left-0 h-1/2 w-full p-[10%]">
@@ -61,7 +65,9 @@ export const GeneralPreview = ({
             )}
           >
             {highlightedField === "explanationText" && <HighlightOverlay />}
-            <span>{explanation ?? "Explanation"}</span>
+            <span lang={explanation ? language : undefined} dir="auto">
+              {explanation ?? "Explanation"}
+            </span>
           </div>
         </div>
       </div>

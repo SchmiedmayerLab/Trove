@@ -21,17 +21,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * Reads the languages a FHIR Questionnaire's JSON names: its base `Questionnaire.language` and the
- * `lang` of every standard `translation` extension, as written. The server reports the same languages
- * for a saved resource; this preview neither validates nor rewrites the text.
+ * `lang` of every standard `translation` extension, as written; `undefined` when the text is not JSON.
+ * This previews unsaved text the way the server reads a saved draft; it neither validates nor rewrites it.
  */
 export const questionnaireLanguages = (
   text: string,
-): QuestionnaireLanguages => {
+): QuestionnaireLanguages | undefined => {
   let resource: unknown;
   try {
     resource = JSON.parse(text);
   } catch {
-    return { translations: [] };
+    return undefined;
   }
   const translations = new Set<string>();
   const collect = (value: unknown, depth: number) => {

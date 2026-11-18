@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@schmiedmayerlab/grove-design-system";
 import { useId, useState } from "react";
-import { isLanguageTag } from "../lib/studyDetails";
+import { isLanguageTag, languageTagHint } from "@/lib/languageTags";
 
 interface DetailLanguageBarProps {
   languages: string[];
@@ -44,8 +44,10 @@ export const DetailLanguageBar = ({
 }: DetailLanguageBarProps) => {
   const selectId = useId();
   const inputId = useId();
+  const hintId = useId();
   const [newLanguage, setNewLanguage] = useState("");
   const isValid = isLanguageTag(newLanguage);
+  const showsError = newLanguage !== "" && !isValid;
 
   const add = () => {
     if (!isValid) return;
@@ -89,7 +91,8 @@ export const DetailLanguageBar = ({
             value={newLanguage}
             onChange={(event) => setNewLanguage(event.target.value.trim())}
             placeholder="e.g. de, zh-Hant, pt-BR"
-            aria-invalid={newLanguage !== "" && !isValid}
+            aria-invalid={showsError}
+            aria-describedby={hintId}
             disabled={disabled}
             className="w-48"
           />
@@ -102,6 +105,16 @@ export const DetailLanguageBar = ({
             Add
           </Button>
         </div>
+        <p
+          id={hintId}
+          className={
+            showsError ?
+              "text-destructive text-sm"
+            : "text-text-tertiary text-sm"
+          }
+        >
+          {languageTagHint}
+        </p>
       </form>
       {language !== sourceLanguage && isSaved && (
         <div className="flex gap-2">

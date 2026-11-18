@@ -161,7 +161,11 @@ const GeneralRouteComponent = () => {
           />
         </Card>
         <PhonePreview>
-          <GeneralPreview form={form} highlightedField={highlightedField} />
+          <GeneralPreview
+            form={form}
+            language={language}
+            highlightedField={highlightedField}
+          />
         </PhonePreview>
       </div>
       <ConfirmDeleteDialog

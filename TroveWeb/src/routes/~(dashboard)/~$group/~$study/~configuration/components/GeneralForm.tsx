@@ -55,6 +55,8 @@ export const GeneralForm = ({
         className="border-border-tertiary border-b px-6"
         render={({ field }) => (
           <Input
+            lang={language}
+            dir="auto"
             className="focus:ring-border-info"
             onFocus={() => onFieldFocus?.("title")}
             {...enhanceField(field, { onBlur: onFieldBlur })}
@@ -102,7 +104,9 @@ export const GeneralForm = ({
           control={form.control}
           name="shortTitle"
           className="flex-1"
-          render={({ field }) => <Input {...enhanceField(field)} />}
+          render={({ field }) => (
+            <Input lang={language} dir="auto" {...enhanceField(field)} />
+          )}
         />
       </div>
       <Field
@@ -122,6 +126,8 @@ export const GeneralForm = ({
         className="border-border-tertiary border-b px-6 pt-6"
         render={({ field }) => (
           <Textarea
+            lang={language}
+            dir="auto"
             className="focus:ring-border-info"
             onFocus={() => onFieldFocus?.("explanationText")}
             {...enhanceField(field, { onBlur: onFieldBlur })}
@@ -143,7 +149,9 @@ export const GeneralForm = ({
           />
         }
         className="px-6 pt-6"
-        render={({ field }) => <Textarea {...enhanceField(field)} />}
+        render={({ field }) => (
+          <Textarea lang={language} dir="auto" {...enhanceField(field)} />
+        )}
       />
     </form>
   );

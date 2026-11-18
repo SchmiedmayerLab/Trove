@@ -126,26 +126,26 @@ export const QuestionnaireComponentForm = ({
           label={
             <FieldLabel
               title="FHIR questionnaire JSON"
-              description="One FHIR Questionnaire for every language: Questionnaire.language names the base language, and translation extensions carry the others. Upload and download keep the exact text."
+              description="One FHIR Questionnaire for every language: Questionnaire.language names the base language, and translation extensions carry the others. Upload and download keep the text without reformatting."
             />
           }
           className="px-6 pt-6"
           render={({ field }) => (
             <div>
               <Textarea {...field} rows={10} className="w-full font-mono" />
-              <dl
-                aria-live="polite"
-                className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm"
-              >
-                <dt className="font-medium">Base language</dt>
-                <dd>{languages.base ?? "Not named"}</dd>
-                <dt className="font-medium">Translations</dt>
-                <dd>
-                  {languages.translations.length > 0 ?
-                    languages.translations.join(", ")
-                  : "None"}
-                </dd>
-              </dl>
+              {languages ?
+                <dl className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm">
+                  <dt className="font-medium">Base language</dt>
+                  <dd>{languages.base ?? "Not named"}</dd>
+                  <dt className="font-medium">Translations</dt>
+                  <dd>
+                    {languages.translations.length > 0 ?
+                      languages.translations.join(", ")
+                    : "None"}
+                  </dd>
+                </dl>
+              : <p className="text-text-secondary pt-3 text-sm">Invalid JSON</p>
+              }
               <div className="flex flex-wrap justify-end gap-2 pt-4">
                 <input
                   ref={fileInputRef}
