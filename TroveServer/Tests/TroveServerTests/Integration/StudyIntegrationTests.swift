@@ -30,7 +30,9 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
                 let study = try response.content.decode(Components.Schemas.StudyResponse.self)
                 #expect(study.id.isEmpty == false)
-                #expect(study.details[.enUS]?.title == "New Study")
+                #expect(study.details.sourceLanguage.rawValue == "en")
+                let details = Dictionary(uniqueKeysWithValues: study.details.content.map { ($0.key.rawValue, $0.value) })
+                #expect(details == ["en": StudyDetailContent(title: "New Study")])
                 #expect(study.locales == [.enUS])
                 #expect(study.icon == "heart")
                 #expect(study.consent.isEmpty)
@@ -67,7 +69,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
                 let responseStudy = try response.content.decode(Components.Schemas.StudyResponse.self)
                 #expect(responseStudy.id == studyId.uuidString)
-                #expect(responseStudy.details[.enUS]?.title == "Test Study")
+                #expect(responseStudy.details.source.title == "Test Study")
                 #expect(responseStudy.locales == [.enUS])
                 #expect(responseStudy.icon == "heart")
                 #expect(responseStudy.consent.isEmpty)
@@ -98,9 +100,8 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             let patchBody: [String: Any] = [
                 "details": [
-                    "en-US": [
-                        "title": "Updated Title"
-                    ] as [String: Any]
+                    "sourceLanguage": "en",
+                    "content": ["en": ["title": "Updated Title"]]
                 ] as [String: Any]
             ]
 
@@ -112,7 +113,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
                 #expect(response.status == .ok)
 
                 let responseStudy = try response.content.decode(Components.Schemas.StudyResponse.self)
-                #expect(responseStudy.details[.enUS]?.title == "Updated Title")
+                #expect(responseStudy.details.source.title == "Updated Title")
                 #expect(responseStudy.locales == [.enUS])
                 #expect(responseStudy.icon == "heart")
                 #expect(responseStudy.consent.isEmpty)
@@ -130,10 +131,13 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
 
             let patchBody: [String: Any] = [
                 "details": [
-                    "en-US": [
-                        "title": "Test Study",
-                        "shortTitle": "TS",
-                        "explanationText": "A test study explanation"
+                    "sourceLanguage": "de",
+                    "content": [
+                        "en": ["title": "Test Study", "shortTitle": "TS", "explanationText": "A test study explanation"],
+                        "de": ["title": "Teststudie"],
+                        "zh-Hant": ["title": "測試研究"],
+                        "pt-BR": ["title": "Estudo de teste"],
+                        "ar": ["title": "دراسة تجريبية"]
                     ] as [String: Any]
                 ] as [String: Any]
             ]
@@ -146,9 +150,14 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
                 #expect(response.status == .ok)
 
                 let responseStudy = try response.content.decode(Components.Schemas.StudyResponse.self)
-                #expect(responseStudy.details[.enUS]?.shortTitle == "TS")
-                #expect(responseStudy.details[.enUS]?.explanationText == "A test study explanation")
-                #expect(responseStudy.details[.enUS]?.shortExplanationText?.isEmpty != false)
+                let details = Dictionary(uniqueKeysWithValues: responseStudy.details.content.map { ($0.key.rawValue, $0.value) })
+                #expect(responseStudy.details.sourceLanguage.rawValue == "de")
+                #expect(responseStudy.details.source.title == "Teststudie")
+                #expect(Set(details.keys) == ["en", "de", "zh-Hant", "pt-BR", "ar"])
+                #expect(details["en"]?.shortTitle == "TS")
+                #expect(details["en"]?.explanationText == "A test study explanation")
+                #expect(details["en"]?.shortExplanationText?.isEmpty != false)
+                #expect(details["ar"]?.title == "دراسة تجريبية")
                 #expect(responseStudy.locales == [.enUS])
                 #expect(responseStudy.icon == "heart")
                 #expect(responseStudy.consent.isEmpty)
@@ -183,7 +192,7 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
                 let responseStudy = try response.content.decode(Components.Schemas.StudyResponse.self)
                 #expect(responseStudy.consent[.enUS]?.content == "# Informed Consent\n\nBy participating in this study, you agree to...")
 
-                #expect(responseStudy.details[.enUS]?.title == "Consent Study")
+                #expect(responseStudy.details.source.title == "Consent Study")
                 #expect(responseStudy.locales == [.enUS])
                 #expect(responseStudy.icon == "heart")
             }
@@ -317,9 +326,34 @@ struct StudyIntegrationTests { // swiftlint:disable:this type_body_length
         }
     }
 
+    @Test(arguments: [
+        #"{"sourceLanguage": "de", "content": {"en": {"title": "Missing source"}}}"#,
+        #"{"sourceLanguage": "en", "content": {"en": {"title": "Lowercase region"}, "pt-br": {"title": "Estudo"}}}"#,
+        #"{"sourceLanguage": "en-us", "content": {"en-us": {"title": "Lowercase source"}}}"#,
+        #"{"sourceLanguage": "en", "content": {}}"#
+    ])
+    func patchStudyRejectsDetailsWithoutValidSourceLanguage(details: String) async throws {
+        try await TestApp.withApp { app, token in
+            let group = try await GroupFixtures.createGroup(on: app.db)
+            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId(), title: "Unchanged")
+            let studyId = try study.requireId()
+
+            let response = try await app.sendRequest(.PATCH, "\(apiBasePath)/studies/\(studyId)", beforeRequest: { req in
+                req.bearerAuth(token)
+                req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
+                try req.encodeJSONBody(["details": try JSONSerialization.jsonObject(with: Data(details.utf8))])
+            })
+            #expect(response.status == .badRequest)
+            let stored = try #require(try await Study.find(studyId, on: app.db))
+            #expect(stored.details == study.details)
+            #expect(stored.draftRevision == study.draftRevision)
+        }
+    }
+
     private func createStudyRequestBody(title: String) -> [String: Any] {
         [
             "title": title,
+            "sourceLanguage": "en",
             "icon": "heart"
         ] as [String: Any]
     }

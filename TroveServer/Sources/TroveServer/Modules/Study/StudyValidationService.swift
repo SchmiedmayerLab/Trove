@@ -100,7 +100,12 @@ final class StudyValidationService: Module, @unchecked Sendable {
             try Task.checkCancellation()
             guard Date() < deadline else { throw ServerError.conflict("Study validation expired before all resources could be checked") }
             let result = try await questionnaires.validate(bytes: resource.bytes, evaluationInstant: instant)
-            evidence.append(.init(componentID: resource.componentID, locale: resource.locale, validation: result))
+            evidence.append(.init(
+                componentID: resource.componentID,
+                language: resource.language,
+                translationLanguages: resource.translationLanguages,
+                validation: result
+            ))
             if let validUntil = result.validUntil {
                 deadline = min(deadline, validUntil)
             }

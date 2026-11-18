@@ -16,10 +16,12 @@ import ZIPFoundation
 
 
 final class StudyBundleService: Module, @unchecked Sendable {
+    /// One multilingual Questionnaire with the languages it names.
     struct QuestionnaireResource: Sendable {
         let componentID: UUID
-        let locale: String
         let bytes: Data
+        let language: String
+        let translationLanguages: [String]
     }
 
     struct Publication: Sendable {
@@ -110,23 +112,17 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
 
 extension StudyBundleService {
-    /// Grove merges translations during bundle construction. Only the resulting archive
-    /// bytes may receive validation evidence; validating the inputs would attest different content.
+    /// Only archive bytes may receive validation evidence. Each component's one resource
+    /// must be archived exactly as stored; a rewritten resource would attest different content.
     private func archivedQuestionnaires(in bytes: Data, inputs: [QuestionnaireResource]) throws -> [QuestionnaireResource] {
         let archive = try Archive(data: bytes, accessMode: .read)
         let entries = archive.filter { $0.path.contains("/questionnaire/") && $0.type == .file }
-        let components = Dictionary(grouping: inputs, by: \.componentID)
-        guard entries.count == components.count else { throw Self.missingResource }
+        guard entries.count == inputs.count else { throw Self.missingResource }
         var remainingBytes = ArtifactReference.Purpose.publication.maximumBytes
-        return try components.keys.sorted(by: { $0.uuidString < $1.uuidString }).map { id in
-            let candidates = (components[id] ?? []).compactMap { input -> (QuestionnaireResource, Entry)? in
-                let suffix = "/questionnaire/\(id.uuidString.lowercased())+\(input.locale).json"
-                guard let entry = entries.first(where: { $0.path.hasSuffix(suffix) }) else {
-                    return nil
-                }
-                return (input, entry)
-            }
-            guard candidates.count == 1, let (input, entry) = candidates.first else { throw Self.missingResource }
+        return try inputs.sorted(by: { $0.componentID.uuidString < $1.componentID.uuidString }).map { input in
+            let prefix = "/questionnaire/\(input.componentID.uuidString.lowercased())+"
+            let matches = entries.filter { $0.path.contains(prefix) }
+            guard matches.count == 1, let entry = matches.first else { throw Self.missingResource }
             var content = Data()
             _ = try archive.extract(entry) { chunk in
                 guard chunk.count <= remainingBytes else {
@@ -135,7 +131,8 @@ extension StudyBundleService {
                 remainingBytes -= chunk.count
                 content.append(chunk)
             }
-            return QuestionnaireResource(componentID: id, locale: input.locale, bytes: content)
+            guard content == input.bytes else { throw ServerError.internalServerError("The study bundle changed a Questionnaire") }
+            return input
         }
     }
 }
@@ -148,11 +145,6 @@ extension StudyBundleService {
         var questionnaires: [QuestionnaireResource] = []
     }
 
-    private struct QuestionnaireFiles {
-        let definition: StudyDefinition.Component
-        let files: [StudyBundle.FileResourceInput]
-        let resources: [QuestionnaireResource]
-    }
 
     // MARK: - Metadata
 
@@ -165,7 +157,11 @@ extension StudyBundleService {
         var explanationTexts = LocalizationsDictionary<String>()
         var shortExplanationTexts = LocalizationsDictionary<String>()
 
-        for (locale, content) in study.details {
+        var locales: Set<LocalizationKey> = []
+        for (language, content) in study.details.content {
+            guard let locale = Self.bundleLocalization(for: language), locales.insert(locale).inserted else {
+                throw Self.unsupportedDetailLanguages
+            }
             titles[locale] = content.title
             shortTitles[locale] = content.shortTitle
             explanationTexts[locale] = content.explanationText
@@ -222,13 +218,7 @@ extension StudyBundleService {
                 result.files += componentFiles
 
             case .questionnaire(let content):
-                let questionnaire = buildQuestionnaire(
-                    id: componentId,
-                    content: content
-                )
-                result.definitions.append(questionnaire.definition)
-                result.files += questionnaire.files
-                result.questionnaires += questionnaire.resources
+                try addQuestionnaire(id: componentId, content: content, to: &result)
 
             case .healthDataCollection(let data):
                 result.definitions.append(.healthDataCollection(data))
@@ -252,22 +242,20 @@ extension StudyBundleService {
         return (definition, files)
     }
 
-    private func buildQuestionnaire(
-        id: UUID,
-        content: LocalizationsDictionary<QuestionnaireContent>
-    ) -> QuestionnaireFiles {
+    /// The component's one multilingual resource, archived as one file without rewriting.
+    private func addQuestionnaire(id: UUID, content: QuestionnaireContent, to result: inout ComponentResources) throws {
         let fileRef = StudyBundle.FileReference(category: .questionnaire, filename: id.uuidString.lowercased(), fileExtension: "json")
-        let definition = StudyDefinition.Component.questionnaire(.init(id: id, fileRef: fileRef))
-
-        var files: [StudyBundle.FileResourceInput] = []
-        var resources: [QuestionnaireResource] = []
-        for (locale, item) in content {
-            let bytes = Data(item.questionnaire.utf8)
-            files.append(StudyBundle.FileResourceInput(fileRef: fileRef, localization: locale, contents: bytes))
-            resources.append(QuestionnaireResource(componentID: id, locale: locale.description, bytes: bytes))
+        let bytes = Data(content.questionnaire.utf8)
+        let languages = QuestionnaireLanguages(bytes)
+        // The pinned Grove bundle names the file by the base language and requires it to have a region.
+        guard let language = languages.base, let localization = LocalizationKey(language) else {
+            throw Self.unsupportedQuestionnaireLanguage
         }
-
-        return QuestionnaireFiles(definition: definition, files: files, resources: resources)
+        result.definitions.append(.questionnaire(.init(id: id, fileRef: fileRef)))
+        result.files.append(StudyBundle.FileResourceInput(fileRef: fileRef, localization: localization, contents: bytes))
+        result.questionnaires.append(
+            QuestionnaireResource(componentID: id, bytes: bytes, language: language, translationLanguages: languages.translations)
+        )
     }
 }
 
@@ -285,6 +273,39 @@ extension StudyBundleService {
         .init(status: .unprocessableContent, title: "Invalid Study Bundle", detail: "Each document component must include a localized resource")
     }
 
+    private static var unsupportedQuestionnaireLanguage: ServerError {
+        .init(
+            status: .unprocessableContent,
+            title: "Invalid Study Bundle",
+            detail: "Questionnaire.language must name a language and region, for example en-US, to publish the resource"
+        )
+    }
+
+    private static var unsupportedDetailLanguages: ServerError {
+        .init(
+            status: .unprocessableContent,
+            title: "Invalid Study Bundle",
+            detail: "Each study details language must map to a distinct language and region in the participant bundle"
+        )
+    }
+
+    /// The participant bundle keys study details by language and region.
+    ///
+    /// A tag without a region takes its likely region (`de` as `de-DE`, `zh-Hant` as `zh-TW`), and the key must name
+    /// the same language and script as the tag. A tag that no key represents (`sr-Latn`) cannot be published.
+    static func bundleLocalization(for tag: LanguageTag) -> LocalizationKey? {
+        let language = Locale.Language(identifier: tag.rawValue)
+        guard let code = language.languageCode?.identifier,
+              let region = language.region ?? Locale.Language(identifier: language.maximalIdentifier).region else {
+            return nil
+        }
+        let identifier = "\(code)-\(region.identifier)"
+        guard Locale.Language(identifier: identifier).maximalIdentifier == language.maximalIdentifier else {
+            return nil
+        }
+        return LocalizationKey(identifier)
+    }
+
     private func informationalMarkdown(id: UUID, content: InformationalContent) -> String {
         var markdown = "---\nid: \(id.uuidString)\ntitle: \(ConsentPresentation.yamlEscape(content.title))\n"
         if let lede = content.lede {
@@ -298,9 +319,10 @@ extension StudyBundleService {
         var paths: Set<String> = []
         var identifiers: Set<UUID> = []
         var remainingBytes = ArtifactReference.Purpose.publication.maximumBytes
-        func register(_ category: String, _ filename: String, _ locale: LocalizationKey, _ content: String) throws {
-            let key = locale.description
-            guard !key.isEmpty, key.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 }),
+        func register(_ category: String, _ filename: String, _ locale: LocalizationKey?, _ content: String) throws {
+            let key = locale?.description ?? ""
+            guard key.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 }),
+                  locale == nil || !key.isEmpty,
                   paths.insert("\(category)/\(filename)+\(key)".lowercased()).inserted else {
                 throw ServerError.badRequest("Study resource locations must be unique and use supported locale identifiers")
             }
@@ -321,10 +343,7 @@ extension StudyBundleService {
                     try register("article", identifier.uuidString, locale, informationalMarkdown(id: identifier, content: item))
                 }
             case .questionnaire(let content):
-                guard !content.isEmpty else { throw Self.missingResource }
-                for (locale, item) in content {
-                    try register("questionnaire", identifier.uuidString, locale, item.questionnaire)
-                }
+                try register("questionnaire", identifier.uuidString, nil, content.questionnaire)
             case .healthDataCollection: break
             }
         }

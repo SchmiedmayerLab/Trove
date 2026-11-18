@@ -24,7 +24,7 @@ struct QuestionnaireValidationService: Sendable {
         let validUntil: Date?
     }
 
-    static let executionCapability = "grove-questionnaire-core-v1"
+    static let executionCapability = "grove-questionnaire-core-v2"
     static let unsupported = ServerError(
         status: .unprocessableContent,
         title: "Unsupported Questionnaire",

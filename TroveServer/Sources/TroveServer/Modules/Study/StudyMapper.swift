@@ -18,7 +18,7 @@ extension Study {
             groupId: groupId,
             locales: [.enUS],
             icon: schema.icon,
-            details: .init([.enUS: StudyDetailContent(title: schema.title)]),
+            details: StudyDetailData(sourceLanguage: schema.sourceLanguage, source: StudyDetailContent(title: schema.title)),
             id: UUID()
         )
     }
@@ -43,10 +43,9 @@ extension StudyPatch {
 
 extension Components.Schemas.StudyListItem {
     init(_ model: Study) throws {
-        let title = model.details[.enUS]?.title ?? model.details.first?.value.title ?? ""
         self.init(
             id: try model.requireId().uuidString,
-            title: title
+            title: model.details.source.title
         )
     }
 }

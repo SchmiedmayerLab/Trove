@@ -471,7 +471,7 @@ class Checkpoint:
         group = self.api_json("/groups", researcher)[0]["id"]
         studies, enrollments, consents = [], [], []
         for label in ("A", "B"):
-            created = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "icon": "heart"}, 201)
+            created = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "sourceLanguage": "en", "icon": "heart"}, 201)
             study = response_uuid(created, "id")
             revision = response_uuid(created, "draftRevision")
             edited = self.api_json(f"/studies/{study}", researcher, "PATCH", {
