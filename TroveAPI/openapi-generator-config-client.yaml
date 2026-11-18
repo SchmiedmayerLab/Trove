@@ -22,10 +22,10 @@ typeOverrides:
     InformationalContent: TroveAPITypes.InformationalContent
     InformationalComponentData: GroveLocalization.LocalizationsDictionary<TroveAPITypes.InformationalContent>
     QuestionnaireContent: TroveAPITypes.QuestionnaireContent
-    QuestionnaireComponentData: GroveLocalization.LocalizationsDictionary<TroveAPITypes.QuestionnaireContent>
     LocalizedString: "GroveLocalization.LocalizationsDictionary<Swift.String>"
     StudyDetailContent: TroveAPITypes.StudyDetailContent
-    StudyDetailData: "GroveLocalization.LocalizationsDictionary<TroveAPITypes.StudyDetailContent>"
+    StudyDetailData: TroveAPITypes.StudyDetailData
+    LanguageTag: TroveAPITypes.LanguageTag
     SampleTypesCollection: "[GroveHealthKit.SampleTypeProxy]"
     LocalizationKey: GroveLocalization.LocalizationKey
     StudyConsent: "GroveLocalization.LocalizationsDictionary<TroveAPITypes.ConsentContent>"

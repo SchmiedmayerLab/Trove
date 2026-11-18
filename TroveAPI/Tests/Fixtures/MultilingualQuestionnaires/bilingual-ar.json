@@ -1,0 +1,61 @@
+{
+  "resourceType" : "Questionnaire",
+  "id": "bilingual-ar",
+  "meta": {
+    "profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]
+  },
+  "language": "en-US",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm",
+      "valueCoding": {"system": "http://hl7.org/fhir/version-algorithm", "code": "semver"}
+    }
+  ],
+  "url": "https://example.org/fhir/Questionnaire/bilingual-ar",
+  "version": "1.0.0",
+  "name": "BilingualAr",
+  "title": "Weekly caf\u00e9 check-in",
+  "_title": {
+    "extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "استبيان المقهى الأسبوعي"}]}]
+  },
+  "status": "active",
+  "subjectType": ["Patient"],
+  "item": [
+    {
+      "linkId": "visited",
+      "prefix": "Q1.",
+      "_prefix": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "س1."}]}]},
+      "text": "Did you visit a caf\u00e9 this week?",
+      "_text": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "هل زرت مقهى هذا الأسبوع؟"}]}]},
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "linkId": "drink",
+      "prefix": "Q2.",
+      "_prefix": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "س2."}]}]},
+      "text": "What did you drink?",
+      "_text": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "ماذا شربت؟"}]}]},
+      "type": "choice",
+      "enableWhen": [{"question": "visited", "operator": "=", "answerBoolean": true}],
+      "answerOption": [
+        {
+          "valueCoding": {
+            "system": "https://example.org/fhir/CodeSystem/drink",
+            "code": "coffee",
+            "display": "Coffee",
+            "_display": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "قهوة"}]}]}
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "https://example.org/fhir/CodeSystem/drink",
+            "code": "tea",
+            "display": "Tea",
+            "_display": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "ar"}, {"url": "content", "valueString": "شاي"}]}]}
+          }
+        }
+      ]
+    }
+  ]
+}

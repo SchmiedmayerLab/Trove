@@ -2533,7 +2533,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every localized Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
