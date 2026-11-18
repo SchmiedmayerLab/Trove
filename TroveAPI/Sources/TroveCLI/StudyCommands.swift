@@ -86,21 +86,39 @@ struct PublishStudy: AsyncParsableCommand {
 }
 
 
+struct ExportQuestionnaire: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "export",
+        abstract: "Write a draft questionnaire component's FHIR Questionnaire JSON to standard output exactly as stored.",
+        discussion: "The output is the resource itself, with every language, not a wrapping JSON document."
+    )
+    @OptionGroup var connection: ConnectionOptions
+    @OptionGroup var draft: DraftAccessOptions
+    @Option(transform: CLIInput.uuid) var study: UUID
+    @Option(help: "The questionnaire component ID.", transform: CLIInput.uuid) var component: UUID
+
+    mutating func run() async throws {
+        let client = try connection.client()
+        let response = try await client.getQuestionnaire(study, component: component, delegation: draft.delegation)
+        try CLIInput.writeExact(Data(response.data.questionnaire.utf8))
+    }
+}
+
+
 struct ImportQuestionnaire: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "import",
-        abstract: "Import a FHIR Questionnaire JSON file into a reviewed draft without rewriting the resource."
+        abstract: "Import a multilingual FHIR Questionnaire JSON file into a reviewed draft without rewriting the resource."
     )
     @OptionGroup var connection: ConnectionOptions
     @OptionGroup var draft: DraftAccessOptions
     @Option(transform: CLIInput.uuid) var study: UUID
     @Option(help: "The draft revision captured before this import.", transform: CLIInput.uuid) var revision: UUID
     @Option(help: "Component display name; independent of the FHIR resource id.") var name: String
-    @Option(help: "Language-region locale, for example en-US.", transform: CLIInput.localization) var locale: Components.Schemas.LocalizationKey
-    @Option(help: "Path to an unmodified UTF-8 FHIR Questionnaire JSON file.") var file: String
+    @Option(help: "Path to an unmodified UTF-8 FHIR Questionnaire JSON file holding every language.") var file: String
 
     mutating func run() async throws {
-        let input = try CLIInput.questionnaire(file: file, name: name, locale: locale)
+        let input = try CLIInput.questionnaire(file: file, name: name)
         let client = try connection.client()
         try CLIInput.write(try await client.importQuestionnaire(study, revision: revision, delegation: draft.delegation, input: input))
     }

@@ -13,7 +13,6 @@ import TroveAPIClient
 
 enum CLIError: Error, CustomStringConvertible, Equatable {
     case invalidIdentifier
-    case invalidLocale
     case invalidEndpoint
     case invalidCredential
     case invalidInput
@@ -28,8 +27,6 @@ enum CLIError: Error, CustomStringConvertible, Equatable {
         switch self {
         case .invalidIdentifier:
             "Expected a UUID."
-        case .invalidLocale:
-            "Expected a locale with a language and region, for example en-US."
         case .invalidEndpoint:
             "Use an HTTPS API base URL without credentials, query or fragment. HTTP requires an explicitly allowed loopback address."
         case .invalidCredential:
@@ -81,18 +78,8 @@ enum CLIInput {
         }
     }
 
-    static func localization(_ value: String) throws -> Components.Schemas.LocalizationKey {
-        guard let locale = Components.Schemas.LocalizationKey(value) else {
-            throw CLIError.invalidLocale
-        }
-        return locale
-    }
-
-    static func questionnaire(
-        file: String,
-        name: String,
-        locale: Components.Schemas.LocalizationKey
-    ) throws -> Components.Schemas.QuestionnaireComponentInput {
+    /// The component input carrying the file's exact text as its one multilingual resource.
+    static func questionnaire(file: String, name: String) throws -> Components.Schemas.QuestionnaireComponentInput {
         struct ResourceHeader: Decodable {
             let resourceType: String
         }
@@ -102,7 +89,7 @@ enum CLIInput {
                   try JSONDecoder().decode(ResourceHeader.self, from: data).resourceType == "Questionnaire" else {
                 throw CLIError.invalidInput
             }
-            return .init(name: name, data: .init([locale: QuestionnaireContent(questionnaire: text)]))
+            return .init(name: name, data: QuestionnaireContent(questionnaire: text))
         } catch {
             throw CLIError.invalidInput
         }
@@ -132,6 +119,15 @@ enum CLIInput {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             var data = try encoder.encode(value)
             data.append(0x0A)
+            try FileHandle.standardOutput.write(contentsOf: data)
+        } catch {
+            throw CLIError.outputFailed
+        }
+    }
+
+    /// Writes the bytes to standard output unchanged, without a trailing newline.
+    static func writeExact(_ data: Data) throws {
+        do {
             try FileHandle.standardOutput.write(contentsOf: data)
         } catch {
             throw CLIError.outputFailed

@@ -19,19 +19,25 @@ struct AuthoringClientTests {
     private let delegation = UUID()
 
     private var studyResponse: Components.Schemas.StudyResponse {
-        .init(
-            enrollmentPeriod: .init(calendar: .gregorian, timeZone: "UTC"),
-            draftRevision: revision.uuidString,
-            collectionRequirements: [],
-            id: study.uuidString,
-            locales: [],
-            icon: "heart",
-            details: .init(),
-            participationCriterion: .ageAtLeast(.init(_type: .ageAtLeast, age: 18)),
-            consent: .init(),
-            visibility: .unlisted,
-            enrollmentConditions: .none
-        )
+        get throws {
+            try .init(
+                enrollmentPeriod: .init(calendar: .gregorian, timeZone: "UTC"),
+                draftRevision: revision.uuidString,
+                collectionRequirements: [],
+                id: study.uuidString,
+                locales: [],
+                icon: "heart",
+                details: .init(sourceLanguage: Self.english(), source: .init(title: "Synthetic study")),
+                participationCriterion: .ageAtLeast(.init(_type: .ageAtLeast, age: 18)),
+                consent: .init(),
+                visibility: .unlisted,
+                enrollmentConditions: .none
+            )
+        }
+    }
+
+    private static func english() throws -> LanguageTag {
+        try #require(LanguageTag(rawValue: "en"))
     }
 
     private func client(_ transport: AuthoringTransport) throws -> AuthoringClient {
@@ -43,7 +49,7 @@ struct AuthoringClientTests {
     func readsTypedDraftWithDelegation() async throws {
         let transport = try AuthoringTransport(response: studyResponse)
         let result = try await client(transport).getStudy(study, delegation: delegation)
-        #expect(result == studyResponse)
+        #expect(try result == studyResponse)
         let records = await transport.records
         let record = try #require(records.first)
         #expect(records.count == 1)
@@ -58,7 +64,7 @@ struct AuthoringClientTests {
     func createsTypedStudyWithoutDelegation() async throws {
         let transport = try AuthoringTransport(response: studyResponse, status: 201)
         let group = UUID()
-        let input = Components.Schemas.StudyCreateInput(title: "Synthetic study", icon: "heart")
+        let input = try Components.Schemas.StudyCreateInput(title: "Synthetic study", sourceLanguage: Self.english(), icon: "heart")
         #expect(try await client(transport).createStudy(group: group, input: input) == studyResponse)
         let record = try #require(await transport.records.first)
         #expect(record.request.method == .post)
@@ -83,19 +89,46 @@ struct AuthoringClientTests {
     }
 
     @Test
-    func importsLocalizedQuestionnaire() async throws {
-        let input = Components.Schemas.QuestionnaireComponentInput(
-            name: "Wellbeing",
-            data: .init([.enUS: QuestionnaireContent(questionnaire: "{\"resourceType\":\"Questionnaire\",\"status\":\"draft\"}")])
+    func importsAndExportsOneMultilingualQuestionnaire() async throws {
+        for fixture in try MultilingualQuestionnaireFixture.all() {
+            let input = try CLIInput.questionnaire(file: fixture.url.path, name: "Wellbeing")
+            let response = Components.Schemas.QuestionnaireComponentResponse(
+                id: UUID().uuidString,
+                name: input.name,
+                data: input.data,
+                language: fixture.language,
+                translationLanguages: fixture.translationLanguages
+            )
+            let component = try #require(UUID(uuidString: response.id))
+            let transport = try AuthoringTransport(response: response, status: 201)
+            #expect(try await client(transport).importQuestionnaire(study, revision: revision, delegation: delegation, input: input) == response)
+            let record = try #require(await transport.records.first)
+            #expect(record.request.path == "/studies/\(study.uuidString)/components/questionnaire")
+            #expect(record.request.method == .post)
+            #expect(record.request.headerFields[.ifMatch] == CLIInput.revisionHeader(revision))
+            let sent = try JSONDecoder().decode(Components.Schemas.QuestionnaireComponentInput.self, from: record.body)
+            #expect(Data(sent.data.questionnaire.utf8) == (try fixture.bytes()))
+
+            let exportTransport = try AuthoringTransport(response: response)
+            let exported = try await client(exportTransport).getQuestionnaire(study, component: component, delegation: delegation)
+            #expect(Data(exported.data.questionnaire.utf8) == (try fixture.bytes()))
+            let read = try #require(await exportTransport.records.first)
+            #expect(read.request.method == .get)
+            #expect(read.request.path == "/studies/\(study.uuidString)/components/questionnaire/\(component.uuidString)")
+            #expect(read.request.headerFields[try #require(HTTPField.Name("Trove-Delegation-ID"))] == delegation.uuidString)
+            #expect(read.request.headerFields[.ifMatch] == nil)
+        }
+    }
+
+    @Test
+    func exportRejectsADifferentComponent() async throws {
+        let response = Components.Schemas.QuestionnaireComponentResponse(
+            id: UUID().uuidString, name: "Other", data: QuestionnaireContent(questionnaire: "{}"), translationLanguages: []
         )
-        let response = Components.Schemas.QuestionnaireComponentResponse(id: UUID().uuidString, name: input.name, data: input.data)
-        let transport = try AuthoringTransport(response: response, status: 201)
-        #expect(try await client(transport).importQuestionnaire(study, revision: revision, delegation: delegation, input: input) == response)
-        let record = try #require(await transport.records.first)
-        #expect(record.request.path == "/studies/\(study.uuidString)/components/questionnaire")
-        #expect(record.request.method == .post)
-        #expect(record.request.headerFields[.ifMatch] == CLIInput.revisionHeader(revision))
-        #expect(try JSONDecoder().decode(Components.Schemas.QuestionnaireComponentInput.self, from: record.body) == input)
+        let transport = try AuthoringTransport(response: response)
+        await #expect(throws: CLIError.requestFailed) {
+            try await client(transport).getQuestionnaire(study, component: UUID(), delegation: nil)
+        }
     }
 
     @Test
