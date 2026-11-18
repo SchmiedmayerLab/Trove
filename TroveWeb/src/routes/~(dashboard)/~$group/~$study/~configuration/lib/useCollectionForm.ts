@@ -28,14 +28,20 @@ export const useCollectionForm = (studyId: string) => {
   ];
   const form = useForm({
     formSchema: makeCollectionFormSchema(measurements),
-    defaultValues: { collectionRequirements: [] },
+    defaultValues: {
+      collectionRequirements: [],
+      receivesDeviceUnitIdentifiers: false,
+    },
   });
   const getSnapshot = useDraftFormSnapshot(
     query.data,
     studyId,
     form.formState.isDirty,
     (loaded) =>
-      form.reset({ collectionRequirements: loaded.collectionRequirements }),
+      form.reset({
+        collectionRequirements: loaded.collectionRequirements,
+        receivesDeviceUnitIdentifiers: loaded.receivesDeviceUnitIdentifiers,
+      }),
   );
   return {
     form,

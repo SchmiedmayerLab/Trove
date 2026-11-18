@@ -62,6 +62,11 @@ companion outputs from the same source, the form names them; each must be select
 explicitly and is not granted implicitly. Native health-data components remain
 separate app configuration; adding a component does not authorize server collection.
 
+The same page sets whether study data includes device unit identifiers, such as serial
+numbers and names a person gave a device. It is off by default and is published with
+the revision; see
+[device unit identifiers](../TroveServer/README.md#device-unit-identifiers).
+
 The browser regressions in `e2e/collection-authoring.spec.ts` use the real authenticated
 API to verify save/reload, exact date retention, invalid input, and stale revisions.
 They exercise draft authoring, not publication or native data acquisition.

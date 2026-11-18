@@ -63,6 +63,12 @@ export const CollectionCard = ({
           key: "Collection scope",
           value: summary,
         },
+        {
+          key: "Device unit identifiers",
+          value:
+            study &&
+            (study.receivesDeviceUnitIdentifiers ? "Included" : "Withheld"),
+        },
       ]}
     />
   );

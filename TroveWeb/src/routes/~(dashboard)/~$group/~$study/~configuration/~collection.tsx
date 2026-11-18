@@ -31,6 +31,8 @@ const CollectionRoute = () => {
         onSuccess: (updated) =>
           form.reset({
             collectionRequirements: updated.collectionRequirements,
+            receivesDeviceUnitIdentifiers:
+              updated.receivesDeviceUnitIdentifiers,
           }),
       },
     );
