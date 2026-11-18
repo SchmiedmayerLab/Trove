@@ -22,6 +22,10 @@ import VaporTesting
 /// One record granted to two studies, of which only the first publication receives device unit identifiers.
 struct DeviceUnitDisclosureTests {
     private static let role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+    /// Facts about a kind of device or an application, which every study receives.
+    private static let kindFacts = [
+        "Watch7,12", "Apple Inc.", "(01)00844588003288", "org.example.writer", "\"Example Writer\"", "com.example.note", "\"Grove Test\""
+    ]
 
     @Test
     func studyDataCarriesUnitFactsOnlyForAPublicationThatReceivesThem() async throws {
@@ -29,7 +33,7 @@ struct DeviceUnitDisclosureTests {
             let fixture = try await ClinicalEventStoreTests.prepare(on: app, deviceUnitStudies: [0])
             let bytes = try Self.record(source: fixture.source)
             let unitFacts = try Self.unitFacts(bytes)
-            #expect(unitFacts.count == 7, "Serial number, unit identity, local identifier, two names, source name and metadata")
+            #expect(unitFacts.count == 6, "Serial number, unit identity, local identifier, two names and metadata")
             let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
             let targets = fixture.targets(for: event)
             let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
@@ -48,7 +52,7 @@ struct DeviceUnitDisclosureTests {
                 #expect(entitled.text.contains(value), "\(value) reaches the study that receives unit facts")
                 #expect(!withheld.text.contains(value), "\(value) is withheld from the other study")
             }
-            for kind in ["Watch7,12", "Apple Inc.", "(01)00844588003288", "org.example.writer", "com.example.note", "\"Grove Test\""] {
+            for kind in Self.kindFacts {
                 #expect(entitled.text.contains(kind) && withheld.text.contains(kind), "\(kind) describes a kind of device or writer")
             }
             #expect(entitled.policies == ["urn:trove:study-point-view-v1"])
@@ -70,14 +74,9 @@ struct DeviceUnitDisclosureTests {
             let source = try await Self.admitNativeRecording(payload, app: app, token: token)
 
             let reader = try await StudyRecordingFixture.readerToken()
-            let sql = try #require(app.db as? any SQLDatabase)
             var paths: [String] = []
             for study in source.studyIDs {
-                let grant = try #require(try await sql.raw("""
-                    SELECT g.id FROM study_data_grants g JOIN clinical_recording_attachments a ON a.node_id = g.node_id
-                    WHERE g.study_id = \(bind: study)
-                    """).first())
-                paths.append(StudyRecordingLocation.path(studyID: study, grantID: try grant.decode(column: "id", as: UUID.self), versions: .current))
+                paths += try await Self.recordingPaths(study: study, app: app)
             }
             try await app.test(.GET, paths[0], beforeRequest: { $0.bearerAuth(reader) }) { response in
                 #expect(response.status == .ok)
@@ -96,6 +95,28 @@ struct DeviceUnitDisclosureTests {
                 #expect(attachment["url"] as? String == (index == 0 ? paths[0] : nil))
                 #expect(attachment["data"] == nil && attachment["hash"] != nil && attachment["size"] != nil)
             }
+        }
+    }
+
+    @Test
+    func aLaterRevisionThatWithholdsAppliesToThePageAndEveryGrantsDownload() async throws {
+        try await TestApp.withApp(token: .participant(subject: "test-participant"), validator: ClinicalEventBatchTests.validator()) { app, token in
+            let payload = Data("{\"device\":{\"serialNumber\":\"SERIAL-IN-PAYLOAD\"}}".utf8)
+            let source = try await Self.admitNativeRecording(payload, app: app, token: token)
+            let study = source.studyIDs[0]
+            try await Self.grantUnderAWithholdingRevision(study: study, source: source, app: app)
+            let reader = try await StudyRecordingFixture.readerToken()
+            let paths = try await Self.recordingPaths(study: study, app: app)
+            #expect(paths.count == 2, "Revision 1 receives unit facts, revision 2 withholds them")
+            for path in paths {
+                try await app.test(.GET, path, beforeRequest: { $0.bearerAuth(reader) }) { #expect($0.status == .forbidden) }
+            }
+            #expect(try await StudyRecordingFixture.disclosureCount(on: app) == 0)
+            let page = try await Self.page(study: study, app: app, bearer: reader)
+            #expect(page.policies.contains(StudyDeviceUnitDisclosure.withheldPolicy))
+            let document = try #require(page.resources.values.first { $0["resourceType"] as? String == "DocumentReference" })
+            let attachment = try #require(((document["content"] as? [[String: Any]])?.first)?["attachment"] as? [String: Any])
+            #expect(attachment["url"] == nil && attachment["data"] == nil)
         }
     }
 }
@@ -145,7 +166,8 @@ extension DeviceUnitDisclosureTests {
             }.compactMap { $0["value"] as? String }
             facts += [device["serialNumber"] as? String].compactMap(\.self)
         }
-        facts += ["\"Example Writer\"", "SERIAL-METADATA"]
+        // The source revision names an application (`org.example.writer`), so its name is not a unit fact.
+        facts += ["SERIAL-METADATA"]
         return facts
     }
 
@@ -165,6 +187,45 @@ extension DeviceUnitDisclosureTests {
             $0["resourceType"] as? String == "Provenance" && ($0["policy"] as? [String])?.first?.hasPrefix("urn:trove:") == true
         })
         return .init(text: String(decoding: bytes, as: UTF8.self), resources: resources, policies: derivation["policy"] as? [String] ?? [])
+    }
+
+    /// Publishes revision 2 of `study`, which withholds unit facts, and grants the admitted record under it as well.
+    private static func grantUnderAWithholdingRevision(
+        study: UUID, source: ClinicalEventStoreTests.Fixture, app: Application
+    ) async throws {
+        let draft = try #require(try await Study.find(study, on: app.db))
+        draft.receivesDeviceUnitIdentifiers = false
+        try await draft.save(on: app.db)
+        _ = try await PublishedStudyFixtures.createNextClinicalRevision(on: app.db, studyId: study)
+        let sql = try #require(app.db as? any SQLDatabase)
+        let event = try #require(try await sql.raw("SELECT id FROM clinical_events").first()).decode(column: "id", as: UUID.self)
+        let rows = try await sql.raw("""
+            SELECT DISTINCT n.full_url FROM clinical_event_nodes n JOIN study_data_grants g ON g.node_id = n.id
+            WHERE g.study_id = \(bind: study)
+            """)
+            .all()
+        let outputs = try rows.map { try $0.decode(column: "full_url", as: String.self) }
+        try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+            let consent = try await ClinicalEventStoreTests.acceptConsent(enrollmentID: source.enrollmentIDs[0], on: app, revision: 2)
+            _ = try await ClinicalAttributionStore(database: app.db).attribute(
+                eventID: event,
+                sourceID: source.source.id,
+                commandID: UUID(),
+                targets: [.init(consentID: consent.requireID(), outputFullURLs: outputs)],
+                installation: source.installation
+            )
+        }
+    }
+
+    /// Study recording locations for every grant of the study's recording output, ordered by revision.
+    private static func recordingPaths(study: UUID, app: Application) async throws -> [String] {
+        let sql = try #require(app.db as? any SQLDatabase)
+        let rows = try await sql.raw("""
+            SELECT g.id FROM study_data_grants g JOIN clinical_recording_attachments a ON a.node_id = g.node_id
+            WHERE g.study_id = \(bind: study) ORDER BY g.revision
+            """)
+            .all()
+        return try rows.map { StudyRecordingLocation.path(studyID: study, grantID: try $0.decode(column: "id", as: UUID.self), versions: .current) }
     }
 
     private static func references(_ value: Any) -> Set<String> {

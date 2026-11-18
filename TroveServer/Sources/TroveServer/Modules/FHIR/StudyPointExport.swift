@@ -43,9 +43,9 @@ enum StudyPointExport {
         _ event: ValidatedExchangeEvent,
         grants: [Grant],
         context: Context,
+        receivesDeviceUnitIdentifiers: Bool,
         id: UUID = UUID(),
         recordingURLs: [String: String] = [:],
-        receivesDeviceUnitIdentifiers: Bool = false,
         maximumBytes: Int = StudyExportLimits.standard.bundleBytes
     ) throws -> Result {
         do {
@@ -54,9 +54,9 @@ enum StudyPointExport {
                 event,
                 outputs: Set(grants.map(\.outputFullURL)),
                 subject: context.subject,
+                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
                 id: id,
                 recordingURLs: recordingURLs,
-                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
                 maximumBytes: maximumBytes
             )
             let snapshots = try StudyExportContextSnapshots.build(grants: grants, context: context)

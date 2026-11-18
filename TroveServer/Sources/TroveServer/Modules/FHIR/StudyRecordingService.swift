@@ -32,8 +32,9 @@ extension StudyService {
                 throw ServerError.notFound("Study recording not found")
             }
             let media = try StudyRecordingMedia(event: event, outputFullURL: output.fullURL)
-            guard try await StudyDeviceUnitDisclosure.receives([grant], studyID: studyID, on: transaction)
-                || StudyDeviceUnitDisclosure.releasesUnchanged(media.format) else {
+            // The same decision as the record's data page: every one of this study's grants for the event counts.
+            let receiving = try await StudyDeviceUnitDisclosure.receivingEvents([output.eventID], studyID: studyID, on: transaction)
+            guard receiving.contains(output.eventID) || StudyDeviceUnitDisclosure.releasesUnchanged(media.format) else {
                 throw ServerError.forbidden("This study does not receive device unit identifiers, which this recording format can carry")
             }
             return (candidate, attachment, media)

@@ -119,8 +119,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
         studyID: UUID,
         revision: Int,
         requirements: [CollectionRequirement],
-        enrollmentPeriod: EnrollmentPeriod = .ongoing,
-        receivesDeviceUnitIdentifiers: Bool = false
+        receivesDeviceUnitIdentifiers: Bool,
+        enrollmentPeriod: EnrollmentPeriod = .ongoing
     ) throws -> Self {
         guard revision > 0 else { throw ServerError.badRequest("Collection policy revision must be positive") }
         try enrollmentPeriod.validate()

@@ -35,9 +35,9 @@ enum StudyPointProjection {
         _ event: ValidatedExchangeEvent,
         outputs: Set<String>,
         subject: BusinessIdentifier,
+        receivesDeviceUnitIdentifiers: Bool,
         id: UUID = UUID(),
         recordingURLs: [String: String] = [:],
-        receivesDeviceUnitIdentifiers: Bool = false,
         maximumBytes: Int = StudyExportLimits.standard.bundleBytes
     ) throws -> Result {
         do {

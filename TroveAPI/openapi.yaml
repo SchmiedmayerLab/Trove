@@ -327,9 +327,9 @@ paths:
         not an authorization token. Changed eligibility can require restarting from
         the first page. Newly attributed historical data also requires a fresh first
         page. This is a live view, not a frozen dataset snapshot.
-        Device unit identifiers are withheld from a record unless each of its grants
-        comes from a publication that receives them; the derivation Provenance then
-        names the withholding policy.
+        Device unit identifiers are withheld from a record unless every grant of this
+        study for the record comes from a publication that receives them; the
+        derivation Provenance then names the withholding policy.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - name: limit
@@ -380,8 +380,9 @@ paths:
         when the stored transport representation is compressed. X-Recording-Content-Type preserves the validated original attachment media type. Transfer expiry does
         not expire retained clinical custody. Storage, integrity or configured
         capacity failures return no partial successful response and can be retried.
-        A recording whose format can carry device unit identifiers returns 403 unless
-        the grant's publication receives them.
+        A native, provider or FHIR collection recording returns 403 unless every grant
+        of this study for the record comes from a publication that receives device
+        unit identifiers.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - name: grantId
@@ -4648,11 +4649,14 @@ components:
           type: boolean
           description: >
             Whether study data released under the next publication includes facts that
-            identify one physical device unit: serial numbers, UDI production identifiers,
-            device local identifiers and unit identities, names a person gave a device, and
-            per-device HealthKit source bundle identifiers. Recordings whose format can carry
-            such facts are released only to a study that receives them. False withholds
-            these facts from study data; retained custody is unchanged.
+            identify one physical device unit. When false, recording and host Devices keep
+            only status, type, manufacturer, model number, versions, parent, patient, UDI
+            device identifier, issuer and jurisdiction, and model, manufacturer and UDI
+            label names; HealthKit source names, bundle identifiers and readable sync
+            identifiers of a device-assigned source, and the metadata entries
+            HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed;
+            native, provider and FHIR collection recordings are not released. Retained
+            custody is unchanged.
         locales:
           type: array
           uniqueItems: true

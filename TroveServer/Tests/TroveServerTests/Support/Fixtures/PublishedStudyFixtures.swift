@@ -88,8 +88,8 @@ enum PublishedStudyFixtures {
                 studyID: studyId,
                 revision: revision,
                 requirements: collectionRequirements,
-                enrollmentPeriod: enrollmentPeriod,
-                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers
+                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
+                enrollmentPeriod: enrollmentPeriod
             )
         )
         if save {

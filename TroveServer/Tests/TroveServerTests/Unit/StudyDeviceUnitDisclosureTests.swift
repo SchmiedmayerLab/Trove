@@ -25,14 +25,19 @@ struct StudyDeviceUnitDisclosureTests {
             "meta": ["profile": [Canonicals.root + "/mobile/StructureDefinition/grove-recording-device"]],
             "serialNumber": "SERIAL-1", "_serialNumber": ["extension": [["url": "https://example.test/note", "valueString": "SERIAL-NOTE"]]],
             "manufacturer": "Apple Inc.", "modelNumber": "Watch7,12",
-            "deviceName": [["name": "Alex's Watch", "type": "user-friendly-name"], ["name": "Apple Watch", "type": "model-name"]],
+            "lotNumber": "LOT-NUMBER", "manufactureDate": "2026-01-01", "distinctIdentifier": "DISTINCT-ID",
+            "deviceName": [
+                ["name": "Alex's Watch", "type": "user-friendly-name"], ["name": "Alex", "type": "patient-reported-name"],
+                ["name": "Apple Watch", "type": "model-name"]
+            ],
             "identifier": [
                 Self.identifier("device-snapshot", value: "SNAPSHOT"),
                 Self.identifier("recording-device", value: "UNIT-TOKEN"),
                 [
                     "system": "https://example.test/local", "value": "LOCAL-ID",
                     "type": ["coding": [["system": Self.deviceIdentifierType, "code": "device-local-identifier"]]]
-                ]
+                ],
+                ["system": "https://example.test/open-slice", "value": "OPEN-SLICE"]
             ],
             "udiCarrier": [
                 [
@@ -44,12 +49,15 @@ struct StudyDeviceUnitDisclosureTests {
         ]
         let result = try Self.withheld(device)
         let text = try Self.text(result)
-        for value in ["SERIAL", "UNIT-TOKEN", "LOCAL-ID", "Alex's Watch", "LOT-", "QUlEQw==", "carrierHRF", "_serialNumber"] {
+        let unit = [
+            "SERIAL", "UNIT-TOKEN", "LOCAL-ID", "OPEN-SLICE", "Alex", "LOT-", "QUlEQw==", "carrierHRF", "2026-01-01", "DISTINCT-ID"
+        ]
+        for value in unit {
             #expect(!text.contains(value), "\(value) identifies the unit")
         }
         #expect(result["manufacturer"] as? String == "Apple Inc." && result["modelNumber"] as? String == "Watch7,12")
         #expect(result["deviceName"] as? [[String: String]] == [["name": "Apple Watch", "type": "model-name"]])
-        #expect((result["identifier"] as? [[String: Any]])?.count == 1, "The snapshot identity is not a unit identity")
+        #expect(result["identifier"] == nil, "A recording or host Device keeps no identifier")
         #expect(result["udiCarrier"] as? [[String: String]] == [["deviceIdentifier": "(01)00844588003288"]])
     }
 
@@ -81,7 +89,7 @@ struct StudyDeviceUnitDisclosureTests {
         let entities = try #require(try Self.withheld(provenance)["entity"] as? [[String: Any]])
         #expect(entities[0]["extension"] == nil, "A revision with no fact left is not stated")
         let application = try Self.text(entities[1])
-        #expect(application.contains("org.example.writer") && !application.contains("sourceName"))
+        #expect(application.contains("org.example.writer") && application.contains("Writer"), "An application keeps its name")
 
         let entries = ["HKDeviceSerialNumber", "HKDeviceName", "HKUDIProductionIdentifier", "HKUDIDeviceIdentifier", "com.example.note"]
         let observation: [String: Any] = [
@@ -98,6 +106,51 @@ struct StudyDeviceUnitDisclosureTests {
         let text = try Self.text(Self.withheld(observation))
         #expect(text.contains("HKUDIDeviceIdentifier") && text.contains("com.example.note"))
         for key in entries.prefix(3) { #expect(!text.contains(key)) }
+    }
+
+    @Test
+    func readableSyncIdentifiersScopedToADeviceAreWithheld() throws {
+        let segment = "https://example.test/native/" + FHIRSyncRecordIdentifier.systemPathSegment + "/"
+        let observation: [String: Any] = [
+            "resourceType": "Observation",
+            "identifier": [
+                ["system": segment + Self.deviceBundle, "value": "DEVICE-SYNC"],
+                ["system": segment + "org.example.writer", "value": "APP-SYNC"]
+            ]
+        ]
+        let text = try Self.text(Self.withheld(observation))
+        #expect(!text.contains("DEVICE-SYNC") && text.contains("APP-SYNC"))
+    }
+
+    @Test
+    func eventsReceiveUnitFactsOnlyWhenEveryGrantsRevisionDoes() throws {
+        let study = UUID(), event = UUID(), first = UUID(), second = UUID()
+        let policies = try [
+            first: PublishedCollectionPolicy.compile(studyID: study, revision: 1, requirements: [], receivesDeviceUnitIdentifiers: true),
+            second: PublishedCollectionPolicy.compile(studyID: study, revision: 2, requirements: [], receivesDeviceUnitIdentifiers: false)
+        ]
+        let entitled = StudyDeviceUnitDisclosure.Grant(eventID: event, publicationID: first, revision: 1)
+        let withheld = StudyDeviceUnitDisclosure.Grant(eventID: event, publicationID: second, revision: 2)
+        #expect(try StudyDeviceUnitDisclosure.receivingEvents([entitled], policies: policies, studyID: study) == [event])
+        #expect(try StudyDeviceUnitDisclosure.receivingEvents([entitled, withheld], policies: policies, studyID: study).isEmpty)
+        #expect(try StudyDeviceUnitDisclosure.receivingEvents([], policies: policies, studyID: study).isEmpty)
+    }
+
+    @Test(arguments: ["missing", "other-study", "revision", "old-schema"])
+    func corruptOrUnknownPublicationEvidenceFails(failure: String) throws {
+        let study = UUID(), publication = UUID()
+        var policy = try PublishedCollectionPolicy.compile(
+            studyID: failure == "other-study" ? UUID() : study, revision: 1, requirements: [], receivesDeviceUnitIdentifiers: true
+        )
+        if failure == "old-schema" {
+            var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(policy)) as? [String: Any])
+            json["schemaVersion"] = 5
+            policy = try JSONDecoder().decode(PublishedCollectionPolicy.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        let grant = StudyDeviceUnitDisclosure.Grant(eventID: UUID(), publicationID: publication, revision: failure == "revision" ? 2 : 1)
+        #expect(throws: ServerError.self) {
+            try StudyDeviceUnitDisclosure.receivingEvents([grant], policies: failure == "missing" ? [:] : [publication: policy], studyID: study)
+        }
     }
 
     @Test

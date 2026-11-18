@@ -41,15 +41,12 @@ extension WorkoutRouteStudyDataTests {
         )
     }
 
+    /// Neither study receives device unit identifiers: the tabular route and the application's source facts still
+    /// reach each authorized study unchanged.
     private static func exerciseDisclosure(fullValidation: Bool) async throws {
         try await TestApp.withApp(token: StudyDataFixture.reader) { app, bearer in
-            // Both studies receive device unit identifiers, so the conversion facts reach them unchanged.
             let fixture = try await ClinicalEventStoreTests.prepare(
-                on: app,
-                profile: CollectionObservationProfile.workout.rawValue,
-                measurementWindow: window,
-                routeStudies: [0],
-                deviceUnitStudies: [0, 1]
+                on: app, profile: CollectionObservationProfile.workout.rawValue, measurementWindow: window, routeStudies: [0]
             )
             let event = try await event(source: fixture.source, app: app, fullValidation: fullValidation)
             let receipt = try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
@@ -95,8 +92,7 @@ extension WorkoutRouteStudyDataTests {
                     measurementWindow: window,
                     includeWorkoutRoutes: true
                 )
-            ],
-            receivesDeviceUnitIdentifiers: true
+            ]
         )
         // Publishing expanded scope alone grants nothing under the participant's prior acceptance.
         try await expectAttributionDenied(event, receipt: receipt, fixture: fixture, app: app)

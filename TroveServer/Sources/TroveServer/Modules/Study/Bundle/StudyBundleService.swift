@@ -67,8 +67,8 @@ final class StudyBundleService: Module, @unchecked Sendable {
             studyID: studyId,
             revision: revision,
             requirements: study.collectionRequirements,
-            enrollmentPeriod: study.enrollmentPeriod,
-            receivesDeviceUnitIdentifiers: study.receivesDeviceUnitIdentifiers
+            receivesDeviceUnitIdentifiers: study.receivesDeviceUnitIdentifiers,
+            enrollmentPeriod: study.enrollmentPeriod
         )
 
         var consentMarkdown = LocalizationsDictionary<String>()

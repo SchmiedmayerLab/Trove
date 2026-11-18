@@ -43,10 +43,20 @@ struct StudyDataExportStore {
         // Reserve the bounded page envelope and record-array punctuation before retaining records.
         var encodedBytes = 1024
         let recordedAt = Date()
+        let receiving = try await StudyDeviceUnitDisclosure.receivingEvents(
+            Set(evidence.page.outputs.map(\.eventID)), studyID: studyID, on: database
+        )
         for output in evidence.page.outputs where visited.insert(output.eventID).inserted {
             try Task.checkCancellation()
             guard let outputs = grouped[output.eventID] else { throw ServerError.unexpectedError }
-            let record = try await record(studyID: studyID, versions: versions, outputs: outputs, evidence: evidence, recordedAt: recordedAt)
+            let record = try await record(
+                studyID: studyID,
+                versions: versions,
+                outputs: outputs,
+                evidence: evidence,
+                recordedAt: recordedAt,
+                receivesDeviceUnitIdentifiers: receiving.contains(output.eventID)
+            )
             let size = try JSONEncoder().encode(record).count
             guard size <= limits.pageBytes - encodedBytes else { throw StudyProjectionJSON.Failure.outputTooLarge }
             encodedBytes += size
@@ -64,8 +74,14 @@ struct StudyDataExportStore {
         return page
     }
 
+    // swiftlint:disable:next function_parameter_count
     private func record(
-        studyID: UUID, versions: StudyDataQuery.Versions, outputs: [StudyDataQuery.Output], evidence: StudyDataFence, recordedAt: Date
+        studyID: UUID,
+        versions: StudyDataQuery.Versions,
+        outputs: [StudyDataQuery.Output],
+        evidence: StudyDataFence,
+        recordedAt: Date,
+        receivesDeviceUnitIdentifiers: Bool
     ) async throws -> Components.Schemas.StudyDataRecord {
         guard let first = outputs.first, outputs.allSatisfy({ $0.enrollmentID == first.enrollmentID && $0.eventID == first.eventID }),
               let enrollment = evidence.enrollments.first(where: { $0.id == first.enrollmentID }) else { throw ServerError.unexpectedError }
@@ -80,8 +96,6 @@ struct StudyDataExportStore {
             )
         }
         let event = try await retainedEvent(id: first.eventID)
-        let recordGrants = evidence.grants.filter { nodes[$0.nodeID] != nil }
-        let receivesUnits = try await StudyDeviceUnitDisclosure.receives(recordGrants, studyID: studyID, on: database)
         for grant in evidence.grants {
             guard let output = nodes[grant.nodeID] else { continue }
             // A grant that lacks row proof fails the page; it is never silently narrowed or released.
@@ -99,8 +113,8 @@ struct StudyDataExportStore {
             event,
             grants: grants,
             context: identities.context(enrollmentID: enrollment.id, endsAt: enrollment.endsAt, recordedAt: recordedAt),
+            receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
             recordingURLs: recordingURLs,
-            receivesDeviceUnitIdentifiers: receivesUnits,
             maximumBytes: limits.bundleBytes
         )
         let lineage = Dictionary(uniqueKeysWithValues: result.sourceEntries.map { ($0.originalFullURL, $0) })

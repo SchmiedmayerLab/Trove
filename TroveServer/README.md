@@ -292,30 +292,42 @@ audit intent; request fewer outputs to reduce page size.
 Each published revision states whether its study receives facts that identify one
 physical device unit. The study's collection configuration sets it, through the web
 editor or `receivesDeviceUnitIdentifiers` in a study patch, and it is off by default.
-These facts are a Device's serial number, UDI production identifier and UDI carrier
-strings, its device local identifier and keyed `recording-device` unit identity, a
-name a person gave a recording or host Device, the HealthKit source name, a source
-bundle identifier beginning with `com.apple.health.` (HealthKit assigns one to each
-iPhone or Apple Watch), and the HealthKit metadata entries `HKDeviceSerialNumber`,
-`HKDeviceName` and `HKUDIProductionIdentifier`. Manufacturer, model, product type,
-versions, the UDI device identifier and application names and bundle identifiers
-describe a kind of device or software and stay in the view.
+A study receives these facts for a record only when every one of its grants for the
+record's event comes from a revision that receives them. Data pages and recording
+downloads make the same decision, whichever page or grant identifier leads to the
+record. An invalid or unknown policy, or a grant whose publication does not match,
+fails the request instead of releasing data.
 
-A record's derived Bundle carries these facts only when every grant behind it comes
-from a revision that receives them. Otherwise they are removed from the Bundle and its
-derivation Provenance adds the policy `urn:trove:device-unit-identifiers-withheld`.
-Only facts are removed, never references, so the graph stays closed. Tabular and
-photoplethysmogram recordings have closed sample grammars whose `device` column names
-a product type, and clinical-record documents are the care record rather than device
-context, so these are released unchanged. Native, provider and FHIR collection
-recordings are opaque payloads that can carry unit facts: for a study that does not
-receive them, their recording document keeps its description, size and hash but has
-no content or download location, and the download route returns HTTP 403 before
-reading storage or recording a disclosure.
+Otherwise the derived Bundle withholds them and its derivation Provenance adds the
+policy `urn:trove:device-unit-identifiers-withheld`:
+
+- Recording and host Devices keep only status, type, manufacturer, model number,
+  versions, parent, patient, the UDI device identifier, issuer and jurisdiction, and
+  model, manufacturer and UDI label names. Serial and lot numbers, dates, other UDI
+  data, names a person gave a device and every identifier are removed.
+- Application Devices keep their names and bundle identifiers, unless HealthKit
+  assigned the bundle identifier to one iPhone or Apple Watch (`com.apple.health.`
+  followed by a UUID); such a Device is treated like a recording Device.
+- The HealthKit source revision loses its source name and bundle identifier when that
+  bundle identifier is device-assigned, and readable sync identifiers scoped to such a
+  bundle identifier are removed.
+- The HealthKit metadata entries `HKDeviceSerialNumber`, `HKDeviceName` and
+  `HKUDIProductionIdentifier` are removed.
+
+Only facts are removed, never references, so the graph stays closed. Producer free
+text, such as notes, is not filtered. The `device` and `originDevice` columns of
+tabular recordings are strings the producer states (Grove writes the product type) and
+are not checked at admission; the photoplethysmogram format has no device column.
+These recordings are released unchanged. Clinical-record documents are released as
+issued because they are the care record collected under their own consented
+requirement, not device context. Native, provider and FHIR collection recordings are
+opaque payloads that can carry unit facts: for a study that does not receive them,
+their recording document keeps its title, description, size and hash but has no
+content or download location, and the download route returns HTTP 403 before reading
+storage or recording a disclosure. Such a study cannot obtain these recordings.
 
 The rule applies only to disclosure. Retained bytes, record identity, deduplication,
-receipts and retractions never depend on it. A producer that already withholds these
-facts leaves nothing for it to remove.
+receipts and retractions never depend on it.
 
 File-backed recording attachments in a derived Bundle point to a study recording
 download route, using one of that output's exact grant identifiers and the page's

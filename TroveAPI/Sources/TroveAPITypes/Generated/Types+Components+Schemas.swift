@@ -4766,7 +4766,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/collectionRequirements`.
             public var collectionRequirements: [Components.Schemas.CollectionRequirement]?
-            /// Whether study data released under the next publication includes facts that identify one physical device unit: serial numbers, UDI production identifiers, device local identifiers and unit identities, names a person gave a device, and per-device HealthKit source bundle identifiers. Recordings whose format can carry such facts are released only to a study that receives them. False withholds these facts from study data; retained custody is unchanged.
+            /// Whether study data released under the next publication includes facts that identify one physical device unit. When false, recording and host Devices keep only status, type, manufacturer, model number, versions, parent, patient, UDI device identifier, issuer and jurisdiction, and model, manufacturer and UDI label names; HealthKit source names, bundle identifiers and readable sync identifiers of a device-assigned source, and the metadata entries HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed; native, provider and FHIR collection recordings are not released. Retained custody is unchanged.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/receivesDeviceUnitIdentifiers`.
@@ -4794,7 +4794,7 @@ extension Components {
             /// - Parameters:
             ///   - enrollmentPeriod:
             ///   - collectionRequirements: Empty disables backend collection in the next publication; existing publications are unchanged.
-            ///   - receivesDeviceUnitIdentifiers: Whether study data released under the next publication includes facts that identify one physical device unit: serial numbers, UDI production identifiers, device local identifiers and unit identities, names a person gave a device, and per-device HealthKit source bundle identifiers. Recordings whose format can carry such facts are released only to a study that receives them. False withholds these facts from study data; retained custody is unchanged.
+            ///   - receivesDeviceUnitIdentifiers: Whether study data released under the next publication includes facts that identify one physical device unit. When false, recording and host Devices keep only status, type, manufacturer, model number, versions, parent, patient, UDI device identifier, issuer and jurisdiction, and model, manufacturer and UDI label names; HealthKit source names, bundle identifiers and readable sync identifiers of a device-assigned source, and the metadata entries HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed; native, provider and FHIR collection recordings are not released. Retained custody is unchanged.
             ///   - locales: Language-region locales of the study's consent and informational documents
             ///   - icon: Icon identifier (e.g. SF Symbol name)
             ///   - details:
