@@ -75,7 +75,7 @@ struct MultilingualQuestionnaireValidationTests {
                 request.bearerAuth(token)
                 request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             })
-            try #require(response.status == .created)
+            try #require(response.status == .created, "\(response.status) \(response.body.string)")
             let candidate = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
             #expect(candidate.questionnaires.count == fixtures.count)
             for evidence in candidate.questionnaires {
