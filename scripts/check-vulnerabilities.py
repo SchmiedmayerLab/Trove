@@ -33,6 +33,7 @@ INPUTS = {
 # Dated exceptions for advisories without a fix. They apply only to dependency checks.
 EXCEPTIONS = "scripts/vulnerability-exceptions.json"
 EXCEPTION_FIELDS = ("advisory", "cve", "package", "version", "manifest", "reason", "expires", "trackingIssue")
+GHSA = r"GHSA-[23456789cfghjmpqrvwx]{4}(-[23456789cfghjmpqrvwx]{4}){2}"
 
 
 def digest(path: Path) -> str:
@@ -85,9 +86,15 @@ def inspect_report(path: Path, targets: dict[str, str] | None = None, image: str
     return count
 
 
-def load_exceptions(path: Path, today: date) -> list[dict[str, str]]:
+def unique_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    if len({key for key, _ in pairs}) != len(pairs):
+        raise ValueError("Vulnerability exceptions repeat a field")
+    return dict(pairs)
+
+
+def load_exceptions(content: bytes, today: date) -> list[dict[str, str]]:
     """Return valid, unexpired exceptions; an entry is valid through its expiry date (UTC)."""
-    entries = json.loads(path.read_text())
+    entries = json.loads(content, object_pairs_hook=unique_keys)
     if not isinstance(entries, list):
         raise ValueError("Vulnerability exceptions must be a list")
     identities = set()
@@ -98,10 +105,14 @@ def load_exceptions(path: Path, today: date) -> list[dict[str, str]]:
             raise ValueError(f"Vulnerability exceptions need exactly these nonempty fields: {', '.join(EXCEPTION_FIELDS)}")
         if entry["manifest"] not in INPUTS:
             raise ValueError(f"Vulnerability exception names an undeclared manifest: {entry['manifest']}")
-        if re.fullmatch(r"#(\d+|TBD)", entry["trackingIssue"]) is None:
-            raise ValueError("Vulnerability exception tracking issue must be #<number> or #TBD")
+        if re.fullmatch(GHSA, entry["advisory"]) is None:
+            raise ValueError(f"Vulnerability exception advisory is not a GHSA ID: {entry['advisory']}")
+        if re.fullmatch(r"CVE-[0-9]{4}-[0-9]{4,}", entry["cve"]) is None:
+            raise ValueError(f"Vulnerability exception CVE is not a CVE ID: {entry['cve']}")
+        if re.fullmatch(r"#[1-9][0-9]*", entry["trackingIssue"]) is None:
+            raise ValueError("Vulnerability exception tracking issue must be an issue number such as #123")
         try:
-            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["expires"]) is None:
+            if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", entry["expires"]) is None:
                 raise ValueError
             expires = date.fromisoformat(entry["expires"])
         except ValueError:
@@ -117,7 +128,7 @@ def load_exceptions(path: Path, today: date) -> list[dict[str, str]]:
 
 
 def apply_exceptions(path: Path, exceptions: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Return the exception covering each excepted finding; every exception must cover one."""
+    """Return the exception covering each excepted unfixed finding; every exception must cover one."""
     applied = []
     used = set()
     for result in json.loads(path.read_text())["Results"]:
@@ -126,7 +137,8 @@ def apply_exceptions(path: Path, exceptions: list[dict[str, str]]) -> list[dict[
             identifiers = {vulnerability["VulnerabilityID"],
                            *(item for item in (vendor if isinstance(vendor, list) else []) if isinstance(item, str))}
             for index, entry in enumerate(exceptions):
-                if (entry["advisory"] in identifiers and entry["cve"] in identifiers
+                if (vulnerability.get("Status") == "affected" and not vulnerability.get("FixedVersion")
+                        and entry["advisory"] in identifiers and entry["cve"] in identifiers
                         and vulnerability["PkgName"] == entry["package"]
                         and vulnerability.get("InstalledVersion") == entry["version"]
                         and result["Target"] == INPUTS[entry["manifest"]][0]):
@@ -158,8 +170,12 @@ def run(root: Path, mode: str, output: Path, cache: Path, image: str | None) -> 
     exceptions: list[dict[str, str]] = []
     exception_digest: str | None = None
     if mode == "dependencies":
-        exceptions = load_exceptions(root / EXCEPTIONS, datetime.now(timezone.utc).date())
-        exception_digest = digest(root / EXCEPTIONS)
+        path = root / EXCEPTIONS
+        if not path.is_file() or path.is_symlink() or path.resolve() != path:
+            raise ValueError("Expected a regular vulnerability exceptions file")
+        content = path.read_bytes()
+        exceptions = load_exceptions(content, datetime.now(timezone.utc).date())
+        exception_digest = hashlib.sha256(content).hexdigest()
     binary = shutil.which("trivy")
     if binary is None:
         raise ValueError("Trivy is required")
