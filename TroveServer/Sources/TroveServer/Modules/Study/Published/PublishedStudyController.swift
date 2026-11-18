@@ -41,8 +41,8 @@ extension Controller {
             questionnaires: candidate.snapshot.questionnaires.map {
                 .init(
                     componentId: $0.componentID.uuidString,
-                    language: $0.language,
-                    translationLanguages: $0.translationLanguages,
+                    language: $0.validation.language,
+                    translationLanguages: $0.validation.translationLanguages,
                     sha256: $0.validation.sha256
                 )
             }

@@ -34,9 +34,12 @@ struct MultilingualQuestionnaireValidationTests {
         return try JSONSerialization.data(withJSONObject: resource)
     }
 
-    /// `qg-translation-1`: a translation into the base language, and a second translation into one language.
+    /// The validator client itself accepts the unchanged fixture and rejects both `qg-translation-1` violations:
+    /// a translation into the base language, and a second translation into one language. The worker reports only
+    /// `invalid_fhir`; the rule is not part of its reply.
     private static func expectTranslationViolationsFail(validator: FHIRValidationClient) async throws {
-        let service = QuestionnaireValidationService(validator: validator)
+        let fixture = try #require(try MultilingualQuestionnaireFixture.all().first { $0.translationLanguage == "de" })
+        #expect(try await validator.validateQuestionnaire(fixture.bytes()) == validator.expectedIdentity)
         let violations = [
             try germanFixture { translations in
                 var parts = translations[0]["extension"] as? [[String: Any]] ?? []
@@ -49,7 +52,7 @@ struct MultilingualQuestionnaireValidationTests {
         ]
         for bytes in violations {
             await #expect {
-                try await service.validate(bytes: bytes, evaluationInstant: Date())
+                try await validator.validateQuestionnaire(bytes)
             } throws: { ($0 as? ServerError)?.status == .unprocessableContent }
         }
     }

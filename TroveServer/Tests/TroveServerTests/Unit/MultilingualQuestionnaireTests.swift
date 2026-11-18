@@ -88,13 +88,14 @@ struct MultilingualQuestionnaireTests {
     }
 
     @Test
-    func draftLanguagesAreReadWithoutValidation() {
-        #expect(QuestionnaireLanguages(Data("not JSON".utf8)) == QuestionnaireLanguages(Data("{}".utf8)))
-        let draft = QuestionnaireLanguages(Data(#"""
-            {"language": "en-us", "_name": {"extension": [\#(Self.translation), \#(Self.translation.replacingOccurrences(of: "\"de\"", with: "\"en-us\""))]}}
-            """#.utf8))
-        #expect(draft.base == "en-us")
-        #expect(draft.translations == ["de", "en-us"])
+    func draftLanguagesAreReadWithoutValidation() throws {
+        let cases = try MultilingualQuestionnaireFixture.draftLanguageCases()
+        #expect(!cases.isEmpty)
+        for draft in cases {
+            let languages = QuestionnaireLanguages(Data(draft.text.utf8))
+            #expect(languages.base == draft.language, "\(draft.name)")
+            #expect(languages.translations == draft.translationLanguages, "\(draft.name)")
+        }
     }
 
     @Test
@@ -104,14 +105,19 @@ struct MultilingualQuestionnaireTests {
             let evidence = try await Self.service.validate(bytes: bytes, evaluationInstant: Self.instant)
             #expect(evidence.sha256 == SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
             #expect(evidence.executionCapability == QuestionnaireValidationService.executionCapability)
+            #expect(evidence.language == fixture.language)
+            #expect(evidence.translationLanguages == fixture.translationLanguages)
         }
     }
 
     @Test(arguments: [
-        ["_title"], ["_description"], ["item", 0, "_text"], ["item", 1, "_prefix"],
+        ["_title"], ["_description"], ["_purpose"], ["useContext", 0, "code", "_display"],
+        ["useContext", 0, "valueCodeableConcept", "coding", 0, "_display"], ["useContext", 0, "valueCodeableConcept", "_text"],
+        ["useContext", 0, "valueQuantity", "_unit"], ["useContext", 0, "valueRange", "high", "_unit"],
+        ["useContext", 0, "valueReference", "_display"], ["item", 0, "_text"], ["item", 1, "_prefix"], ["item", 1, "code", 0, "_display"],
         ["item", 1, "answerOption", 0, "valueCoding", "_display"], ["item", 1, "answerOption", 1, "_valueString"]
     ] as [[any Sendable]])
-    func translationsAreAdmittedOnDisplayedStrings(path: [any Sendable]) throws {
+    func translationsAreAdmittedOnRenderedStrings(path: [any Sendable]) throws {
         let bytes = try Self.resource(placing: Self.translation, at: path)
         _ = try JSONDecoder().decode(QuestionnaireExtensionBoundary.self, from: bytes)
     }
@@ -119,7 +125,8 @@ struct MultilingualQuestionnaireTests {
     @Test(arguments: [
         ["_name"], ["_url"], ["_version"], ["_language"], ["item", 0, "_linkId"], ["item", 1, "_type"],
         ["item", 1, "answerOption", 0, "valueCoding", "_code"], ["item", 1, "enableWhen", 0, "_question"],
-        ["item", 1, "initial", 0, "_valueString"], ["item", 1, "code", 0, "_display"], ["meta", "_versionId"]
+        ["item", 1, "initial", 0, "_valueString"], ["item", 1, "code", 0, "_code"], ["meta", "_versionId"], ["_copyright"],
+        ["_publisher"], ["useContext", 0, "code", "_code"], ["item", 0, "item", 0, "answerOption", 0, "valueCoding", "_system"]
     ] as [[any Sendable]])
     func translationsAreRejectedOnDataAndIdentity(path: [any Sendable]) async throws {
         let bytes = try Self.resource(placing: Self.translation, at: path)

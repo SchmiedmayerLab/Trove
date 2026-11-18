@@ -31,8 +31,9 @@ private struct Translation: Decodable {
 
 /// Checks extension locations, including primitive metadata that a renderer could ignore.
 ///
-/// Only the resource and the strings a filler displays carry extensions: the resource its own, whose URLs execution
-/// checks, and a displayed string only standard `translation` extensions, as the Grove Questionnaire profile allows.
+/// Only the resource and the strings Grove renders carry extensions: the resource its own, whose URLs execution
+/// checks, and a rendered string only standard `translation` extensions. The Grove Questionnaire profile restricts
+/// translation languages (`qg-translation-1`), which the official validator checks; this boundary restricts elements.
 /// Typed FHIR decoding follows; this traversal neither interprets values nor rewrites bytes.
 struct QuestionnaireExtensionBoundary: Decodable {
     fileprivate struct Member: CodingKey {
@@ -49,6 +50,18 @@ struct QuestionnaireExtensionBoundary: Decodable {
             self.init(stringValue: String(intValue))
         }
     }
+
+    /// The strings of the resource and of an item that the pinned Grove converter reads with their translations.
+    private static let resourceStrings: Set<[String]> = [
+        ["_title"], ["_description"], ["_purpose"],
+        ["useContext", "code", "_display"],
+        ["useContext", "valueCodeableConcept", "coding", "_display"], ["useContext", "valueCodeableConcept", "_text"],
+        ["useContext", "valueQuantity", "_unit"], ["useContext", "valueRange", "low", "_unit"],
+        ["useContext", "valueRange", "high", "_unit"], ["useContext", "valueReference", "_display"]
+    ]
+    private static let itemStrings: Set<[String]> = [
+        ["_text"], ["_prefix"], ["code", "_display"], ["answerOption", "_valueString"], ["answerOption", "valueCoding", "_display"]
+    ]
 
     init(from decoder: any Decoder) throws {
         try Self.check(decoder) { path in
@@ -84,28 +97,12 @@ struct QuestionnaireExtensionBoundary: Decodable {
         }
     }
 
-    /// The primitive extensions of a translatable string: `_title`, `_description`, an item's `_text` and `_prefix`,
-    /// and an answer option's `_valueString` and `valueCoding._display`.
+    /// Whether the path names the primitive extensions (`_element`) of a string that Grove renders in the participant's
+    /// language: the title, description and purpose, use-context displays, and an item's text, prefix, code displays
+    /// and answer option displays and string values.
     private static func displaysText(at path: [any CodingKey]) -> Bool {
         let names = path.filter { $0.intValue == nil }.map(\.stringValue)
-        guard let element = names.last else {
-            return false
-        }
-        let parents = names.dropLast()
-        func isItem(_ names: ArraySlice<String>) -> Bool {
-            !names.isEmpty && names.allSatisfy { $0 == "item" }
-        }
-        switch element {
-        case "_title", "_description":
-            return parents.isEmpty
-        case "_text", "_prefix":
-            return isItem(parents)
-        case "_valueString":
-            return parents.last == "answerOption" && isItem(parents.dropLast())
-        case "_display":
-            return parents.suffix(2) == ["answerOption", "valueCoding"] && isItem(parents.dropLast(2))
-        default:
-            return false
-        }
+        let depth = names.prefix { $0 == "item" }.count
+        return depth == 0 ? resourceStrings.contains(names) : itemStrings.contains(Array(names.dropFirst(depth)))
     }
 }

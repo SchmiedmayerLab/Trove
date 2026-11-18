@@ -16,7 +16,8 @@ extension Study {
     convenience init(_ schema: Components.Schemas.StudyCreateInput, groupId: UUID) {
         self.init(
             groupId: groupId,
-            locales: [.enUS],
+            // Document locales start from the source language where the participant bundle can represent it.
+            locales: Set([StudyBundleService.bundleLocalization(for: schema.sourceLanguage)].compactMap(\.self)),
             icon: schema.icon,
             details: StudyDetailData(sourceLanguage: schema.sourceLanguage, source: StudyDetailContent(title: schema.title)),
             id: UUID()

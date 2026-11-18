@@ -18,8 +18,6 @@ import TroveAPIServer
 final class StudyPublicationCandidate: Model, @unchecked Sendable {
     struct QuestionnaireEvidence: Codable, Sendable {
         let componentID: UUID
-        let language: String
-        let translationLanguages: [String]
         let validation: QuestionnaireValidationService.Evidence
     }
 

@@ -16,12 +16,11 @@ import ZIPFoundation
 
 
 final class StudyBundleService: Module, @unchecked Sendable {
-    /// One multilingual Questionnaire with the languages it names.
+    /// One multilingual Questionnaire and the base language that names its archived file.
     struct QuestionnaireResource: Sendable {
         let componentID: UUID
         let bytes: Data
         let language: String
-        let translationLanguages: [String]
     }
 
     struct Publication: Sendable {
@@ -95,7 +94,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
         let archive = try writeBundleZip(
             studyId: studyId, definition: definition, files: consentFiles + components.files, collectionPolicy: collectionPolicy
         )
-        let questionnaires = try archivedQuestionnaires(in: archive, inputs: components.questionnaires)
+        let questionnaires = try Self.archivedQuestionnaires(in: archive, inputs: components.questionnaires)
 
         return Publication(
             metadata: metadata,
@@ -114,7 +113,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
 extension StudyBundleService {
     /// Only archive bytes may receive validation evidence. Each component's one resource
     /// must be archived exactly as stored; a rewritten resource would attest different content.
-    private func archivedQuestionnaires(in bytes: Data, inputs: [QuestionnaireResource]) throws -> [QuestionnaireResource] {
+    static func archivedQuestionnaires(in bytes: Data, inputs: [QuestionnaireResource]) throws -> [QuestionnaireResource] {
         let archive = try Archive(data: bytes, accessMode: .read)
         let entries = archive.filter { $0.path.contains("/questionnaire/") && $0.type == .file }
         guard entries.count == inputs.count else { throw Self.missingResource }
@@ -157,10 +156,13 @@ extension StudyBundleService {
         var explanationTexts = LocalizationsDictionary<String>()
         var shortExplanationTexts = LocalizationsDictionary<String>()
 
-        var locales: Set<LocalizationKey> = []
-        for (language, content) in study.details.content {
-            guard let locale = Self.bundleLocalization(for: language), locales.insert(locale).inserted else {
-                throw Self.unsupportedDetailLanguages
+        var languages: [LocalizationKey: LanguageTag] = [:]
+        for (language, content) in study.details.content.sorted(by: { $0.key < $1.key }) {
+            guard let locale = Self.bundleLocalization(for: language) else {
+                throw Self.unsupportedDetailLanguage("\(language) has no language and region")
+            }
+            if let other = languages.updateValue(language, forKey: locale) {
+                throw Self.unsupportedDetailLanguage("\(other) and \(language) share \(locale)")
             }
             titles[locale] = content.title
             shortTitles[locale] = content.shortTitle
@@ -246,16 +248,13 @@ extension StudyBundleService {
     private func addQuestionnaire(id: UUID, content: QuestionnaireContent, to result: inout ComponentResources) throws {
         let fileRef = StudyBundle.FileReference(category: .questionnaire, filename: id.uuidString.lowercased(), fileExtension: "json")
         let bytes = Data(content.questionnaire.utf8)
-        let languages = QuestionnaireLanguages(bytes)
         // The pinned Grove bundle names the file by the base language and requires it to have a region.
-        guard let language = languages.base, let localization = LocalizationKey(language) else {
+        guard let language = QuestionnaireLanguages(bytes).base, let localization = LocalizationKey(language) else {
             throw Self.unsupportedQuestionnaireLanguage
         }
         result.definitions.append(.questionnaire(.init(id: id, fileRef: fileRef)))
         result.files.append(StudyBundle.FileResourceInput(fileRef: fileRef, localization: localization, contents: bytes))
-        result.questionnaires.append(
-            QuestionnaireResource(componentID: id, bytes: bytes, language: language, translationLanguages: languages.translations)
-        )
+        result.questionnaires.append(QuestionnaireResource(componentID: id, bytes: bytes, language: language))
     }
 }
 
@@ -281,11 +280,12 @@ extension StudyBundleService {
         )
     }
 
-    private static var unsupportedDetailLanguages: ServerError {
+    /// Language tags are validated identifiers, not authored text, so the detail can name them.
+    private static func unsupportedDetailLanguage(_ reason: String) -> ServerError {
         .init(
             status: .unprocessableContent,
             title: "Invalid Study Bundle",
-            detail: "Each study details language must map to a distinct language and region in the participant bundle"
+            detail: "Each study details language must map to a distinct language and region in the participant bundle: \(reason)"
         )
     }
 

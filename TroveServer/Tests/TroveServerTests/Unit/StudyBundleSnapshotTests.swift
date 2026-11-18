@@ -49,7 +49,6 @@ struct StudyBundleSnapshotTests {
         for fixture in fixtures {
             let resource = try #require(publication.questionnaires.first { $0.bytes == (try? fixture.bytes()) })
             #expect(resource.language == fixture.language)
-            #expect(resource.translationLanguages == fixture.translationLanguages)
         }
         try Self.verifyArchive(publication)
     }
@@ -98,7 +97,28 @@ struct StudyBundleSnapshotTests {
         study.$components.value = []
         #expect {
             try StudyBundleService().preparePublication(from: study, revision: 1)
-        } throws: { ($0 as? ServerError)?.status == .unprocessableContent }
+        } throws: { error in
+            guard let error = error as? ServerError else {
+                return false
+            }
+            return error.status == .unprocessableContent && languages.allSatisfy { error.detail.contains($0) }
+        }
+    }
+
+    @Test("Archived questionnaire bytes that differ from the stored resource receive no evidence")
+    func rewrittenArchiveIsRejected() throws {
+        let study = try Self.study()
+        let componentID = UUID()
+        study.$components.value = [Self.questionnaire(studyID: try study.requireId(), id: componentID)]
+        let publication = try StudyBundleService().preparePublication(from: study, revision: 1)
+        let stored = try #require(publication.questionnaires.first)
+        let changed = StudyBundleService.QuestionnaireResource(
+            componentID: componentID, bytes: stored.bytes + Data(" ".utf8), language: stored.language
+        )
+        #expect(try StudyBundleService.archivedQuestionnaires(in: publication.bundle, inputs: [stored]).first?.bytes == stored.bytes)
+        #expect {
+            try StudyBundleService.archivedQuestionnaires(in: publication.bundle, inputs: [changed])
+        } throws: { ($0 as? ServerError)?.status == .internalServerError }
     }
 
     @Test("Duplicate component identities fail before resource writing")

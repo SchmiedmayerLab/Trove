@@ -17,6 +17,9 @@ import ModelsR4
 struct QuestionnaireValidationService: Sendable {
     struct Evidence: Codable, Equatable, Sendable {
         let sha256: String
+        /// The base language and the translation languages, as the Grove model of the validated resource names them.
+        let language: String
+        let translationLanguages: [String]
         let validatorIdentity: String
         let contractRevision: String
         let executionCapability: String
@@ -36,21 +39,26 @@ struct QuestionnaireValidationService: Sendable {
     func validate(bytes: Data, evaluationInstant: Date) async throws -> Evidence {
         let identity = try await validator.validateQuestionnaire(bytes)
         let validUntil: Date?
+        let languages: [String]
         do {
             _ = try JSONDecoder().decode(QuestionnaireExtensionBoundary.self, from: bytes)
             let resource = try JSONDecoder().decode(ModelsR4.Questionnaire.self, from: bytes)
             try Self.checkExecution(resource, at: evaluationInstant)
             validUntil = try resource.effectivePeriod?.end?.value?.asNSDate()
-            _ = try GroveQuestionnaire.Questionnaire(
+            let questionnaire = try GroveQuestionnaire.Questionnaire(
                 resource,
                 clock: .fixed(at: evaluationInstant, in: .gmt)
             )
+            guard questionnaire.metadata.language != nil else { throw Self.unsupported }
+            languages = questionnaire.languages
         } catch {
             // Decoder/converter errors can contain researcher-authored content.
             throw Self.unsupported
         }
         return Evidence(
             sha256: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
+            language: languages[0],
+            translationLanguages: Array(languages.dropFirst()),
             validatorIdentity: identity,
             contractRevision: FHIRValidationClient.contractRevision,
             executionCapability: Self.executionCapability,

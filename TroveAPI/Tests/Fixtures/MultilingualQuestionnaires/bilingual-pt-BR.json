@@ -41,7 +41,7 @@
       "answerOption": [
         {
           "valueCoding": {
-            "system": "https://example.org/fhir/CodeSystem/drink",
+            "system": "urn:oid:2.25.249846150839427180313926152102489201273",
             "code": "coffee",
             "display": "Coffee",
             "_display": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "pt-BR"}, {"url": "content", "valueString": "Café"}]}]}
@@ -49,7 +49,7 @@
         },
         {
           "valueCoding": {
-            "system": "https://example.org/fhir/CodeSystem/drink",
+            "system": "urn:oid:2.25.249846150839427180313926152102489201273",
             "code": "tea",
             "display": "Tea",
             "_display": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "pt-BR"}, {"url": "content", "valueString": "Chá"}]}]}

@@ -13,6 +13,14 @@ import TroveAPIServer
 
 /// The bilingual Questionnaires that the Swift and TypeScript tests share, stored once in `TroveAPI/Tests/Fixtures`.
 struct MultilingualQuestionnaireFixture: Decodable, Sendable, CustomTestStringConvertible {
+    /// Draft text whose languages the server and the web read without validation.
+    struct DraftLanguageCase: Decodable, Sendable {
+        let name: String
+        let text: String
+        let language: String?
+        let translationLanguages: [String]
+    }
+
     static let directory = URL(filePath: #filePath)
         .deletingLastPathComponent()
         .appending(path: "../../../../TroveAPI/Tests/Fixtures/MultilingualQuestionnaires")
@@ -33,6 +41,10 @@ struct MultilingualQuestionnaireFixture: Decodable, Sendable, CustomTestStringCo
 
     var translationLanguage: String {
         translationLanguages[0]
+    }
+
+    static func draftLanguageCases() throws -> [DraftLanguageCase] {
+        try JSONDecoder().decode([DraftLanguageCase].self, from: Data(contentsOf: directory.appending(path: "draft-language-cases.json")))
     }
 
     static func all() throws -> [Self] {
