@@ -416,11 +416,11 @@ const DeviceUnitIdentifiers = ({
         </label>
       </div>
       <p id={`${id}-help`} className="text-text-tertiary text-sm">
-        Serial numbers, UDI production identifiers, device identifiers and names
-        a person gave a device identify one physical device. Study data leaves
-        them out unless this is selected, and original recordings that can
-        contain them are then not available to this study. Each
-        participant&apos;s data follows the published version they accepted.
+        Unless this is selected, study data leaves out serial numbers, UDI
+        production identifiers, device local identifiers and names a person gave
+        a device, and original recordings that can contain them (native and
+        provider recordings) are not available to this study. A record includes
+        them only when every published version it was shared under does.
       </p>
     </fieldset>
   );
