@@ -102,6 +102,22 @@ class QuestionnaireValidationTests(unittest.TestCase):
         status, response = self.validate()
         self.assertEqual((status, response["status"]), (422, "invalid"))
 
+    def test_unknown_companion_severity_counts_as_an_error(self):
+        self.validator.questionnaire_rules.return_value = [
+            SimpleNamespace(rule="qg-synthetic", path="Questionnaire", message="Synthetic", severity="fatal")]
+        status, response = self.validate()
+        self.assertEqual((status, response["status"], response["diagnostics"][0]["severity"]), (422, "invalid", "error"))
+
+    def test_every_route_runs_exclusively(self):
+        validator = object.__new__(worker.Validator)
+        held = []
+        for method in ("validate", "validate_questionnaire", "validate_questionnaire_response"):
+            setattr(validator, method, Mock(side_effect=lambda raw: held.append(worker.VALIDATION_LOCK.locked()) or (200, {})))
+        for path in worker.ROUTES:
+            validator.route(path)(b"{}")
+        self.assertEqual(held, [True, True, True])
+        self.assertFalse(worker.VALIDATION_LOCK.locked())
+
     def test_companion_failure_to_read_is_invalid(self):
         self.validator.questionnaire_rules.side_effect = TypeError("private")
         status, response = self.validate()
@@ -238,6 +254,7 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
     def test_offline_process_stops_the_engine_and_requires_attributed_outcomes(self):
         outcomes = self.run_pair()
         self.validator.engine.close.assert_called_once()
+        self.validator.engine.start.assert_called_once()
         self.assertEqual(len(outcomes), 2)
         error = official_issue("error", "Synthetic", "QuestionnaireResponse")
         self.assertEqual(len(self.run_pair(1, lambda paths: {"resourceType": "Bundle", "entry": [
@@ -252,6 +269,35 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
         for failure in failures:
             with self.subTest(failure=failure), self.assertRaises(ValueError):
                 self.run_pair(**failure)
+
+    def test_engine_is_restarted_after_every_run_so_health_recovers(self):
+        def timeout(*_args, **_kwargs):
+            raise subprocess.TimeoutExpired("java", worker.TIMEOUT)
+        for outcome in ("success", "unusable", "timeout"):
+            with self.subTest(outcome=outcome):
+                self.validator.engine = Mock()
+                if outcome == "success":
+                    self.run_pair()
+                elif outcome == "unusable":
+                    with self.assertRaises(ValueError):
+                        self.run_pair(returncode=2)
+                else:
+                    with patch.object(worker.subprocess, "run", side_effect=timeout), \
+                            self.assertRaises(subprocess.TimeoutExpired):
+                        self.validator.pair_outcomes([self.questionnaire, self.response])
+                self.assertEqual([name for name, _, _ in self.validator.engine.mock_calls], ["close", "start"])
+
+    def test_failed_engine_restart_does_not_replace_the_result(self):
+        self.validator.engine.start.side_effect = ValueError("Engine initialization failed")
+        self.assertEqual(len(self.run_pair()), 2)
+
+    def test_framing_breakout_is_refused(self):
+        questionnaire = b'{"resourceType":"Questionnaire","meta":{"profile":["' + worker.QUESTIONNAIRE_PROFILE.encode() + b'"]},"title":"abc'
+        response = b'"}},{"resource":' + self.response
+        with patch.object(self.validator, "pair_outcomes") as run:
+            status, result = self.validator.validate_questionnaire_response(self.raw(questionnaire, response))
+        self.assertEqual((status, result["status"], result["diagnostics"][0]["rule"]), (422, "invalid", "pair-input"))
+        run.assert_not_called()
 
 
 class DiagnosticTests(unittest.TestCase):

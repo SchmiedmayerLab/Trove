@@ -18,6 +18,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from decimal import Decimal
 
@@ -35,15 +36,34 @@ PAIR_PREFIX = '{"resourceType":"Bundle","type":"collection","entry":[{"resource"
 PAIR_INFIX = '},{"resource":'
 PAIR_SUFFIX = '}]}'
 FILE_EXTENSION = "http://hl7.org/fhir/StructureDefinition/operationoutcome-file"
+# The companion rules use error and warning; any other severity counts as an error.
+GROVE_SEVERITIES = {"error": "error", "warning": "warning", "information": "information"}
+VALIDATION_LOCK = threading.Lock()
 QUESTIONNAIRE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"
 RESPONSE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response"
 TRANSLATION = "http://hl7.org/fhir/StructureDefinition/translation"
 MESSAGE_ID = "http://hl7.org/fhir/StructureDefinition/operationoutcome-message-id"
-# Official findings that state a check was skipped, not passed. Without terminology
-# services or network access these mean validity is not established.
+# Official message identifiers (validator 7.0.6, `-tx n/a`, no network) stating that a check against a definition
+# did not run: the Questionnaire a response names, a profile the resource declares or depends on, or a code's
+# membership in a required value set. Codes from code systems outside the offline package set, including language
+# codes, are reported as information or `TERMINOLOGY_TX_WARNING` and are not listed: they occur on every resource.
 NOT_EVALUATED = frozenset({
     "Questionnaire_QR_Q_None",
     "Questionnaire_QR_Q_NotFound",
+    "Validation_VAL_Profile_Unknown",
+    "VALIDATION_VAL_PROFILE_UNKNOWN_ERROR",
+    "VALIDATION_VAL_PROFILE_UNKNOWN_ERROR_NETWORK",
+    "VALIDATION_VAL_PROFILE_UNKNOWN_NOT_POLICY",
+    "VALIDATION_VAL_GLOBAL_PROFILE_UNKNOWN",
+    "VALIDATION_VAL_PROFILE_DEPENDS_NOT_RESOLVED",
+    "Reference_REF_CantResolveProfile",
+    "TERMINOLOGY_TX_NOSVC_BOUND_REQ",
+    "Terminology_TX_Binding_NoServer",
+    "Error_validating_code_running_without_terminology_services",
+    "Unable_to_resolve_value_Set_",
+    "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_",
+    "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_CS",
+    "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_VS",
 })
 
 
@@ -320,7 +340,14 @@ class Validator:
 
     def route(self, path):
         """The one validation each fixed route performs; routes never select each other's checks."""
-        return dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
+        validate = dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
+
+        def exclusive(raw):
+            # One validation at a time: the response route stops and restarts the shared engine, so no other
+            # validation may use it meanwhile. The HTTP server is single-threaded as well; this does not rely on it.
+            with VALIDATION_LOCK:
+                return validate(raw)
+        return exclusive
 
     def response(self, raw, valid=False, code=None):
         result = {
@@ -408,7 +435,7 @@ class Validator:
                 "error", "trove", "profile-required", "Questionnaire.meta.profile",
                 "The resource must be a Questionnaire that claims the Grove Questionnaire profile.")])
         try:
-            diagnostics = [diagnostic(issue.severity, "grove", issue.rule, issue.path, issue.message,
+            diagnostics = [diagnostic(GROVE_SEVERITIES.get(issue.severity, "error"), "grove", issue.rule, issue.path, issue.message,
                                       translation_language(resource, issue.path)) for issue in self.questionnaire_rules(resource)]
         except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
             diagnostics = [diagnostic("error", "grove", "questionnaire-rules", "Questionnaire",
@@ -431,11 +458,11 @@ class Validator:
         purpose = "questionnaire-response"
         try:
             documents = pair_documents(raw)
+            resources = [strict_json(document) for document in documents]
         except (ValueError, UnicodeError, RecursionError):
             return self.report(raw, purpose, "invalid", [diagnostic(
                 "error", "trove", "pair-input", "", "The input must be a collection Bundle of a Grove Questionnaire and a "
                 "Grove QuestionnaireResponse, framed exactly as documented.")])
-        resources = [strict_json(document) for document in documents]
         if not (self.claims(resources[0], "Questionnaire", QUESTIONNAIRE_PROFILE)
                 and self.claims(resources[1], "QuestionnaireResponse", RESPONSE_PROFILE)):
             return self.report(raw, purpose, "invalid", [diagnostic(
@@ -443,7 +470,7 @@ class Validator:
                 "Grove QuestionnaireResponse, framed exactly as documented.")])
         try:
             outcomes = self.pair_outcomes(documents)
-        except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        except (OSError, ValueError, TypeError, KeyError, RecursionError, subprocess.SubprocessError):
             return self.report(raw, purpose, "unavailable")
         named = {"Questionnaire": ("Questionnaire", resources[0]), "QuestionnaireResponse": ("QuestionnaireResponse", resources[1])}
         diagnostics = [issue_diagnostic(issue, named) for outcome in outcomes for issue in outcome["issue"]]
@@ -453,10 +480,23 @@ class Validator:
     def pair_outcomes(self, documents):
         """One offline validator process over both documents; raises unless its outcomes are trustworthy.
 
-        The reusable engine is stopped first so that both Java processes never share the memory limit;
-        a later request starts a new engine.
+        The reusable engine is stopped first so that both Java processes never share the memory limit,
+        and restarted afterwards, whatever the outcome, so that `/health` reports the worker ready again.
         """
         self.engine.close()
+        try:
+            return self.run_pair(documents)
+        finally:
+            self.restart_engine()
+
+    def restart_engine(self):
+        """Start the reusable engine; on failure the next request starts it, and `/health` reports it unready."""
+        try:
+            self.engine.start()
+        except (OSError, ValueError, TimeoutError, subprocess.SubprocessError):
+            pass
+
+    def run_pair(self, documents):
         with tempfile.TemporaryDirectory(prefix="validator-pair-") as directory:
             paths = [Path(directory) / "1-questionnaire.json", Path(directory) / "2-response.json"]
             for path, document in zip(paths, documents):

@@ -69,6 +69,9 @@ if purpose=='questionnaire':
         answers['questionnaire']=questionnaire['url']+'|999.0.0'
         authoring('/validate/questionnaire-response',pair(raw,json.dumps(answers).encode()),'incomplete','Questionnaire_QR_Q_NotFound')
     authoring('/validate/questionnaire-response',b'{"resourceType":"Bundle"}','invalid','pair-input')
+    connection=http.client.HTTPConnection(host,8080,timeout=10)
+    connection.request('GET','/health'); response=connection.getresponse(); response.read(); connection.close()
+    assert response.status==200,('engine not restarted after a pair',response.status)
 else:
     check(raw,200)
     check(b'{"x":1,"x":2}',422,'invalid_json')
