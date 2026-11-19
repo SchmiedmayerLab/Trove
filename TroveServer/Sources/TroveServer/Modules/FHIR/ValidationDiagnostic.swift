@@ -30,6 +30,9 @@ extension ValidationDiagnostic {
     }
 
     /// The error finding that explains a result that is neither valid nor invalid.
+    ///
+    /// `unavailable` is not always transient: the official validator stops without a result on some inputs, so the same
+    /// input stays `unavailable` on every attempt. Callers that retry must bound their attempts.
     static func reason(for status: ValidationStatus) -> Self? {
         switch status {
         case .unavailable:
@@ -37,7 +40,7 @@ extension ValidationDiagnostic {
                 "validator-unavailable",
                 path: "",
                 message: "The FHIR validator could not be reached or returned no trustworthy result, so validity is not established.",
-                nextAction: "Validate again later."
+                nextAction: "Validate again later. If the same content stays unavailable, the validator cannot process it; change the content."
             )
         case .incomplete:
             .trove(

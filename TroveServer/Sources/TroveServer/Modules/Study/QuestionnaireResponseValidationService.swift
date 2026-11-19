@@ -18,6 +18,11 @@ import ModelsR4
 /// packages. The validator is a remote service, so call this before, never inside, a database transaction. The result
 /// binds both digests; a caller that commits based on it must recheck those digests against its own current state in
 /// its transaction. A result grants no permission to store or accept the response.
+///
+/// The worker runs one pair at a time in a separate validator process, which takes seconds. While it runs, that worker
+/// validates no events or questionnaires. Do not call this for each participant response on the worker that gates event
+/// admission. A result of `unavailable` can be permanent for one pair, because the official validator stops without a
+/// result on some inputs, so callers bound their retries.
 struct QuestionnaireResponseValidationService: Sendable {
     struct Result: Sendable {
         let status: ValidationStatus

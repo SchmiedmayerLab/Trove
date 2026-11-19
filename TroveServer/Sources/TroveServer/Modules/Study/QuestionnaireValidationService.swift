@@ -54,10 +54,6 @@ struct QuestionnaireValidationService: Sendable {
         let official = try await validator.validateQuestionnaire(bytes)
         let local = Self.checkLocally(bytes, at: evaluationInstant)
         let status = ValidationStatus.combined([official.status, local.diagnostics.contains { $0.severity == .error } ? .invalid : .valid])
-        let diagnostics = ValidationDiagnostic.ordered(
-            (ValidationDiagnostic.reason(for: official.status).map { [$0] } ?? []) + official.diagnostics + local.diagnostics,
-            limit: Self.maximumDiagnostics
-        )
         let sha256 = FHIRValidationClient.digest(bytes)
         var evidence: Evidence?
         if status == .valid, let identity = official.validatorIdentity, let model = local.model {
@@ -71,8 +67,15 @@ struct QuestionnaireValidationService: Sendable {
                 validUntil: model.validUntil
             )
         }
+        // A passing result without evidence lacks the validator identity or the Grove model; it establishes nothing.
+        let resultStatus = evidence == nil && status == .valid ? ValidationStatus.unavailable : status
+        let reasonStatus = official.status == .valid ? resultStatus : official.status
+        let diagnostics = ValidationDiagnostic.ordered(
+            (ValidationDiagnostic.reason(for: reasonStatus).map { [$0] } ?? []) + official.diagnostics + local.diagnostics,
+            limit: Self.maximumDiagnostics
+        )
         return Result(
-            status: evidence == nil && status == .valid ? .unavailable : status,
+            status: resultStatus,
             sha256: sha256,
             language: local.model?.language ?? QuestionnaireLanguages(bytes).base,
             translationLanguages: local.model?.translationLanguages ?? QuestionnaireLanguages(bytes).translations,

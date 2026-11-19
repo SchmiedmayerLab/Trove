@@ -139,8 +139,15 @@ struct FHIRValidationClient: Sendable {
     /// Validates a response against its exact Questionnaire with the official validator.
     ///
     /// The worker receives one collection Bundle that embeds both documents byte for byte, so the response's canonical
-    /// resolves only to these Questionnaire bytes.
+    /// resolves only to these Questionnaire bytes. Each document must be exactly one JSON object on its own; otherwise
+    /// one document could close the framing and supply the other.
     func validateQuestionnaireResponse(questionnaire: Data, response: Data) async throws -> AuthoringResult {
+        guard [questionnaire, response].allSatisfy({ (try? JSONSerialization.jsonObject(with: $0)) is [String: Any] }) else {
+            let finding = ValidationDiagnostic.trove(
+                "pair-input", path: "", message: "The Questionnaire and the QuestionnaireResponse must each be one JSON object."
+            )
+            return .init(status: .invalid, diagnostics: [finding], validatorIdentity: expectedIdentity)
+        }
         var bundle = Data(#"{"resourceType":"Bundle","type":"collection","entry":[{"resource":"#.utf8)
         bundle.append(questionnaire)
         bundle.append(Data(#"},{"resource":"#.utf8))

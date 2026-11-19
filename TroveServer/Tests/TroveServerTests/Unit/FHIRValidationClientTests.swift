@@ -207,6 +207,21 @@ struct FHIRValidationClientTests {
         #expect(try await validator.validateQuestionnaireResponse(questionnaire: questionnaire, response: response).status == .valid)
     }
 
+    @Test(arguments: [
+        (#"{"resourceType":"Questionnaire","title":"abc"#, #""}},{"resource":{"resourceType":"QuestionnaireResponse"}"#),
+        (#"{"resourceType":"Questionnaire"}"#, #"{"resourceType":"QuestionnaireResponse"}, {}"#),
+        (#"[]"#, #"{"resourceType":"QuestionnaireResponse"}"#)
+    ])
+    func responseValidationRefusesDocumentsThatAreNotEachOneObject(questionnaire: String, response: String) async throws {
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, _ in
+            Issue.record("A document that could break out of the pair framing must not reach the worker")
+            return (200, Data())
+        })
+        let result = try await validator.validateQuestionnaireResponse(questionnaire: Data(questionnaire.utf8), response: Data(response.utf8))
+        #expect(result.status == .invalid)
+        #expect(result.diagnostics.map(\.rule) == ["pair-input"])
+    }
+
     @Test
     func cancelledAuthoringValidationIsNotReportedAsUnavailable() async throws {
         let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, _ in throw CancellationError() })

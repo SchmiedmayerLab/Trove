@@ -873,7 +873,7 @@ extension Components {
                 ])
             }
         }
-        /// `valid`: every check ran and passed. `invalid`: at least one finding is an error. `incomplete`: a check could not be evaluated, for example an unresolved definition or terminology, so validity is not established. `unavailable`: the validator could not be reached or returned no trustworthy result. Only `valid` permits publication.
+        /// `valid`: every check ran and passed. `invalid`: at least one finding is an error. `incomplete`: the official validator reported that it could not resolve the Questionnaire a response names or a profile the resource declares or depends on, or could not check a code against a required value set, so validity is not established. Codes from code systems outside the offline package set are reported as information and do not make a result incomplete. `unavailable`: the validator could not be reached or returned no trustworthy result; for some inputs this repeats on every attempt. Only `valid` permits publication.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/ValidationStatus`.
