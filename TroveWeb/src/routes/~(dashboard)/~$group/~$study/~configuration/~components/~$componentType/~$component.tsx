@@ -85,7 +85,11 @@ const EditQuestionnairePage = () => {
       onSubmit={handleSubmit}
       layout={EditComponentLayout}
     >
-      <QuestionnaireComponentForm form={form} onSubmit={handleSubmit} />
+      <QuestionnaireComponentForm
+        form={form}
+        onSubmit={handleSubmit}
+        saved={{ studyId: params.study, componentId: params.component }}
+      />
     </ComponentPageShell>
   );
 };

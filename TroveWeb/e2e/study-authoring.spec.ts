@@ -73,7 +73,10 @@ const reviewPublicationCandidate = async (page: Page) => {
     .click();
   const validated = await validationResponse;
   expect(validated.status()).toBe(201);
-  const candidate = zStudyDraftValidation.parse(await validated.json());
+  const report = zStudyDraftValidation.parse(await validated.json());
+  expect(report.status).toBe("valid");
+  const candidate = report.candidate;
+  if (!candidate) throw new Error("A valid draft must return a candidate");
   await expect(
     page.getByRole("heading", { name: "Review publication candidate" }),
   ).toBeVisible();
@@ -82,9 +85,9 @@ const reviewPublicationCandidate = async (page: Page) => {
     page.getByText(candidate.bundleSha256, { exact: true }),
   ).toBeVisible();
   expect((await validated.request().allHeaders())["if-match"]).toBe(
-    `"${candidate.draftRevision}"`,
+    `"${report.draftRevision}"`,
   );
-  return candidate;
+  return { ...candidate, draftRevision: report.draftRevision };
 };
 
 test.describe("study authoring", () => {

@@ -22,6 +22,7 @@ import { Rocket } from "lucide-react";
 import { useState } from "react";
 import { getStudiesByStudyId } from "@/lib/api/generated/sdk.gen";
 import type { StudyDraftValidation } from "@/lib/api/generated/types.gen";
+import { componentListQueryOptions } from "@/lib/queries/component";
 import { onMutationError } from "@/lib/queries/mutationCallbacks";
 import {
   publicationNeedsReview,
@@ -34,6 +35,7 @@ import {
   useValidateStudyMutation,
 } from "@/lib/queries/study";
 import { FeaturedIconContainer } from "../../ui/FeaturedIconContainer";
+import { ValidationDiagnostics } from "../ValidationDiagnostics";
 
 const PublicationDialog = ({
   studyId,
@@ -48,8 +50,10 @@ const PublicationDialog = ({
 }) => {
   const validateStudy = useValidateStudyMutation();
   const publishStudy = usePublishStudyMutation();
-  const [candidate, setCandidate] = useState<StudyDraftValidation>();
+  const { data: components } = useQuery(componentListQueryOptions({ studyId }));
+  const [report, setReport] = useState<StudyDraftValidation>();
   const [needsReview, setNeedsReview] = useState(false);
+  const candidate = report?.candidate;
   const isPending = validateStudy.isPending || publishStudy.isPending;
   const publicationStatus =
     latestRevision === undefined ?
@@ -58,23 +62,27 @@ const PublicationDialog = ({
 
   const onValidate = () => {
     if (candidate || needsReview || isPending) return;
+    setReport(undefined);
     validateStudy.mutate(validationRequest(studyId, draftRevision), {
-      onSuccess: setCandidate,
+      onSuccess: setReport,
       onError: (error) => setNeedsReview(publicationNeedsReview(error)),
     });
   };
 
   const onPublish = () => {
-    if (!candidate || needsReview || isPending) return;
+    if (!report || !candidate || needsReview || isPending) return;
     // The server owns expiry checks and recognizes exact accepted retries,
     // including a lost reply whose candidate expired in the meantime.
-    publishStudy.mutate(publicationRequest(studyId, candidate), {
-      onSuccess: (data) => {
-        toast.success(`Study published (v${data.revision})`);
-        onClose();
+    publishStudy.mutate(
+      publicationRequest(studyId, report.draftRevision, candidate),
+      {
+        onSuccess: (data) => {
+          toast.success(`Study published (v${data.revision})`);
+          onClose();
+        },
+        onError: (error) => setNeedsReview(publicationNeedsReview(error)),
       },
-      onError: (error) => setNeedsReview(publicationNeedsReview(error)),
-    });
+    );
   };
 
   return (
@@ -98,14 +106,14 @@ const PublicationDialog = ({
           <DialogDescription>
             {candidate ?
               "Review this exact candidate before publishing. Publishing does not rebuild or select a newer draft."
-            : `${publicationStatus} Only saved changes are included. Validation creates a candidate for review; it does not publish.`
+            : `${publicationStatus} Only saved changes are included. A valid draft becomes a candidate for review; validation does not publish.`
             }
           </DialogDescription>
         </DialogHeader>
         <dl className="grid gap-1 text-sm">
           <dt className="font-medium">Draft revision</dt>
           <dd className="mb-2 font-mono text-xs break-all">
-            {candidate?.draftRevision ?? draftRevision}
+            {report?.draftRevision ?? draftRevision}
           </dd>
           {candidate && (
             <>
@@ -119,10 +127,8 @@ const PublicationDialog = ({
               <dd className="mb-2 font-mono text-xs break-all">
                 {candidate.bundleSha256}
               </dd>
-              <dt className="font-medium">
-                Validated questionnaire localizations
-              </dt>
-              <dd className="mb-2">{candidate.questionnaires.length}</dd>
+              <dt className="font-medium">Validated questionnaires</dt>
+              <dd className="mb-2">{report.questionnaires.length}</dd>
               <dt className="font-medium">Candidate expires</dt>
               <dd>{new Date(candidate.expiresAt).toLocaleString()}</dd>
             </>
@@ -141,6 +147,35 @@ const PublicationDialog = ({
             </dl>
           </details>
         )}
+        {report &&
+          (report.blockers.length > 0 ||
+            report.advisories.length > 0 ||
+            !candidate) && (
+            <div className="grid max-h-80 gap-4 overflow-y-auto">
+              {(!candidate || report.blockers.length > 0) && (
+                <ValidationDiagnostics
+                  key={`blockers:${report.status}`}
+                  title="Blockers"
+                  status={report.status}
+                  diagnostics={report.blockers}
+                  componentName={(id) =>
+                    components?.find((component) => component.id === id)?.name
+                  }
+                  focusOnMount
+                />
+              )}
+              {report.advisories.length > 0 && (
+                <ValidationDiagnostics
+                  title="Advisories"
+                  status={report.status}
+                  diagnostics={report.advisories}
+                  componentName={(id) =>
+                    components?.find((component) => component.id === id)?.name
+                  }
+                />
+              )}
+            </div>
+          )}
         {needsReview && (
           <p role="alert" className="text-sm">
             The draft or validation is no longer current. Reload and review the
@@ -162,6 +197,35 @@ const PublicationDialog = ({
           >
             Cancel
           </Button>
+          {report &&
+            (report.blockers.length > 0 ||
+              report.advisories.length > 0 ||
+              !candidate) && (
+              <div className="grid max-h-80 gap-4 overflow-y-auto">
+                {(!candidate || report.blockers.length > 0) && (
+                  <ValidationDiagnostics
+                    key={`blockers:${report.status}`}
+                    title="Blockers"
+                    status={report.status}
+                    diagnostics={report.blockers}
+                    componentName={(id) =>
+                      components?.find((component) => component.id === id)?.name
+                    }
+                    focusOnMount
+                  />
+                )}
+                {report.advisories.length > 0 && (
+                  <ValidationDiagnostics
+                    title="Advisories"
+                    status={report.status}
+                    diagnostics={report.advisories}
+                    componentName={(id) =>
+                      components?.find((component) => component.id === id)?.name
+                    }
+                  />
+                )}
+              </div>
+            )}
           {needsReview && (
             <Button size="sm" onClick={() => window.location.reload()}>
               Reload and review
@@ -186,7 +250,7 @@ const PublicationDialog = ({
               disabled={isPending}
               isPending={validateStudy.isPending}
             >
-              Validate draft
+              {report ? "Validate again" : "Validate draft"}
             </Button>
           )}
         </DialogFooter>

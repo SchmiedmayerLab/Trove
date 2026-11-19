@@ -23,6 +23,7 @@ import {
   putStudiesByStudyIdComponentsHealthDataByComponentIdMutation,
   putStudiesByStudyIdComponentsByComponentIdSchedulesByScheduleIdMutation,
   deleteStudiesByStudyIdComponentsByComponentIdSchedulesByScheduleIdMutation,
+  validateStudyComponentMutation,
 } from "../api/generated/@tanstack/react-query.gen";
 import {
   getStudiesByStudyIdComponents,
@@ -179,6 +180,12 @@ export const scheduleListQueryOptions = ({
   );
 
 // --- Component mutations ---
+
+/** Validates a component's saved resource; it changes nothing, so no read is invalidated. */
+export const useValidateComponentMutation = createMutationHook(
+  validateStudyComponentMutation,
+  "Error validating questionnaire",
+);
 
 export const useDeleteComponentMutation = createMutationHook(
   deleteStudiesByStudyIdComponentsByComponentIdMutation,

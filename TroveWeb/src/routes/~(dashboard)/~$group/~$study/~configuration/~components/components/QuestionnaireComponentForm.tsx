@@ -12,10 +12,22 @@ import {
   Input,
   Textarea,
 } from "@schmiedmayerlab/grove-design-system";
-import { useRef, type BaseSyntheticEvent, type ChangeEvent } from "react";
+import {
+  useRef,
+  useState,
+  type BaseSyntheticEvent,
+  type ChangeEvent,
+} from "react";
+import { ValidationDiagnostics } from "@/components/interfaces/ValidationDiagnostics";
 import { CardHeader } from "@/components/ui/Card";
 import { FieldLabel } from "@/components/ui/FieldLabel";
+import type {
+  QuestionnaireValidation,
+  ValidationDiagnostic,
+} from "@/lib/api/generated/types.gen";
+import { useValidateComponentMutation } from "@/lib/queries/component";
 import { questionnaireLanguages } from "@/lib/questionnaireLanguages";
+import { itemLinkId, linkIdRange } from "@/lib/validationDiagnostics";
 import { enhanceField } from "@/utils/enhanceField";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
 
@@ -35,17 +47,90 @@ const downloadFile = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+/** Validates the saved component and lists its findings; unsaved text is not validated. */
+const QuestionnaireValidationSection = ({
+  studyId,
+  componentId,
+  hasUnsavedChanges,
+  locate,
+}: {
+  studyId: string;
+  componentId: string;
+  hasUnsavedChanges: boolean;
+  locate: (diagnostic: ValidationDiagnostic) => (() => void) | undefined;
+}) => {
+  const validate = useValidateComponentMutation();
+  const [result, setResult] = useState<QuestionnaireValidation>();
+
+  return (
+    <div className="border-border-tertiary grid gap-3 border-t px-6 pt-6">
+      <FieldLabel
+        title="Validation"
+        description="Checks the saved questionnaire with the FHIR Validator, the Grove questionnaire rules and the study app's supported features. Publishing validates the draft again."
+      />
+      {hasUnsavedChanges && (
+        <p className="text-text-secondary text-sm">
+          Save your changes to validate them.
+        </p>
+      )}
+      <div>
+        <Button
+          type="button"
+          size="xs"
+          variant="outlineBg"
+          disabled={hasUnsavedChanges || validate.isPending}
+          isPending={validate.isPending}
+          onClick={() => {
+            setResult(undefined);
+            validate.mutate(
+              { path: { studyId, componentId } },
+              { onSuccess: setResult },
+            );
+          }}
+        >
+          Validate saved questionnaire
+        </Button>
+      </div>
+      {result && (
+        <ValidationDiagnostics
+          key={`${result.sha256}:${result.draftRevision}`}
+          title="Validation result"
+          status={result.status}
+          diagnostics={result.diagnostics}
+          locate={locate}
+          focusOnMount
+        />
+      )}
+    </div>
+  );
+};
+
 interface QuestionnaireComponentFormProps {
   form: QuestionnaireForm;
   onSubmit: (event?: BaseSyntheticEvent) => Promise<void>;
+  /** The saved component to validate; omitted while creating one. */
+  saved?: { studyId: string; componentId: string };
 }
 
 export const QuestionnaireComponentForm = ({
   form,
   onSubmit,
+  saved,
 }: QuestionnaireComponentFormProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const questionnaireJson = form.watch("questionnaire");
+
+  const locate = (diagnostic: ValidationDiagnostic) => {
+    const linkId = itemLinkId(questionnaireJson, diagnostic.path);
+    const range = linkId && linkIdRange(questionnaireJson, linkId);
+    if (!range) return undefined;
+    return () => {
+      const textarea = editorRef.current?.querySelector("textarea");
+      textarea?.focus();
+      textarea?.setSelectionRange(...range);
+    };
+  };
 
   const setQuestionnaireJson = (json: string) => {
     form.setValue("questionnaire", json, {
@@ -131,7 +216,7 @@ export const QuestionnaireComponentForm = ({
           }
           className="px-6 pt-6"
           render={({ field }) => (
-            <div>
+            <div ref={editorRef}>
               <Textarea {...field} rows={10} className="w-full font-mono" />
               {languages ?
                 <dl className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm">
@@ -183,6 +268,14 @@ export const QuestionnaireComponentForm = ({
           )}
         />
       </form>
+      {saved && (
+        <QuestionnaireValidationSection
+          studyId={saved.studyId}
+          componentId={saved.componentId}
+          hasUnsavedChanges={form.formState.isDirty}
+          locate={locate}
+        />
+      )}
     </>
   );
 };
