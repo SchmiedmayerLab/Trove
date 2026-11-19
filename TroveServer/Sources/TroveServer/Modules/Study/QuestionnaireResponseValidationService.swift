@@ -64,7 +64,7 @@ struct QuestionnaireResponseValidationService: Sendable {
         })
     }
 
-    /// Only `valid` means both checks ran and passed. Throws only when cancelled.
+    /// Only `valid` means both checks reported no error and no skipped check. Throws only when cancelled.
     func validate(questionnaire: Data, response: Data) async throws -> Result {
         let grove = Self.pairRules(questionnaire: questionnaire, response: response)
         let official = try await validator.validateQuestionnaireResponse(questionnaire: questionnaire, response: response)

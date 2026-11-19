@@ -155,7 +155,7 @@ Both commands print their result before exiting with a status-specific code:
 
 | Exit code | Status | Meaning |
 |---|---|---|
-| 0 | `valid` | Every check ran and passed. |
+| 0 | `valid` | No finding is an error and no check was reported as skipped. |
 | 2 | `invalid` | At least one finding is an error. |
 | 3 | `incomplete` | A check could not be evaluated, so validity is not established. |
 | 4 | `unavailable` | The validator could not be reached; validate again later. |

@@ -489,7 +489,7 @@ paths:
         when Questionnaire eligibility ends. This operation does not publish. Changes
         during validation reject the result without accepting a candidate. Provider
         registration and publication preparation failures, such as invalid consent
-        response controls, remain problem responses with status 422.
+        response controls, remain problem responses.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - $ref: '#/components/parameters/DraftIfMatch'
@@ -739,8 +739,9 @@ paths:
         official FHIR Validator, the IG's Questionnaire rules, and the execution
         capabilities of the supported study client. Returns every finding with its
         severity, rule, element path and, for a translation, its language. Only `valid`
-        means that every check ran and passed. The result is not stored, does not change
-        the draft and is not publication evidence; publication requires draft validation.
+        means that no finding is an error and no check was reported as skipped. The
+        result is not stored, does not change the draft and is not publication evidence;
+        publication requires draft validation.
         Other component types return 422.
       parameters:
         - $ref: '#/components/parameters/StudyId'
@@ -3156,12 +3157,14 @@ components:
     ValidationStatus:
       type: string
       description: >
-        `valid`: every check ran and passed. `invalid`: at least one finding is an error.
+        `valid`: no finding is an error and no official finding states that a check was
+        skipped. `invalid`: at least one finding is an error.
         `incomplete`: the official validator reported that it could not resolve the
-        Questionnaire a response names or a profile the resource declares or depends on,
-        or could not check a code against a required value set, so validity is not
-        established. Codes from code systems outside the offline package set are reported
-        as information and do not make a result incomplete. `unavailable`: the validator
+        Questionnaire a response names, an enableWhen condition or a profile the resource
+        declares or depends on, or could not check slicing cardinality or a code against a
+        value set binding or answer options, so validity is not established. A code from a
+        code system outside the offline package set is reported as information unless a
+        value set check depends on it. `unavailable`: the validator
         could not be reached or returned no trustworthy result; for some inputs this
         repeats on every attempt. Only `valid` permits publication.
       enum: [valid, invalid, incomplete, unavailable]

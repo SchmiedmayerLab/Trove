@@ -142,9 +142,12 @@ struct FHIRValidationClient: Sendable {
     /// resolves only to these Questionnaire bytes. Each document must be exactly one JSON object on its own; otherwise
     /// one document could close the framing and supply the other.
     func validateQuestionnaireResponse(questionnaire: Data, response: Data) async throws -> AuthoringResult {
-        guard [questionnaire, response].allSatisfy({ (try? JSONSerialization.jsonObject(with: $0)) is [String: Any] }) else {
+        guard questionnaire.count + response.count <= Self.maximumBytes,
+              [questionnaire, response].allSatisfy({ (try? JSONSerialization.jsonObject(with: $0)) is [String: Any] }) else {
             let finding = ValidationDiagnostic.trove(
-                "pair-input", path: "", message: "The Questionnaire and the QuestionnaireResponse must each be one JSON object."
+                "pair-input",
+                path: "",
+                message: "The Questionnaire and the QuestionnaireResponse must each be one JSON object, together within the size limit."
             )
             return .init(status: .invalid, diagnostics: [finding], validatorIdentity: expectedIdentity)
         }

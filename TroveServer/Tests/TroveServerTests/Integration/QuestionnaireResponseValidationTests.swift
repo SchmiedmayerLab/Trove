@@ -49,6 +49,20 @@ struct QuestionnaireResponseValidationTests {
         return Data(text.replacingOccurrences(of: "https://example.org/fhir/Questionnaire/bilingual-de", with: canonical).utf8)
     }
 
+    /// The German fixture whose second item is enabled by an expression that fails when evaluated.
+    private static func questionnaireWithUncheckableCondition() throws -> Data {
+        var resource = try #require(try JSONSerialization.jsonObject(with: questionnaire()) as? [String: Any])
+        var items = try #require(resource["item"] as? [[String: Any]])
+        items[1]["enableWhen"] = nil
+        let condition: [String: Any] = [
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+            "valueExpression": ["language": "text/fhirpath", "expression": "%resource.item.where(linkId='visited').answer.value.foo()"]
+        ]
+        items[1]["extension"] = [condition]
+        resource["item"] = items
+        return try JSONSerialization.data(withJSONObject: resource)
+    }
+
     /// A completed German response to the German fixture, changed by `mismatch`.
     private static func response(_ mismatch: Mismatch? = nil) throws -> Data {
         var visited: [String: Any] = ["linkId": "visited", "answer": [["valueBoolean": true]]]
@@ -141,6 +155,12 @@ struct QuestionnaireResponseValidationTests {
             )
             #expect(otherVersion.status == .incomplete, "\(otherVersion.diagnostics)")
             #expect(otherVersion.diagnostics.contains { $0.rule == "Questionnaire_QR_Q_NotFound" })
+            // A condition the validator cannot evaluate leaves the answers unchecked against it.
+            let uncheckable = try await official.validateQuestionnaireResponse(
+                questionnaire: Self.questionnaireWithUncheckableCondition(), response: Self.response()
+            )
+            #expect(uncheckable.status == .incomplete, "\(uncheckable.diagnostics)")
+            #expect(uncheckable.diagnostics.contains { $0.rule == "Questionnaire_QR_Item_EnableWhen_Uncheckable" })
         }
     }
 }

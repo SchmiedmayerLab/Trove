@@ -67,8 +67,9 @@ struct ComponentValidationAuthorizationTests {
                     Issue.record("Expected a questionnaire component")
                     return
                 }
-                if let identity = Environment.get("FHIR_VALIDATOR_IDENTITY") {
+                if Environment.get("FHIR_VALIDATOR_URL") != nil, let identity = Environment.get("FHIR_VALIDATOR_IDENTITY") {
                     #expect(result.validatorIdentity == identity)
+                    #expect(result.status != .unavailable)
                 } else {
                     // Without a configured validator nothing establishes validity.
                     #expect(result.status == .unavailable)
