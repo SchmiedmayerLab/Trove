@@ -393,7 +393,7 @@ const CollectionControls = ({
   );
 };
 
-const DeviceUnitIdentifiers = ({
+export const DeviceUnitIdentifiers = ({
   checked,
   onChange,
 }: {
@@ -418,9 +418,10 @@ const DeviceUnitIdentifiers = ({
       <p id={`${id}-help`} className="text-text-tertiary text-sm">
         Unless this is selected, study data leaves out serial numbers, UDI
         production identifiers, device local identifiers and names a person gave
-        a device, and original recordings that can contain them (native and
-        provider recordings) are not available to this study. A record includes
-        them only when every published version it was shared under does.
+        a device, and original recordings that can contain them (native,
+        provider and FHIR collection recordings) are not available to this
+        study. A record includes them only when every published version it was
+        shared under does.
       </p>
     </fieldset>
   );
