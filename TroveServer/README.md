@@ -307,8 +307,7 @@ policy `urn:trove:device-unit-identifiers-withheld`:
   model, manufacturer and UDI label names. Serial and lot numbers, dates, other UDI
   data, names a person gave a device and every identifier are removed.
 - Application Devices follow the same list and also keep their user-friendly name and
-  typed identifiers, such as the bundle identifier. When HealthKit assigned the bundle
-  identifier to one iPhone or Apple Watch (`com.apple.health.` followed by a UUID, in
+  the bundle identifier. When HealthKit assigned the bundle identifier to one iPhone or Apple Watch (`com.apple.health.` followed by a UUID, in
   any case), the Device is treated like a recording Device.
 - A reference to a Device keeps only its address and type, so its display text does
   not name the unit.
@@ -318,16 +317,18 @@ policy `urn:trove:device-unit-identifiers-withheld`:
 - The HealthKit metadata entries `HKDeviceSerialNumber`, `HKDeviceName` and
   `HKUDIProductionIdentifier` are removed.
 
-References are never removed, so the graph stays closed. Producer free
-text, such as notes, is not filtered. The `device` and `originDevice` columns of
-tabular recordings are strings the producer states (Grove writes the product type) and
-are not checked at admission; the photoplethysmogram format has no device column.
-These recordings are released unchanged. Clinical-record documents are released as
-issued: they are the care record, collected under their own consented requirement. Native, provider and FHIR collection recordings are
-opaque payloads that can carry unit facts: for a study that does not receive them,
-their recording document keeps its title, description, size and hash but has no
-content or download location, and the download route returns HTTP 403 before reading
-storage or recording a disclosure. Such a study cannot obtain these recordings.
+References are never removed, so the graph stays closed. Producer free text, such as
+notes, is not filtered. The `device` and `originDevice` columns of tabular recordings
+are strings the producer states (Grove writes the product type) and are not checked at
+admission; the photoplethysmogram format has no device column. These recordings are
+released unchanged. Clinical-record documents are released as issued: they are the
+care record, collected under their own consented requirement. Native, provider and
+FHIR collection recordings are opaque payloads that can carry unit facts: for a study
+that does not receive them, their recording document keeps its title, description,
+size and hash but has no content or download location, and the download route returns
+HTTP 403 before reading storage or recording a disclosure. A grant under a withholding
+revision that is attributed while the file is prepared also gives HTTP 403, before the
+disclosure is recorded. Such a study cannot obtain these recordings.
 
 The rule applies only to disclosure. Retained bytes, record identity, deduplication,
 receipts and retractions never depend on it.

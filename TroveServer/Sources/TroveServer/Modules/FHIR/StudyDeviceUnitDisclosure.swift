@@ -19,8 +19,9 @@ import SQLKit
 /// Recording and host Devices keep only facts about a kind of device: status, type, manufacturer, model number,
 /// versions, parent, patient, the UDI device identifier, issuer and jurisdiction, and model, manufacturer and UDI label
 /// names. Everything else, including serial and lot numbers, dates, UDI production data, names a person gave a device
-/// and every identifier, is withheld. Application Devices keep their names and identifiers unless HealthKit assigned
-/// their bundle identifier to one device (`com.apple.health.`). The rule also withholds the HealthKit source name and
+/// and every identifier, is withheld. Application Devices follow the same allowlist and also keep their user-friendly
+/// name and bundle identifier, unless HealthKit assigned that bundle identifier to one device (`com.apple.health.`).
+/// References to Devices keep only `reference` and `type`. The rule also withholds the HealthKit source name and
 /// bundle identifier of such a device, readable sync identifiers scoped to it, and the HealthKit metadata keys that
 /// repeat a withheld Device fact. Producer free text is not filtered.
 ///
@@ -39,8 +40,8 @@ enum StudyDeviceUnitDisclosure {
 
     private static let deviceBundlePrefix = "com.apple.health."
     private static let sourceRevision = Canonicals.root + "/healthkit/StructureDefinition/healthkit-source-revision"
-    private static let roleSystem = Canonicals.root + "/mobile/CodeSystem/grove-identifier-role"
-    private static let deviceIdentifierTypeSystem = Canonicals.root + "/mobile/CodeSystem/grove-device-identifier-type"
+    /// The HealthKit guide's bundle identifier type; the mobile guide defines no other application identifier type.
+    private static let bundleIdentifierTypeSystem = Canonicals.root + "/healthkit/CodeSystem/healthkit-identifier-type"
     private static let applicationProfiles = [Profile.groveApplicationDevice, Profile.healthkitApplicationDevice]
         .compactMap { $0.value?.url.absoluteString }
     private static let metadataKeys: Set<String> = ["HKDeviceSerialNumber", "HKDeviceName", "HKUDIProductionIdentifier"]
@@ -75,6 +76,7 @@ enum StudyDeviceUnitDisclosure {
         // A grant naming a publication that is not loaded fails through the guard in `receivingEvents(_:policies:studyID:)`.
         let publications = try await PublishedStudy.query(on: database)
             .filter(\.$id ~~ Array(Set(grants.map(\.publicationID))))
+            .filter(\.$study.$id == studyID)
             .field(\.$id)
             .field(\.$collectionPolicy)
             .all()
@@ -135,7 +137,7 @@ enum StudyDeviceUnitDisclosure {
     private static func device(_ resource: inout [String: StudyProjectionJSON]) {
         let identifiers = resource["identifier"]?.array ?? []
         let profiles = resource["meta"]?["profile"]?.array?.compactMap(\.string) ?? []
-        // An application's typed identifier and user-friendly name describe software, unless HealthKit assigned its
+        // An application's bundle identifier and user-friendly name describe software, unless HealthKit assigned its
         // bundle identifier to one device. Every other member follows the same allowlist as a recording Device.
         let application = profiles.contains(where: applicationProfiles.contains)
             && !identifiers.contains { isDeviceBundle($0["value"]?.string) }
@@ -145,8 +147,8 @@ enum StudyDeviceUnitDisclosure {
         } ?? []
         resource = resource.filter { deviceMembers.contains($0.key) }
         resource["deviceName"] = names.isEmpty ? nil : .array(names)
-        let typed = application ? identifiers.filter { $0["type"] != nil && !isUnitIdentifier($0) } : []
-        resource["identifier"] = typed.isEmpty ? nil : .array(typed)
+        let bundles = application ? identifiers.filter(isBundleIdentifier) : []
+        resource["identifier"] = bundles.isEmpty ? nil : .array(bundles)
         let carriers = resource["udiCarrier"]?.array?.compactMap { carrier -> StudyProjectionJSON? in
             let members = carrier.object?.filter { carrierMembers.contains($0.key) } ?? [:]
             return members["deviceIdentifier"] == nil ? nil : .object(members)
@@ -238,12 +240,11 @@ enum StudyDeviceUnitDisclosure {
         resource["identifier"] = retained.isEmpty ? nil : .array(retained)
     }
 
-    private static func isUnitIdentifier(_ identifier: StudyProjectionJSON) -> Bool {
+    /// An application's bundle identifier that HealthKit did not assign to one device.
+    private static func isBundleIdentifier(_ identifier: StudyProjectionJSON) -> Bool {
         let codings = identifier["type"]?["coding"]?.array ?? []
-        return isDeviceBundle(identifier["value"]?.string) || codings.contains {
-            ($0["system"]?.string == roleSystem && $0["code"]?.string == "recording-device")
-                || ($0["system"]?.string == deviceIdentifierTypeSystem && $0["code"]?.string == "device-local-identifier")
-        }
+        return !isDeviceBundle(identifier["value"]?.string)
+            && codings.contains { $0["system"]?.string == bundleIdentifierTypeSystem && $0["code"]?.string == "apple-bundle-id" }
     }
 
     /// HealthKit assigns `com.apple.health.<UUID>` to one iPhone or Apple Watch. Any value with that prefix counts, in any case.

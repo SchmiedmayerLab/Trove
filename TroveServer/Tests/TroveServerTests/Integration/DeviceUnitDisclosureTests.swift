@@ -124,6 +124,29 @@ struct DeviceUnitDisclosureTests {
     }
 
     @Test
+    func aWithholdingGrantAttributedWhileTheFileIsPreparedRefusesTheDownload() async throws {
+        let storage = RecordingDownloadStorage()
+        try await TestApp.withApp(
+            token: .participant(subject: "test-participant"), storageProvider: storage, validator: ClinicalEventBatchTests.validator()
+        ) { app, token in
+            let payload = Data("{\"device\":{\"serialNumber\":\"SERIAL-IN-PAYLOAD\"}}".utf8)
+            let source = try await Self.admitNativeRecording(payload, app: app, token: token)
+            let study = source.studyIDs[0]
+            let path = try #require(try await Self.recordingPaths(study: study, app: app).first)
+            // The storage read runs between the download's two transactions.
+            await storage.reset { try await Self.grantUnderAWithholdingRevision(study: study, source: source, app: app) }
+            let reader = try await StudyRecordingFixture.readerToken()
+            try await app.test(.GET, path, beforeRequest: { $0.bearerAuth(reader) }) { response in
+                #expect(response.status == .forbidden)
+                #expect(!response.body.string.contains("SERIAL-IN-PAYLOAD"))
+            }
+            #expect(await storage.reads > 0, "The first check passed and the file was prepared")
+            #expect(try await Self.recordingPaths(study: study, app: app).count == 2, "The withholding grant was attributed meanwhile")
+            #expect(try await StudyRecordingFixture.disclosureCount(on: app) == 0)
+        }
+    }
+
+    @Test
     func aLaterRevisionThatWithholdsAppliesToThePageAndEveryGrantsDownload() async throws {
         try await TestApp.withApp(token: .participant(subject: "test-participant"), validator: ClinicalEventBatchTests.validator()) { app, token in
             let payload = Data("{\"device\":{\"serialNumber\":\"SERIAL-IN-PAYLOAD\"}}".utf8)

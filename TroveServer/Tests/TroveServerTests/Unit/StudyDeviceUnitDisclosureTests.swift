@@ -16,6 +16,7 @@ import Testing
 struct StudyDeviceUnitDisclosureTests {
     private static let role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
     private static let deviceBundle = "com.apple.health.94C8E349-0D09-4184-BF6C-AF11692FA465"
+    private static let v20203 = "http://terminology.hl7.org/CodeSystem/v2-0203"
     private static let deviceIdentifierType = Canonicals.root + "/mobile/CodeSystem/grove-device-identifier-type"
 
     @Test
@@ -78,22 +79,25 @@ struct StudyDeviceUnitDisclosureTests {
     }
 
     @Test
-    func applicationDevicesFollowTheAllowlistBesideTheirNameAndTypedIdentifier() throws {
+    func applicationDevicesFollowTheAllowlistBesideTheirNameAndBundleIdentifier() throws {
         let device: [String: Any] = [
             "resourceType": "Device",
             "meta": ["profile": [Canonicals.root + "/mobile/StructureDefinition/grove-application-device"]],
             "serialNumber": "APP-SERIAL", "lotNumber": "APP-LOT",
             "udiCarrier": [["deviceIdentifier": "(01)00844588003288", "carrierHRF": "APP-HRF"]],
             "deviceName": [["name": "Writer", "type": "user-friendly-name"], ["name": "Alex", "type": "patient-reported-name"]],
-            "identifier": [Self.bundleIdentifier("org.example.writer"), ["system": "https://example.test/open-slice", "value": "APP-SLICE"]]
+            "identifier": [
+                Self.bundleIdentifier("org.example.writer"), ["system": "https://example.test/open-slice", "value": "APP-SLICE"],
+                ["system": "https://example.test/serials", "value": "APP-SNO", "type": ["coding": [["system": Self.v20203, "code": "SNO"]]]]
+            ]
         ]
         let result = try Self.withheld(device)
         let text = try Self.text(result)
-        for value in ["APP-SERIAL", "APP-LOT", "APP-HRF", "Alex", "APP-SLICE"] {
+        for value in ["APP-SERIAL", "APP-LOT", "APP-HRF", "Alex", "APP-SLICE", "APP-SNO"] {
             #expect(!text.contains(value), "\(value) is not a fact about the application")
         }
         #expect(result["deviceName"] as? [[String: String]] == [["name": "Writer", "type": "user-friendly-name"]])
-        #expect((result["identifier"] as? [[String: Any]])?.first?["value"] as? String == "org.example.writer")
+        #expect((result["identifier"] as? [[String: Any]])?.compactMap { $0["value"] as? String } == ["org.example.writer"])
         #expect(result["udiCarrier"] as? [[String: String]] == [["deviceIdentifier": "(01)00844588003288"]])
     }
 

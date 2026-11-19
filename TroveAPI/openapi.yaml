@@ -4652,7 +4652,8 @@ components:
             identify one physical device unit. When false, recording and host Devices keep
             only status, type, manufacturer, model number, versions, parent, patient, UDI
             device identifier, issuer and jurisdiction, and model, manufacturer and UDI
-            label names; references to Devices keep only their address and type;
+            label names, and application Devices also keep their user-friendly name and
+            the bundle identifier; references to Devices keep only their address and type;
             HealthKit source names, bundle identifiers and readable sync
             identifiers of a device-assigned source, and the metadata entries
             HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed;
