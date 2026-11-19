@@ -8,6 +8,7 @@ import {
   questionnaireFormSchema,
   questionnaireFormValues,
   questionnaireInput,
+  isStaleValidation,
   shownValidation,
 } from "./questionnaireForm";
 
@@ -60,5 +61,16 @@ describe("shownValidation", () => {
     expect(shownValidation(result, "revision-2", false)).toBeUndefined();
     expect(shownValidation(result, undefined, false)).toBeUndefined();
     expect(shownValidation(undefined, "revision-1", false)).toBeUndefined();
+  });
+});
+
+describe("isStaleValidation", () => {
+  const result = { draftRevision: "revision-1" };
+
+  it("reports a hidden result only when the saved draft changed", () => {
+    expect(isStaleValidation(result, "revision-2", false)).toBe(true);
+    expect(isStaleValidation(result, "revision-1", false)).toBe(false);
+    expect(isStaleValidation(result, "revision-2", true)).toBe(false);
+    expect(isStaleValidation(undefined, "revision-2", false)).toBe(false);
   });
 });

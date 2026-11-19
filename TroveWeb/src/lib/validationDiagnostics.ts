@@ -7,7 +7,7 @@ import type {
 } from "./api/generated/types.gen";
 
 export const statusSummary: Record<ValidationStatus, string> = {
-  valid: "Valid. Every check ran and passed.",
+  valid: "Valid. No errors and no skipped checks were reported.",
   invalid: "Invalid. Resolve the errors before publishing.",
   incomplete:
     "Not fully checked. At least one check could not be evaluated, so validity is not established.",

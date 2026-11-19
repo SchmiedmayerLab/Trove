@@ -57,3 +57,13 @@ export const shownValidation = <Result extends { draftRevision: string }>(
   result && !hasUnsavedChanges && result.draftRevision === savedRevision ?
     result
   : undefined;
+
+/** Whether a result is hidden only because the saved draft changed since it was validated. */
+export const isStaleValidation = (
+  result: { draftRevision: string } | undefined,
+  savedRevision: string | undefined,
+  hasUnsavedChanges: boolean,
+): boolean =>
+  result !== undefined &&
+  !hasUnsavedChanges &&
+  result.draftRevision !== savedRevision;

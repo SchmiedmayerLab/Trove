@@ -321,4 +321,61 @@ test.describe("study authoring", () => {
       0,
     );
   });
+
+  test("lists the blockers of a draft that cannot be published and focuses them", async ({
+    researcherPage: page,
+  }, testInfo) => {
+    const suffix = `${Date.now()}-${testInfo.project.name}`;
+    const studyTitle = `Blocked E2E ${suffix}`;
+    const questionnaireName = `Draft questionnaire ${suffix}`;
+
+    await openNewStudyDialog(page);
+    await page.getByLabel("Study title").fill(studyTitle);
+    await page.getByRole("button", { name: "Create study" }).click();
+    await expect(
+      page.getByRole("button", { name: studyTitle, exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Components", exact: true }).click();
+
+    // Only an active Questionnaire can be published; a draft one is a blocker
+    // whether or not the FHIR validator is reachable.
+    await chooseComponentType(page, "Questionnaire");
+    await page
+      .getByRole("textbox", { name: /^Name\b/ })
+      .fill(questionnaireName);
+    await page
+      .getByRole("textbox", { name: /^FHIR questionnaire JSON\b/ })
+      .fill(questionnaire.replace('"status":"active"', '"status":"draft"'));
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(
+      page.getByRole("link", { name: questionnaireName, exact: true }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const validationResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/v0\/studies\/[^/]+\/draft\/validations$/.test(response.url()),
+    );
+    await page
+      .getByRole("button", { name: "Validate draft", exact: true })
+      .click();
+    const validated = await validationResponse;
+    expect(validated.status()).toBe(200);
+    const report = zStudyDraftValidation.parse(await validated.json());
+    expect(report.candidate).toBeUndefined();
+    expect(report.blockers.map((blocker) => blocker.rule)).toContain(
+      "status-active",
+    );
+
+    const blockers = page.getByRole("heading", { name: "Blockers" });
+    await expect(blockers).toHaveCount(1);
+    await expect(blockers).toBeFocused();
+    await expect(
+      page.getByText("Only an active Questionnaire can be published."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Publish v/ })).toHaveCount(
+      0,
+    );
+  });
 });

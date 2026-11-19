@@ -29,7 +29,10 @@ import { useValidateComponentMutation } from "@/lib/queries/component";
 import { questionnaireLanguages } from "@/lib/questionnaireLanguages";
 import { itemLinkId, linkIdRange } from "@/lib/validationDiagnostics";
 import { enhanceField } from "@/utils/enhanceField";
-import { shownValidation } from "../../lib/questionnaireForm";
+import {
+  isStaleValidation,
+  shownValidation,
+} from "../../lib/questionnaireForm";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
 
 // Reformatting rewrites the resource, so it only happens on request.
@@ -100,6 +103,12 @@ const QuestionnaireValidationSection = ({
           Validate saved questionnaire
         </Button>
       </div>
+      {isStaleValidation(result, savedRevision, hasUnsavedChanges) && (
+        <p role="status" className="text-text-secondary text-sm">
+          The draft changed since this page loaded. Reload to see the current
+          result.
+        </p>
+      )}
       {shown && (
         <ValidationDiagnostics
           key={`${shown.sha256}:${shown.draftRevision}`}

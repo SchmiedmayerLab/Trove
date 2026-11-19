@@ -65,6 +65,8 @@ describe("PublicationFindings", () => {
     const markup = render(report("valid", true));
     expect(markup).not.toContain(">Blockers<");
     expect(markup.match(/>Advisories</g)).toHaveLength(1);
-    expect(markup).not.toContain("Valid. Every check ran and passed.");
+    expect(markup).not.toContain(
+      "Valid. No errors and no skipped checks were reported.",
+    );
   });
 });
