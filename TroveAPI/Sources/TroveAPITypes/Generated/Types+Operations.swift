@@ -3070,7 +3070,7 @@ public enum Operations {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -3163,7 +3163,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Exact draft validated and staged for explicit review and publication
+            /// Exact draft validated and staged as a candidate for explicit review and publication
             ///
             /// - Remark: Generated from `#/paths//studies/{studyId}/draft/validations/post(validateStudyDraft)/responses/201`.
             ///
@@ -3181,6 +3181,57 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "created",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/draft/validations/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/draft/validations/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.StudyDraftValidation)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.StudyDraftValidation {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ValidateStudyDraft.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ValidateStudyDraft.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Exact draft validated with blockers; no candidate was created
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/draft/validations/post(validateStudyDraft)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ValidateStudyDraft.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ValidateStudyDraft.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
                             response: self
                         )
                     }
@@ -5066,6 +5117,179 @@ public enum Operations {
             }
             public static var allCases: [Self] {
                 [
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Validate a questionnaire component's stored resource
+    ///
+    /// Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the official FHIR Validator, the IG's Questionnaire rules, and the execution capabilities of the supported study client. Returns every finding with its severity, rule, element path and, for a translation, its language. Only `valid` means that every check ran and passed. The result is not stored, does not change the draft and is not publication evidence; publication requires draft validation. Other component types return 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
+    public enum ValidateStudyComponent {
+        public static let id: Swift.String = "validateStudyComponent"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/path/componentId`.
+                public var componentId: Components.Parameters.ComponentId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - componentId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    componentId: Components.Parameters.ComponentId
+                ) {
+                    self.studyId = studyId
+                    self.componentId = componentId
+                }
+            }
+            public var path: Operations.ValidateStudyComponent.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Selects a server-side grant for a registered draft-only OAuth client. It cannot authorize a request by itself. Interactive clients must omit it.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/header/Trove-Delegation-ID`.
+                public var troveDelegationID: Components.Parameters.DelegationId?
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ValidateStudyComponent.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveDelegationID: Selects a server-side grant for a registered draft-only OAuth client. It cannot authorize a request by itself. Interactive clients must omit it.
+                ///   - accept:
+                public init(
+                    troveDelegationID: Components.Parameters.DelegationId? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ValidateStudyComponent.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveDelegationID = troveDelegationID
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ValidateStudyComponent.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ValidateStudyComponent.Input.Path,
+                headers: Operations.ValidateStudyComponent.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/validations/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.QuestionnaireValidation)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.QuestionnaireValidation {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ValidateStudyComponent.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ValidateStudyComponent.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Validation result for the stored resource at the returned draft revision
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ValidateStudyComponent.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ValidateStudyComponent.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
                     .applicationProblemJson
                 ]
             }

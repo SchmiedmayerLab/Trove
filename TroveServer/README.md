@@ -738,10 +738,12 @@ the client journal; the shared entry point checks this before compiling.
 The real-store job in `swift-package.yml` runs the full server suite with the
 checksum-pinned offline validator and the separately pinned receiver lifecycle
 corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the nine named clinical test groups
-and the multilingual Questionnaire group to execute; missing or skipped groups fail
-verification. The Questionnaire group validates the shared bilingual fixtures through
-the questionnaire route and checks that the validator rejects translations that repeat
-the base language or a language. The parameterized
+and the two Questionnaire groups to execute; missing or skipped groups fail
+verification. The multilingual group validates the shared bilingual fixtures through
+the questionnaire route and checks that the validator reports `qg-translation-1` for
+translations that repeat the base language or a language. The response group checks a
+matching QuestionnaireResponse and four mismatches (questionnaire version, missing
+required answer, answer type, language not offered) through the response route. The parameterized
 receiver group covers all 43 declared sequences, and the retraction group covers
 both arrival orders. Deployment binding preserves recorded lexemes and writer
 evidence. The pinned IG generator supplies the expected states, including the

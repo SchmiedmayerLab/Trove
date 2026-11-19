@@ -433,9 +433,11 @@ class Checkpoint:
 
     def publish_draft(self, study: str, token: str, revision: str) -> None:
         headers = {"If-Match": '"' + response_uuid({"draftRevision": revision}, "draftRevision") + '"'}
-        candidate = self.api_json(f"/studies/{study}/draft/validations", token, "POST", expected=201, headers=headers)
+        report = self.api_json(f"/studies/{study}/draft/validations", token, "POST", expected=201, headers=headers)
+        require(isinstance(report, dict) and report.get("status") == "valid", "Validation did not produce a candidate")
+        require(response_uuid(report, "draftRevision") == revision, "Validation selected a different draft")
+        candidate = report.get("candidate")
         candidate_id = response_uuid(candidate, "id")
-        require(response_uuid(candidate, "draftRevision") == revision, "Validation selected a different draft")
         publication_revision = candidate.get("publicationRevision")
         require(type(publication_revision) is int and publication_revision > 0, "Invalid publication revision")
         publication = self.api_json(f"/studies/{study}/publish", token, "POST", {"validationId": candidate_id},

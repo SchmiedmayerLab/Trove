@@ -873,33 +873,408 @@ extension Components {
                 ])
             }
         }
+        /// `valid`: every check ran and passed. `invalid`: at least one finding is an error. `incomplete`: a check could not be evaluated, for example an unresolved definition or terminology, so validity is not established. `unavailable`: the validator could not be reached or returned no trustworthy result. Only `valid` permits publication.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/ValidationStatus`.
+        @frozen public enum ValidationStatus: String, Codable, Hashable, Sendable, CaseIterable {
+            case valid = "valid"
+            case invalid = "invalid"
+            case incomplete = "incomplete"
+            case unavailable = "unavailable"
+        }
+        /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic`.
+        public struct ValidationDiagnostic: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/severity`.
+            @frozen public enum SeverityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case error = "error"
+                case warning = "warning"
+                case information = "information"
+            }
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/severity`.
+            public var severity: Components.Schemas.ValidationDiagnostic.SeverityPayload
+            /// `fhir`: the official FHIR Validator. `grove`: the Grove FHIR IG or Grove questionnaire rules. `trove`: Trove's own publication and execution rules.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/source`.
+            @frozen public enum SourcePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case fhir = "fhir"
+                case grove = "grove"
+                case trove = "trove"
+            }
+            /// `fhir`: the official FHIR Validator. `grove`: the Grove FHIR IG or Grove questionnaire rules. `trove`: Trove's own publication and execution rules.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/source`.
+            public var source: Components.Schemas.ValidationDiagnostic.SourcePayload
+            /// Stable rule or message identifier within its source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/rule`.
+            public var rule: Swift.String
+            /// FHIRPath of the element within the resource, for example `Questionnaire.item[1].answerOption[0]`, or the draft field. Empty when the finding concerns the whole input.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/path`.
+            public var path: Swift.String
+            /// Language of the translation the finding concerns.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/language`.
+            public var language: Swift.String?
+            /// Component the finding concerns, in draft validation results.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/componentId`.
+            public var componentId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/message`.
+            public var message: Swift.String
+            /// What to change or do next, where the rule defines it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationDiagnostic/nextAction`.
+            public var nextAction: Swift.String?
+            /// Creates a new `ValidationDiagnostic`.
+            ///
+            /// - Parameters:
+            ///   - severity:
+            ///   - source: `fhir`: the official FHIR Validator. `grove`: the Grove FHIR IG or Grove questionnaire rules. `trove`: Trove's own publication and execution rules.
+            ///   - rule: Stable rule or message identifier within its source.
+            ///   - path: FHIRPath of the element within the resource, for example `Questionnaire.item[1].answerOption[0]`, or the draft field. Empty when the finding concerns the whole input.
+            ///   - language: Language of the translation the finding concerns.
+            ///   - componentId: Component the finding concerns, in draft validation results.
+            ///   - message:
+            ///   - nextAction: What to change or do next, where the rule defines it.
+            public init(
+                severity: Components.Schemas.ValidationDiagnostic.SeverityPayload,
+                source: Components.Schemas.ValidationDiagnostic.SourcePayload,
+                rule: Swift.String,
+                path: Swift.String,
+                language: Swift.String? = nil,
+                componentId: Swift.String? = nil,
+                message: Swift.String,
+                nextAction: Swift.String? = nil
+            ) {
+                self.severity = severity
+                self.source = source
+                self.rule = rule
+                self.path = path
+                self.language = language
+                self.componentId = componentId
+                self.message = message
+                self.nextAction = nextAction
+            }
+            public enum CodingKeys: String, CodingKey {
+                case severity
+                case source
+                case rule
+                case path
+                case language
+                case componentId
+                case message
+                case nextAction
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.severity = try container.decode(
+                    Components.Schemas.ValidationDiagnostic.SeverityPayload.self,
+                    forKey: .severity
+                )
+                self.source = try container.decode(
+                    Components.Schemas.ValidationDiagnostic.SourcePayload.self,
+                    forKey: .source
+                )
+                self.rule = try container.decode(
+                    Swift.String.self,
+                    forKey: .rule
+                )
+                self.path = try container.decode(
+                    Swift.String.self,
+                    forKey: .path
+                )
+                self.language = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.componentId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.message = try container.decode(
+                    Swift.String.self,
+                    forKey: .message
+                )
+                self.nextAction = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextAction
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "severity",
+                    "source",
+                    "rule",
+                    "path",
+                    "language",
+                    "componentId",
+                    "message",
+                    "nextAction"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation`.
+        public struct QuestionnaireValidation: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/componentId`.
+            public var componentId: Swift.String
+            /// Draft revision at which the stored resource was read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/draftRevision`.
+            public var draftRevision: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/status`.
+            public var status: Components.Schemas.ValidationStatus
+            /// SHA-256 of the exact validated bytes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/sha256`.
+            public var sha256: Swift.String
+            /// The resource's base language as the Grove model reads it. Omitted when it cannot be read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/language`.
+            public var language: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/translationLanguages`.
+            public var translationLanguages: [Swift.String]
+            /// The configured validator identity. Omitted when no validator is configured.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/validatorIdentity`.
+            public var validatorIdentity: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/contractVersion`.
+            public var contractVersion: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/contractRevision`.
+            public var contractRevision: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/executionCapability`.
+            public var executionCapability: Swift.String
+            /// Findings ordered by severity, errors first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireValidation/diagnostics`.
+            public var diagnostics: [Components.Schemas.ValidationDiagnostic]
+            /// Creates a new `QuestionnaireValidation`.
+            ///
+            /// - Parameters:
+            ///   - componentId:
+            ///   - draftRevision: Draft revision at which the stored resource was read.
+            ///   - status:
+            ///   - sha256: SHA-256 of the exact validated bytes.
+            ///   - language: The resource's base language as the Grove model reads it. Omitted when it cannot be read.
+            ///   - translationLanguages:
+            ///   - validatorIdentity: The configured validator identity. Omitted when no validator is configured.
+            ///   - contractVersion:
+            ///   - contractRevision:
+            ///   - executionCapability:
+            ///   - diagnostics: Findings ordered by severity, errors first.
+            public init(
+                componentId: Swift.String,
+                draftRevision: Swift.String,
+                status: Components.Schemas.ValidationStatus,
+                sha256: Swift.String,
+                language: Swift.String? = nil,
+                translationLanguages: [Swift.String],
+                validatorIdentity: Swift.String? = nil,
+                contractVersion: Swift.String,
+                contractRevision: Swift.String,
+                executionCapability: Swift.String,
+                diagnostics: [Components.Schemas.ValidationDiagnostic]
+            ) {
+                self.componentId = componentId
+                self.draftRevision = draftRevision
+                self.status = status
+                self.sha256 = sha256
+                self.language = language
+                self.translationLanguages = translationLanguages
+                self.validatorIdentity = validatorIdentity
+                self.contractVersion = contractVersion
+                self.contractRevision = contractRevision
+                self.executionCapability = executionCapability
+                self.diagnostics = diagnostics
+            }
+            public enum CodingKeys: String, CodingKey {
+                case componentId
+                case draftRevision
+                case status
+                case sha256
+                case language
+                case translationLanguages
+                case validatorIdentity
+                case contractVersion
+                case contractRevision
+                case executionCapability
+                case diagnostics
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.componentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.draftRevision = try container.decode(
+                    Swift.String.self,
+                    forKey: .draftRevision
+                )
+                self.status = try container.decode(
+                    Components.Schemas.ValidationStatus.self,
+                    forKey: .status
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.language = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.translationLanguages = try container.decode(
+                    [Swift.String].self,
+                    forKey: .translationLanguages
+                )
+                self.validatorIdentity = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .validatorIdentity
+                )
+                self.contractVersion = try container.decode(
+                    Swift.String.self,
+                    forKey: .contractVersion
+                )
+                self.contractRevision = try container.decode(
+                    Swift.String.self,
+                    forKey: .contractRevision
+                )
+                self.executionCapability = try container.decode(
+                    Swift.String.self,
+                    forKey: .executionCapability
+                )
+                self.diagnostics = try container.decode(
+                    [Components.Schemas.ValidationDiagnostic].self,
+                    forKey: .diagnostics
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "componentId",
+                    "draftRevision",
+                    "status",
+                    "sha256",
+                    "language",
+                    "translationLanguages",
+                    "validatorIdentity",
+                    "contractVersion",
+                    "contractRevision",
+                    "executionCapability",
+                    "diagnostics"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/StudyDraftValidation`.
         public struct StudyDraftValidation: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/id`.
-            public var id: Swift.String
             /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/draftRevision`.
             public var draftRevision: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/publicationRevision`.
-            public var publicationRevision: Swift.Int
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/bundleSha256`.
-            public var bundleSha256: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/validatorIdentity`.
-            public var validatorIdentity: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/contractRevision`.
-            public var contractRevision: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/executionCapability`.
-            public var executionCapability: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/createdAt`.
-            public var createdAt: Foundation.Date
-            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/expiresAt`.
-            public var expiresAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/status`.
+            public var status: Components.Schemas.ValidationStatus
+            /// Findings that prevent publication, including an unavailable or incomplete check.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/blockers`.
+            public var blockers: [Components.Schemas.ValidationDiagnostic]
+            /// Warnings and information that do not prevent publication.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/advisories`.
+            public var advisories: [Components.Schemas.ValidationDiagnostic]
             /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/questionnaires`.
             public var questionnaires: [Components.Schemas.StudyQuestionnaireValidation]
+            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/candidate`.
+            public var candidate: Components.Schemas.StudyPublicationCandidate?
             /// Creates a new `StudyDraftValidation`.
             ///
             /// - Parameters:
-            ///   - id:
             ///   - draftRevision:
+            ///   - status:
+            ///   - blockers: Findings that prevent publication, including an unavailable or incomplete check.
+            ///   - advisories: Warnings and information that do not prevent publication.
+            ///   - questionnaires:
+            ///   - candidate:
+            public init(
+                draftRevision: Swift.String,
+                status: Components.Schemas.ValidationStatus,
+                blockers: [Components.Schemas.ValidationDiagnostic],
+                advisories: [Components.Schemas.ValidationDiagnostic],
+                questionnaires: [Components.Schemas.StudyQuestionnaireValidation],
+                candidate: Components.Schemas.StudyPublicationCandidate? = nil
+            ) {
+                self.draftRevision = draftRevision
+                self.status = status
+                self.blockers = blockers
+                self.advisories = advisories
+                self.questionnaires = questionnaires
+                self.candidate = candidate
+            }
+            public enum CodingKeys: String, CodingKey {
+                case draftRevision
+                case status
+                case blockers
+                case advisories
+                case questionnaires
+                case candidate
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.draftRevision = try container.decode(
+                    Swift.String.self,
+                    forKey: .draftRevision
+                )
+                self.status = try container.decode(
+                    Components.Schemas.ValidationStatus.self,
+                    forKey: .status
+                )
+                self.blockers = try container.decode(
+                    [Components.Schemas.ValidationDiagnostic].self,
+                    forKey: .blockers
+                )
+                self.advisories = try container.decode(
+                    [Components.Schemas.ValidationDiagnostic].self,
+                    forKey: .advisories
+                )
+                self.questionnaires = try container.decode(
+                    [Components.Schemas.StudyQuestionnaireValidation].self,
+                    forKey: .questionnaires
+                )
+                self.candidate = try container.decodeIfPresent(
+                    Components.Schemas.StudyPublicationCandidate.self,
+                    forKey: .candidate
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "draftRevision",
+                    "status",
+                    "blockers",
+                    "advisories",
+                    "questionnaires",
+                    "candidate"
+                ])
+            }
+        }
+        /// Present only when the status is `valid`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate`.
+        public struct StudyPublicationCandidate: Codable, Hashable, Sendable {
+            /// Immutable candidate ID and future publication ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/publicationRevision`.
+            public var publicationRevision: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/bundleSha256`.
+            public var bundleSha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/validatorIdentity`.
+            public var validatorIdentity: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/contractRevision`.
+            public var contractRevision: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/executionCapability`.
+            public var executionCapability: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/StudyPublicationCandidate/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `StudyPublicationCandidate`.
+            ///
+            /// - Parameters:
+            ///   - id: Immutable candidate ID and future publication ID.
             ///   - publicationRevision:
             ///   - bundleSha256:
             ///   - validatorIdentity:
@@ -907,21 +1282,17 @@ extension Components {
             ///   - executionCapability:
             ///   - createdAt:
             ///   - expiresAt:
-            ///   - questionnaires:
             public init(
                 id: Swift.String,
-                draftRevision: Swift.String,
                 publicationRevision: Swift.Int,
                 bundleSha256: Swift.String,
                 validatorIdentity: Swift.String,
                 contractRevision: Swift.String,
                 executionCapability: Swift.String,
                 createdAt: Foundation.Date,
-                expiresAt: Foundation.Date,
-                questionnaires: [Components.Schemas.StudyQuestionnaireValidation]
+                expiresAt: Foundation.Date
             ) {
                 self.id = id
-                self.draftRevision = draftRevision
                 self.publicationRevision = publicationRevision
                 self.bundleSha256 = bundleSha256
                 self.validatorIdentity = validatorIdentity
@@ -929,11 +1300,9 @@ extension Components {
                 self.executionCapability = executionCapability
                 self.createdAt = createdAt
                 self.expiresAt = expiresAt
-                self.questionnaires = questionnaires
             }
             public enum CodingKeys: String, CodingKey {
                 case id
-                case draftRevision
                 case publicationRevision
                 case bundleSha256
                 case validatorIdentity
@@ -941,17 +1310,12 @@ extension Components {
                 case executionCapability
                 case createdAt
                 case expiresAt
-                case questionnaires
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 self.id = try container.decode(
                     Swift.String.self,
                     forKey: .id
-                )
-                self.draftRevision = try container.decode(
-                    Swift.String.self,
-                    forKey: .draftRevision
                 )
                 self.publicationRevision = try container.decode(
                     Swift.Int.self,
@@ -981,21 +1345,15 @@ extension Components {
                     Foundation.Date.self,
                     forKey: .expiresAt
                 )
-                self.questionnaires = try container.decode(
-                    [Components.Schemas.StudyQuestionnaireValidation].self,
-                    forKey: .questionnaires
-                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "id",
-                    "draftRevision",
                     "publicationRevision",
                     "bundleSha256",
                     "validatorIdentity",
                     "contractRevision",
                     "executionCapability",
                     "createdAt",
-                    "expiresAt",
-                    "questionnaires"
+                    "expiresAt"
                 ])
             }
         }
@@ -1003,10 +1361,12 @@ extension Components {
         public struct StudyQuestionnaireValidation: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/componentId`.
             public var componentId: Swift.String
-            /// The validated resource's base language (`Questionnaire.language`).
+            /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/status`.
+            public var status: Components.Schemas.ValidationStatus
+            /// The validated resource's base language (`Questionnaire.language`). Omitted when it cannot be read.
             ///
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/language`.
-            public var language: Swift.String
+            public var language: Swift.String?
             /// Languages of the resource's translation extensions, sorted.
             ///
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/translationLanguages`.
@@ -1017,22 +1377,26 @@ extension Components {
             ///
             /// - Parameters:
             ///   - componentId:
-            ///   - language: The validated resource's base language (`Questionnaire.language`).
+            ///   - status:
+            ///   - language: The validated resource's base language (`Questionnaire.language`). Omitted when it cannot be read.
             ///   - translationLanguages: Languages of the resource's translation extensions, sorted.
             ///   - sha256:
             public init(
                 componentId: Swift.String,
-                language: Swift.String,
+                status: Components.Schemas.ValidationStatus,
+                language: Swift.String? = nil,
                 translationLanguages: [Swift.String],
                 sha256: Swift.String
             ) {
                 self.componentId = componentId
+                self.status = status
                 self.language = language
                 self.translationLanguages = translationLanguages
                 self.sha256 = sha256
             }
             public enum CodingKeys: String, CodingKey {
                 case componentId
+                case status
                 case language
                 case translationLanguages
                 case sha256
@@ -1043,7 +1407,11 @@ extension Components {
                     Swift.String.self,
                     forKey: .componentId
                 )
-                self.language = try container.decode(
+                self.status = try container.decode(
+                    Components.Schemas.ValidationStatus.self,
+                    forKey: .status
+                )
+                self.language = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .language
                 )
@@ -1057,6 +1425,7 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "componentId",
+                    "status",
                     "language",
                     "translationLanguages",
                     "sha256"

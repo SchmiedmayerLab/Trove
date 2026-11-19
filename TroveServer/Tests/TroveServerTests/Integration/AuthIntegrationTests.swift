@@ -16,6 +16,9 @@ import TroveAPIServer
 import VaporTesting
 
 
+private typealias StudyDraftValidation = Components.Schemas.StudyDraftValidation
+
+
 @Suite(.serialized)
 struct AuthIntegrationTests {
     @Test
@@ -213,7 +216,7 @@ struct AuthIntegrationTests {
                 try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId)
                 let response = try await PublicationWorkflowFixtures.validate(studyId, app: app, token: token)
                 try #require(response.status == .created)
-                validationID = try #require(UUID(uuidString: response.content.decode(Components.Schemas.StudyDraftValidation.self).id))
+                validationID = try #require(UUID(uuidString: response.content.decode(StudyDraftValidation.self).candidate?.id ?? ""))
             } else {
                 validationID = UUID()
             }

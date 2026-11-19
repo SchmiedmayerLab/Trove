@@ -79,34 +79,85 @@ struct FHIRValidationClientTests {
         await #expect(throws: CancellationError.self) { try await validator.validate(Self.bytes) }
     }
 
-    @Test
-    func questionnaireSuccessRequiresItsOwnBoundPurpose() async throws {
+    @Test(arguments: [ValidationStatus.valid, .invalid, .incomplete])
+    func questionnaireResultCarriesTheWorkerFindingsBoundToItsPurpose(status: ValidationStatus) async throws {
+        let findings = [
+            QuestionnaireWorkerReply.finding("Synthetic_Error", severity: status == .invalid ? .error : .warning, path: "Questionnaire.item[0]")
+        ]
         let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { purpose, input in
             #expect(purpose == .questionnaire)
             #expect(input == Self.bytes)
-            return (200, try Self.reply(purpose: "questionnaire"))
+            return (QuestionnaireWorkerReply.httpStatus(for: status), try QuestionnaireWorkerReply.body(
+                for: input, status: status, diagnostics: findings, identity: Self.identity
+            ))
         })
-        #expect(try await validator.validateQuestionnaire(Self.bytes) == Self.identity)
+        let result = try await validator.validateQuestionnaire(Self.bytes)
+        #expect(result.status == status)
+        #expect(result.diagnostics == findings)
+        #expect(result.validatorIdentity == Self.identity)
     }
 
-    @Test(arguments: ["missing", "event", "unknown", "digest", "revision", "identity", "false", "code", "malformed", "unavailable"])
-    func questionnaireResultMustMatchPurposeAndEveryPin(change: String) async throws {
-        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, _ in
-            if change == "malformed" {
-                return (200, Data("{}".utf8))
+    @Test(arguments: [
+        "event", "response", "digest", "revision", "identity", "http", "valid-with-error", "invalid-without-error",
+        "incomplete-with-error", "too-many", "zero-omitted", "malformed", "oversized", "unavailable", "transport"
+    ])
+    func questionnaireReplyThatIsNotBoundOrConsistentIsUnavailable(change: String) async throws { // swiftlint:disable:this cyclomatic_complexity
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, input in
+            let error = QuestionnaireWorkerReply.finding("Synthetic_Error")
+            func reply(
+                _ status: ValidationStatus,
+                bytes: Data = input,
+                purpose: FHIRValidationClient.Purpose = .questionnaire,
+                diagnostics: [ValidationDiagnostic] = [],
+                omitted: Int? = nil,
+                identity: String = Self.identity
+            ) throws -> Data {
+                var body = try JSONSerialization.jsonObject(with: QuestionnaireWorkerReply.body(
+                    for: bytes, status: status, purpose: purpose, diagnostics: diagnostics, omitted: omitted, identity: identity
+                )) as? [String: Any] ?? [:]
+                if change == "revision" { body["contractRevision"] = "wrong" }
+                return try JSONSerialization.data(withJSONObject: body)
             }
-            let purpose = change == "missing" ? nil : ["event", "unknown"].contains(change) ? change : "questionnaire"
-            return (change == "unavailable" ? 503 : 200, try Self.reply(change: change, purpose: purpose))
+            switch change {
+            case "event": return (200, try reply(.valid, purpose: .event))
+            case "response": return (200, try reply(.valid, purpose: .questionnaireResponse))
+            case "digest": return (200, try reply(.valid, bytes: Data("other".utf8)))
+            case "revision": return (200, try reply(.valid))
+            case "identity": return (200, try reply(.valid, identity: "sha256:" + String(repeating: "b", count: 64)))
+            case "http": return (200, try reply(.invalid, diagnostics: [error]))
+            case "valid-with-error": return (200, try reply(.valid, diagnostics: [error]))
+            case "invalid-without-error": return (422, try reply(.invalid))
+            case "incomplete-with-error": return (422, try reply(.incomplete, diagnostics: [error]))
+            case "too-many": return (422, try reply(.invalid, diagnostics: Array(repeating: error, count: 101)))
+            case "zero-omitted": return (422, try reply(.invalid, diagnostics: [error], omitted: 0))
+            case "malformed": return (200, Data("{}".utf8))
+            case "oversized": return (200, Data(repeating: 32, count: FHIRValidationClient.maximumAuthoringReplyBytes + 1))
+            case "unavailable": return (503, try reply(.unavailable))
+            default: throw FHIRValidationClient.unavailable
+            }
         })
-        await #expect {
-            try await validator.validateQuestionnaire(Self.bytes)
-        } throws: { ($0 as? ServerError)?.status.code == 503 }
+        let result = try await validator.validateQuestionnaire(Self.bytes)
+        #expect(result.status == .unavailable)
+        #expect(result.diagnostics.isEmpty)
+    }
+
+    @Test
+    func omittedWorkerFindingsAreStated() async throws {
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, input in
+            (422, try QuestionnaireWorkerReply.body(
+                for: input, status: .invalid, diagnostics: [QuestionnaireWorkerReply.finding("Synthetic_Error")], omitted: 7, identity: Self.identity
+            ))
+        })
+        let result = try await validator.validateQuestionnaire(Self.bytes)
+        #expect(result.status == .invalid)
+        #expect(result.diagnostics.last?.rule == "diagnostics-omitted")
+        #expect(result.diagnostics.last?.message.contains("7") == true)
     }
 
     @Test
     func questionnaireReplyNeverAdmitsAnExchangeEvent() async throws {
-        let validator = FHIRValidationClient(expectedIdentity: Self.identity) { _ in
-            (200, try Self.reply(purpose: "questionnaire"))
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity) { input in
+            (200, try QuestionnaireWorkerReply.body(for: input, identity: Self.identity))
         }
         await #expect {
             try await validator.validate(Self.bytes)
@@ -119,19 +170,16 @@ struct FHIRValidationClientTests {
             Issue.record("An event-only transport must never receive authoring content")
             return (200, try Self.reply())
         }
-        await #expect {
-            try await validator.validateQuestionnaire(Self.bytes)
-        } throws: { ($0 as? ServerError)?.status.code == 503 }
+        #expect(try await validator.validateQuestionnaire(Self.bytes).status == .unavailable)
     }
 
-    @Test
-    func pinnedQuestionnaireRejectionRemainsAValidationRefusal() async throws {
-        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, _ in
-            (422, try Self.reply(change: "invalid", purpose: "questionnaire"))
+    @Test(arguments: [nil, "sha256:missing"])
+    func unpinnedValidatorNeverReceivesAuthoringContent(identity: String?) async throws {
+        let validator = FHIRValidationClient(expectedIdentity: identity, sendForPurpose: { _, _ in
+            Issue.record("An unpinned worker must never receive authoring content")
+            return (200, Data())
         })
-        await #expect {
-            try await validator.validateQuestionnaire(Self.bytes)
-        } throws: { ($0 as? ServerError)?.status.code == 422 }
+        #expect(try await validator.validateQuestionnaire(Self.bytes).status == .unavailable)
     }
 
     @Test(arguments: [0, 4 * 1024 * 1024 + 1])
@@ -140,9 +188,29 @@ struct FHIRValidationClientTests {
             Issue.record("Invalid input length must not reach worker")
             return (200, Data())
         })
-        await #expect {
-            try await validator.validateQuestionnaire(Data(repeating: 32, count: size))
-        } throws: { ($0 as? ServerError)?.status.code == (size == 0 ? 422 : 413) }
+        let result = try await validator.validateQuestionnaire(Data(repeating: 32, count: size))
+        #expect(result.status == .invalid)
+        #expect(result.diagnostics.map(\.rule) == ["size-limit"])
+    }
+
+    @Test
+    func responseValidationSendsOnePairBundleEmbeddingBothExactDocuments() async throws {
+        let questionnaire = Data(#"{"resourceType":"Questionnaire", "id" : "q"}"#.utf8)
+        let response = Data(#"{"resourceType":"QuestionnaireResponse","id":"r"}"#.utf8)
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { purpose, input in
+            #expect(purpose == .questionnaireResponse)
+            let text = String(decoding: input, as: UTF8.self)
+            #expect(text == #"{"resourceType":"Bundle","type":"collection","entry":[{"resource":"#
+                + String(decoding: questionnaire, as: UTF8.self) + #"},{"resource":"# + String(decoding: response, as: UTF8.self) + "}]}")
+            return (200, try QuestionnaireWorkerReply.body(for: input, purpose: .questionnaireResponse, identity: Self.identity))
+        })
+        #expect(try await validator.validateQuestionnaireResponse(questionnaire: questionnaire, response: response).status == .valid)
+    }
+
+    @Test
+    func cancelledAuthoringValidationIsNotReportedAsUnavailable() async throws {
+        let validator = FHIRValidationClient(expectedIdentity: Self.identity, sendForPurpose: { _, _ in throw CancellationError() })
+        await #expect(throws: CancellationError.self) { try await validator.validateQuestionnaire(Self.bytes) }
     }
 }
 

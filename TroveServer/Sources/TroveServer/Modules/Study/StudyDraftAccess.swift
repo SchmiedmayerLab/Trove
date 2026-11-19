@@ -15,9 +15,10 @@ extension StudyService {
     /// Callers must load their complete result on the supplied transaction, not another pool lease.
     func readDraft<Value: Sendable>(
         id: UUID,
+        operation: DraftPermission = .inspect,
         read: @escaping @Sendable (Study, any Database) async throws -> Value
     ) async throws -> Value {
-        let access = try await authorizationService.prepareDraftAccess(operation: .inspect)
+        let access = try await authorizationService.prepareDraftAccess(operation: operation)
         return try await repository.database.transaction { transaction in
             let study = try await self.repository.lockStudy(id: id, on: transaction)
             let context = try await self.authorizationService.authorizeDraft(access, study: study, on: transaction)

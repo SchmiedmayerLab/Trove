@@ -22,7 +22,7 @@ class ProcessRestartAuthoringTests(unittest.TestCase):
         study, revision, candidate_id = [str(uuid.uuid4()) for _ in range(3)]
         checkpoint = object.__new__(Checkpoint)
         checkpoint.api_json = Mock(side_effect=[
-            {"id": candidate_id, "draftRevision": revision, "publicationRevision": 1},
+            {"status": "valid", "draftRevision": revision, "candidate": {"id": candidate_id, "publicationRevision": 1}},
             {"id": candidate_id, "studyId": study, "revision": 1},
         ])
         checkpoint.publish_draft(study, "synthetic-token", revision)
@@ -34,9 +34,10 @@ class ProcessRestartAuthoringTests(unittest.TestCase):
 
     def test_malformed_or_mismatched_candidate_never_reaches_publication(self):
         study, revision, candidate_id = [str(uuid.uuid4()) for _ in range(3)]
-        for candidate in ({}, {"id": "invalid"},
-                          {"id": candidate_id, "draftRevision": str(uuid.uuid4()), "publicationRevision": 1},
-                          {"id": candidate_id, "draftRevision": revision, "publicationRevision": True}):
+        for candidate in ({}, {"status": "valid", "draftRevision": revision, "candidate": {"id": "invalid"}},
+                          {"status": "invalid", "draftRevision": revision, "candidate": {"id": candidate_id, "publicationRevision": 1}},
+                          {"status": "valid", "draftRevision": str(uuid.uuid4()), "candidate": {"id": candidate_id, "publicationRevision": 1}},
+                          {"status": "valid", "draftRevision": revision, "candidate": {"id": candidate_id, "publicationRevision": True}}):
             with self.subTest(candidate=candidate):
                 checkpoint = object.__new__(Checkpoint)
                 checkpoint.api_json = Mock(return_value=candidate)
@@ -50,7 +51,7 @@ class ProcessRestartAuthoringTests(unittest.TestCase):
             checkpoint = object.__new__(Checkpoint)
             published = {"id": candidate_id, "studyId": study, "revision": 1, field: value}
             checkpoint.api_json = Mock(side_effect=[
-                {"id": candidate_id, "draftRevision": revision, "publicationRevision": 1}, published,
+                {"status": "valid", "draftRevision": revision, "candidate": {"id": candidate_id, "publicationRevision": 1}}, published,
             ])
             with self.subTest(field=field), self.assertRaises(RuntimeError):
                 checkpoint.publish_draft(study, "synthetic-token", revision)

@@ -160,29 +160,6 @@ struct AuthoringClientTests {
     }
 
     @Test
-    func validatesCapturedDraft() async throws {
-        let receipt = Components.Schemas.StudyDraftValidation(
-            id: UUID().uuidString,
-            draftRevision: revision.uuidString,
-            publicationRevision: 1,
-            bundleSha256: String(repeating: "0", count: 64),
-            validatorIdentity: "synthetic-validator",
-            contractRevision: "synthetic-contract",
-            executionCapability: "synthetic-capability",
-            createdAt: Date(timeIntervalSince1970: 0),
-            expiresAt: Date(timeIntervalSince1970: 3_600),
-            questionnaires: []
-        )
-        let transport = try AuthoringTransport(response: receipt, status: 201)
-        #expect(try await client(transport).validateStudy(study, revision: revision, delegation: delegation) == receipt)
-        let record = try #require(await transport.records.first)
-        #expect(record.request.path == "/studies/\(study.uuidString)/draft/validations")
-        #expect(record.request.headerFields[.ifMatch] == CLIInput.revisionHeader(revision))
-        #expect(record.request.headerFields[try #require(HTTPField.Name("Trove-Delegation-ID"))] == delegation.uuidString)
-        #expect(record.body.isEmpty)
-    }
-
-    @Test
     func publicationUsesOnlySelectedCandidateAndRevision() async throws {
         let response = Components.Schemas.PublishedStudyResponse(
             id: UUID().uuidString, studyId: study.uuidString, revision: 1, visibility: .unlisted, publishedAt: Date(timeIntervalSince1970: 0)

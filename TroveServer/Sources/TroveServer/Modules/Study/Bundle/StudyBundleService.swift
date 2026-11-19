@@ -289,6 +289,33 @@ extension StudyBundleService {
         )
     }
 
+    /// Study details languages that the participant bundle cannot key, as publication blockers.
+    static func detailLanguageDiagnostics(_ languages: some Sequence<LanguageTag>) -> [ValidationDiagnostic] {
+        var keys: [LocalizationKey: LanguageTag] = [:]
+        var diagnostics: [ValidationDiagnostic] = []
+        for language in languages.sorted() {
+            let path = "details.content.\(language)"
+            guard let locale = bundleLocalization(for: language) else {
+                diagnostics.append(.trove(
+                    "details-language-region",
+                    path: path,
+                    message: "The participant bundle cannot key \(language) by a language and region.",
+                    nextAction: "Use a tag with a region, for example sr-Latn-RS."
+                ))
+                continue
+            }
+            if let other = keys.updateValue(language, forKey: locale) {
+                diagnostics.append(.trove(
+                    "details-language-distinct",
+                    path: path,
+                    message: "\(other) and \(language) share the participant bundle key \(locale).",
+                    nextAction: "Keep the study details in only one of these languages."
+                ))
+            }
+        }
+        return diagnostics
+    }
+
     /// The participant bundle keys study details by language and region.
     ///
     /// A tag without a region takes its likely region (`de` as `de-DE`, `zh-Hant` as `zh-TW`), and the key must name

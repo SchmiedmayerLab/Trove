@@ -16,15 +16,7 @@ import VaporTesting
 
 
 struct StudyPublicationCandidateTests {
-    private struct Reply: Encodable {
-        let valid = true
-        let sha256: String
-        let contractRevision = FHIRValidationClient.contractRevision
-        let validatorIdentity = StudyPublicationCandidateTests.identity
-        let purpose = "questionnaire"
-    }
-
-    private static let identity = "sha256:" + String(repeating: "a", count: 64)
+    private static let identity = QuestionnaireWorkerReply.identity
     private static var authority: GrantorAuthorityProvider {
         .init { actor in
             .init(
@@ -37,14 +29,12 @@ struct StudyPublicationCandidateTests {
         }
     }
 
-    private static func validator(unavailable: Bool = false) -> FHIRValidationClient {
-        .init(expectedIdentity: identity, sendForPurpose: { purpose, bytes in
-            #expect(purpose == .questionnaire)
-            if unavailable {
-                return (503, Data())
-            }
-            return (200, try JSONEncoder().encode(Reply(sha256: ArtifactStore.digest(bytes))))
-        })
+    private static func validator(_ status: ValidationStatus = .valid) -> FHIRValidationClient {
+        QuestionnaireWorkerReply.validator(
+            status: status,
+            diagnostics: status == .invalid ? [QuestionnaireWorkerReply.finding("Synthetic_Error")]
+                : status == .incomplete ? [QuestionnaireWorkerReply.finding("Questionnaire_QR_Q_NotFound", severity: .warning)] : []
+        )
     }
 
     @Test
@@ -107,14 +97,28 @@ struct StudyPublicationCandidateTests {
         }
     }
 
-    @Test
-    func unavailableValidatorCannotCreateCandidateOrArtifact() async throws {
-        try await TestApp.withApp(validator: Self.validator(unavailable: true), grantorAuthority: Self.authority) { app, token in
+    @Test(arguments: [ValidationStatus.unavailable, .incomplete, .invalid])
+    func resultsOtherThanValidCannotCreateCandidateArtifactOrPublication(status: ValidationStatus) async throws {
+        try await TestApp.withApp(validator: Self.validator(status), grantorAuthority: Self.authority) { app, token in
             let study = try await Self.study(on: app)
             let response = try await Self.validationResponse(study, app: app, token: token)
-            #expect(response.status == .serviceUnavailable)
+            #expect(response.status == .ok)
+            let report = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
+            #expect(report.status == status)
+            #expect(report.candidate == nil)
+            #expect(report.questionnaires.map(\.status) == [status])
+            // Each blocker names its component; the reason for a result that is neither valid nor invalid is a blocker.
+            #expect(!report.blockers.isEmpty && report.blockers.allSatisfy { $0.componentId != nil && $0.severity == .error })
+            let expectedRule = [.unavailable: "validator-unavailable", .incomplete: "not-evaluated", .invalid: "Synthetic_Error"][status]
+            #expect(report.blockers.map(\.rule).contains(expectedRule ?? ""))
             #expect(try await StudyPublicationCandidate.query(on: app.db).count() == 0)
             #expect(try await StoredArtifact.query(on: app.db).count() == 0)
+            let publication = try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(study.requireId())/publish", beforeRequest: { request in
+                request.bearerAuth(token)
+                request.headers.replaceOrAdd(name: "If-Match", value: Self.tag(study.draftRevision))
+                try request.encodeJSONBody(Components.Schemas.StudyPublicationInput(validationId: UUID().uuidString))
+            })
+            #expect(publication.status.code >= 400)
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
         }
     }
@@ -171,16 +175,17 @@ extension StudyPublicationCandidateTests {
         })
     }
 
-    private static func validate(_ study: Study, app: Application, token: String?) async throws -> Components.Schemas.StudyDraftValidation {
+    private static func validate(_ study: Study, app: Application, token: String?) async throws -> Components.Schemas.StudyPublicationCandidate {
         let response = try await validationResponse(study, app: app, token: token)
         try #require(response.status == .created)
-        let candidate = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
-        #expect(candidate.questionnaires.count == 1)
-        return candidate
+        let report = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
+        #expect(report.status == .valid && report.blockers.isEmpty)
+        #expect(report.questionnaires.count == 1)
+        return try #require(report.candidate)
     }
 
     private static func publish(
-        _ study: Study, candidate: Components.Schemas.StudyDraftValidation, app: Application, token: String?, revision: UUID? = nil
+        _ study: Study, candidate: Components.Schemas.StudyPublicationCandidate, app: Application, token: String?, revision: UUID? = nil
     ) async throws -> TestingHTTPResponse {
         try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(study.requireId())/publish", beforeRequest: { request in
             request.bearerAuth(token)

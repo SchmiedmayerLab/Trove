@@ -8,6 +8,7 @@
 
 import Crypto
 import Foundation
+import GroveLocalization
 import GroveQuestionnaire
 import GroveQuestionnaireFHIR
 import ModelsR4
@@ -27,7 +28,19 @@ struct QuestionnaireValidationService: Sendable {
         let validUntil: Date?
     }
 
+    /// Every finding for one exact resource. Only a `valid` result carries publication evidence.
+    struct Result: Sendable {
+        let status: ValidationStatus
+        let sha256: String
+        let language: String?
+        let translationLanguages: [String]
+        let validatorIdentity: String?
+        let diagnostics: [ValidationDiagnostic]
+        let evidence: Evidence?
+    }
+
     static let executionCapability = "grove-questionnaire-core-v2"
+    static let maximumDiagnostics = 200
     static let unsupported = ServerError(
         status: .unprocessableContent,
         title: "Unsupported Questionnaire",
@@ -36,108 +49,253 @@ struct QuestionnaireValidationService: Sendable {
 
     let validator: FHIRValidationClient
 
-    func validate(bytes: Data, evaluationInstant: Date) async throws -> Evidence {
-        let identity = try await validator.validateQuestionnaire(bytes)
-        let validUntil: Date?
-        let languages: [String]
-        do {
-            _ = try JSONDecoder().decode(QuestionnaireExtensionBoundary.self, from: bytes)
-            let resource = try JSONDecoder().decode(ModelsR4.Questionnaire.self, from: bytes)
-            try Self.checkExecution(resource, at: evaluationInstant)
-            validUntil = try resource.effectivePeriod?.end?.value?.asNSDate()
-            let questionnaire = try GroveQuestionnaire.Questionnaire(
-                resource,
-                clock: .fixed(at: evaluationInstant, in: .gmt)
+    /// Runs the validator and Trove's execution checks on the exact bytes. Throws only when cancelled.
+    func validate(bytes: Data, evaluationInstant: Date) async throws -> Result {
+        let official = try await validator.validateQuestionnaire(bytes)
+        let local = Self.checkLocally(bytes, at: evaluationInstant)
+        let status = ValidationStatus.combined([official.status, local.diagnostics.contains { $0.severity == .error } ? .invalid : .valid])
+        let diagnostics = ValidationDiagnostic.ordered(
+            (ValidationDiagnostic.reason(for: official.status).map { [$0] } ?? []) + official.diagnostics + local.diagnostics,
+            limit: Self.maximumDiagnostics
+        )
+        let sha256 = FHIRValidationClient.digest(bytes)
+        var evidence: Evidence?
+        if status == .valid, let identity = official.validatorIdentity, let model = local.model {
+            evidence = Evidence(
+                sha256: sha256,
+                language: model.language,
+                translationLanguages: model.translationLanguages,
+                validatorIdentity: identity,
+                contractRevision: FHIRValidationClient.contractRevision,
+                executionCapability: Self.executionCapability,
+                validUntil: model.validUntil
             )
-            guard questionnaire.metadata.language != nil else { throw Self.unsupported }
-            languages = questionnaire.languages
-        } catch {
-            // Decoder/converter errors can contain researcher-authored content.
-            throw Self.unsupported
         }
-        return Evidence(
-            sha256: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
-            language: languages[0],
-            translationLanguages: Array(languages.dropFirst()),
-            validatorIdentity: identity,
-            contractRevision: FHIRValidationClient.contractRevision,
-            executionCapability: Self.executionCapability,
-            validUntil: validUntil
+        return Result(
+            status: evidence == nil && status == .valid ? .unavailable : status,
+            sha256: sha256,
+            language: local.model?.language ?? QuestionnaireLanguages(bytes).base,
+            translationLanguages: local.model?.translationLanguages ?? QuestionnaireLanguages(bytes).translations,
+            validatorIdentity: official.validatorIdentity,
+            diagnostics: diagnostics,
+            evidence: evidence
         )
     }
 }
 
 
 extension QuestionnaireValidationService {
-    private static func checkExecution(_ resource: ModelsR4.Questionnaire, at instant: Date) throws {
-        guard resource.status.value == .active,
-              resource.implicitRules == nil,
-              resource.contained?.isEmpty != false,
-              resource.extension?.allSatisfy({
-                  $0.url.value?.url.absoluteString == "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm"
-              }) != false else { throw unsupported }
-        if let start = resource.effectivePeriod?.start?.value {
-            guard start.time != nil, start.timeZone != nil, try start.asNSDate() <= instant else { throw unsupported }
+    private struct Model {
+        let language: String
+        let translationLanguages: [String]
+        let validUntil: Date?
+    }
+
+    private static let resourceExtensions: Set<String> = ["http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm"]
+
+    /// Trove's extension boundary and execution subset, and the Grove model that execution reads.
+    private static func checkLocally(_ bytes: Data, at instant: Date) -> (diagnostics: [ValidationDiagnostic], model: Model?) {
+        guard (try? JSONSerialization.jsonObject(with: bytes)) is [String: Any] else {
+            // The validator reports text that is not one JSON object.
+            return ([], nil)
         }
-        if let end = resource.effectivePeriod?.end?.value {
-            guard end.time != nil, end.timeZone != nil, try end.asNSDate() >= instant else { throw unsupported }
+        var diagnostics = QuestionnaireExtensionBoundary.violations(in: bytes)
+        guard let resource = try? JSONDecoder().decode(ModelsR4.Questionnaire.self, from: bytes) else {
+            diagnostics.append(.trove(
+                "fhir-structure", path: "Questionnaire", message: "The resource cannot be read as an R4 Questionnaire."
+            ))
+            return (diagnostics, nil)
         }
-        var items: [String: QuestionnaireItem] = [:]
+        diagnostics += checkExecution(resource, at: instant)
+        let base = resource.language?.value?.string
+        if base == nil {
+            diagnostics.append(.trove(
+                "base-language-required",
+                path: "Questionnaire.language",
+                message: "Questionnaire.language must name the language of the base text.",
+                nextAction: "Set Questionnaire.language, for example to en-US."
+            ))
+        } else if let base, LocalizationKey(base) == nil {
+            // The pinned Grove bundle names the archived file by the base language, which needs a region.
+            diagnostics.append(.trove(
+                "base-language-region",
+                path: "Questionnaire.language",
+                message: "The participant bundle requires a base language with a region.",
+                nextAction: "Set Questionnaire.language to a language with a region, for example en-US."
+            ))
+        }
+        guard diagnostics.allSatisfy({ $0.severity != .error }) else {
+            return (diagnostics, nil)
+        }
+        do {
+            let questionnaire = try GroveQuestionnaire.Questionnaire(resource, clock: .fixed(at: instant, in: .gmt))
+            let languages = questionnaire.languages
+            guard questionnaire.metadata.language != nil, let language = languages.first else { throw unsupported }
+            return (diagnostics, Model(
+                language: language,
+                translationLanguages: Array(languages.dropFirst()),
+                validUntil: try resource.effectivePeriod?.end?.value?.asNSDate()
+            ))
+        } catch {
+            // Converter errors can contain researcher-authored content; the finding does not repeat them.
+            diagnostics.append(.trove(
+                "grove-model", path: "Questionnaire", message: "The Grove questionnaire model cannot read this resource."
+            ))
+            return (diagnostics, nil)
+        }
+    }
+
+    private static func checkExecution(_ resource: ModelsR4.Questionnaire, at instant: Date) -> [ValidationDiagnostic] {
+        checkResource(resource, at: instant) + checkItems(resource.item ?? [])
+    }
+
+    private static func checkResource(_ resource: ModelsR4.Questionnaire, at instant: Date) -> [ValidationDiagnostic] {
+        var diagnostics: [ValidationDiagnostic] = []
+        if resource.status.value != .active {
+            diagnostics.append(.trove(
+                "status-active",
+                path: "Questionnaire.status",
+                message: "Only an active Questionnaire can be published.",
+                nextAction: "Set Questionnaire.status to active."
+            ))
+        }
+        if resource.implicitRules != nil {
+            diagnostics.append(.trove("implicit-rules", path: "Questionnaire.implicitRules", message: "Implicit rules are not supported."))
+        }
+        if resource.contained?.isEmpty == false {
+            diagnostics.append(.trove("contained-resources", path: "Questionnaire.contained", message: "Contained resources are not supported."))
+        }
+        for (index, element) in (resource.extension ?? []).enumerated()
+        where !resourceExtensions.contains(element.url.value?.url.absoluteString ?? "") {
+            diagnostics.append(.trove(
+                "resource-extension",
+                path: "Questionnaire.extension[\(index)]",
+                message: "The supported study client reads no extension here other than artifact-versionAlgorithm."
+            ))
+        }
+        for (name, boundary) in [("start", resource.effectivePeriod?.start), ("end", resource.effectivePeriod?.end)] {
+            guard let value = boundary?.value else {
+                continue
+            }
+            let path = "Questionnaire.effectivePeriod.\(name)"
+            guard value.time != nil, value.timeZone != nil, let date = try? value.asNSDate() else {
+                diagnostics.append(.trove("effective-period-precision", path: path, message: "The effective period needs a time and time zone."))
+                continue
+            }
+            if name == "start" ? date > instant : date < instant {
+                let message = name == "start" ? "The effective period has not started." : "The effective period has ended."
+                diagnostics.append(.trove("effective-period", path: path, message: message))
+            }
+        }
+        return diagnostics
+    }
+
+    private static func checkItems(_ children: [QuestionnaireItem]) -> [ValidationDiagnostic] {
+        var diagnostics: [ValidationDiagnostic] = []
+        var items: [String: (item: QuestionnaireItem, path: String)] = [:]
         var dependencies: [String: [String]] = [:]
-        try inspect(resource.item ?? [], parent: nil, items: &items, dependencies: &dependencies)
+        inspect(children, path: "Questionnaire", parent: nil, items: &items, dependencies: &dependencies, diagnostics: &diagnostics)
         var complete: Set<String> = []
-        var visiting: Set<String> = []
-        for identifier in items.keys {
-            try visit(identifier, dependencies: dependencies, complete: &complete, visiting: &visiting)
-        }
-        for item in items.values {
-            for condition in item.enableWhen ?? [] {
-                guard let reference = condition.question.value?.string, let target = items[reference],
-                      target.type.value != .group, target.type.value != .display else { throw unsupported }
+        for identifier in items.keys.sorted() {
+            var visiting: [String] = []
+            if let cycle = cycle(from: identifier, dependencies: dependencies, complete: &complete, visiting: &visiting) {
+                diagnostics.append(.trove(
+                    "dependency-cycle",
+                    path: items[cycle]?.path ?? "Questionnaire",
+                    message: "Item '\(cycle)' depends on itself through its conditions or groups."
+                ))
             }
         }
+        for (identifier, entry) in items.sorted(by: { $0.key < $1.key }) {
+            for (index, condition) in (entry.item.enableWhen ?? []).enumerated() {
+                let reference: String? = condition.question.value?.string
+                let target: QuestionnaireItem? = reference.flatMap { items[$0]?.item }
+                let type: QuestionnaireItemType? = target?.type.value
+                if target == nil || type == .group || type == .display {
+                    diagnostics.append(.trove(
+                        "enable-when-target",
+                        path: "\(entry.path).enableWhen[\(index)].question",
+                        message: "A condition of '\(identifier)' must refer to an answerable item in this Questionnaire."
+                    ))
+                }
+            }
+        }
+        return diagnostics
     }
 
+    // swiftlint:disable:next function_parameter_count
     private static func inspect(
-        _ children: [QuestionnaireItem], parent: String?, items: inout [String: QuestionnaireItem], dependencies: inout [String: [String]]
-    ) throws {
-        for item in children {
-            guard let identifier = item.linkId.value?.string, let type = item.type.value,
-                  items.count < 512, items.updateValue(item, forKey: identifier) == nil,
-                  item.answerValueSet == nil, item.definition == nil,
-                  item.repeats?.value?.bool != true || type == .choice || type == .openChoice else { throw unsupported }
-            // The current converter does not preserve required groups or non-coded choice initial values.
-            guard type != .group || item.required?.value?.bool != true else { throw unsupported }
-            if type == .choice || type == .openChoice {
-                guard item.initial?.allSatisfy({
-                    if case .coding = $0.value { true } else { false }
-                }) != false else { throw unsupported }
+        _ children: [QuestionnaireItem],
+        path parentPath: String,
+        parent: String?,
+        items: inout [String: (item: QuestionnaireItem, path: String)],
+        dependencies: inout [String: [String]],
+        diagnostics: inout [ValidationDiagnostic]
+    ) {
+        for (index, item) in children.enumerated() {
+            let path = "\(parentPath).item[\(index)]"
+            guard items.count < 512 else {
+                diagnostics.append(.trove("item-limit", path: path, message: "The supported study client reads at most 512 items."))
+                return
             }
-            switch type {
-            case .group, .display, .boolean, .decimal, .integer, .date, .dateTime, .time, .string, .text, .url, .choice, .openChoice, .quantity:
-                break
-            case .attachment, .reference, .question:
-                throw unsupported
+            guard let identifier = item.linkId.value?.string, items[identifier] == nil else {
+                diagnostics.append(.trove("link-id-unique", path: "\(path).linkId", message: "Each item needs a linkId that no other item uses."))
+                continue
             }
-            dependencies[identifier] = try (item.enableWhen ?? []).map {
-                guard let target = $0.question.value?.string else { throw unsupported }
-                return target
-            } + (parent.map { [$0] } ?? [])
-            try inspect(item.item ?? [], parent: identifier, items: &items, dependencies: &dependencies)
+            items[identifier] = (item, path)
+            diagnostics += checkItem(item, path: path)
+            dependencies[identifier] = (item.enableWhen ?? []).compactMap { $0.question.value?.string } + (parent.map { [$0] } ?? [])
+            inspect(item.item ?? [], path: path, parent: identifier, items: &items, dependencies: &dependencies, diagnostics: &diagnostics)
         }
     }
 
-    private static func visit(
-        _ identifier: String, dependencies: [String: [String]], complete: inout Set<String>, visiting: inout Set<String>
-    ) throws {
+    /// The semantics of one item that the pinned converter would drop or that the study client does not present.
+    private static func checkItem(_ item: QuestionnaireItem, path: String) -> [ValidationDiagnostic] {
+        var diagnostics: [ValidationDiagnostic] = []
+        func add(_ rule: String, _ element: String, _ message: String) {
+            diagnostics.append(.trove(rule, path: "\(path).\(element)", message: message))
+        }
+        let type = item.type.value
+        let choice = type == .choice || type == .openChoice
+        if item.answerValueSet != nil {
+            add("answer-value-set", "answerValueSet", "Answer value sets are not supported; list the options in answerOption.")
+        }
+        if item.definition != nil {
+            add("item-definition", "definition", "Item definitions are not supported.")
+        }
+        if item.repeats?.value?.bool == true && !choice {
+            add("repeats", "repeats", "Only choice items can repeat.")
+        }
+        if type == .group && item.required?.value?.bool == true {
+            add("required-group", "required", "Required groups are not supported; mark the questions in the group as required.")
+        }
+        if choice && item.initial?.allSatisfy({ if case .coding = $0.value { true } else { false } }) == false {
+            add("choice-initial", "initial", "Initial values of choice items must be codings.")
+        }
+        if type == nil || [.attachment, .reference, .question].contains(type) {
+            add("item-type", "type", "The supported study client does not present this item type.")
+        }
+        return diagnostics
+    }
+
+    /// The first item found on a dependency cycle reachable from `identifier`, if any.
+    private static func cycle(
+        from identifier: String, dependencies: [String: [String]], complete: inout Set<String>, visiting: inout [String]
+    ) -> String? {
         guard !complete.contains(identifier) else {
-            return
+            return nil
         }
-        guard let references = dependencies[identifier], visiting.insert(identifier).inserted else { throw unsupported }
-        for reference in references {
-            try visit(reference, dependencies: dependencies, complete: &complete, visiting: &visiting)
+        if visiting.contains(identifier) {
+            return identifier
         }
-        visiting.remove(identifier)
+        visiting.append(identifier)
+        for reference in dependencies[identifier] ?? [] where dependencies[reference] != nil {
+            if let found = cycle(from: reference, dependencies: dependencies, complete: &complete, visiting: &visiting) {
+                return found
+            }
+        }
+        visiting.removeLast()
         complete.insert(identifier)
+        return nil
     }
 }

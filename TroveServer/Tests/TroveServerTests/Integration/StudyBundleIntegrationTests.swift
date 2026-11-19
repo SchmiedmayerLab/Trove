@@ -22,20 +22,9 @@ import ZIPFoundation
 
 @Suite(.serialized)
 struct StudyBundleIntegrationTests {
-    private struct ValidationReply: Encodable {
-        let valid = true
-        let sha256: String
-        let contractRevision = FHIRValidationClient.contractRevision
-        let validatorIdentity = "sha256:" + String(repeating: "a", count: 64)
-        let purpose = "questionnaire"
-    }
-
     private static let participantSubject = "bundle-test-participant"
     private static var validator: FHIRValidationClient {
-        .init(expectedIdentity: "sha256:" + String(repeating: "a", count: 64), sendForPurpose: { purpose, bytes in
-            #expect(purpose == .questionnaire)
-            return (200, try JSONEncoder().encode(ValidationReply(sha256: ArtifactStore.digest(bytes))))
-        })
+        QuestionnaireWorkerReply.validator()
     }
 
     private static func bilingualQuestionnaire() throws -> MultilingualQuestionnaireFixture {
