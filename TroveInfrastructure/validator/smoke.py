@@ -14,7 +14,7 @@ import uuid
 HTTP_CLIENT = r'''
 import hashlib,http.client,json,sys,time
 host=sys.argv[1]; expected=sys.argv[2]; purpose=sys.argv[3]; raw=sys.stdin.buffer.read()
-route='/validate/questionnaire' if purpose=='questionnaire' else '/validate'
+response_fixture=bytes.fromhex(sys.argv[4]) if len(sys.argv)>4 else b''
 for attempt in range(90):
     try:
         connection=http.client.HTTPConnection(host,8080,timeout=2)
@@ -25,36 +25,68 @@ for attempt in range(90):
         connection.close()
     time.sleep(1)
 else: raise RuntimeError('worker did not become ready')
-def check(payload,status,code=None):
+def post(route,payload):
     connection=http.client.HTTPConnection(host,8080,timeout=130)
     connection.request('POST',route,body=payload,headers={'Content-Type':'application/fhir+json'})
-    response=connection.getresponse(); data=response.read(2049); connection.close()
-    assert response.status==status,(response.status,data)
+    response=connection.getresponse(); data=response.read(262145); connection.close()
+    return response.status,data
+def check(payload,status,code=None):
+    http_status,data=post('/validate',payload)
+    assert http_status==status,(http_status,data)
     assert len(data)<=2048
     value=json.loads(data)
     assert value['sha256']==hashlib.sha256(payload).hexdigest()
     assert value['validatorIdentity']==expected
     assert value['valid']==(status==200)
     assert value.get('code')==code
-    assert value.get('purpose')==('questionnaire' if purpose=='questionnaire' else None)
+    assert 'purpose' not in value and 'diagnostics' not in value
     print(json.dumps({'httpStatus':status,'code':code,'sha256':value['sha256']}),flush=True)
-check(raw,200)
-check(b'{"x":1,"x":2}',422,'invalid_json')
-resource=json.loads(raw)
+def authoring(route,payload,status,rule=None):
+    http_status,data=post(route,payload)
+    assert http_status=={'valid':200,'unavailable':503}.get(status,422),(http_status,data[:2048])
+    assert len(data)<=262144
+    value=json.loads(data)
+    assert value['sha256']==hashlib.sha256(payload).hexdigest()
+    assert value['validatorIdentity']==expected
+    assert value['purpose']==route.rsplit('/',1)[1]
+    assert value['status']==status,(value['status'],value['diagnostics'][:5])
+    assert (status=='invalid')==any(item['severity']=='error' for item in value['diagnostics'])
+    assert rule is None or any(item['rule']==rule for item in value['diagnostics']),value['diagnostics'][:5]
+    print(json.dumps({'route':route,'status':status,'findings':len(value['diagnostics']),'sha256':value['sha256']}),flush=True)
+def pair(questionnaire,response):
+    return b'{"resourceType":"Bundle","type":"collection","entry":[{"resource":'+questionnaire+b'},{"resource":'+response+b'}]}'
 if purpose=='questionnaire':
-    del resource['status']
+    route='/validate/questionnaire'
+    authoring(route,raw,'valid')
+    authoring(route,b'{"x":1,"x":2}','invalid','invalid-json')
+    resource=json.loads(raw); del resource['status']
+    authoring(route,json.dumps(resource,separators=(',',':')).encode(),'invalid')
+    authoring(route,raw,'valid')
+    if response_fixture:
+        authoring('/validate/questionnaire-response',pair(raw,response_fixture),'valid')
+        answers=json.loads(response_fixture)
+        questionnaire=json.loads(raw)
+        answers['questionnaire']=questionnaire['url']+'|999.0.0'
+        authoring('/validate/questionnaire-response',pair(raw,json.dumps(answers).encode()),'incomplete','Questionnaire_QR_Q_NotFound')
+    authoring('/validate/questionnaire-response',b'{"resourceType":"Bundle"}','invalid','pair-input')
 else:
+    check(raw,200)
+    check(b'{"x":1,"x":2}',422,'invalid_json')
+    resource=json.loads(raw)
     observation=next(entry['resource'] for entry in resource['entry'] if entry['resource']['resourceType']=='Observation')
     del observation['status']
-check(json.dumps(resource,separators=(',',':')).encode(),422,'invalid_fhir')
-check(raw,200)
-for path in ('/loadIG','/stop','/validateResource','/validate?profile=untrusted'):
+    check(json.dumps(resource,separators=(',',':')).encode(),422,'invalid_fhir')
+    check(raw,200)
+for path in ('/loadIG','/stop','/validateResource','/validate?profile=untrusted','/validate/questionnaire?profile=untrusted'):
     connection=http.client.HTTPConnection(host,8080,timeout=10)
     connection.request('POST',path,body=raw,headers={'Content-Type':'application/fhir+json'})
     response=connection.getresponse(); data=response.read(2049); connection.close()
     assert response.status==400,(path,response.status)
     assert json.loads(data)=={'code':'invalid_request'}
-check(raw,200)
+if purpose=='questionnaire':
+    authoring('/validate/questionnaire',raw,'valid')
+else:
+    check(raw,200)
 '''
 
 
@@ -72,7 +104,7 @@ try:
     os.kill(first,signal.SIGSTOP)
     worker.TIMEOUT=1
     status,result=validate(raw)
-    assert status==503 and result['code']=='validator_unavailable' and not result['valid']
+    assert status==503 and (result.get('status')=='unavailable' if sys.argv[1]=='questionnaire' else result['code']=='validator_unavailable' and not result['valid'])
     assert validator.engine.process is None
     worker.TIMEOUT=120
     assert validate(raw)[0]==200
@@ -97,7 +129,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
     parser.add_argument("--fixture", required=True, type=Path, help="Synthetic, fully valid exchange event or Questionnaire")
-    parser.add_argument("--questionnaire", action="store_true", help="Check the Questionnaire route instead of exchange admission")
+    parser.add_argument("--questionnaire", action="store_true", help="Check the Questionnaire routes instead of exchange admission")
+    parser.add_argument("--response", type=Path, help="Synthetic QuestionnaireResponse that answers the Questionnaire fixture")
     parser.add_argument("--expected-identity", required=True)
     args = parser.parse_args()
     purpose = "questionnaire" if args.questionnaire else "event"
@@ -125,9 +158,13 @@ def main():
             value = json.loads(result.stdout)
             assert value["sha256"] == hashlib.sha256(payload).hexdigest()
             assert value["validatorIdentity"] == args.expected_identity
-            assert value["valid"] == (expected_exit == 0)
-            assert value.get("purpose") == ("questionnaire" if args.questionnaire else None)
-            print(json.dumps({"cliExit": result.returncode, **value}), flush=True)
+            if args.questionnaire:
+                assert value["status"] == ("valid" if expected_exit == 0 else "invalid")
+                assert value["purpose"] == "questionnaire"
+            else:
+                assert value["valid"] == (expected_exit == 0)
+                assert "purpose" not in value
+            print(json.dumps({"cliExit": result.returncode, "sha256": value["sha256"]}), flush=True)
         recovery_name = name + "-recovery"
         owned_containers.append(recovery_name)
         run(["docker", "run", "--rm", "-i", "--name", recovery_name, "--network", "none", *resources,
@@ -144,7 +181,8 @@ def main():
         run(["docker", "run", "--rm", "-i", "--name", client_name, "--network", name,
              "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
              "--memory", "128m", "--cpus", "1", "--pids-limit", "32",
-             "--entrypoint", "python3", args.image, "-c", HTTP_CLIENT, worker_name, args.expected_identity, purpose], input=raw)
+             "--entrypoint", "python3", args.image, "-c", HTTP_CLIENT, worker_name, args.expected_identity, purpose,
+             *([args.response.read_bytes().hex()] if args.response else [])], input=raw)
         print("Offline CLI and private HTTP valid/invalid checks passed.", flush=True)
     finally:
         for container in reversed(owned_containers):

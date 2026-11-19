@@ -73,10 +73,15 @@ class ProcessRestartIdentityTests(unittest.TestCase):
         self.assertIn(f"if not 0 <= size <= {worker.MAX_BODY}:", RELAY)
 
     def test_relay_forwards_every_route_the_worker_serves(self):
-        # The questionnaire route is reached through the same relay as event validation.
-        self.assertIn("if self.path not in ('/health','/validate','/validate/questionnaire'):", RELAY)
+        # The questionnaire routes are reached through the same relay as event validation.
+        routes = "','".join(("/health",) + worker.ROUTES)
+        self.assertIn(f"if self.path not in ('{routes}'):", RELAY)
         source = (ROOT / "TroveInfrastructure/validator/worker.py").read_text()
-        self.assertIn('self.path not in ("/validate", "/validate/questionnaire")', source)
+        self.assertIn("if self.path not in ROUTES", source)
+
+    def test_relay_returns_every_reply_the_worker_sends(self):
+        # A truncated diagnostics reply would no longer parse or match its digest.
+        self.assertIn(f"data=response.read({worker.MAX_REPLY + 1})", RELAY)
 
     def test_reused_validator_requires_exact_image_and_private_network_without_mutations(self):
         original = {"Id": "owned-fixture-id", "Image": "sha256:selected", "State": {"Running": True, "StartedAt": "fixture-start"},

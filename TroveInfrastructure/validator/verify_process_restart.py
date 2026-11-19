@@ -48,7 +48,7 @@ import http.client,http.server,sys
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args): pass
     def forward(self):
-        if self.path not in ('/health','/validate','/validate/questionnaire'):
+        if self.path not in ('/health','/validate','/validate/questionnaire','/validate/questionnaire-response'):
             self.send_error(404); return
         size=int(self.headers.get('Content-Length','0'))
         if not 0 <= size <= 16777216:
@@ -58,7 +58,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         connection=http.client.HTTPConnection(sys.argv[1],8080,timeout=130)
         try:
             connection.request(self.command,self.path,body=body,headers={'Content-Type':'application/fhir+json'})
-            response=connection.getresponse(); data=response.read(2049)
+            response=connection.getresponse(); data=response.read(262145)
             self.send_response(response.status); self.send_header('Content-Length',str(len(data)))
             self.end_headers(); self.wfile.write(data)
         finally: connection.close()

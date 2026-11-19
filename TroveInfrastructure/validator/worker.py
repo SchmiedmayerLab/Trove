@@ -24,8 +24,27 @@ from decimal import Decimal
 MAX_BODY = 16 * 1024 * 1024
 MAX_DEPTH = 64
 MAX_OUTCOME = 8 * 1024 * 1024
+# Questionnaire replies carry diagnostics; event replies stay below 2 KiB.
+MAX_REPLY = 256 * 1024
+MAX_DIAGNOSTICS = 100
 TIMEOUT = 120
 ASSETS = Path(os.environ.get("VALIDATOR_ASSETS", "/opt/validator"))
+ROUTES = ("/validate", "/validate/questionnaire", "/validate/questionnaire-response")
+# The response route's exact framing; the server embeds both documents byte for byte.
+PAIR_PREFIX = '{"resourceType":"Bundle","type":"collection","entry":[{"resource":'
+PAIR_INFIX = '},{"resource":'
+PAIR_SUFFIX = '}]}'
+FILE_EXTENSION = "http://hl7.org/fhir/StructureDefinition/operationoutcome-file"
+QUESTIONNAIRE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"
+RESPONSE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response"
+TRANSLATION = "http://hl7.org/fhir/StructureDefinition/translation"
+MESSAGE_ID = "http://hl7.org/fhir/StructureDefinition/operationoutcome-message-id"
+# Official findings that state a check was skipped, not passed. Without terminology
+# services or network access these mean validity is not established.
+NOT_EVALUATED = frozenset({
+    "Questionnaire_QR_Q_None",
+    "Questionnaire_QR_Q_NotFound",
+})
 
 
 def bound_child_output():
@@ -99,6 +118,87 @@ def strict_json(raw, maximum=MAX_BODY):
 
     strings(result)
     return result
+
+
+def diagnostic(severity, source, rule, path, message, language=None):
+    """One bounded finding. Paths and messages can quote submitted content, never process output."""
+    result = {
+        "severity": severity,
+        "source": source,
+        "rule": str(rule)[:200],
+        "path": str(path)[:500],
+        "message": str(message)[:1000],
+    }
+    if isinstance(language, str) and language:
+        result["language"] = language[:100]
+    return result
+
+
+def path_steps(path):
+    """`Questionnaire.item[0].value.ofType(Coding)` as [("item", 0), ("valueCoding", None)], without the resource type."""
+    steps = []
+    for part in path.replace(".ofType(", "ofType(").split(".")[1:]:
+        name, _, index = part.partition("[")
+        name, _, choice = name.partition("ofType(")
+        if choice:
+            if not choice.endswith(")") or not choice[:-1].isalnum():
+                return None
+            name += choice[0].upper() + choice[1:-1]
+        if not name or (index and not index[:-1].isdigit()):
+            return None
+        steps.append((name, int(index[:-1]) if index else None))
+    return steps
+
+
+def translation_language(resource, path):
+    """The `lang` of the translation extension a FHIRPath points into, if any.
+
+    A primitive's extensions are serialized under `_name`, where a step continues past a primitive value.
+    """
+    steps = path_steps(path) if isinstance(path, str) else None
+    node = resource
+    for name, index in steps or ():
+        if not isinstance(node, dict):
+            return None
+        value = node.get(name)
+        if not isinstance(value, (dict, list)):
+            value = node.get("_" + name)
+        if index is not None:
+            value = value[index] if isinstance(value, list) and index < len(value) else None
+        node = value
+        if isinstance(node, dict) and node.get("url") == TRANSLATION:
+            parts = node.get("extension")
+            languages = [part.get("valueCode") for part in parts if isinstance(part, dict) and part.get("url") == "lang"] \
+                if isinstance(parts, list) else []
+            return languages[0] if len(languages) == 1 and isinstance(languages[0], str) else None
+    return None
+
+
+def issue_diagnostic(issue, resources):
+    """Map one official issue. `resources` maps a FHIRPath prefix to (resource type, resource)."""
+    identifiers = [extension.get("valueCode") or extension.get("valueString") for extension in issue.get("extension", [])
+                   if isinstance(extension, dict) and extension.get("url") == MESSAGE_ID]
+    rule = identifiers[0] if identifiers and isinstance(identifiers[0], str) else issue.get("code") or "unknown"
+    paths = [value for field in ("expression", "location") for value in (issue.get(field) or []) if isinstance(value, str)]
+    path = paths[0] if paths else ""
+    resource = None
+    for prefix, (resource_type, value) in resources.items():
+        if path == prefix or path.startswith(prefix + ".") or path.startswith(prefix + "/*"):
+            remainder = path[len(prefix):]
+            if remainder.startswith("/*"):
+                remainder = remainder.partition("*/")[2]
+            path, resource = resource_type + remainder, value
+            break
+    details = issue.get("details")
+    message = issue.get("diagnostics") or (details.get("text") if isinstance(details, dict) else None) or rule
+    severity = "error" if issue["severity"] in ("fatal", "error") else issue["severity"]
+    return diagnostic(severity, "fhir", rule, path, message, translation_language(resource, path) if resource else None)
+
+
+def assessed(diagnostics, not_evaluated=False):
+    if any(item["severity"] == "error" for item in diagnostics):
+        return "invalid"
+    return "incomplete" if not_evaluated else "valid"
 
 
 class Engine:
@@ -218,6 +318,10 @@ class Validator:
         self.engine.close()
         shutil.rmtree(self.home)
 
+    def route(self, path):
+        """The one validation each fixed route performs; routes never select each other's checks."""
+        return dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
+
     def response(self, raw, valid=False, code=None):
         result = {
             "valid": valid,
@@ -261,36 +365,150 @@ class Validator:
         except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
             return 503, self.response(raw, code="validator_unavailable")
 
+    def report(self, raw, purpose, status, diagnostics=()):
+        """An authoring result with its findings, errors first, bounded in count and size."""
+        order = {"error": 0, "warning": 1, "information": 2}
+        diagnostics = sorted(diagnostics, key=lambda item: order[item["severity"]])
+        result = {
+            "status": status,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "contractRevision": self.manifest["contractRevision"],
+            "validatorIdentity": self.identity,
+            "purpose": purpose,
+            "diagnostics": diagnostics[:MAX_DIAGNOSTICS],
+        }
+        while len(json.dumps(result, ensure_ascii=False).encode()) > MAX_REPLY - 64:
+            result["diagnostics"].pop()
+        if len(result["diagnostics"]) < len(diagnostics):
+            result["omittedDiagnostics"] = len(diagnostics) - len(result["diagnostics"])
+        return {"valid": 200, "unavailable": 503}.get(status, 422), result
+
+    @staticmethod
+    def claims(resource, resource_type, profile):
+        profiles = resource.get("meta", {}).get("profile", []) if isinstance(resource, dict) else []
+        return isinstance(resource, dict) and resource.get("resourceType") == resource_type \
+            and isinstance(profiles, list) and profile in profiles
+
+    def official(self, raw, resources):
+        """Official findings, and whether any states that a check was skipped. Raises when unavailable."""
+        outcome = self.engine.validate(raw)
+        diagnostics = [issue_diagnostic(issue, resources) for issue in outcome["issue"]]
+        return diagnostics, any(item["rule"] in NOT_EVALUATED for item in diagnostics)
+
     def validate_questionnaire(self, raw):
         """Validate authoring content without broadening the exchange admission route."""
-        from Scripts.producer_validation.external_validator import reject_validator_errors
-        from Scripts.producer_validation.diagnostics import ProducerValidationError
-
-        def response(**fields):
-            return dict(self.response(raw, **fields), purpose="questionnaire")
-
+        purpose = "questionnaire"
         try:
             resource = strict_json(raw)
         except (ValueError, UnicodeError, RecursionError):
-            return 422, response(code="invalid_json")
+            return self.report(raw, purpose, "invalid", [diagnostic(
+                "error", "trove", "invalid-json", "", "The resource is not JSON within the validation limits.")])
+        if not self.claims(resource, "Questionnaire", QUESTIONNAIRE_PROFILE):
+            return self.report(raw, purpose, "invalid", [diagnostic(
+                "error", "trove", "profile-required", "Questionnaire.meta.profile",
+                "The resource must be a Questionnaire that claims the Grove Questionnaire profile.")])
         try:
-            profile = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"
-            profiles = resource.get("meta", {}).get("profile", []) if isinstance(resource, dict) else []
-            if not isinstance(profiles, list) or profile not in profiles:
-                raise ProducerValidationError("questionnaire profile required")
-            if any(issue.severity == "error" for issue in self.questionnaire_rules(resource)):
-                raise ProducerValidationError("questionnaire contract failed")
-        except (ProducerValidationError, ValueError, TypeError, KeyError, AttributeError, RecursionError):
-            return 422, response(code="invalid_fhir")
+            diagnostics = [diagnostic(issue.severity, "grove", issue.rule, issue.path, issue.message,
+                                      translation_language(resource, issue.path)) for issue in self.questionnaire_rules(resource)]
+        except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+            diagnostics = [diagnostic("error", "grove", "questionnaire-rules", "Questionnaire",
+                                      "The Grove Questionnaire rules cannot read this resource.")]
         try:
-            outcome = self.engine.validate(raw)
-            try:
-                reject_validator_errors(outcome, "questionnaire")
-            except ProducerValidationError:
-                return 422, response(code="invalid_fhir")
-            return 200, response(valid=True)
+            official, not_evaluated = self.official(raw, {"Questionnaire": ("Questionnaire", resource)})
         except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
-            return 503, response(code="validator_unavailable")
+            # A definite rule failure stays invalid; otherwise nothing establishes validity.
+            return self.report(raw, purpose, "invalid" if assessed(diagnostics) == "invalid" else "unavailable", diagnostics)
+        diagnostics += official
+        return self.report(raw, purpose, assessed(diagnostics, not_evaluated), diagnostics)
+
+    def validate_questionnaire_response(self, raw):
+        """Validate one response against its exact Questionnaire with the official validator.
+
+        The engine's single-resource route cannot resolve a study's Questionnaire, so one offline
+        validator process loads both documents into its context. The input is a collection Bundle
+        framed exactly as the server builds it, so each document's original bytes are validated.
+        """
+        purpose = "questionnaire-response"
+        try:
+            documents = pair_documents(raw)
+        except (ValueError, UnicodeError, RecursionError):
+            return self.report(raw, purpose, "invalid", [diagnostic(
+                "error", "trove", "pair-input", "", "The input must be a collection Bundle of a Grove Questionnaire and a "
+                "Grove QuestionnaireResponse, framed exactly as documented.")])
+        resources = [strict_json(document) for document in documents]
+        if not (self.claims(resources[0], "Questionnaire", QUESTIONNAIRE_PROFILE)
+                and self.claims(resources[1], "QuestionnaireResponse", RESPONSE_PROFILE)):
+            return self.report(raw, purpose, "invalid", [diagnostic(
+                "error", "trove", "pair-input", "", "The input must be a collection Bundle of a Grove Questionnaire and a "
+                "Grove QuestionnaireResponse, framed exactly as documented.")])
+        try:
+            outcomes = self.pair_outcomes(documents)
+        except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+            return self.report(raw, purpose, "unavailable")
+        named = {"Questionnaire": ("Questionnaire", resources[0]), "QuestionnaireResponse": ("QuestionnaireResponse", resources[1])}
+        diagnostics = [issue_diagnostic(issue, named) for outcome in outcomes for issue in outcome["issue"]]
+        return self.report(raw, purpose, assessed(diagnostics, any(item["rule"] in NOT_EVALUATED for item in diagnostics)),
+                           diagnostics)
+
+    def pair_outcomes(self, documents):
+        """One offline validator process over both documents; raises unless its outcomes are trustworthy.
+
+        The reusable engine is stopped first so that both Java processes never share the memory limit;
+        a later request starts a new engine.
+        """
+        self.engine.close()
+        with tempfile.TemporaryDirectory(prefix="validator-pair-") as directory:
+            paths = [Path(directory) / "1-questionnaire.json", Path(directory) / "2-response.json"]
+            for path, document in zip(paths, documents):
+                path.write_bytes(document)
+            output = Path(directory) / "outcome.json"
+            command = ["java", "-Xmx1400m", "-Djava.net.preferIPv4Stack=true", f"-Duser.home={self.home}",
+                       "-jar", str(self.assets / "validator_cli.jar"), *map(str, paths),
+                       "-version", "4.0.1", "-tx", "n/a", "-no-http-access", "-output", str(output)]
+            for package in self.manifest["guides"]:
+                command.extend(("-ig", str(self.assets / "packages" / package["file"])))
+            result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    preexec_fn=bound_child_output, timeout=TIMEOUT, check=False)
+            if result.returncode not in (0, 1) or not output.is_file() or output.is_symlink():
+                raise ValueError("Validator result unavailable")
+            with output.open("rb") as file:
+                value = strict_json(file.read(MAX_OUTCOME + 1), maximum=MAX_OUTCOME)
+            entries = value.get("entry") if isinstance(value, dict) and value.get("resourceType") == "Bundle" else None
+            outcomes = [entry.get("resource") for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
+            if len(outcomes) != 2 or not all(
+                isinstance(outcome, dict) and outcome.get("resourceType") == "OperationOutcome" and outcome_has_valid_issues(outcome)
+                and [extension.get("valueString") for extension in outcome.get("extension", [])
+                     if isinstance(extension, dict) and extension.get("url") == FILE_EXTENSION] == [str(path)]
+                for outcome, path in zip(outcomes, paths)
+            ):
+                raise ValueError("Validator result unavailable")
+            errors = any(issue["severity"] in ("fatal", "error") for outcome in outcomes for issue in outcome["issue"])
+            if result.returncode == 1 and not errors:
+                raise ValueError("Validator result unavailable")
+            return outcomes
+
+
+def pair_documents(raw):
+    """The exact Questionnaire and response bytes of a pair Bundle, including surrounding whitespace; raises unless
+    framed exactly."""
+    strict_json(raw)
+    text = raw.decode("utf-8", errors="strict")
+    if not text.startswith(PAIR_PREFIX) or not text.endswith(PAIR_SUFFIX):
+        raise ValueError("pair framing")
+    decoder = json.JSONDecoder()
+    whitespace = " \t\n\r"
+
+    def document(start):
+        _, end = decoder.raw_decode(text, len(text) - len(text[start:].lstrip(whitespace)))
+        return len(text) - len(text[end:].lstrip(whitespace))
+
+    middle = document(len(PAIR_PREFIX))
+    if not text.startswith(PAIR_INFIX, middle):
+        raise ValueError("pair framing")
+    end = document(middle + len(PAIR_INFIX))
+    if end != len(text) - len(PAIR_SUFFIX):
+        raise ValueError("pair framing")
+    return [text[len(PAIR_PREFIX):middle].encode(), text[middle + len(PAIR_INFIX):end].encode()]
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -320,7 +538,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_result(code, {"code": "invalid_request"})
 
     def send_result(self, status, result):
-        data = json.dumps(result, separators=(",", ":")).encode("ascii")
+        data = json.dumps(result, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
@@ -330,7 +548,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         lengths = self.headers.get_all("Content-Length", [])
-        if self.path not in ("/validate", "/validate/questionnaire") or self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
+        if self.path not in ROUTES or self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
             self.send_result(400, {"code": "invalid_request"})
             return
         if len(lengths[0]) > len(str(MAX_BODY)) or not lengths[0].isascii() or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= MAX_BODY:
@@ -358,8 +576,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_result(400, {"code": "invalid_request"})
             return
         signal.alarm(0)
-        validate = self.server.validator.validate_questionnaire if self.path == "/validate/questionnaire" else self.server.validator.validate
-        self.send_result(*validate(raw))
+        self.send_result(*self.server.validator.route(self.path)(raw))
 
     def do_GET(self):
         ready = self.path == "/health" and self.server.validator.engine.ready
@@ -377,10 +594,13 @@ class Server(http.server.HTTPServer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--stdin", action="store_true")
-    parser.add_argument("--questionnaire", action="store_true", help="validate a Questionnaire in stdin mode")
+    purpose = parser.add_mutually_exclusive_group()
+    purpose.add_argument("--questionnaire", action="store_true", help="validate a Questionnaire in stdin mode")
+    purpose.add_argument("--questionnaire-response", action="store_true",
+                         help="validate a Bundle of a Questionnaire and its QuestionnaireResponse in stdin mode")
     arguments = parser.parse_args()
-    if arguments.questionnaire and not arguments.stdin:
-        parser.error("--questionnaire requires --stdin")
+    if (arguments.questionnaire or arguments.questionnaire_response) and not arguments.stdin:
+        parser.error("--questionnaire and --questionnaire-response require --stdin")
     # Applies to stdin mode as well as the HTTP handler.
     signal.signal(signal.SIGALRM, Handler.read_timeout)
     try:
@@ -390,9 +610,9 @@ def main():
         return 2
     try:
         if arguments.stdin:
-            validate = validator.validate_questionnaire if arguments.questionnaire else validator.validate
-            status, result = validate(sys.stdin.buffer.read(MAX_BODY + 1))
-            print(json.dumps(result, separators=(",", ":")))
+            route = ROUTES[2] if arguments.questionnaire_response else ROUTES[1] if arguments.questionnaire else ROUTES[0]
+            status, result = validator.route(route)(sys.stdin.buffer.read(MAX_BODY + 1))
+            print(json.dumps(result, separators=(",", ":"), ensure_ascii=False))
             return 0 if status == 200 else 1 if status == 422 else 2
         with Server(("0.0.0.0", 8080), Handler) as server:
             server.validator = validator
