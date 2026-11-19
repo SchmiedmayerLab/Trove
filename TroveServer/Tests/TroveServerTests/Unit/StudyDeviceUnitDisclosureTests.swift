@@ -68,13 +68,72 @@ struct StudyDeviceUnitDisclosureTests {
             [
                 "resourceType": "Device", "meta": ["profile": [profile]],
                 "deviceName": [["name": "Writer", "type": "user-friendly-name"]],
-                "identifier": [["system": Canonicals.appleBundleIdentifierSystem, "value": bundle]]
+                "identifier": [Self.bundleIdentifier(bundle)]
             ]
         }
         let ordinary = try Self.withheld(application("org.example.writer"))
         #expect((ordinary["deviceName"] as? [Any])?.count == 1 && (ordinary["identifier"] as? [Any])?.count == 1)
         let device = try Self.withheld(application(Self.deviceBundle))
         #expect(device["deviceName"] == nil && device["identifier"] == nil)
+    }
+
+    @Test
+    func applicationDevicesFollowTheAllowlistBesideTheirNameAndTypedIdentifier() throws {
+        let device: [String: Any] = [
+            "resourceType": "Device",
+            "meta": ["profile": [Canonicals.root + "/mobile/StructureDefinition/grove-application-device"]],
+            "serialNumber": "APP-SERIAL", "lotNumber": "APP-LOT",
+            "udiCarrier": [["deviceIdentifier": "(01)00844588003288", "carrierHRF": "APP-HRF"]],
+            "deviceName": [["name": "Writer", "type": "user-friendly-name"], ["name": "Alex", "type": "patient-reported-name"]],
+            "identifier": [Self.bundleIdentifier("org.example.writer"), ["system": "https://example.test/open-slice", "value": "APP-SLICE"]]
+        ]
+        let result = try Self.withheld(device)
+        let text = try Self.text(result)
+        for value in ["APP-SERIAL", "APP-LOT", "APP-HRF", "Alex", "APP-SLICE"] {
+            #expect(!text.contains(value), "\(value) is not a fact about the application")
+        }
+        #expect(result["deviceName"] as? [[String: String]] == [["name": "Writer", "type": "user-friendly-name"]])
+        #expect((result["identifier"] as? [[String: Any]])?.first?["value"] as? String == "org.example.writer")
+        #expect(result["udiCarrier"] as? [[String: String]] == [["deviceIdentifier": "(01)00844588003288"]])
+    }
+
+    @Test
+    func referencesToDevicesKeepOnlyTheirAddressAndType() throws {
+        let observation: [String: Any] = [
+            "resourceType": "Observation",
+            "device": ["reference": "urn:uuid:device", "type": "Device", "display": "Alex's Apple Watch"],
+            "performer": [["reference": "urn:uuid:patient", "display": "Participant"]],
+            "extension": [
+                [
+                    "url": "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice",
+                    "valueReference": ["reference": "urn:uuid:device", "display": "Alex's iPhone"]
+                ]
+            ]
+        ]
+        let result = try Self.withheld(observation, devices: ["urn:uuid:device"])
+        let text = try Self.text(result)
+        #expect(!text.contains("Alex") && text.contains("Participant"))
+        #expect(result["device"] as? [String: String] == ["reference": "urn:uuid:device", "type": "Device"])
+    }
+
+    @Test
+    func deviceAssignedPrefixesMatchInAnyCaseAndRecordingFormatsNeedTheirSystem() throws {
+        let segment = "https://example.test/native/" + FHIRSyncRecordIdentifier.systemPathSegment + "/"
+        let observation: [String: Any] = [
+            "resourceType": "Observation",
+            "identifier": [["system": segment + Self.deviceBundle.uppercased(), "value": "DEVICE-SYNC"]]
+        ]
+        #expect(try !Self.text(Self.withheld(observation)).contains("DEVICE-SYNC"))
+        let document: [String: Any] = [
+            "resourceType": "DocumentReference",
+            "content": [
+                [
+                    "format": ["system": "https://example.test/other-formats", "code": RegisteredRecordingFormat.heartRateSamples.rawValue],
+                    "attachment": ["contentType": "text/csv", "url": "/studies/a/recording", "size": 2]
+                ]
+            ]
+        ]
+        #expect(try !Self.text(Self.withheld(document)).contains("/studies/a/recording"), "An unknown format system is opaque")
     }
 
     @Test
@@ -194,9 +253,16 @@ extension StudyDeviceUnitDisclosureTests {
         ]
     }
 
-    private static func withheld(_ resource: [String: Any]) throws -> [String: Any] {
+    private static func bundleIdentifier(_ value: String) -> [String: Any] {
+        [
+            "system": Canonicals.appleBundleIdentifierSystem, "value": value,
+            "type": ["coding": [["system": Canonicals.root + "/healthkit/CodeSystem/healthkit-identifier-type", "code": "apple-bundle-id"]]]
+        ]
+    }
+
+    private static func withheld(_ resource: [String: Any], devices: Set<String> = []) throws -> [String: Any] {
         guard case .object(var members) = try json(resource) else { throw FHIRValidationClient.invalid }
-        try StudyDeviceUnitDisclosure.withhold(from: &members)
+        try StudyDeviceUnitDisclosure.withhold(from: &members) { devices.contains($0) }
         return try #require(JSONSerialization.jsonObject(with: StudyProjectionJSON.object(members).encoded()) as? [String: Any])
     }
 

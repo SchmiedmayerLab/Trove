@@ -167,7 +167,7 @@ struct StudyPointResourceProjection {
 
     private func restrictDeviceUnits(_ resource: inout [String: StudyProjectionJSON]) throws {
         if !receivesDeviceUnitIdentifiers {
-            try StudyDeviceUnitDisclosure.withhold(from: &resource)
+            try StudyDeviceUnitDisclosure.withhold(from: &resource) { resources[$0]?["resourceType"]?.string == "Device" }
         }
     }
 

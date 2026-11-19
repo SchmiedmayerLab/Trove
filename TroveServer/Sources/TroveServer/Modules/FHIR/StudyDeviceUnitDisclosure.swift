@@ -72,7 +72,12 @@ enum StudyDeviceUnitDisclosure {
                 revision: $0.decode(column: "revision", as: Int.self)
             )
         }
-        let publications = try await PublishedStudy.query(on: database).filter(\.$study.$id == studyID).all()
+        // A grant naming a publication that is not loaded fails through the guard in `receivingEvents(_:policies:studyID:)`.
+        let publications = try await PublishedStudy.query(on: database)
+            .filter(\.$id ~~ Array(Set(grants.map(\.publicationID))))
+            .field(\.$id)
+            .field(\.$collectionPolicy)
+            .all()
         let policies = try Dictionary(uniqueKeysWithValues: publications.map { try ($0.requireID(), $0.collectionPolicy) })
         return try receivingEvents(grants, policies: policies, studyID: studyID)
     }
@@ -96,7 +101,7 @@ enum StudyDeviceUnitDisclosure {
     /// Whether a recording's original bytes can be released unchanged to a study that does not receive unit facts.
     /// The `device` and `originDevice` columns of tabular formats are strings the producer states (Grove writes the
     /// product type) and are not checked at admission; the photoplethysmogram format has no device column.
-    /// Clinical-record documents are the care record collected under their own requirement, not device context.
+    /// Clinical-record documents are the care record, collected under their own consented requirement.
     /// Native, provider and FHIR collection payloads are opaque to this rule and can carry unit facts.
     static func releasesUnchanged(_ format: RegisteredRecordingFormat) -> Bool {
         switch format {
@@ -109,8 +114,10 @@ enum StudyDeviceUnitDisclosure {
         }
     }
 
-    /// Removes unit facts from one projected resource. References are never removed, so the graph stays closed.
-    static func withhold(from resource: inout [String: StudyProjectionJSON]) throws {
+    /// Removes unit facts from one projected resource. References are never removed, so the graph stays closed; a
+    /// reference to a Device keeps only its address and type, because its display text can name the unit.
+    static func withhold(from resource: inout [String: StudyProjectionJSON], isDevice: (String) -> Bool) throws {
+        resource = deviceReferences(in: .object(resource), isDevice: isDevice).object ?? resource
         switch resource["resourceType"]?.string {
         case "Device": device(&resource)
         case "Provenance": try provenance(&resource)
@@ -128,15 +135,18 @@ enum StudyDeviceUnitDisclosure {
     private static func device(_ resource: inout [String: StudyProjectionJSON]) {
         let identifiers = resource["identifier"]?.array ?? []
         let profiles = resource["meta"]?["profile"]?.array?.compactMap(\.string) ?? []
-        if profiles.contains(where: applicationProfiles.contains), !identifiers.contains(where: { isDeviceBundle($0["value"]?.string) }) {
-            // An application's name and bundle identifier describe software, not a unit; unit identities never apply to it.
-            let retained = identifiers.filter { !isUnitIdentifier($0) }
-            resource["identifier"] = retained.isEmpty ? nil : .array(retained)
-            return
-        }
+        // An application's typed identifier and user-friendly name describe software, unless HealthKit assigned its
+        // bundle identifier to one device. Every other member follows the same allowlist as a recording Device.
+        let application = profiles.contains(where: applicationProfiles.contains)
+            && !identifiers.contains { isDeviceBundle($0["value"]?.string) }
+        let names = resource["deviceName"]?.array?.filter { name in
+            let type = name["type"]?.string ?? ""
+            return kindNames.contains(type) || (application && type == "user-friendly-name")
+        } ?? []
         resource = resource.filter { deviceMembers.contains($0.key) }
-        let names = resource["deviceName"]?.array?.filter { kindNames.contains($0["type"]?.string ?? "") } ?? []
         resource["deviceName"] = names.isEmpty ? nil : .array(names)
+        let typed = application ? identifiers.filter { $0["type"] != nil && !isUnitIdentifier($0) } : []
+        resource["identifier"] = typed.isEmpty ? nil : .array(typed)
         let carriers = resource["udiCarrier"]?.array?.compactMap { carrier -> StudyProjectionJSON? in
             let members = carrier.object?.filter { carrierMembers.contains($0.key) } ?? [:]
             return members["deviceIdentifier"] == nil ? nil : .object(members)
@@ -206,7 +216,9 @@ enum StudyDeviceUnitDisclosure {
             guard var members = content.object, var attachment = members["attachment"]?.object else {
                 throw FHIRValidationClient.invalid
             }
-            let format = content["format"]?["code"]?.string.flatMap(RegisteredRecordingFormat.init(rawValue:))
+            let format = content["format"]?["system"]?.string == FHIRRecordingProjection.formatSystem
+                ? content["format"]?["code"]?.string.flatMap(RegisteredRecordingFormat.init(rawValue:))
+                : nil
             guard format.map(releasesUnchanged) != true else {
                 return content
             }
@@ -221,8 +233,8 @@ enum StudyDeviceUnitDisclosure {
         guard let identifiers = resource["identifier"]?.array else {
             return
         }
-        let marker = "/" + FHIRSyncRecordIdentifier.systemPathSegment + "/" + deviceBundlePrefix
-        let retained = identifiers.filter { $0["system"]?.string?.contains(marker) != true }
+        let marker = ("/" + FHIRSyncRecordIdentifier.systemPathSegment + "/" + deviceBundlePrefix).lowercased()
+        let retained = identifiers.filter { $0["system"]?.string?.lowercased().contains(marker) != true }
         resource["identifier"] = retained.isEmpty ? nil : .array(retained)
     }
 
@@ -234,9 +246,22 @@ enum StudyDeviceUnitDisclosure {
         }
     }
 
-    /// HealthKit assigns `com.apple.health.<UUID>` to one iPhone or Apple Watch. Any value with that prefix counts.
+    /// HealthKit assigns `com.apple.health.<UUID>` to one iPhone or Apple Watch. Any value with that prefix counts, in any case.
     private static func isDeviceBundle(_ value: String?) -> Bool {
-        value?.hasPrefix(deviceBundlePrefix) == true
+        value?.lowercased().hasPrefix(deviceBundlePrefix) == true
+    }
+
+    /// Reduces every reference to a Device to its address and type.
+    private static func deviceReferences(in value: StudyProjectionJSON, isDevice: (String) -> Bool) -> StudyProjectionJSON {
+        switch value {
+        case .scalar: return value
+        case .array(let elements): return .array(elements.map { deviceReferences(in: $0, isDevice: isDevice) })
+        case .object(let members):
+            if let address = members["reference"]?.string, isDevice(address) {
+                return .object(members.filter { ["reference", "type"].contains($0.key) })
+            }
+            return .object(members.mapValues { deviceReferences(in: $0, isDevice: isDevice) })
+        }
     }
 
     /// Removes members together with their primitive extensions (`_name`).

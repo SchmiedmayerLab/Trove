@@ -296,7 +296,8 @@ A study receives these facts for a record only when every one of its grants for 
 record's event comes from a revision that receives them. Data pages and recording
 downloads make the same decision, whichever page or grant identifier leads to the
 record. An invalid or unknown policy, or a grant whose publication does not match,
-fails the request instead of releasing data.
+fails the request instead of releasing data, and such requests keep failing until the
+stored data is repaired.
 
 Otherwise the derived Bundle withholds them and its derivation Provenance adds the
 policy `urn:trove:device-unit-identifiers-withheld`:
@@ -305,22 +306,24 @@ policy `urn:trove:device-unit-identifiers-withheld`:
   versions, parent, patient, the UDI device identifier, issuer and jurisdiction, and
   model, manufacturer and UDI label names. Serial and lot numbers, dates, other UDI
   data, names a person gave a device and every identifier are removed.
-- Application Devices keep their names and bundle identifiers, unless HealthKit
-  assigned the bundle identifier to one iPhone or Apple Watch (`com.apple.health.`
-  followed by a UUID); such a Device is treated like a recording Device.
+- Application Devices follow the same list and also keep their user-friendly name and
+  typed identifiers, such as the bundle identifier. When HealthKit assigned the bundle
+  identifier to one iPhone or Apple Watch (`com.apple.health.` followed by a UUID, in
+  any case), the Device is treated like a recording Device.
+- A reference to a Device keeps only its address and type, so its display text does
+  not name the unit.
 - The HealthKit source revision loses its source name and bundle identifier when that
   bundle identifier is device-assigned, and readable sync identifiers scoped to such a
   bundle identifier are removed.
 - The HealthKit metadata entries `HKDeviceSerialNumber`, `HKDeviceName` and
   `HKUDIProductionIdentifier` are removed.
 
-Only facts are removed, never references, so the graph stays closed. Producer free
+References are never removed, so the graph stays closed. Producer free
 text, such as notes, is not filtered. The `device` and `originDevice` columns of
 tabular recordings are strings the producer states (Grove writes the product type) and
 are not checked at admission; the photoplethysmogram format has no device column.
 These recordings are released unchanged. Clinical-record documents are released as
-issued because they are the care record collected under their own consented
-requirement, not device context. Native, provider and FHIR collection recordings are
+issued: they are the care record, collected under their own consented requirement. Native, provider and FHIR collection recordings are
 opaque payloads that can carry unit facts: for a study that does not receive them,
 their recording document keeps its title, description, size and hash but has no
 content or download location, and the download route returns HTTP 403 before reading
@@ -673,7 +676,7 @@ append-only consent record. Later uploads and plan reads use those literal bound
 not the current draft, device time zone or a newly computed lookback. A historical
 scope can grant an already retained eligible measurement to another study through
 late attribution without copying or uploading the event again. The published
-policy archive uses schema version 5 and RFC 3339 dates at API microsecond precision;
+policy archive uses schema version 6 and RFC 3339 dates at API microsecond precision;
 unknown or older policy contracts fail explicitly.
 
 The selected scope is included in the retained consent markdown and therefore its

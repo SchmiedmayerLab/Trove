@@ -22,6 +22,9 @@ import VaporTesting
 /// One record granted to two studies, of which only the first publication receives device unit identifiers.
 struct DeviceUnitDisclosureTests {
     private static let role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+    /// Bundle identifiers HealthKit assigns to one device, for the writing source and the application Device.
+    private static let writerBundle = "com.apple.health.94C8E349-0D09-4184-BF6C-AF11692FA465"
+    private static let applicationBundle = "com.apple.health.0F0C8D6A-5F1B-4B8E-9A47-0C7E1D2B3A45"
     /// Facts about a kind of device or an application, which every study receives.
     private static let kindFacts = [
         "Watch7,12", "Apple Inc.", "(01)00844588003288", "org.example.writer", "\"Example Writer\"", "com.example.note", "\"Grove Test\""
@@ -63,6 +66,28 @@ struct DeviceUnitDisclosureTests {
                 let device = try #require((observation["device"] as? [String: Any])?["reference"] as? String)
                 #expect(page.resources[device]?["resourceType"] as? String == "Device")
                 #expect(Self.references(page.resources).isSubset(of: addresses))
+            }
+        }
+    }
+
+    @Test
+    func deviceAssignedSourceFactsReachOnlyTheReceivingStudyUnchanged() async throws {
+        try await TestApp.withApp(token: StudyDataFixture.reader) { app, bearer in
+            let fixture = try await ClinicalEventStoreTests.prepare(on: app, deviceUnitStudies: [0])
+            let bytes = try Self.record(source: fixture.source, deviceAssigned: true)
+            let event = try FHIRPointProjection.project(validatedBytes: bytes, validatorIdentity: "test-only")
+            try await AuthContext.$current.withValue(ClinicalEventStoreTests.participant) {
+                _ = try await ClinicalEventStore(database: app.db).accept(
+                    event, sourceID: fixture.source.id, targets: fixture.targets(for: event), installation: fixture.installation
+                )
+            }
+            let admitted = try Self.sourceFacts(Array(Self.resources(bytes)))
+            #expect(admitted.count == 4, "Application name and bundle identifier, source revision and sync identifier")
+            let entitled = try await Self.page(study: fixture.studyIDs[0], app: app, bearer: bearer)
+            #expect(try Self.sourceFacts(Array(entitled.resources.values)) == admitted)
+            let withheld = try await Self.page(study: fixture.studyIDs[1], app: app, bearer: bearer)
+            for value in [Self.writerBundle, Self.applicationBundle, "\"Example Writer\"", "\"Grove Test\""] {
+                #expect(entitled.text.contains(value) && !withheld.text.contains(value), "\(value) names one device")
             }
         }
     }
@@ -130,7 +155,7 @@ extension DeviceUnitDisclosureTests {
     }
 
     /// Grove's sync identifier golden with a serial number and device metadata, rekeyed to the registered source.
-    private static func record(source: SourceBinding) throws -> Data {
+    private static func record(source: SourceBinding, deviceAssigned: Bool = false) throws -> Data {
         let golden = try SyncIdentifierFixture.changing(SyncIdentifierFixture.bytes(), resourceType: "Device") { device in
             device["serialNumber"] = "SERIAL-0042"
         }
@@ -143,11 +168,39 @@ extension DeviceUnitDisclosureTests {
             ]
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("trove-device-units-\(UUID().uuidString).json")
-        try enriched.write(to: url)
+        var text = String(decoding: enriched, as: UTF8.self)
+        if deviceAssigned {
+            text = text.replacingOccurrences(of: "org.example.writer", with: writerBundle)
+                .replacingOccurrences(of: "org.grovealliance.test", with: applicationBundle)
+        }
+        try Data(text.utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         let rekeyed = try LocalPointEventFixture.bytes(source: source, fixtureURL: url)
         let nativeSystem = try Components.Schemas.ParticipantSource(source).nativeRecordIdentifierSystem().rawValue
         return Data(String(decoding: rekeyed, as: UTF8.self).replacingOccurrences(of: SyncIdentifierFixture.nativeSystem, with: nativeSystem).utf8)
+    }
+
+    private static func resources(_ bytes: Data) throws -> [[String: Any]] {
+        let document = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+        return try #require(document["entry"] as? [[String: Any]]).compactMap { $0["resource"] as? [String: Any] }
+    }
+
+    /// The device-assigned source facts as canonical JSON: the application Device's name and bundle identifier, the
+    /// source-revision extension and the readable sync identifier, in that order.
+    private static func sourceFacts(_ resources: [[String: Any]]) throws -> [Data] {
+        let application = resources.first { resource in
+            ((resource["identifier"] as? [[String: Any]]) ?? []).contains { $0["value"] as? String == applicationBundle }
+        }
+        let bundle = (application?["identifier"] as? [[String: Any]])?.filter { $0["value"] as? String == applicationBundle } ?? []
+        let revisions = resources.filter { $0["resourceType"] as? String == "Provenance" }
+            .flatMap { $0["entity"] as? [[String: Any]] ?? [] }
+            .flatMap { $0["extension"] as? [[String: Any]] ?? [] }
+            .filter { $0["url"] as? String == "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-source-revision" }
+        let sync = resources.filter { $0["resourceType"] as? String == "Observation" }
+            .flatMap { $0["identifier"] as? [[String: Any]] ?? [] }
+            .filter(SyncIdentifierFixture.isSyncIdentifier)
+        let values: [Any] = [application?["deviceName"]].compactMap(\.self) + bundle + revisions + sync
+        return try values.map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) }
     }
 
     /// The exact unit fact values the admitted record states.
