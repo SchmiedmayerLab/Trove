@@ -108,10 +108,16 @@ byte. The engine's single-resource route cannot resolve a study's Questionnaire,
 the worker writes both documents to a private temporary directory and runs one offline
 validator process over them, which resolves the response's canonical against that
 Questionnaire only. Before it starts, the reusable engine is stopped so that the two
-Java processes never share the memory limit, and afterwards it is started again,
-also when the process fails or times out. A pair takes about ten seconds. Validations
-are serialized: while a pair runs, the same worker validates no events or
-questionnaires, and `/health` reports the worker unready until the engine is back. Do
+Java processes never share the memory limit. The result is sent first; the engine is
+then started again, also after the process failed or timed out, before the worker
+takes the next request. With the 0.8.2 image on a 2-CPU, 4 GB container, a
+bilingual pair replied after 13 to 17 seconds and the engine restart took another 13
+to 19 seconds (a cold first start took 28 seconds). Validations are serialized: while
+a pair runs, the worker answers no other request, including `/health`; afterwards it
+is ready unless the engine fails to start. The Compose healthcheck (5-second interval,
+3-second timeout, 12 retries) tolerates that measured interval of about 30 seconds,
+but a pair that runs into the 120-second process timeout followed by a slow engine
+start can mark the container unhealthy until the engine is back. Do
 not send each participant response to the worker that gates event admission. The
 official validator stops without a result on some responses whose answer type
 contradicts a condition; the route then reports `unavailable` for that input on every
@@ -133,13 +139,13 @@ ordered errors first; at most 100 are returned within 256 KiB, and
 The status is `valid` (HTTP 200) when no finding is an error and no official finding
 states that a check was skipped, `invalid` (HTTP 422) when any finding is an error,
 `incomplete` (HTTP 422) when the official validator reports that it could not resolve
-the Questionnaire a response names or a profile the resource declares or depends on,
-or could not check a code against a required value set (the identifiers are listed as
-`NOT_EVALUATED` in `worker.py`), and `unavailable` (HTTP 503) when the official
+the Questionnaire a response names, an enableWhen condition or a profile the resource
+declares or depends on, or could not check slicing cardinality or a code against a
+value set binding or answer options (the identifiers are listed as `NOT_EVALUATED` in
+`worker.py`), and `unavailable` (HTTP 503) when the official
 validator gave no trustworthy result. A companion-rule error stays `invalid` even when
-the engine is unavailable. Codes from code systems outside the offline package set,
-including language codes, are reported as information or warnings and do not make a
-result incomplete. Findings can quote submitted content; the worker never
+the engine is unavailable. A code from a code system outside the offline package set
+is reported as information unless a value set check depends on it. Findings can quote submitted content; the worker never
 logs them, and only the server receives them.
 
 Both routes use the same bounds and unavailable semantics below. For offline

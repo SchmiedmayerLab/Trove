@@ -108,15 +108,35 @@ class QuestionnaireValidationTests(unittest.TestCase):
         status, response = self.validate()
         self.assertEqual((status, response["status"], response["diagnostics"][0]["severity"]), (422, "invalid", "error"))
 
-    def test_every_route_runs_exclusively(self):
+    def test_every_route_runs_exclusively_and_delivers_before_restarting_the_engine(self):
         validator = object.__new__(worker.Validator)
-        held = []
+        validator.engine = Mock()
+        events = []
         for method in ("validate", "validate_questionnaire", "validate_questionnaire_response"):
-            setattr(validator, method, Mock(side_effect=lambda raw: held.append(worker.VALIDATION_LOCK.locked()) or (200, {})))
-        for path in worker.ROUTES:
-            validator.route(path)(b"{}")
-        self.assertEqual(held, [True, True, True])
+            setattr(validator, method, Mock(side_effect=lambda raw: events.append(("validate", worker.VALIDATION_LOCK.locked())) or (200, {})))
+        validator.engine.start.side_effect = lambda: events.append(("start", worker.VALIDATION_LOCK.locked()))
+
+        def deliver(*_reply):
+            events.append(("deliver", worker.VALIDATION_LOCK.locked()))
+        for ready in (True, False):
+            validator.engine.ready = ready
+            events.clear()
+            validator.respond(worker.ROUTES[2], b"{}", deliver)
+            self.assertEqual(events, [("validate", True), ("deliver", True)] + ([] if ready else [("start", True)]))
+        validator.engine.start.side_effect = ValueError("Engine initialization failed")
+        validator.respond(worker.ROUTES[1], b"{}", deliver)
+        events.clear()
+        validator.respond(worker.ROUTES[0], b"{}", deliver, restore=False)
+        self.assertEqual(events, [("validate", True), ("deliver", True)])
         self.assertFalse(worker.VALIDATION_LOCK.locked())
+
+    def test_engine_is_restarted_even_when_delivery_fails(self):
+        validator = object.__new__(worker.Validator)
+        validator.engine = Mock(ready=False)
+        validator.validate = Mock(return_value=(200, {}))
+        with self.assertRaises(BrokenPipeError):
+            validator.respond(worker.ROUTES[0], b"{}", Mock(side_effect=BrokenPipeError()))
+        validator.engine.start.assert_called_once()
 
     def test_companion_failure_to_read_is_invalid(self):
         self.validator.questionnaire_rules.side_effect = TypeError("private")
@@ -153,6 +173,7 @@ class QuestionnaireValidationTests(unittest.TestCase):
                 handler.connection = Mock()
                 handler.server = Mock()
                 validator = object.__new__(worker.Validator)
+                validator.engine = Mock(ready=True)
                 for method in methods:
                     setattr(validator, method, Mock(return_value=(200, {})))
                 handler.server.validator = validator
@@ -254,7 +275,7 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
     def test_offline_process_stops_the_engine_and_requires_attributed_outcomes(self):
         outcomes = self.run_pair()
         self.validator.engine.close.assert_called_once()
-        self.validator.engine.start.assert_called_once()
+        self.validator.engine.start.assert_not_called()
         self.assertEqual(len(outcomes), 2)
         error = official_issue("error", "Synthetic", "QuestionnaireResponse")
         self.assertEqual(len(self.run_pair(1, lambda paths: {"resourceType": "Bundle", "entry": [
@@ -270,7 +291,7 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
             with self.subTest(failure=failure), self.assertRaises(ValueError):
                 self.run_pair(**failure)
 
-    def test_engine_is_restarted_after_every_run_so_health_recovers(self):
+    def test_engine_stays_stopped_until_the_result_is_delivered(self):
         def timeout(*_args, **_kwargs):
             raise subprocess.TimeoutExpired("java", worker.TIMEOUT)
         for outcome in ("success", "unusable", "timeout"):
@@ -285,13 +306,9 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
                     with patch.object(worker.subprocess, "run", side_effect=timeout), \
                             self.assertRaises(subprocess.TimeoutExpired):
                         self.validator.pair_outcomes([self.questionnaire, self.response])
-                self.assertEqual([name for name, _, _ in self.validator.engine.mock_calls], ["close", "start"])
+                self.assertEqual([name for name, _, _ in self.validator.engine.mock_calls], ["close"])
 
-    def test_failed_engine_restart_does_not_replace_the_result(self):
-        self.validator.engine.start.side_effect = ValueError("Engine initialization failed")
-        self.assertEqual(len(self.run_pair()), 2)
-
-    def test_framing_breakout_is_refused(self):
+    def test_framing_breakout_makes_the_framed_bundle_invalid_json(self):
         questionnaire = b'{"resourceType":"Questionnaire","meta":{"profile":["' + worker.QUESTIONNAIRE_PROFILE.encode() + b'"]},"title":"abc'
         response = b'"}},{"resource":' + self.response
         with patch.object(self.validator, "pair_outcomes") as run:

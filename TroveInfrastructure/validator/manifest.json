@@ -185,7 +185,7 @@
       "sha256": "c5e6a8599a18ac791ef25cb503b9fc3c31ea867a5b69669c093f085f81c68e40"
     }
   ],
-  "workerSHA256": "74f5e5f3379a15a5a89e91a420509bd8fc49350ee0059ad0957791c0c053c169",
+  "workerSHA256": "c52350d4e185ed837a1af20bcd833fbde48f50b67d2c20533f03c0e078b4878e",
   "runtimeImages": {
     "base": "cgr.dev/chainguard/wolfi-base:latest@sha256:2c12da5496e21e99003b3db3b9246f025e53d533c4df334205391260f1e8f85b",
     "packages": [

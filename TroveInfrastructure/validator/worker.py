@@ -43,22 +43,31 @@ QUESTIONNAIRE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureD
 RESPONSE_PROFILE = "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response"
 TRANSLATION = "http://hl7.org/fhir/StructureDefinition/translation"
 MESSAGE_ID = "http://hl7.org/fhir/StructureDefinition/operationoutcome-message-id"
-# Official message identifiers (validator 7.0.6, `-tx n/a`, no network) stating that a check against a definition
-# did not run: the Questionnaire a response names, a profile the resource declares or depends on, or a code's
-# membership in a required value set. Codes from code systems outside the offline package set, including language
-# codes, are reported as information or `TERMINOLOGY_TX_WARNING` and are not listed: they occur on every resource.
+# Official message identifiers (validator 7.0.6, `-tx n/a`, no network) stating that a check did not run: the
+# Questionnaire a response names, an enableWhen condition, a profile the resource declares or depends on, slicing
+# cardinality, or a code's membership in a value set or answer options. A code from a code system outside the
+# offline package set is reported as information unless a value set check depends on it.
+# `Terminology_TX_NoValid_15` is not listed: the validator reports it for the language code of every translation.
 NOT_EVALUATED = frozenset({
     "Questionnaire_QR_Q_None",
     "Questionnaire_QR_Q_NotFound",
+    "Questionnaire_QR_Item_EnableWhen_Uncheckable",
+    "QUESTIONNAIRE_QR_ITEM_BADOPTION_CS",
     "Validation_VAL_Profile_Unknown",
     "VALIDATION_VAL_PROFILE_UNKNOWN_ERROR",
     "VALIDATION_VAL_PROFILE_UNKNOWN_ERROR_NETWORK",
     "VALIDATION_VAL_PROFILE_UNKNOWN_NOT_POLICY",
     "VALIDATION_VAL_GLOBAL_PROFILE_UNKNOWN",
     "VALIDATION_VAL_PROFILE_DEPENDS_NOT_RESOLVED",
+    "Validation_VAL_Profile_NoCheckMin_one",
+    "Validation_VAL_Profile_NoCheckMin_other",
+    "Validation_VAL_Profile_NoCheckMax_one",
+    "Validation_VAL_Profile_NoCheckMax_other",
     "Reference_REF_CantResolveProfile",
     "TERMINOLOGY_TX_NOSVC_BOUND_REQ",
     "Terminology_TX_Binding_NoServer",
+    "Terminology_TX_Binding_CantCheck",
+    "Terminology_TX_ValueSet_NotFound",
     "Error_validating_code_running_without_terminology_services",
     "Unable_to_resolve_value_Set_",
     "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_",
@@ -340,14 +349,21 @@ class Validator:
 
     def route(self, path):
         """The one validation each fixed route performs; routes never select each other's checks."""
-        validate = dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
+        return dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
 
-        def exclusive(raw):
-            # One validation at a time: the response route stops and restarts the shared engine, so no other
-            # validation may use it meanwhile. The HTTP server is single-threaded as well; this does not rely on it.
-            with VALIDATION_LOCK:
-                return validate(raw)
-        return exclusive
+    def respond(self, path, raw, deliver, restore=True):
+        """Validate, deliver the result, then start a stopped engine before any other request runs.
+
+        One validation at a time: the response route stops the shared engine, so no other validation may
+        use it until it is started again. The HTTP server is single-threaded as well; this does not rely on it.
+        The result is delivered before the restart, so a client never waits for the engine to start.
+        """
+        with VALIDATION_LOCK:
+            try:
+                deliver(*self.route(path)(raw))
+            finally:
+                if restore and not self.engine.ready:
+                    self.restart_engine()
 
     def response(self, raw, valid=False, code=None):
         result = {
@@ -480,14 +496,11 @@ class Validator:
     def pair_outcomes(self, documents):
         """One offline validator process over both documents; raises unless its outcomes are trustworthy.
 
-        The reusable engine is stopped first so that both Java processes never share the memory limit,
-        and restarted afterwards, whatever the outcome, so that `/health` reports the worker ready again.
+        The reusable engine is stopped first so that both Java processes never share the memory limit;
+        `respond` starts it again after the result is delivered.
         """
         self.engine.close()
-        try:
-            return self.run_pair(documents)
-        finally:
-            self.restart_engine()
+        return self.run_pair(documents)
 
     def restart_engine(self):
         """Start the reusable engine; on failure the next request starts it, and `/health` reports it unready."""
@@ -585,6 +598,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
+        self.wfile.flush()
 
     def do_POST(self):
         lengths = self.headers.get_all("Content-Length", [])
@@ -616,7 +630,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_result(400, {"code": "invalid_request"})
             return
         signal.alarm(0)
-        self.send_result(*self.server.validator.route(self.path)(raw))
+        self.server.validator.respond(self.path, raw, self.send_result)
 
     def do_GET(self):
         ready = self.path == "/health" and self.server.validator.engine.ready
@@ -651,7 +665,9 @@ def main():
     try:
         if arguments.stdin:
             route = ROUTES[2] if arguments.questionnaire_response else ROUTES[1] if arguments.questionnaire else ROUTES[0]
-            status, result = validator.route(route)(sys.stdin.buffer.read(MAX_BODY + 1))
+            replies = []
+            validator.respond(route, sys.stdin.buffer.read(MAX_BODY + 1), lambda *reply: replies.append(reply), restore=False)
+            status, result = replies[0]
             print(json.dumps(result, separators=(",", ":"), ensure_ascii=False))
             return 0 if status == 200 else 1 if status == 422 else 2
         with Server(("0.0.0.0", 8080), Handler) as server:
