@@ -1003,28 +1003,38 @@ extension Components {
         public struct StudyQuestionnaireValidation: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/componentId`.
             public var componentId: Swift.String
-            /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/locale`.
-            public var locale: Swift.String
+            /// The validated resource's base language (`Questionnaire.language`).
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/language`.
+            public var language: Swift.String
+            /// Languages of the resource's translation extensions, sorted.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/translationLanguages`.
+            public var translationLanguages: [Swift.String]
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/sha256`.
             public var sha256: Swift.String
             /// Creates a new `StudyQuestionnaireValidation`.
             ///
             /// - Parameters:
             ///   - componentId:
-            ///   - locale:
+            ///   - language: The validated resource's base language (`Questionnaire.language`).
+            ///   - translationLanguages: Languages of the resource's translation extensions, sorted.
             ///   - sha256:
             public init(
                 componentId: Swift.String,
-                locale: Swift.String,
+                language: Swift.String,
+                translationLanguages: [Swift.String],
                 sha256: Swift.String
             ) {
                 self.componentId = componentId
-                self.locale = locale
+                self.language = language
+                self.translationLanguages = translationLanguages
                 self.sha256 = sha256
             }
             public enum CodingKeys: String, CodingKey {
                 case componentId
-                case locale
+                case language
+                case translationLanguages
                 case sha256
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -1033,9 +1043,13 @@ extension Components {
                     Swift.String.self,
                     forKey: .componentId
                 )
-                self.locale = try container.decode(
+                self.language = try container.decode(
                     Swift.String.self,
-                    forKey: .locale
+                    forKey: .language
+                )
+                self.translationLanguages = try container.decode(
+                    [Swift.String].self,
+                    forKey: .translationLanguages
                 )
                 self.sha256 = try container.decode(
                     Swift.String.self,
@@ -1043,7 +1057,8 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "componentId",
-                    "locale",
+                    "language",
+                    "translationLanguages",
                     "sha256"
                 ])
             }
@@ -3867,6 +3882,11 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/LocalizationKey`.
         public typealias LocalizationKey = GroveLocalization.LocalizationKey
+        /// BCP 47 language tag of written content in canonical case: a language, optionally followed by a script and a region. Distinct tags stay distinct; a region is not required. The special codes und, mul, zxx, mis and qaa–qtz name no written language and are rejected.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/LanguageTag`.
+        public typealias LanguageTag = TroveAPITypes.LanguageTag
         /// Localized string keyed by locale (e.g., "en-US" -> "value")
         ///
         /// - Remark: Generated from `#/components/schemas/LocalizedString`.
@@ -3964,14 +3984,15 @@ extension Components {
                 case icon
             }
         }
-        /// Per-locale study detail fields
+        /// Study detail fields in one language
         ///
         /// - Remark: Generated from `#/components/schemas/StudyDetailContent`.
         public typealias StudyDetailContent = TroveAPITypes.StudyDetailContent
-        /// Localized study details keyed by locale
+        /// Study details keyed by language tag. The source language names the language the details were written in; content must include it.
+        ///
         ///
         /// - Remark: Generated from `#/components/schemas/StudyDetailData`.
-        public typealias StudyDetailData = GroveLocalization.LocalizationsDictionary<TroveAPITypes.StudyDetailContent>
+        public typealias StudyDetailData = TroveAPITypes.StudyDetailData
         /// A criterion which must be satisfied for a person to participate in a study. Uses a discriminated union on "type". Leaf criteria carry a single value. Logical operators (not, all, any) are recursive.
         ///
         ///
@@ -4310,7 +4331,7 @@ extension Components {
         public struct StudyListItem: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/StudyListItem/id`.
             public var id: Swift.String
-            /// Study title (en-US preferred, falls back to first available locale)
+            /// Study title in the details' source language
             ///
             /// - Remark: Generated from `#/components/schemas/StudyListItem/title`.
             public var title: Swift.String
@@ -4318,7 +4339,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id:
-            ///   - title: Study title (en-US preferred, falls back to first available locale)
+            ///   - title: Study title in the details' source language
             public init(
                 id: Swift.String,
                 title: Swift.String
@@ -4335,10 +4356,12 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/StudyCreateInput`.
         public struct StudyCreateInput: Codable, Hashable, Sendable {
-            /// Study title (stored under en-US locale)
+            /// Study title, written in the source language
             ///
             /// - Remark: Generated from `#/components/schemas/StudyCreateInput/title`.
             public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyCreateInput/sourceLanguage`.
+            public var sourceLanguage: Components.Schemas.LanguageTag
             /// Icon identifier (e.g. SF Symbol name)
             ///
             /// - Remark: Generated from `#/components/schemas/StudyCreateInput/icon`.
@@ -4346,17 +4369,21 @@ extension Components {
             /// Creates a new `StudyCreateInput`.
             ///
             /// - Parameters:
-            ///   - title: Study title (stored under en-US locale)
+            ///   - title: Study title, written in the source language
+            ///   - sourceLanguage:
             ///   - icon: Icon identifier (e.g. SF Symbol name)
             public init(
                 title: Swift.String,
+                sourceLanguage: Components.Schemas.LanguageTag,
                 icon: Swift.String
             ) {
                 self.title = title
+                self.sourceLanguage = sourceLanguage
                 self.icon = icon
             }
             public enum CodingKeys: String, CodingKey {
                 case title
+                case sourceLanguage
                 case icon
             }
         }
@@ -4370,7 +4397,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/collectionRequirements`.
             public var collectionRequirements: [Components.Schemas.CollectionRequirement]?
-            /// Supported locales for the study
+            /// Language-region locales of the study's consent and informational documents
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/locales`.
             public var locales: [Components.Schemas.LocalizationKey]?
@@ -4393,7 +4420,7 @@ extension Components {
             /// - Parameters:
             ///   - enrollmentPeriod:
             ///   - collectionRequirements: Empty disables backend collection in the next publication; existing publications are unchanged.
-            ///   - locales: Supported locales for the study
+            ///   - locales: Language-region locales of the study's consent and informational documents
             ///   - icon: Icon identifier (e.g. SF Symbol name)
             ///   - details:
             ///   - participationCriterion:
@@ -4447,7 +4474,7 @@ extension Components {
             public var collectionRequirements: [Components.Schemas.CollectionRequirement]
             /// - Remark: Generated from `#/components/schemas/StudyResponse/id`.
             public var id: Swift.String
-            /// Supported locales for the study
+            /// Language-region locales of the study's consent and informational documents
             ///
             /// - Remark: Generated from `#/components/schemas/StudyResponse/locales`.
             public var locales: [Components.Schemas.LocalizationKey]
@@ -4472,7 +4499,7 @@ extension Components {
             ///   - draftRevision: Opaque revision of the complete editable study draft.
             ///   - collectionRequirements:
             ///   - id:
-            ///   - locales: Supported locales for the study
+            ///   - locales: Language-region locales of the study's consent and informational documents
             ///   - icon: Icon identifier (e.g. SF Symbol name)
             ///   - details:
             ///   - participationCriterion:
@@ -5655,14 +5682,11 @@ extension Components {
                 case data
             }
         }
-        /// Content for a single locale in a questionnaire component
+        /// One FHIR Questionnaire holding its base language and every translation. The server stores, publishes and exports these exact bytes.
+        ///
         ///
         /// - Remark: Generated from `#/components/schemas/QuestionnaireContent`.
         public typealias QuestionnaireContent = TroveAPITypes.QuestionnaireContent
-        /// Localized questionnaire content keyed by locale (e.g., "en-US", "de-DE")
-        ///
-        /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentData`.
-        public typealias QuestionnaireComponentData = GroveLocalization.LocalizationsDictionary<TroveAPITypes.QuestionnaireContent>
         /// Request body for creating or updating a questionnaire component
         ///
         /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentInput`.
@@ -5672,7 +5696,7 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentInput/name`.
             public var name: Swift.String
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentInput/data`.
-            public var data: Components.Schemas.QuestionnaireComponentData
+            public var data: Components.Schemas.QuestionnaireContent
             /// Creates a new `QuestionnaireComponentInput`.
             ///
             /// - Parameters:
@@ -5680,7 +5704,7 @@ extension Components {
             ///   - data:
             public init(
                 name: Swift.String,
-                data: Components.Schemas.QuestionnaireComponentData
+                data: Components.Schemas.QuestionnaireContent
             ) {
                 self.name = name
                 self.data = data
@@ -5690,7 +5714,8 @@ extension Components {
                 case data
             }
         }
-        /// Response containing questionnaire component with ID and name
+        /// Questionnaire component with the languages found in its resource. A draft resource is not validated; publication validation checks it.
+        ///
         ///
         /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse`.
         public struct QuestionnaireComponentResponse: Codable, Hashable, Sendable {
@@ -5701,26 +5726,42 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/name`.
             public var name: Swift.String
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/data`.
-            public var data: Components.Schemas.QuestionnaireComponentData
+            public var data: Components.Schemas.QuestionnaireContent
+            /// The resource's base language (`Questionnaire.language`), as written. Omitted when the draft names none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/language`.
+            public var language: Swift.String?
+            /// Languages of the resource's translation extensions, as written and sorted.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/translationLanguages`.
+            public var translationLanguages: [Swift.String]
             /// Creates a new `QuestionnaireComponentResponse`.
             ///
             /// - Parameters:
             ///   - id:
             ///   - name: Display name for the component
             ///   - data:
+            ///   - language: The resource's base language (`Questionnaire.language`), as written. Omitted when the draft names none.
+            ///   - translationLanguages: Languages of the resource's translation extensions, as written and sorted.
             public init(
                 id: Swift.String,
                 name: Swift.String,
-                data: Components.Schemas.QuestionnaireComponentData
+                data: Components.Schemas.QuestionnaireContent,
+                language: Swift.String? = nil,
+                translationLanguages: [Swift.String]
             ) {
                 self.id = id
                 self.name = name
                 self.data = data
+                self.language = language
+                self.translationLanguages = translationLanguages
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case name
                 case data
+                case language
+                case translationLanguages
             }
         }
         /// Defines how the start date of an export session is determined. This represents a strategy rather than a concrete date.

@@ -70,7 +70,7 @@ enum ComponentFixtures {
             """
         let component = Component(
             studyId: studyId,
-            data: .questionnaire(.init([.enUS: QuestionnaireContent(questionnaire: questionnaireJSON)])),
+            data: .questionnaire(QuestionnaireContent(questionnaire: questionnaireJSON)),
             name: name,
             id: componentId
         )

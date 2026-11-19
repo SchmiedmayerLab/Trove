@@ -34,7 +34,7 @@ enum PublishedStudyFixtures {
             revision: revision,
             visibility: study.visibility,
             enrollmentCondition: study.enrollmentCondition,
-            title: study.details[.enUS]?.title ?? "Synthetic Study",
+            title: study.details.source.title,
             consentSnapshot: consent,
             participationCriterion: study.participationCriterion,
             collectionRequirements: study.collectionRequirements,

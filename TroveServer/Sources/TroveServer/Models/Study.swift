@@ -16,7 +16,7 @@ import Vapor
 struct StudyPatch: Sendable {
     var locales: Set<LocalizationKey>? // swiftlint:disable:this discouraged_optional_collection
     var icon: String?
-    var details: LocalizationsDictionary<StudyDetailContent>?
+    var details: StudyDetailData?
     var participationCriterion: StudyDefinition.ParticipationCriterion?
     var consent: LocalizationsDictionary<ConsentContent>?
     var visibility: StudyVisibility?
@@ -48,7 +48,7 @@ final class Study: Model, @unchecked Sendable {
 
     @Field(key: "icon") var icon: String
 
-    @Field(key: "details") var details: LocalizationsDictionary<StudyDetailContent>
+    @Field(key: "details") var details: StudyDetailData
 
     @Field(key: "participation_criterion") var participationCriterion: StudyDefinition.ParticipationCriterion
 
@@ -88,7 +88,7 @@ final class Study: Model, @unchecked Sendable {
         groupId: UUID,
         locales: Set<LocalizationKey>,
         icon: String,
-        details: LocalizationsDictionary<StudyDetailContent> = .init(),
+        details: StudyDetailData,
         participationCriterion: StudyDefinition.ParticipationCriterion = .all([]),
         consent: LocalizationsDictionary<ConsentContent> = .init(),
         visibility: StudyVisibility = .public,

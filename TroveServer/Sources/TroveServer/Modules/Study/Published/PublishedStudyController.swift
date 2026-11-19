@@ -39,7 +39,12 @@ extension Controller {
             createdAt: candidate.createdAt,
             expiresAt: candidate.expiresAt,
             questionnaires: candidate.snapshot.questionnaires.map {
-                .init(componentId: $0.componentID.uuidString, locale: $0.locale, sha256: $0.validation.sha256)
+                .init(
+                    componentId: $0.componentID.uuidString,
+                    language: $0.validation.language,
+                    translationLanguages: $0.validation.translationLanguages,
+                    sha256: $0.validation.sha256
+                )
             }
         ))))
     }

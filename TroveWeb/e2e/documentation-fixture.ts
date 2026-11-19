@@ -121,7 +121,11 @@ export const seedDocumentationStudy = async () => {
     "POST",
     profile,
   );
-  const create: StudyCreateInput = { title: studyTitle, icon: "heart" };
+  const create: StudyCreateInput = {
+    title: studyTitle,
+    sourceLanguage: "en",
+    icon: "heart",
+  };
   const created = await request(
     researcher,
     `/groups/${group.id}/studies`,
@@ -131,12 +135,15 @@ export const seedDocumentationStudy = async () => {
   );
   const patch: StudyPatchInput = {
     details: {
-      "en-US": {
-        title: studyTitle,
-        shortTitle: "Daily Activity",
-        explanationText:
-          "Help us understand how daily activity supports wellbeing. Review the study information, provide consent, and choose whether to share heart rate data from your device.\n\nThis is a synthetic demonstration, not an active research study.",
-        shortExplanationText: "Exploring everyday movement and wellbeing.",
+      sourceLanguage: "en",
+      content: {
+        en: {
+          title: studyTitle,
+          shortTitle: "Daily Activity",
+          explanationText:
+            "Help us understand how daily activity supports wellbeing. Review the study information, provide consent, and choose whether to share heart rate data from your device.\n\nThis is a synthetic demonstration, not an active research study.",
+          shortExplanationText: "Exploring everyday movement and wellbeing.",
+        },
       },
     },
     participationCriterion: {

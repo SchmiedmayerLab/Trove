@@ -94,8 +94,9 @@ const AddLocaleDialogContent = ({
           />
           <DialogTitle>Add a locale</DialogTitle>
           <DialogDescription>
-            Add a new language to your study. You can then switch to it and
-            start editing content.
+            Add a language-region locale for the study's consent and
+            informational documents. Study details and questionnaires keep their
+            languages in their own content.
           </DialogDescription>
         </DialogHeader>
         <div className="pt-4">
@@ -170,8 +171,10 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
 
   return (
     <>
-      <HeaderSelector selectedItem={{ title: activeLocale }}>
-        <HeaderSelectorMenuLabel>Locales</HeaderSelectorMenuLabel>
+      <HeaderSelector selectedItem={{ title: `Documents · ${activeLocale}` }}>
+        <HeaderSelectorMenuLabel>
+          Consent and informational document locales
+        </HeaderSelectorMenuLabel>
         {locales.map((locale) => (
           <HeaderSelectorMenuItem
             key={locale}

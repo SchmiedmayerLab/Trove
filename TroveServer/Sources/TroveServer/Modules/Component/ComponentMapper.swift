@@ -53,10 +53,13 @@ extension Components.Schemas.QuestionnaireComponentResponse {
         guard case .questionnaire(let content) = model.data else {
             throw ServerError.internalServerError("Expected questionnaire component data")
         }
+        let languages = QuestionnaireLanguages(Data(content.questionnaire.utf8))
         self.init(
             id: try model.requireId().uuidString,
             name: model.name,
-            data: content
+            data: content,
+            language: languages.base,
+            translationLanguages: languages.translations
         )
     }
 }

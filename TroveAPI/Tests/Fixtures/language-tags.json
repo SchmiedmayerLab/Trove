@@ -1,0 +1,7 @@
+{
+  "accept": ["de", "en", "zh-Hant", "pt-BR", "ar", "es-419", "sr-Latn-RS", "yue", "qua", "mus"],
+  "reject": [
+    "", "DE", "de-de", "zh-hant", "en_US", "de-", "-de", "e", "deutsch", "pt-BRA", "en-US-x-private",
+    "zh-Hant-TW-x", "dé", "de-DE ", "und", "mul", "zxx", "mis", "qaa", "qtz", "qaa-Latn", "und-US"
+  ]
+}

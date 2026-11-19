@@ -479,7 +479,7 @@ paths:
       tags: [Studies]
       summary: Validate an exact study draft for publication
       description: >
-        Captures the complete draft, validates every localized Questionnaire against
+        Captures the complete draft, validates every multilingual Questionnaire against
         the pinned Grove FHIR IG and execution capabilities, and stages the exact
         publication archive. The returned validation ID identifies a single immutable
         candidate and is also its future publication ID. Candidates expire within one
@@ -3150,13 +3150,20 @@ components:
     StudyQuestionnaireValidation:
       type: object
       additionalProperties: false
-      required: [componentId, locale, sha256]
+      required: [componentId, language, translationLanguages, sha256]
       properties:
         componentId:
           type: string
           format: uuid
-        locale:
+        language:
           type: string
+          description: The validated resource's base language (`Questionnaire.language`).
+        translationLanguages:
+          type: array
+          uniqueItems: true
+          description: Languages of the resource's translation extensions, sorted.
+          items:
+            type: string
         sha256:
           type: string
           pattern: '^[0-9a-f]{64}$'
@@ -4178,6 +4185,19 @@ components:
       examples:
         - 'en-US'
 
+    LanguageTag:
+      type: string
+      description: >
+        BCP 47 language tag of written content in canonical case: a language,
+        optionally followed by a script and a region. Distinct tags stay distinct;
+        a region is not required. The special codes und, mul, zxx, mis and
+        qaa–qtz name no written language and are rejected.
+      pattern: '^(?!(und|mul|zxx|mis|q[a-t][a-z])(-|$))[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$'
+      examples:
+        - 'de'
+        - 'zh-Hant'
+        - 'pt-BR'
+
     LocalizedString:
       type: object
       description: Localized string keyed by locale (e.g., "en-US" -> "value")
@@ -4239,7 +4259,7 @@ components:
 
     StudyDetailContent:
       type: object
-      description: Per-locale study detail fields
+      description: Study detail fields in one language
       required:
         - title
       properties:
@@ -4254,15 +4274,34 @@ components:
 
     StudyDetailData:
       type: object
-      description: Localized study details keyed by locale
-      additionalProperties:
-        $ref: '#/components/schemas/StudyDetailContent'
+      description: >
+        Study details keyed by language tag. The source language names the
+        language the details were written in; content must include it.
+      additionalProperties: false
+      required:
+        - sourceLanguage
+        - content
+      properties:
+        sourceLanguage:
+          $ref: '#/components/schemas/LanguageTag'
+        content:
+          type: object
+          minProperties: 1
+          propertyNames:
+            $ref: '#/components/schemas/LanguageTag'
+          additionalProperties:
+            $ref: '#/components/schemas/StudyDetailContent'
       examples:
-        - en-US:
-            title: 'My Heart Counts'
-            shortTitle: 'MHC'
-            explanationText: 'This study aims to...'
-            shortExplanationText: 'A heart health study'
+        - sourceLanguage: 'en'
+          content:
+            en:
+              title: 'My Heart Counts'
+              shortTitle: 'MHC'
+              explanationText: 'This study aims to...'
+              shortExplanationText: 'A heart health study'
+            de:
+              title: 'My Heart Counts'
+              shortExplanationText: 'Eine Studie zur Herzgesundheit'
 
     ParticipationCriterion:
       description: >
@@ -4402,20 +4441,23 @@ components:
           format: uuid
         title:
           type: string
-          description: Study title (en-US preferred, falls back to first available locale)
+          description: Study title in the details' source language
 
     StudyCreateInput:
       type: object
       description: Request body for creating a new study
       required:
         - title
+        - sourceLanguage
         - icon
       properties:
         title:
           type: string
-          description: Study title (stored under en-US locale)
+          description: Study title, written in the source language
           examples:
             - 'My Heart Counts'
+        sourceLanguage:
+          $ref: '#/components/schemas/LanguageTag'
         icon:
           type: string
           description: Icon identifier (e.g. SF Symbol name)
@@ -4438,7 +4480,7 @@ components:
         locales:
           type: array
           uniqueItems: true
-          description: Supported locales for the study
+          description: Language-region locales of the study's consent and informational documents
           items:
             $ref: '#/components/schemas/LocalizationKey'
           minItems: 1
@@ -4494,7 +4536,7 @@ components:
         locales:
           type: array
           uniqueItems: true
-          description: Supported locales for the study
+          description: Language-region locales of the study's consent and informational documents
           items:
             $ref: '#/components/schemas/LocalizationKey'
           examples:
@@ -5010,24 +5052,19 @@ components:
 
     QuestionnaireContent:
       type: object
-      description: Content for a single locale in a questionnaire component
+      description: >
+        One FHIR Questionnaire holding its base language and every translation.
+        The server stores, publishes and exports these exact bytes.
       required:
         - questionnaire
       properties:
         questionnaire:
           type: string
-          description: FHIR Questionnaire as JSON string
-
-    QuestionnaireComponentData:
-      type: object
-      description: Localized questionnaire content keyed by locale (e.g., "en-US", "de-DE")
-      additionalProperties:
-        $ref: '#/components/schemas/QuestionnaireContent'
+          description: >
+            FHIR Questionnaire JSON. `Questionnaire.language` names the base language;
+            other languages are standard `translation` extensions on the displayed strings.
       examples:
-        - en-US:
-            questionnaire: '{"resourceType": "Questionnaire", "title": "Daily Survey"}'
-          de-DE:
-            questionnaire: '{"resourceType": "Questionnaire", "title": "Tägliche Umfrage"}'
+        - questionnaire: '{"resourceType": "Questionnaire", "language": "en-US", "title": "Daily Survey", "_title": {"extension": [{"url": "http://hl7.org/fhir/StructureDefinition/translation", "extension": [{"url": "lang", "valueCode": "de"}, {"url": "content", "valueString": "Tägliche Umfrage"}]}]}}'
 
     QuestionnaireComponentInput:
       type: object
@@ -5040,15 +5077,18 @@ components:
           type: string
           description: Display name for the component
         data:
-          $ref: '#/components/schemas/QuestionnaireComponentData'
+          $ref: '#/components/schemas/QuestionnaireContent'
 
     QuestionnaireComponentResponse:
       type: object
-      description: Response containing questionnaire component with ID and name
+      description: >
+        Questionnaire component with the languages found in its resource. A draft
+        resource is not validated; publication validation checks it.
       required:
         - id
         - name
         - data
+        - translationLanguages
       properties:
         id:
           type: string
@@ -5057,7 +5097,16 @@ components:
           type: string
           description: Display name for the component
         data:
-          $ref: '#/components/schemas/QuestionnaireComponentData'
+          $ref: '#/components/schemas/QuestionnaireContent'
+        language:
+          type: string
+          description: The resource's base language (`Questionnaire.language`), as written. Omitted when the draft names none.
+        translationLanguages:
+          type: array
+          uniqueItems: true
+          description: Languages of the resource's translation extensions, as written and sorted.
+          items:
+            type: string
 
     # ── Components — Health Data ──────────────────────────────────────────
 

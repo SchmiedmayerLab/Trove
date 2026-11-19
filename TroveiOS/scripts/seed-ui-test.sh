@@ -101,7 +101,7 @@ curl --fail-with-body --silent --show-error \
     done
 
 created_study="$(
-    jq --null-input --arg title "$STUDY_TITLE" '{title: $title, icon: "heart"}' \
+    jq --null-input --arg title "$STUDY_TITLE" '{title: $title, sourceLanguage: "en", icon: "heart"}' \
         | curl --fail-with-body --silent --show-error \
             --request POST "$SERVER_URL/groups/$group_id/studies" \
             --header "Authorization: Bearer $researcher_token" \

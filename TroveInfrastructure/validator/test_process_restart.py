@@ -72,6 +72,12 @@ class ProcessRestartIdentityTests(unittest.TestCase):
         # CI and this verifier reach the isolated worker only through this relay.
         self.assertIn(f"if not 0 <= size <= {worker.MAX_BODY}:", RELAY)
 
+    def test_relay_forwards_every_route_the_worker_serves(self):
+        # The questionnaire route is reached through the same relay as event validation.
+        self.assertIn("if self.path not in ('/health','/validate','/validate/questionnaire'):", RELAY)
+        source = (ROOT / "TroveInfrastructure/validator/worker.py").read_text()
+        self.assertIn('self.path not in ("/validate", "/validate/questionnaire")', source)
+
     def test_reused_validator_requires_exact_image_and_private_network_without_mutations(self):
         original = {"Id": "owned-fixture-id", "Image": "sha256:selected", "State": {"Running": True, "StartedAt": "fixture-start"},
                     "NetworkSettings": {"Networks": {"fixture-network": {}}},

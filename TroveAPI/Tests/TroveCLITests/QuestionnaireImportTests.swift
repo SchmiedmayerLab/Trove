@@ -26,19 +26,21 @@ struct QuestionnaireImportTests {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("trove-cli-questionnaire-\(UUID()).json")
         try Data(raw.utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
-        let input = try CLIInput.questionnaire(file: file.path, name: "Component Display Name", locale: .enUS)
-        let content = try #require(input.data[.enUS])
+        let input = try CLIInput.questionnaire(file: file.path, name: "Component Display Name")
         #expect(input.name == "Component Display Name")
-        #expect(Data(content.questionnaire.utf8) == Data(raw.utf8))
+        #expect(Data(input.data.questionnaire.utf8) == Data(raw.utf8))
     }
 
-    @Test(arguments: [Data([0xFF]), Data("not JSON".utf8), Data("{}".utf8), Data("{\"resourceType\":\"Patient\"}".utf8)])
+    @Test(arguments: [
+        Data([0xFF]), Data("not JSON".utf8), Data("{}".utf8), Data("{\"resourceType\":\"Patient\"}".utf8),
+        Data([0xEF, 0xBB, 0xBF]) + Data("{\"resourceType\":\"Questionnaire\"}".utf8)
+    ])
     func rejectsWrongResourceOrEncoding(data: Data) throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("trove-cli-questionnaire-\(UUID()).json")
         try data.write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         #expect(throws: CLIError.invalidInput) {
-            try CLIInput.questionnaire(file: file.path, name: "Questionnaire", locale: .enUS)
+            try CLIInput.questionnaire(file: file.path, name: "Questionnaire")
         }
     }
 
@@ -48,7 +50,7 @@ struct QuestionnaireImportTests {
         try Data(repeating: 32, count: 8 * 1024 * 1024 + 1).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         #expect(throws: CLIError.invalidInput) {
-            try CLIInput.questionnaire(file: file.path, name: "Questionnaire", locale: .enUS)
+            try CLIInput.questionnaire(file: file.path, name: "Questionnaire")
         }
     }
 }

@@ -48,7 +48,7 @@ import http.client,http.server,sys
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args): pass
     def forward(self):
-        if self.path not in ('/health','/validate'):
+        if self.path not in ('/health','/validate','/validate/questionnaire'):
             self.send_error(404); return
         size=int(self.headers.get('Content-Length','0'))
         if not 0 <= size <= 16777216:
@@ -471,7 +471,7 @@ class Checkpoint:
         group = self.api_json("/groups", researcher)[0]["id"]
         studies, enrollments, consents = [], [], []
         for label in ("A", "B"):
-            created = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "icon": "heart"}, 201)
+            created = self.api_json(f"/groups/{group}/studies", researcher, "POST", {"title": f"Restart Study {label}", "sourceLanguage": "en", "icon": "heart"}, 201)
             study = response_uuid(created, "id")
             revision = response_uuid(created, "draftRevision")
             edited = self.api_json(f"/studies/{study}", researcher, "PATCH", {

@@ -107,7 +107,8 @@ export const StudySelector = () => {
                     setPendingDelete({
                       id: data.id,
                       title:
-                        Object.values(data.details).at(0)?.title ?? study.title,
+                        data.details.content[data.details.sourceLanguage]
+                          ?.title ?? study.title,
                       draftRevision: data.draftRevision,
                     });
                     deleteDialog.open();

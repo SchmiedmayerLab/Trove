@@ -9,6 +9,7 @@
 import Fluent
 import Foundation
 import GroveLocalization
+import Testing
 import TroveAPIServer
 @testable import TroveServer
 
@@ -26,7 +27,7 @@ enum StudyFixtures {
             groupId: groupId,
             locales: [.enUS],
             icon: "heart",
-            details: .init([.enUS: StudyDetailContent(title: title)]),
+            details: StudyDetailData(sourceLanguage: try #require(LanguageTag(rawValue: "en")), source: StudyDetailContent(title: title)),
             enrollmentCondition: enrollmentCondition,
             id: id
         )

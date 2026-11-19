@@ -124,7 +124,7 @@ extension AuthIntegrationTests {
         ))
         let questionnaire = jsonData(Components.Schemas.QuestionnaireComponentInput(
             name: "X",
-            data: .init([.enUS: QuestionnaireContent(questionnaire: "{}")])
+            data: QuestionnaireContent(questionnaire: "{}")
         ))
         let healthData = jsonData(Components.Schemas.HealthDataComponentInput(
             name: "X",
@@ -397,11 +397,11 @@ private func profileBody(firstName: String = "Jane") -> [String: String] {
 }
 
 private func studyBody(title: String = "X") -> [String: Any] {
-    ["title": title, "icon": "heart"] as [String: Any]
+    ["title": title, "sourceLanguage": "en", "icon": "heart"] as [String: Any]
 }
 
 private func patchBody() -> [String: Any] {
-    ["details": ["en-US": ["title": "Updated"] as [String: Any]] as [String: Any]] as [String: Any]
+    ["details": ["sourceLanguage": "en", "content": ["en": ["title": "Updated"]]] as [String: Any]] as [String: Any]
 }
 
 private func scheduleBody() -> [String: Any] {
