@@ -60,7 +60,8 @@ const EditInformationPage = () => {
 
 const EditQuestionnairePage = () => {
   const params = Route.useParams();
-  const { form, toInput, getDraftHeaders } = useQuestionnaireForm();
+  const { form, toInput, getDraftHeaders, savedRevision } =
+    useQuestionnaireForm();
   const mutation = useUpdateQuestionnaireMutation();
 
   const handleSubmit = form.handleSubmit((data) => {
@@ -88,7 +89,11 @@ const EditQuestionnairePage = () => {
       <QuestionnaireComponentForm
         form={form}
         onSubmit={handleSubmit}
-        saved={{ studyId: params.study, componentId: params.component }}
+        saved={{
+          studyId: params.study,
+          componentId: params.component,
+          revision: savedRevision,
+        }}
       />
     </ComponentPageShell>
   );

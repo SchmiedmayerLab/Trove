@@ -55,12 +55,35 @@ export const itemLinkId = (text: string, path: string): string | undefined => {
   return linkId;
 };
 
-/** The character range of an item's `"linkId": "<id>"` member in the JSON text. */
+const parseString = (literal: string): unknown => {
+  try {
+    return JSON.parse(literal);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The character range of an item's `"linkId": "<id>"` member in the JSON text. Strings are read in order,
+ * so text inside a string value that looks like a member is never matched.
+ */
 export const linkIdRange = (
   text: string,
   linkId: string,
 ): [number, number] | undefined => {
-  const escaped = JSON.stringify(linkId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = new RegExp(`"linkId"\\s*:\\s*${escaped}`).exec(text);
-  return match ? [match.index, match.index + match[0].length] : undefined;
+  const strings = /"(?:[^"\\]|\\.)*"/g;
+  let previous: RegExpExecArray | null = null;
+  for (let match = strings.exec(text); match; match = strings.exec(text)) {
+    if (
+      previous?.[0] === '"linkId"' &&
+      /^\s*:\s*$/.test(
+        text.slice(previous.index + previous[0].length, match.index),
+      ) &&
+      parseString(match[0]) === linkId
+    ) {
+      return [previous.index, match.index + match[0].length];
+    }
+    previous = match;
+  }
+  return undefined;
 };

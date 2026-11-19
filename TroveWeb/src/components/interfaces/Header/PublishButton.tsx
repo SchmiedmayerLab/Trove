@@ -35,7 +35,7 @@ import {
   useValidateStudyMutation,
 } from "@/lib/queries/study";
 import { FeaturedIconContainer } from "../../ui/FeaturedIconContainer";
-import { ValidationDiagnostics } from "../ValidationDiagnostics";
+import { PublicationFindings } from "./PublicationFindings";
 
 const PublicationDialog = ({
   studyId,
@@ -147,35 +147,14 @@ const PublicationDialog = ({
             </dl>
           </details>
         )}
-        {report &&
-          (report.blockers.length > 0 ||
-            report.advisories.length > 0 ||
-            !candidate) && (
-            <div className="grid max-h-80 gap-4 overflow-y-auto">
-              {(!candidate || report.blockers.length > 0) && (
-                <ValidationDiagnostics
-                  key={`blockers:${report.status}`}
-                  title="Blockers"
-                  status={report.status}
-                  diagnostics={report.blockers}
-                  componentName={(id) =>
-                    components?.find((component) => component.id === id)?.name
-                  }
-                  focusOnMount
-                />
-              )}
-              {report.advisories.length > 0 && (
-                <ValidationDiagnostics
-                  title="Advisories"
-                  status={report.status}
-                  diagnostics={report.advisories}
-                  componentName={(id) =>
-                    components?.find((component) => component.id === id)?.name
-                  }
-                />
-              )}
-            </div>
-          )}
+        {report && (
+          <PublicationFindings
+            report={report}
+            componentName={(id) =>
+              components?.find((component) => component.id === id)?.name
+            }
+          />
+        )}
         {needsReview && (
           <p role="alert" className="text-sm">
             The draft or validation is no longer current. Reload and review the
@@ -197,35 +176,6 @@ const PublicationDialog = ({
           >
             Cancel
           </Button>
-          {report &&
-            (report.blockers.length > 0 ||
-              report.advisories.length > 0 ||
-              !candidate) && (
-              <div className="grid max-h-80 gap-4 overflow-y-auto">
-                {(!candidate || report.blockers.length > 0) && (
-                  <ValidationDiagnostics
-                    key={`blockers:${report.status}`}
-                    title="Blockers"
-                    status={report.status}
-                    diagnostics={report.blockers}
-                    componentName={(id) =>
-                      components?.find((component) => component.id === id)?.name
-                    }
-                    focusOnMount
-                  />
-                )}
-                {report.advisories.length > 0 && (
-                  <ValidationDiagnostics
-                    title="Advisories"
-                    status={report.status}
-                    diagnostics={report.advisories}
-                    componentName={(id) =>
-                      components?.find((component) => component.id === id)?.name
-                    }
-                  />
-                )}
-              </div>
-            )}
           {needsReview && (
             <Button size="sm" onClick={() => window.location.reload()}>
               Reload and review

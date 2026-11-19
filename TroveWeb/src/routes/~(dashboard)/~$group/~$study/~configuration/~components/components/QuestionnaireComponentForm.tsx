@@ -29,6 +29,7 @@ import { useValidateComponentMutation } from "@/lib/queries/component";
 import { questionnaireLanguages } from "@/lib/questionnaireLanguages";
 import { itemLinkId, linkIdRange } from "@/lib/validationDiagnostics";
 import { enhanceField } from "@/utils/enhanceField";
+import { shownValidation } from "../../lib/questionnaireForm";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
 
 // Reformatting rewrites the resource, so it only happens on request.
@@ -47,20 +48,28 @@ const downloadFile = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-/** Validates the saved component and lists its findings; unsaved text is not validated. */
+/**
+ * Validates the saved component and lists its findings. A result is shown only for the saved
+ * revision it describes and only while there are no unsaved changes.
+ */
 const QuestionnaireValidationSection = ({
   studyId,
   componentId,
+  savedRevision,
   hasUnsavedChanges,
   locate,
 }: {
   studyId: string;
   componentId: string;
+  savedRevision: string | undefined;
   hasUnsavedChanges: boolean;
-  locate: (diagnostic: ValidationDiagnostic) => (() => void) | undefined;
+  locate: (
+    diagnostic: ValidationDiagnostic,
+  ) => { target: string; show: () => void } | undefined;
 }) => {
   const validate = useValidateComponentMutation();
   const [result, setResult] = useState<QuestionnaireValidation>();
+  const shown = shownValidation(result, savedRevision, hasUnsavedChanges);
 
   return (
     <div className="border-border-tertiary grid gap-3 border-t px-6 pt-6">
@@ -91,12 +100,12 @@ const QuestionnaireValidationSection = ({
           Validate saved questionnaire
         </Button>
       </div>
-      {result && (
+      {shown && (
         <ValidationDiagnostics
-          key={`${result.sha256}:${result.draftRevision}`}
+          key={`${shown.sha256}:${shown.draftRevision}`}
           title="Validation result"
-          status={result.status}
-          diagnostics={result.diagnostics}
+          status={shown.status}
+          diagnostics={shown.diagnostics}
           locate={locate}
           focusOnMount
         />
@@ -108,8 +117,12 @@ const QuestionnaireValidationSection = ({
 interface QuestionnaireComponentFormProps {
   form: QuestionnaireForm;
   onSubmit: (event?: BaseSyntheticEvent) => Promise<void>;
-  /** The saved component to validate; omitted while creating one. */
-  saved?: { studyId: string; componentId: string };
+  /** The saved component to validate and its draft revision; omitted while creating one. */
+  saved?: {
+    studyId: string;
+    componentId: string;
+    revision: string | undefined;
+  };
 }
 
 export const QuestionnaireComponentForm = ({
@@ -125,10 +138,13 @@ export const QuestionnaireComponentForm = ({
     const linkId = itemLinkId(questionnaireJson, diagnostic.path);
     const range = linkId && linkIdRange(questionnaireJson, linkId);
     if (!range) return undefined;
-    return () => {
-      const textarea = editorRef.current?.querySelector("textarea");
-      textarea?.focus();
-      textarea?.setSelectionRange(...range);
+    return {
+      target: linkId,
+      show: () => {
+        const textarea = editorRef.current?.querySelector("textarea");
+        textarea?.focus();
+        textarea?.setSelectionRange(...range);
+      },
     };
   };
 
@@ -272,6 +288,7 @@ export const QuestionnaireComponentForm = ({
         <QuestionnaireValidationSection
           studyId={saved.studyId}
           componentId={saved.componentId}
+          savedRevision={saved.revision}
           hasUnsavedChanges={form.formState.isDirty}
           locate={locate}
         />

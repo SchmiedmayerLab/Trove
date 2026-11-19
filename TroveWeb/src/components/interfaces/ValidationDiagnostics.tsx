@@ -31,8 +31,12 @@ interface ValidationDiagnosticsProps {
   diagnostics: ValidationDiagnostic[];
   /** Names a component by its ID, for findings of a draft validation. */
   componentName?: (componentId: string) => string | undefined;
-  /** An action that shows the element a finding concerns, when that element can be found. */
-  locate?: (diagnostic: ValidationDiagnostic) => (() => void) | undefined;
+  /** Shows the element a finding concerns, when that element can be found, naming it in the action. */
+  locate?: (
+    diagnostic: ValidationDiagnostic,
+  ) => { target: string; show: () => void } | undefined;
+  /** Whether to state the overall result; a second list of the same result omits it. */
+  showStatus?: boolean;
   /** Moves focus to the heading when a new result appears, instead of announcing it. */
   focusOnMount?: boolean;
 }
@@ -47,9 +51,11 @@ export const ValidationDiagnostics = ({
   diagnostics,
   componentName,
   locate,
+  showStatus = true,
   focusOnMount = false,
 }: ValidationDiagnosticsProps) => {
   const headingId = useId();
+  const statusId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (focusOnMount) headingRef.current?.focus();
@@ -61,16 +67,17 @@ export const ValidationDiagnostics = ({
         id={headingId}
         ref={headingRef}
         tabIndex={-1}
-        className="font-medium outline-none"
+        aria-describedby={showStatus ? statusId : undefined}
+        className="focus:ring-border-focus rounded-sm font-medium outline-hidden focus:ring-2"
       >
         {title}
       </h3>
-      <p>{statusSummary[status]}</p>
+      {showStatus && <p id={statusId}>{statusSummary[status]}</p>}
       {diagnostics.length > 0 && (
         <ul className="grid gap-2">
           {diagnostics.map((diagnostic, index) => {
             const Icon = severityIcon[diagnostic.severity];
-            const show = locate?.(diagnostic);
+            const location = locate?.(diagnostic);
             const component =
               diagnostic.componentId &&
               (componentName?.(diagnostic.componentId) ??
@@ -116,15 +123,15 @@ export const ValidationDiagnostics = ({
                     <span className="font-mono">{diagnostic.rule}</span>
                   </dd>
                 </dl>
-                {show && (
+                {location && (
                   <div>
                     <Button
                       type="button"
                       size="xs"
                       variant="outlineBg"
-                      onClick={show}
+                      onClick={location.show}
                     >
-                      Show item in JSON
+                      Show item {location.target} in JSON
                     </Button>
                   </div>
                 )}

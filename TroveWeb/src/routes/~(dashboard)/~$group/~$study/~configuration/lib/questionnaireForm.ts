@@ -44,3 +44,16 @@ export const questionnaireInput = (
   name: values.name,
   data: { questionnaire: values.questionnaire },
 });
+
+/**
+ * A component validation result is shown only for the saved revision it describes and only while
+ * the form has no unsaved changes; any other result describes text the form no longer shows.
+ */
+export const shownValidation = <Result extends { draftRevision: string }>(
+  result: Result | undefined,
+  savedRevision: string | undefined,
+  hasUnsavedChanges: boolean,
+): Result | undefined =>
+  result && !hasUnsavedChanges && result.draftRevision === savedRevision ?
+    result
+  : undefined;

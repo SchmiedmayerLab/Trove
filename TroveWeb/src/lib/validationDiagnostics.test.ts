@@ -50,4 +50,12 @@ describe("linkIdRange", () => {
     expect(text.slice(...dotted)).toBe('"linkId": "group.1"');
     expect(linkIdRange(text, "groupX1")).toBeUndefined();
   });
+
+  it("ignores member-like text inside a string value", () => {
+    const tricky =
+      '{"text": "\\"linkId\\": \\"x\\"", "item": [{"linkId": "x"}]}';
+    const [start, end] = linkIdRange(tricky, "x") ?? [0, 0];
+    expect(start).toBe(tricky.indexOf('{"linkId"') + 1);
+    expect(tricky.slice(start, end)).toBe('"linkId": "x"');
+  });
 });

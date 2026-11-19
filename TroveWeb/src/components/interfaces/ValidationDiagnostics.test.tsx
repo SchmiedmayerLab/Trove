@@ -34,7 +34,9 @@ describe("ValidationDiagnostics", () => {
       diagnostics={diagnostics}
       componentName={(id) => (id === "component-1" ? "Wellbeing" : undefined)}
       locate={(diagnostic) =>
-        diagnostic.path.includes("item") ? () => undefined : undefined
+        diagnostic.path.includes("item") ?
+          { target: "visited", show: () => undefined }
+        : undefined
       }
     />,
   );
@@ -59,10 +61,14 @@ describe("ValidationDiagnostics", () => {
   });
 
   it("offers to show only findings whose element can be found, without live regions", () => {
-    expect(markup.match(/Show item in JSON/g)).toHaveLength(1);
+    expect(
+      markup.match(/Show item (<!-- -->)?visited(<!-- -->)? in JSON/g),
+    ).toHaveLength(1);
     expect(markup).not.toContain("aria-live");
     expect(markup).not.toContain('role="alert"');
     expect(markup).toMatch(/<section aria-labelledby="[^"]+"/);
+    const describedBy = /aria-describedby="([^"]+)"/.exec(markup)?.[1];
+    expect(markup).toContain(`<p id="${describedBy}">Invalid.`);
   });
 
   it("states that an unavailable validator establishes nothing", () => {

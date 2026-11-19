@@ -58,6 +58,8 @@ export const useQuestionnaireForm = () => {
     toInput: (formData: QuestionnaireFormValues) =>
       questionnaireInput(formData),
     getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
+    /** The draft revision of the loaded component, which a validation result must match. */
+    savedRevision: snapshot?.draftRevision,
   };
 };
 
