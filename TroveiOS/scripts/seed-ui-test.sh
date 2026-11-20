@@ -134,8 +134,8 @@ validation="$(
         --header "If-Match: \"$updated_revision\""
 )"
 jq --exit-status --arg revision "$updated_revision" \
-    '.draftRevision == $revision and .publicationRevision == 1' <<< "$validation" > /dev/null
-validation_id="$(jq --exit-status --raw-output '.id' <<< "$validation")"
+    '.status == "valid" and .draftRevision == $revision and .candidate.publicationRevision == 1' <<< "$validation" > /dev/null
+validation_id="$(jq --exit-status --raw-output '.candidate.id' <<< "$validation")"
 
 jq --null-input --arg id "$validation_id" '{validationId: $id}' \
     | curl --fail-with-body --silent --show-error \

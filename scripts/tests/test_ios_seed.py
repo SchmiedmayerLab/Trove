@@ -39,7 +39,8 @@ class IOSSeedTests(unittest.TestCase):
             ("POST", "/groups/group/studies", 201, {"id": "new", "draftRevision": CREATED}),
             ("PATCH", "/studies/new", patch_status, {"draftRevision": UPDATED}),
             ("POST", "/studies/new/draft/validations", 201, {
-                "id": CANDIDATE, "draftRevision": receipt_revision, "publicationRevision": 1,
+                "status": "valid", "draftRevision": receipt_revision,
+                "candidate": {"id": CANDIDATE, "publicationRevision": 1},
             }),
             ("POST", "/studies/new/publish", 201, {}),
             ("GET", "/participant/studies", 200, [{"studyId": "new"}]),

@@ -289,6 +289,17 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.validateStudyComponent(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/components/{componentId}/validations")
+        )
+        try transport.register(
+            {
                 try await server.postStudiesStudyIdComponentsInformational(
                     request: $0,
                     body: $1,
@@ -2533,7 +2544,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -2580,6 +2591,24 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                 case let .created(value):
                     suppressUnusedWarning(value)
                     var response = HTTPTypes.HTTPResponse(soar_statusCode: 201)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
                     suppressMutabilityWarning(&response)
                     let body: OpenAPIRuntime.HTTPBody
                     switch value.body {
@@ -3663,6 +3692,94 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                             value,
                             headerFields: &response.headerFields,
                             contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Validate a questionnaire component's stored resource
+    ///
+    /// Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the official FHIR Validator, the IG's Questionnaire rules, and the execution capabilities of the supported study client. Returns every finding with its severity, rule, element path and, for a translation, its language. Only `valid` means that no finding is an error and no check was reported as skipped. The result is not stored, does not change the draft and is not publication evidence; publication requires draft validation. Other component types return 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
+    func validateStudyComponent(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.ValidateStudyComponent.id,
+            using: {
+                APIHandler.validateStudyComponent($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.ValidateStudyComponent.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    componentId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "componentId",
+                        as: Components.Parameters.ComponentId.self
+                    )
+                )
+                let headers: Operations.ValidateStudyComponent.Input.Headers = .init(
+                    troveDelegationID: try converter.getOptionalHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Delegation-ID",
+                        as: Components.Parameters.DelegationId.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                return Operations.ValidateStudyComponent.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
                         )
                     }
                     return (response, body)

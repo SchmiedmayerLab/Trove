@@ -12,11 +12,27 @@ import {
   Input,
   Textarea,
 } from "@schmiedmayerlab/grove-design-system";
-import { useRef, type BaseSyntheticEvent, type ChangeEvent } from "react";
+import {
+  useRef,
+  useState,
+  type BaseSyntheticEvent,
+  type ChangeEvent,
+} from "react";
+import { ValidationDiagnostics } from "@/components/interfaces/ValidationDiagnostics";
 import { CardHeader } from "@/components/ui/Card";
 import { FieldLabel } from "@/components/ui/FieldLabel";
+import type {
+  QuestionnaireValidation,
+  ValidationDiagnostic,
+} from "@/lib/api/generated/types.gen";
+import { useValidateComponentMutation } from "@/lib/queries/component";
 import { questionnaireLanguages } from "@/lib/questionnaireLanguages";
+import { itemLinkId, linkIdRange } from "@/lib/validationDiagnostics";
 import { enhanceField } from "@/utils/enhanceField";
+import {
+  isStaleValidation,
+  shownValidation,
+} from "../../lib/questionnaireForm";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
 
 // Reformatting rewrites the resource, so it only happens on request.
@@ -35,17 +51,111 @@ const downloadFile = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+/**
+ * Validates the saved component and lists its findings. A result is shown only for the saved
+ * revision it describes and only while there are no unsaved changes.
+ */
+const QuestionnaireValidationSection = ({
+  studyId,
+  componentId,
+  savedRevision,
+  hasUnsavedChanges,
+  locate,
+}: {
+  studyId: string;
+  componentId: string;
+  savedRevision: string | undefined;
+  hasUnsavedChanges: boolean;
+  locate: (
+    diagnostic: ValidationDiagnostic,
+  ) => { target: string; show: () => void } | undefined;
+}) => {
+  const validate = useValidateComponentMutation();
+  const [result, setResult] = useState<QuestionnaireValidation>();
+  const shown = shownValidation(result, savedRevision, hasUnsavedChanges);
+
+  return (
+    <div className="border-border-tertiary grid gap-3 border-t px-6 pt-6">
+      <FieldLabel
+        title="Validation"
+        description="Checks the saved questionnaire with the FHIR Validator, the Grove questionnaire rules and the study app's supported features. Publishing validates the draft again."
+      />
+      {hasUnsavedChanges && (
+        <p className="text-text-secondary text-sm">
+          Save your changes to validate them.
+        </p>
+      )}
+      <div>
+        <Button
+          type="button"
+          size="xs"
+          variant="outlineBg"
+          disabled={hasUnsavedChanges || validate.isPending}
+          isPending={validate.isPending}
+          onClick={() => {
+            setResult(undefined);
+            validate.mutate(
+              { path: { studyId, componentId } },
+              { onSuccess: setResult },
+            );
+          }}
+        >
+          Validate saved questionnaire
+        </Button>
+      </div>
+      {isStaleValidation(result, savedRevision, hasUnsavedChanges) && (
+        <p role="status" className="text-text-secondary text-sm">
+          The draft changed since this page loaded. Reload to see the current
+          result.
+        </p>
+      )}
+      {shown && (
+        <ValidationDiagnostics
+          key={`${shown.sha256}:${shown.draftRevision}`}
+          title="Validation result"
+          status={shown.status}
+          diagnostics={shown.diagnostics}
+          locate={locate}
+          focusOnMount
+        />
+      )}
+    </div>
+  );
+};
+
 interface QuestionnaireComponentFormProps {
   form: QuestionnaireForm;
   onSubmit: (event?: BaseSyntheticEvent) => Promise<void>;
+  /** The saved component to validate and its draft revision; omitted while creating one. */
+  saved?: {
+    studyId: string;
+    componentId: string;
+    revision: string | undefined;
+  };
 }
 
 export const QuestionnaireComponentForm = ({
   form,
   onSubmit,
+  saved,
 }: QuestionnaireComponentFormProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const questionnaireJson = form.watch("questionnaire");
+
+  const locate = (diagnostic: ValidationDiagnostic) => {
+    const linkId = itemLinkId(questionnaireJson, diagnostic.path);
+    const range = linkId && linkIdRange(questionnaireJson, linkId);
+    if (!range) return undefined;
+    return {
+      target: linkId,
+      show: () => {
+        const textarea = editorRef.current?.querySelector("textarea");
+        textarea?.focus();
+        textarea?.setSelectionRange(...range);
+      },
+    };
+  };
 
   const setQuestionnaireJson = (json: string) => {
     form.setValue("questionnaire", json, {
@@ -131,7 +241,7 @@ export const QuestionnaireComponentForm = ({
           }
           className="px-6 pt-6"
           render={({ field }) => (
-            <div>
+            <div ref={editorRef}>
               <Textarea {...field} rows={10} className="w-full font-mono" />
               {languages ?
                 <dl className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm">
@@ -183,6 +293,15 @@ export const QuestionnaireComponentForm = ({
           )}
         />
       </form>
+      {saved && (
+        <QuestionnaireValidationSection
+          studyId={saved.studyId}
+          componentId={saved.componentId}
+          savedRevision={saved.revision}
+          hasUnsavedChanges={form.formState.isDirty}
+          locate={locate}
+        />
+      )}
     </>
   );
 };

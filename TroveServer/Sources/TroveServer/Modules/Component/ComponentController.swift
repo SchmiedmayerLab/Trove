@@ -109,6 +109,26 @@ extension Controller {
         return .created(.init(body: .json(try .init(component))))
     }
 
+    func validateStudyComponent(_ input: Operations.ValidateStudyComponent.Input) async throws -> Operations.ValidateStudyComponent.Output {
+        let componentID = try input.path.componentId.requireId()
+        let (draftRevision, result) = try await studyValidationService.validateComponent(
+            studyID: input.path.studyId.requireId(), componentID: componentID
+        )
+        return .ok(.init(body: .json(.init(
+            componentId: componentID.uuidString,
+            draftRevision: draftRevision.uuidString,
+            status: result.status,
+            sha256: result.sha256,
+            language: result.language,
+            translationLanguages: result.translationLanguages,
+            validatorIdentity: result.validatorIdentity,
+            contractVersion: FHIRValidationClient.contractVersion,
+            contractRevision: FHIRValidationClient.contractRevision,
+            executionCapability: QuestionnaireValidationService.executionCapability,
+            diagnostics: result.diagnostics
+        ))))
+    }
+
     func getStudiesStudyIdComponentsQuestionnaireComponentId(
         _ input: Operations.GetStudiesStudyIdComponentsQuestionnaireComponentId.Input
     ) async throws -> Operations.GetStudiesStudyIdComponentsQuestionnaireComponentId.Output {

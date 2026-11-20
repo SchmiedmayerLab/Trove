@@ -11,14 +11,30 @@ import Foundation
 import Grove
 
 
-/// Validates one captured draft, then records a short-lived, immutable publication candidate.
+/// Validates one captured draft and, when it is valid, records a short-lived, immutable publication candidate.
 /// Validator and object-storage requests never run while holding a database transaction.
 final class StudyValidationService: Module, @unchecked Sendable {
+    /// The outcome of validating one exact draft. Only a `valid` report carries a candidate.
+    struct Report: Sendable {
+        struct Questionnaire: Sendable {
+            let componentID: UUID
+            let result: QuestionnaireValidationService.Result
+        }
+
+        let draftRevision: UUID
+        let status: ValidationStatus
+        let blockers: [ValidationDiagnostic]
+        let advisories: [ValidationDiagnostic]
+        let questionnaires: [Questionnaire]
+        let candidate: StudyPublicationCandidate?
+    }
+
     @Dependency(StudyRepository.self) var repository
     @Dependency(AuthorizationService.self) var authorizationService
     @Dependency(StudyBundleService.self) var bundleService
     @Dependency(ObjectStorageService.self) var storageService
     @Dependency(ProviderRuntime.self) var providerRuntime
+    @Dependency(StudyService.self) var studyService
 
     let validator: FHIRValidationClient
 
@@ -33,12 +49,85 @@ final class StudyValidationService: Module, @unchecked Sendable {
         return maximum + 1
     }
 
-    func validate(studyID: UUID, expectedRevision: UUID) async throws -> StudyPublicationCandidate {
+    func validate(studyID: UUID, expectedRevision: UUID) async throws -> Report {
         let (study, publicationRevision) = try await capture(studyID: studyID, expectedRevision: expectedRevision)
-        let identity = try validator.requireIdentity()
         let createdAt = Date()
+        let questionnaires = try await validateQuestionnaires(in: study, at: createdAt)
+        let details = StudyBundleService.detailLanguageDiagnostics(study.details.content.keys)
+        var statuses = questionnaires.map(\.result.status) + [details.isEmpty ? .valid : .invalid]
+        var findings = questionnaires.flatMap { entry in entry.result.diagnostics.map { $0.concerning(component: entry.componentID) } }
+        findings += details
+        if (try? validator.requireIdentity()) == nil {
+            // Every candidate, with or without questionnaires, names the pinned validator.
+            if !statuses.contains(.unavailable) {
+                findings.append(.trove(
+                    "validator-unavailable",
+                    path: "",
+                    message: "No pinned FHIR validator is configured, so no candidate can be created.",
+                    nextAction: "Validate again once the validator is available."
+                ))
+            }
+            statuses.append(.unavailable)
+        }
+        let status = ValidationStatus.combined(statuses)
+        // Each result that is not valid carries an error finding that says why, so errors are exactly the blockers.
+        let blockers = findings.filter { $0.severity == .error }
+        let advisories = findings.filter { $0.severity != .error }
+        guard status == .valid else {
+            return Report(
+                draftRevision: expectedRevision,
+                status: status,
+                blockers: blockers,
+                advisories: advisories,
+                questionnaires: questionnaires,
+                candidate: nil
+            )
+        }
+        let candidate = try await stage(
+            study, publicationRevision: publicationRevision, expectedRevision: expectedRevision, questionnaires: questionnaires, at: createdAt
+        )
+        return Report(
+            draftRevision: expectedRevision,
+            status: .valid,
+            blockers: [],
+            advisories: advisories,
+            questionnaires: questionnaires,
+            candidate: candidate
+        )
+    }
+
+    /// Validates one questionnaire component's stored resource without staging or recording anything.
+    func validateComponent(studyID: UUID, componentID: UUID) async throws -> (draftRevision: UUID, result: QuestionnaireValidationService.Result) {
+        let (draftRevision, content) = try await studyService.readDraft(id: studyID, operation: .validate) { study, transaction in
+            guard let component = try await ComponentRepository(database: transaction).find(id: componentID, studyId: studyID) else {
+                throw ServerError.notFound(resource: "Component", identifier: componentID.uuidString)
+            }
+            guard case .questionnaire(let content) = component.data else {
+                throw ServerError(
+                    status: .unprocessableContent, title: "Unsupported Validation", detail: "Only questionnaire components have validation"
+                )
+            }
+            return (study.draftRevision, content)
+        }
+        let result = try await QuestionnaireValidationService(validator: validator)
+            .validate(bytes: Data(content.questionnaire.utf8), evaluationInstant: Date())
+        return (draftRevision, result)
+    }
+
+    private func stage(
+        _ study: Study, publicationRevision: Int, expectedRevision: UUID, questionnaires: [Report.Questionnaire], at createdAt: Date
+    ) async throws -> StudyPublicationCandidate {
+        let studyID = try study.requireId()
+        let identity = try validator.requireIdentity()
         let publication = try bundleService.preparePublication(from: study, revision: publicationRevision)
-        let evidence = try await validateQuestionnaires(publication.questionnaires, at: createdAt)
+        // The archive holds each component's stored bytes, so the validated digests describe it exactly.
+        let evidence = try publication.questionnaires.map { resource in
+            guard let validation = questionnaires.first(where: { $0.componentID == resource.componentID })?.result.evidence,
+                  validation.sha256 == FHIRValidationClient.digest(resource.bytes) else {
+                throw ServerError.internalServerError("Validated questionnaire bytes differ from the archive")
+            }
+            return StudyPublicationCandidate.QuestionnaireEvidence(componentID: resource.componentID, validation: validation)
+        }
         let expiresAt = evidence.compactMap { $0.validation.validUntil }.reduce(createdAt.addingTimeInterval(3600), min)
         try Task.checkCancellation()
         guard expiresAt > Date() else { throw ServerError.conflict("Questionnaire eligibility expired during validation") }
@@ -90,22 +179,24 @@ final class StudyValidationService: Module, @unchecked Sendable {
         }
     }
 
-    private func validateQuestionnaires(
-        _ resources: [StudyBundleService.QuestionnaireResource], at instant: Date
-    ) async throws -> [StudyPublicationCandidate.QuestionnaireEvidence] {
+    private func validateQuestionnaires(in study: Study, at instant: Date) async throws -> [Report.Questionnaire] {
         let questionnaires = QuestionnaireValidationService(validator: validator)
-        var evidence: [StudyPublicationCandidate.QuestionnaireEvidence] = []
+        var results: [Report.Questionnaire] = []
         var deadline = instant.addingTimeInterval(3600)
-        for resource in resources {
+        let components = (study.$components.value ?? []).sorted { ($0.id?.uuidString ?? "") < ($1.id?.uuidString ?? "") }
+        for component in components {
+            guard case .questionnaire(let content) = component.data else {
+                continue
+            }
             try Task.checkCancellation()
             guard Date() < deadline else { throw ServerError.conflict("Study validation expired before all resources could be checked") }
-            let result = try await questionnaires.validate(bytes: resource.bytes, evaluationInstant: instant)
-            evidence.append(.init(componentID: resource.componentID, validation: result))
-            if let validUntil = result.validUntil {
+            let result = try await questionnaires.validate(bytes: Data(content.questionnaire.utf8), evaluationInstant: instant)
+            results.append(.init(componentID: try component.requireId(), result: result))
+            if let validUntil = result.evidence?.validUntil {
                 deadline = min(deadline, validUntil)
             }
         }
-        return evidence
+        return results
     }
 
     private func persist(_ candidate: StudyPublicationCandidate) async throws -> StudyPublicationCandidate {

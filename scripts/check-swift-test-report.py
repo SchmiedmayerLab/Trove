@@ -27,6 +27,7 @@ FULL_VALIDATOR_TESTS = {
     ("TroveServerTests.FHIRClinicalDerivationTests", "pinnedPendingAndTargetKeepTheirReferenceSemantics()"),
     ("TroveServerTests.ReceiverRevisionCorpusTests", "completeRevisionSequenceAndRestart(index:)"),
     ("TroveServerTests.MultilingualQuestionnaireValidationTests", "fullValidatorAcceptsBilingualQuestionnairesAndRejectsConflictingTranslations()"),
+    ("TroveServerTests.QuestionnaireResponseValidationTests", "fullValidatorChecksResponsesAgainstTheirExactQuestionnaire()"),
 }
 
 

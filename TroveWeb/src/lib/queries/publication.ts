@@ -4,7 +4,7 @@
 import { ApiError } from "../api/client";
 import type {
   PostStudiesByStudyIdPublishData,
-  StudyDraftValidation,
+  StudyPublicationCandidate,
   ValidateStudyDraftData,
 } from "../api/generated/types.gen";
 import { draftHeaders } from "./draft";
@@ -17,13 +17,14 @@ export const validationRequest = (
   headers: draftHeaders(draftRevision),
 });
 
-/** Publication identity comes only from the receipt the researcher reviewed. */
+/** Publication identity comes only from the candidate and revision the researcher reviewed. */
 export const publicationRequest = (
   studyId: string,
-  candidate: StudyDraftValidation,
+  draftRevision: string,
+  candidate: StudyPublicationCandidate,
 ): Pick<PostStudiesByStudyIdPublishData, "path" | "headers" | "body"> => ({
   path: { studyId },
-  headers: draftHeaders(candidate.draftRevision),
+  headers: draftHeaders(draftRevision),
   body: { validationId: candidate.id },
 });
 

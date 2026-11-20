@@ -25,28 +25,37 @@ extension Controller {
     }
 
     func validateStudyDraft(_ input: Operations.ValidateStudyDraft.Input) async throws -> Operations.ValidateStudyDraft.Output {
-        let candidate = try await studyValidationService.validate(
+        let report = try await studyValidationService.validate(
             studyID: input.path.studyId.requireId(), expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch)
         )
-        return .created(.init(body: .json(try .init(
-            id: candidate.requireId().uuidString,
-            draftRevision: candidate.draftRevision.uuidString,
-            publicationRevision: candidate.publicationRevision,
-            bundleSha256: candidate.bundleDigest,
-            validatorIdentity: candidate.validatorIdentity,
-            contractRevision: candidate.contractRevision,
-            executionCapability: candidate.executionCapability,
-            createdAt: candidate.createdAt,
-            expiresAt: candidate.expiresAt,
-            questionnaires: candidate.snapshot.questionnaires.map {
+        let body = Components.Schemas.StudyDraftValidation(
+            draftRevision: report.draftRevision.uuidString,
+            status: report.status,
+            blockers: report.blockers,
+            advisories: report.advisories,
+            questionnaires: report.questionnaires.map {
                 .init(
                     componentId: $0.componentID.uuidString,
-                    language: $0.validation.language,
-                    translationLanguages: $0.validation.translationLanguages,
-                    sha256: $0.validation.sha256
+                    status: $0.result.status,
+                    language: $0.result.language,
+                    translationLanguages: $0.result.translationLanguages,
+                    sha256: $0.result.sha256
+                )
+            },
+            candidate: try report.candidate.map {
+                .init(
+                    id: try $0.requireId().uuidString,
+                    publicationRevision: $0.publicationRevision,
+                    bundleSha256: $0.bundleDigest,
+                    validatorIdentity: $0.validatorIdentity,
+                    contractRevision: $0.contractRevision,
+                    executionCapability: $0.executionCapability,
+                    createdAt: $0.createdAt,
+                    expiresAt: $0.expiresAt
                 )
             }
-        ))))
+        )
+        return body.candidate == nil ? .ok(.init(body: .json(body))) : .created(.init(body: .json(body)))
     }
 
     func getStudiesStudyIdPublished(

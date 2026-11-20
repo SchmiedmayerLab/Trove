@@ -34,12 +34,13 @@ struct MultilingualQuestionnaireValidationTests {
         return try JSONSerialization.data(withJSONObject: resource)
     }
 
-    /// The validator client itself accepts the unchanged fixture and rejects both `qg-translation-1` violations:
-    /// a translation into the base language, and a second translation into one language. The worker reports only
-    /// `invalid_fhir`; the rule is not part of its reply.
+    /// The validator accepts the unchanged fixture and rejects both `qg-translation-1` violations, a translation into
+    /// the base language and a second translation into one language, naming the invariant in an error finding.
     private static func expectTranslationViolationsFail(validator: FHIRValidationClient) async throws {
         let fixture = try #require(try MultilingualQuestionnaireFixture.all().first { $0.translationLanguage == "de" })
-        #expect(try await validator.validateQuestionnaire(fixture.bytes()) == validator.expectedIdentity)
+        let accepted = try await validator.validateQuestionnaire(fixture.bytes())
+        #expect(accepted.status == .valid, "\(accepted.diagnostics)")
+        #expect(!accepted.diagnostics.contains { $0.severity == .error })
         let violations = [
             try germanFixture { translations in
                 var parts = translations[0]["extension"] as? [[String: Any]] ?? []
@@ -51,10 +52,33 @@ struct MultilingualQuestionnaireValidationTests {
             }
         ]
         for bytes in violations {
-            await #expect {
-                try await validator.validateQuestionnaire(bytes)
-            } throws: { ($0 as? ServerError)?.status == .unprocessableContent }
+            let result = try await validator.validateQuestionnaire(bytes)
+            #expect(result.status == .invalid)
+            #expect(result.diagnostics.contains {
+                $0.severity == .error && $0.source == .fhir && ($0.rule + $0.message).contains("qg-translation-1")
+                    && $0.path.hasPrefix("Questionnaire")
+            }, "\(result.diagnostics)")
         }
+    }
+
+    /// The component operation returns the same findings for a stored resource, without staging anything.
+    private static func expectComponentValidationReportsTheInvariant(app: Application, study: Study, token: String?) async throws {
+        let component = Component(
+            studyId: try study.requireId(),
+            data: .questionnaire(.init(questionnaire: String(decoding: try germanFixture { $0.append($0[0]) }, as: UTF8.self))),
+            name: "Conflicting translations"
+        )
+        try await component.create(on: app.db)
+        let validation = try await app.sendRequest(
+            .POST,
+            "\(apiBasePath)/studies/\(study.requireId())/components/\(component.requireId())/validations",
+            beforeRequest: { request in request.bearerAuth(token) }
+        )
+        try #require(validation.status == .ok)
+        let result = try validation.content.decode(Components.Schemas.QuestionnaireValidation.self)
+        #expect(result.status == .invalid)
+        #expect(result.validatorIdentity == Environment.get("FHIR_VALIDATOR_IDENTITY"))
+        #expect(result.diagnostics.contains { ($0.rule + $0.message).contains("qg-translation-1") })
     }
 
     @Test(.enabled(if: Environment.get("TROVE_TEST_VALIDATOR_ASSETS") != nil, "Requires the isolated pinned full validator"))
@@ -76,9 +100,10 @@ struct MultilingualQuestionnaireValidationTests {
                 request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
             })
             try #require(response.status == .created, "\(response.status) \(response.body.string)")
-            let candidate = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
-            #expect(candidate.questionnaires.count == fixtures.count)
-            for evidence in candidate.questionnaires {
+            let report = try response.content.decode(Components.Schemas.StudyDraftValidation.self)
+            #expect(report.status == .valid && report.candidate != nil && report.blockers.isEmpty)
+            #expect(report.questionnaires.count == fixtures.count)
+            for evidence in report.questionnaires {
                 let componentId = try #require(UUID(uuidString: evidence.componentId))
                 let fixture = try #require(components[componentId])
                 #expect(evidence.sha256 == ArtifactStore.digest(try fixture.bytes()))
@@ -87,6 +112,8 @@ struct MultilingualQuestionnaireValidationTests {
             }
 
             try await Self.expectTranslationViolationsFail(validator: FHIRValidationClient(application: app))
+
+            try await Self.expectComponentValidationReportsTheInvariant(app: app, study: study, token: token)
         }
     }
 }

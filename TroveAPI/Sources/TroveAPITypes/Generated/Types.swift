@@ -114,7 +114,7 @@ public protocol APIProtocol: Sendable {
     func getStudiesStudyIdAuditEvents(_ input: Operations.GetStudiesStudyIdAuditEvents.Input) async throws -> Operations.GetStudiesStudyIdAuditEvents.Output
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -163,6 +163,14 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /studies/{studyId}/components/{componentId}`.
     /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/delete`.
     func deleteStudiesStudyIdComponentsComponentId(_ input: Operations.DeleteStudiesStudyIdComponentsComponentId.Input) async throws -> Operations.DeleteStudiesStudyIdComponentsComponentId.Output
+    /// Validate a questionnaire component's stored resource
+    ///
+    /// Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the official FHIR Validator, the IG's Questionnaire rules, and the execution capabilities of the supported study client. Returns every finding with its severity, rule, element path and, for a translation, its language. Only `valid` means that no finding is an error and no check was reported as skipped. The result is not stored, does not change the draft and is not publication evidence; publication requires draft validation. Other component types return 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
+    func validateStudyComponent(_ input: Operations.ValidateStudyComponent.Input) async throws -> Operations.ValidateStudyComponent.Output
     /// Add an informational component to a study
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/components/informational`.
@@ -662,7 +670,7 @@ extension APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -783,6 +791,22 @@ extension APIProtocol {
         headers: Operations.DeleteStudiesStudyIdComponentsComponentId.Input.Headers
     ) async throws -> Operations.DeleteStudiesStudyIdComponentsComponentId.Output {
         try await deleteStudiesStudyIdComponentsComponentId(Operations.DeleteStudiesStudyIdComponentsComponentId.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Validate a questionnaire component's stored resource
+    ///
+    /// Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the official FHIR Validator, the IG's Questionnaire rules, and the execution capabilities of the supported study client. Returns every finding with its severity, rule, element path and, for a translation, its language. Only `valid` means that no finding is an error and no check was reported as skipped. The result is not stored, does not change the draft and is not publication evidence; publication requires draft validation. Other component types return 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
+    public func validateStudyComponent(
+        path: Operations.ValidateStudyComponent.Input.Path,
+        headers: Operations.ValidateStudyComponent.Input.Headers = .init()
+    ) async throws -> Operations.ValidateStudyComponent.Output {
+        try await validateStudyComponent(Operations.ValidateStudyComponent.Input(
             path: path,
             headers: headers
         ))

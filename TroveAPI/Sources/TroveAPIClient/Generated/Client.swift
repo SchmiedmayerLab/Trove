@@ -1941,7 +1941,7 @@ public struct Client: APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. The returned validation ID identifies a single immutable candidate and is also its future publication ID. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -2002,6 +2002,28 @@ public struct Client: APIProtocol {
                         preconditionFailure("bestContentType chose an invalid content type.")
                     }
                     return .created(.init(body: body))
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ValidateStudyDraft.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.StudyDraftValidation.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
                 case 412:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
                     let body: Components.Responses.PreconditionFailed.Body
@@ -3195,6 +3217,94 @@ public struct Client: APIProtocol {
                         preconditionFailure("bestContentType chose an invalid content type.")
                     }
                     return .preconditionFailed(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Validate a questionnaire component's stored resource
+    ///
+    /// Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the official FHIR Validator, the IG's Questionnaire rules, and the execution capabilities of the supported study client. Returns every finding with its severity, rule, element path and, for a translation, its language. Only `valid` means that no finding is an error and no check was reported as skipped. The result is not stored, does not change the draft and is not publication evidence; publication requires draft validation. Other component types return 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
+    public func validateStudyComponent(_ input: Operations.ValidateStudyComponent.Input) async throws -> Operations.ValidateStudyComponent.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ValidateStudyComponent.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/components/{}/validations",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.componentId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "Trove-Delegation-ID",
+                    value: input.headers.troveDelegationID
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ValidateStudyComponent.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.QuestionnaireValidation.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
                 default:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
                     let body: Components.Responses.OperationFailure.Body
