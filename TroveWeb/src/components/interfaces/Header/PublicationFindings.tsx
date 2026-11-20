@@ -23,7 +23,7 @@ export const PublicationFindings = ({
   const showBlockers = !report.candidate || report.blockers.length > 0;
   if (!showBlockers && report.advisories.length === 0) return null;
   return (
-    <div className="grid max-h-80 gap-4 overflow-y-auto">
+    <div className="grid gap-4">
       {showBlockers && (
         <ValidationDiagnostics
           key={`blockers:${report.status}`}
