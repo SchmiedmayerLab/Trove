@@ -41,6 +41,8 @@ extension WorkoutRouteStudyDataTests {
         )
     }
 
+    /// Neither study receives device unit identifiers: the tabular route and the application's source facts still
+    /// reach each authorized study unchanged.
     private static func exerciseDisclosure(fullValidation: Bool) async throws {
         try await TestApp.withApp(token: StudyDataFixture.reader) { app, bearer in
             let fixture = try await ClinicalEventStoreTests.prepare(

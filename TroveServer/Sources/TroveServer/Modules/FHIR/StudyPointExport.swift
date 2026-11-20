@@ -43,6 +43,7 @@ enum StudyPointExport {
         _ event: ValidatedExchangeEvent,
         grants: [Grant],
         context: Context,
+        receivesDeviceUnitIdentifiers: Bool,
         id: UUID = UUID(),
         recordingURLs: [String: String] = [:],
         maximumBytes: Int = StudyExportLimits.standard.bundleBytes
@@ -53,6 +54,7 @@ enum StudyPointExport {
                 event,
                 outputs: Set(grants.map(\.outputFullURL)),
                 subject: context.subject,
+                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
                 id: id,
                 recordingURLs: recordingURLs,
                 maximumBytes: maximumBytes
@@ -61,7 +63,8 @@ enum StudyPointExport {
             let entries = try associating(point, grants: grants, studies: snapshots.studies) + snapshots.entries
             guard entries.count < maximumEntries else { throw StudyProjectionJSON.Failure.outputTooLarge }
             guard var bundle = point.document.object else { throw FHIRValidationClient.invalid }
-            let provenance = try derivation(entries: entries, grants: grants, context: context, policy: point.policy)
+            let policies = ["urn:trove:" + point.policy] + (receivesDeviceUnitIdentifiers ? [] : [StudyDeviceUnitDisclosure.withheldPolicy])
+            let provenance = try derivation(entries: entries, grants: grants, context: context, policies: policies)
             bundle["entry"] = .array(entries + [provenance])
             bundle["identifier"] = try identifier(system: context.exportSystem.rawValue, value: id.uuidString.lowercased())
             bundle["timestamp"] = try .string(timestamp(context.recordedAt))
@@ -127,7 +130,7 @@ enum StudyPointExport {
     }
 
     private static func derivation(
-        entries: [StudyProjectionJSON], grants: [Grant], context: Context, policy: String
+        entries: [StudyProjectionJSON], grants: [Grant], context: Context, policies: [String]
     ) throws -> StudyProjectionJSON {
         let id = UUID().uuidString.lowercased()
         let targets = try entries.map { entry in
@@ -149,7 +152,7 @@ enum StudyPointExport {
         ])
         let provenance: StudyProjectionJSON = try .object([
             "resourceType": .string("Provenance"), "id": .string(id), "target": .array(targets),
-            "recorded": .string(timestamp(context.recordedAt)), "policy": .array([.string("urn:trove:" + policy)]),
+            "recorded": .string(timestamp(context.recordedAt)), "policy": .array(policies.map { try .string($0) }),
             "activity": .object(["coding": .array([activity])]),
             "agent": .array([.object(["who": receiver])]),
             "entity": .array(sources)

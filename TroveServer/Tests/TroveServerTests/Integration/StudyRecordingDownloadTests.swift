@@ -29,6 +29,9 @@ struct StudyRecordingDownloadTests {
             let study = fixture.source.studyIDs[0]
             let page = try await client.getStudyData(.init(path: .init(studyId: study.uuidString))).ok.body.json
             let resources = try StudyDataFixture.resources(#require(page.records.first))
+            // The study withholds device unit identifiers; a tabular recording is still released unchanged.
+            let derivation = try #require(resources.first { ($0["policy"] as? [String])?.contains(StudyDeviceUnitDisclosure.withheldPolicy) == true })
+            #expect(derivation["resourceType"] as? String == "Provenance")
             let document = try #require(resources.first { $0["resourceType"] as? String == "DocumentReference" })
             let content = try #require(document["content"] as? [[String: Any]])
             let attachment = try #require(content[0]["attachment"] as? [String: Any])

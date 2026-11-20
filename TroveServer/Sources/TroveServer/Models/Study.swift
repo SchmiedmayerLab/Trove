@@ -23,6 +23,7 @@ struct StudyPatch: Sendable {
     var enrollmentCondition: EnrollmentConditions?
     var enrollmentPeriod: EnrollmentPeriod?
     var collectionRequirements: [CollectionRequirement]? // swiftlint:disable:this discouraged_optional_collection
+    var receivesDeviceUnitIdentifiers: Bool? // swiftlint:disable:this discouraged_optional_boolean
 }
 
 
@@ -32,6 +33,7 @@ final class Study: Model, @unchecked Sendable {
     private struct CollectionConfiguration: Codable, Sendable {
         var requirements: [CollectionRequirement]
         var enrollmentPeriod: EnrollmentPeriod = .ongoing
+        var receivesDeviceUnitIdentifiers = false
     }
 
     static let schema = "studies"
@@ -80,6 +82,12 @@ final class Study: Model, @unchecked Sendable {
     var collectionRequirements: [CollectionRequirement] {
         get { collectionConfiguration.requirements }
         set { collectionConfiguration.requirements = newValue }
+    }
+
+    /// Draft disclosure setting that the next publication captures; see ``StudyDeviceUnitDisclosure``.
+    var receivesDeviceUnitIdentifiers: Bool {
+        get { collectionConfiguration.receivesDeviceUnitIdentifiers }
+        set { collectionConfiguration.receivesDeviceUnitIdentifiers = newValue }
     }
 
     init() {}
@@ -135,5 +143,6 @@ final class Study: Model, @unchecked Sendable {
         apply(\.visibility, to: \.visibility)
         apply(\.enrollmentCondition, to: \.enrollmentCondition)
         apply(\.collectionRequirements, to: \.collectionRequirements)
+        apply(\.receivesDeviceUnitIdentifiers, to: \.receivesDeviceUnitIdentifiers)
     }
 }

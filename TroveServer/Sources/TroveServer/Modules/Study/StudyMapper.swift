@@ -37,7 +37,8 @@ extension StudyPatch {
             visibility: schema.visibility,
             enrollmentCondition: schema.enrollmentConditions,
             enrollmentPeriod: schema.enrollmentPeriod,
-            collectionRequirements: requirements
+            collectionRequirements: requirements,
+            receivesDeviceUnitIdentifiers: schema.receivesDeviceUnitIdentifiers
         )
     }
 }
@@ -57,6 +58,7 @@ extension Components.Schemas.StudyResponse {
             enrollmentPeriod: model.enrollmentPeriod,
             draftRevision: model.draftRevision.uuidString,
             collectionRequirements: model.collectionRequirements.map(Components.Schemas.CollectionRequirement.init),
+            receivesDeviceUnitIdentifiers: model.receivesDeviceUnitIdentifiers,
             id: try model.requireId().uuidString,
             locales: model.locales.sorted(using: KeyPathComparator(\.description)),
             icon: model.icon,

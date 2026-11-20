@@ -24,6 +24,7 @@ struct AuthoringClientTests {
                 enrollmentPeriod: .init(calendar: .gregorian, timeZone: "UTC"),
                 draftRevision: revision.uuidString,
                 collectionRequirements: [],
+                receivesDeviceUnitIdentifiers: false,
                 id: study.uuidString,
                 locales: [],
                 icon: "heart",

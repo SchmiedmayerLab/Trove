@@ -393,6 +393,40 @@ const CollectionControls = ({
   );
 };
 
+export const DeviceUnitIdentifiers = ({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) => {
+  const id = useId();
+  return (
+    <fieldset className="mt-8 space-y-2 rounded-lg border p-4">
+      <legend className="px-2 font-medium">Device unit identifiers</legend>
+      <div className="flex items-center gap-3">
+        <Checkbox
+          id={id}
+          checked={checked}
+          aria-describedby={`${id}-help`}
+          onCheckedChange={(value) => onChange(value === true)}
+        />
+        <label htmlFor={id}>
+          Include device unit identifiers in study data
+        </label>
+      </div>
+      <p id={`${id}-help`} className="text-text-tertiary text-sm">
+        Unless this is selected, study data leaves out serial numbers, UDI
+        production identifiers, device local identifiers and names a person gave
+        a device, and original recordings that can contain them (native,
+        provider and FHIR collection recordings) are not available to this
+        study. A record includes them only when every published version it was
+        shared under does.
+      </p>
+    </fieldset>
+  );
+};
+
 export const CollectionForm = ({
   measurements,
   form,
@@ -426,6 +460,16 @@ export const CollectionForm = ({
                 onChange={field.onChange}
               />
             </div>
+          )}
+        />
+        <Field
+          control={form.control}
+          name="receivesDeviceUnitIdentifiers"
+          render={({ field }) => (
+            <DeviceUnitIdentifiers
+              checked={field.value === true}
+              onChange={field.onChange}
+            />
           )}
         />
       </fieldset>
