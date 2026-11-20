@@ -46,12 +46,19 @@ const openNewComponentDialog = async (page: Page) => {
   const firstComponentButton = page.getByRole("button", {
     name: "Create component",
   });
+  const listedComponent = page.getByRole("table").getByRole("link");
+  // The configuration overview has its own empty-state button, so first wait for the
+  // components route, then until its list has loaded into the empty state or a list.
+  await expect(page).toHaveURL(/\/configuration\/components\/?$/);
+  await expect(firstComponentButton.or(listedComponent).first()).toBeVisible();
   if (await firstComponentButton.isVisible()) {
     await firstComponentButton.click();
-    return;
+  } else {
+    await page.getByRole("button", { name: "Add component" }).click();
   }
-
-  await page.getByRole("button", { name: "Add component" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Choose a component type" }),
+  ).toBeVisible();
 };
 
 const chooseComponentType = async (page: Page, name: string) => {
