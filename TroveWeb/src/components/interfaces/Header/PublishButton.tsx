@@ -92,7 +92,7 @@ const PublicationDialog = ({
         if (!open && !isPending) onClose();
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
         <DialogHeader className="items-center sm:items-start">
           <FeaturedIconContainer
             icon={Rocket}
