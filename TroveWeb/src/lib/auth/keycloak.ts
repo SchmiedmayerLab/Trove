@@ -26,7 +26,7 @@ export const getKeycloak = (): Keycloak => {
 
 /**
  * Initializes Keycloak with `check-sso` so existing sessions are picked up
- * without forcing a login redirect. Safe to call multiple times — the init
+ * without forcing a login redirect. Safe to call multiple times: the init
  * promise is shared so Keycloak is only initialized once.
  */
 export const initKeycloak = async (): Promise<boolean> => {
