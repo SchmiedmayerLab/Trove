@@ -7,5 +7,5 @@
 //
 
 export const LocaleSuffix = ({ locale }: { locale: string }) => (
-  <span className="text-text-tertiary font-normal"> · {locale}</span>
+  <span className="text-text-tertiary font-normal"> ({locale})</span>
 );
