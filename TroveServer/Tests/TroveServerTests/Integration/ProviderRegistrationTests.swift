@@ -81,15 +81,15 @@ struct ProviderRegistrationTests {
                 providerRegistrationID: registration.id,
                 sourceTypeIdentifier: "getmeas:1"
             )
-            await #expect(throws: ProviderFailure.scopeLost) {
+            await #expect {
                 try await app.db.transaction { try await service.validate(requirements: [mismatched], on: $0) }
-            }
+            } throws: { ($0 as? ServerError)?.status.code == 409 }
             try await ProviderRegistrationStore(database: app.db).configure(
                 registration, approved: false, audit: ClinicalEventStoreTests.researcher.auditContext
             )
-            await #expect(throws: ProviderFailure.fenced) {
+            await #expect {
                 try await app.db.transaction { try await service.validate(requirements: [allowed], on: $0) }
-            }
+            } throws: { ($0 as? ServerError)?.status.code == 409 }
         }
     }
 }

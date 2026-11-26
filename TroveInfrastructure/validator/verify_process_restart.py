@@ -38,6 +38,13 @@ KEYCLOAK_VERSION = "26.8.2"
 KEYCLOAK_SHA = "dd124787283918bc597628887168333465ee2a811a389e0003569e52be7e487f"
 PROFILE = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
 PDF = b"%PDF-1.4 Synthetic process-restart consent evidence"
+READINESS = {
+    "content": {"en": {
+        "aims": "Verify validator process restarts.", "population": "Synthetic participants.",
+        "procedures": "Consent and heart rate collection.", "burden": "None.",
+        "retention": "Removed with the verification stack.", "withdrawal": "Participants withdraw in the app."}},
+    "contacts": [{"name": "Synthetic Coordinator", "role": "Coordinator", "email": "coordinator@example.org"}],
+}
 POSTGRES_IMAGE = "timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a"
 STORAGE_IMAGE = "chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15"
 
@@ -478,7 +485,8 @@ class Checkpoint:
             revision = response_uuid(created, "draftRevision")
             edited = self.api_json(f"/studies/{study}", researcher, "PATCH", {
                 "consent": {"en-US": {"title": "Synthetic Consent", "content": '<toggle id="agree" expected-value="true">I agree.</toggle>'}},
-                "collectionRequirements": [{"profile": PROFILE, "sourceKind": "participant-app"}]}, headers={"If-Match": '"' + revision + '"'})
+                "collectionRequirements": [{"profile": PROFILE, "sourceKind": "participant-app"}],
+                "readinessFacts": READINESS}, headers={"If-Match": '"' + revision + '"'})
             require(response_uuid(edited, "id") == study, "Edit selected a different study")
             self.publish_draft(study, researcher, response_uuid(edited, "draftRevision"))
             enrollment = self.api_json(f"/participant/studies/{study}/enrollments", participant, "POST", {}, 201)["id"]

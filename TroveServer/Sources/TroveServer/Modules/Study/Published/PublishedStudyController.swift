@@ -33,13 +33,22 @@ extension Controller {
             status: report.status,
             blockers: report.blockers,
             advisories: report.advisories,
-            questionnaires: report.questionnaires.map {
-                .init(
-                    componentId: $0.componentID.uuidString,
-                    status: $0.result.status,
-                    language: $0.result.language,
-                    translationLanguages: $0.result.translationLanguages,
-                    sha256: $0.result.sha256
+            questionnaires: report.questionnaires.map { entry in
+                let administration = report.administrations.first { $0.componentID == entry.componentID }
+                return .init(
+                    componentId: entry.componentID.uuidString,
+                    status: entry.result.status,
+                    language: entry.result.language,
+                    translationLanguages: entry.result.translationLanguages,
+                    sha256: entry.result.sha256,
+                    administrationLanguages: (administration?.languages ?? []).map {
+                        .init(
+                            language: $0.language,
+                            translationComplete: $0.translationComplete,
+                            approved: $0.approval != nil,
+                            approvalId: $0.approval?.id?.uuidString
+                        )
+                    }
                 )
             },
             candidate: try report.candidate.map {
@@ -53,7 +62,8 @@ extension Controller {
                     createdAt: $0.createdAt,
                     expiresAt: $0.expiresAt
                 )
-            }
+            },
+            routes: report.routes.map(Components.Schemas.StudyRouteValidation.init)
         )
         return body.candidate == nil ? .ok(.init(body: .json(body))) : .created(.init(body: .json(body)))
     }

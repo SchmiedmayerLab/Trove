@@ -24,6 +24,7 @@ struct StudyPatch: Sendable {
     var enrollmentPeriod: EnrollmentPeriod?
     var collectionRequirements: [CollectionRequirement]? // swiftlint:disable:this discouraged_optional_collection
     var receivesDeviceUnitIdentifiers: Bool? // swiftlint:disable:this discouraged_optional_boolean
+    var readinessFacts: StudyReadinessFacts?
 }
 
 
@@ -61,6 +62,9 @@ final class Study: Model, @unchecked Sendable {
     @Field(key: "enrollment_condition") var enrollmentCondition: EnrollmentConditions
 
     @Field(key: "collection_configuration") private var collectionConfiguration: CollectionConfiguration
+
+    /// Baseline facts that publication requires; see ``StudyReadinessCheck``.
+    @Field(key: "readiness_facts") var readinessFacts: StudyReadinessFacts
 
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
@@ -102,6 +106,7 @@ final class Study: Model, @unchecked Sendable {
         visibility: StudyVisibility = .public,
         enrollmentCondition: EnrollmentConditions = .none,
         collectionRequirements: [CollectionRequirement] = [],
+        readinessFacts: StudyReadinessFacts = .empty,
         id: UUID? = nil
     ) {
         self.id = id
@@ -115,6 +120,7 @@ final class Study: Model, @unchecked Sendable {
         self.visibility = visibility
         self.enrollmentCondition = enrollmentCondition
         self.collectionConfiguration = .init(requirements: collectionRequirements)
+        self.readinessFacts = readinessFacts
     }
 
     func requireDraftRevision(_ expectedRevision: UUID) throws {
@@ -126,8 +132,9 @@ final class Study: Model, @unchecked Sendable {
     func apply(_ patch: StudyPatch) throws {
         try patch.enrollmentPeriod?.validate()
         if let requirements = patch.collectionRequirements {
-            try CollectionRequirement.validate(requirements)
+            try CollectionRequirement.validate(requirements, requiringSupportedSources: false)
         }
+        try patch.readinessFacts?.validate()
         if let period = patch.enrollmentPeriod { enrollmentPeriod = period }
         func apply<T>(_ otherKeyPath: KeyPath<StudyPatch, T?>, to selfKeyPath: ReferenceWritableKeyPath<Study, T>) {
             if let value = patch[keyPath: otherKeyPath] {
@@ -144,5 +151,6 @@ final class Study: Model, @unchecked Sendable {
         apply(\.enrollmentCondition, to: \.enrollmentCondition)
         apply(\.collectionRequirements, to: \.collectionRequirements)
         apply(\.receivesDeviceUnitIdentifiers, to: \.receivesDeviceUnitIdentifiers)
+        apply(\.readinessFacts, to: \.readinessFacts)
     }
 }

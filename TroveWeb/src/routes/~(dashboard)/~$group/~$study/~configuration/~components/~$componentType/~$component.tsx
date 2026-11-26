@@ -60,7 +60,7 @@ const EditInformationPage = () => {
 
 const EditQuestionnairePage = () => {
   const params = Route.useParams();
-  const { form, toInput, getDraftHeaders, savedRevision } =
+  const { form, toInput, getDraftHeaders, componentData, savedRevision } =
     useQuestionnaireForm();
   const mutation = useUpdateQuestionnaireMutation();
 
@@ -93,6 +93,8 @@ const EditQuestionnairePage = () => {
           studyId: params.study,
           componentId: params.component,
           revision: savedRevision,
+          component: componentData,
+          groupId: params.group,
         }}
       />
     </ComponentPageShell>

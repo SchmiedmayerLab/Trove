@@ -40,7 +40,9 @@ enum PublicationWorkflowFixtures {
         try await TestApp.withApp(storageProvider: storageProvider, validator: effectiveValidator, grantorAuthority: authority, test)
     }
 
+    /// Validates the current draft after approving its administration languages; approval rules have their own tests.
     static func validate(_ studyID: UUID, app: Application, token: String?) async throws -> TestingHTTPResponse {
+        try await StudyFixtures.approveAdministrationLanguages(studyID: studyID, on: app.db)
         let study = try #require(try await Study.find(studyID, on: app.db))
         return try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(studyID)/draft/validations", beforeRequest: { request in
             request.bearerAuth(token)

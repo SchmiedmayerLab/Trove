@@ -17,7 +17,7 @@ import {
   toast,
 } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { Rocket } from "lucide-react";
 import { useState } from "react";
 import { getStudiesByStudyId } from "@/lib/api/generated/sdk.gen";
@@ -34,8 +34,23 @@ import {
   usePublishStudyMutation,
   useValidateStudyMutation,
 } from "@/lib/queries/study";
+import { readinessDestination } from "@/lib/readinessDestination";
+import { itemLinkId, linkIdRange } from "@/lib/validationDiagnostics";
 import { FeaturedIconContainer } from "../../ui/FeaturedIconContainer";
 import { PublicationFindings } from "./PublicationFindings";
+
+/** The element of the questionnaire form a questionnaire finding concerns. */
+const questionnaireTarget = (
+  finding: { rule: string; path: string; language?: string },
+  collection: boolean,
+) => {
+  if (collection) return "collection-edit";
+  if (finding.rule === "language-approval-missing" && finding.language)
+    return `approval-${finding.language}`;
+  if (finding.path.endsWith(".administrationLanguages"))
+    return "administrationLanguages";
+  return "questionnaire-resource";
+};
 
 const PublicationDialog = ({
   studyId,
@@ -48,6 +63,8 @@ const PublicationDialog = ({
   latestRevision: number | undefined;
   onClose: () => void;
 }) => {
+  const navigate = useNavigate();
+  const { group } = useParams({ strict: false });
   const validateStudy = useValidateStudyMutation();
   const publishStudy = usePublishStudyMutation();
   const { data: components } = useQuery(componentListQueryOptions({ studyId }));
@@ -147,9 +164,94 @@ const PublicationDialog = ({
             </dl>
           </details>
         )}
+        {report?.questionnaires.map((q) => (
+          <section key={q.componentId} className="grid gap-1 text-sm">
+            <h3>
+              {components?.find((value) => value.id === q.componentId)?.name ??
+                q.componentId}
+            </h3>
+            <p className="break-all">
+              Reviewed SHA-256 <code>{q.sha256}</code>
+            </p>
+            {q.administrationLanguages.map((entry) => (
+              <p key={entry.language}>
+                {entry.language}:{" "}
+                {entry.translationComplete ?
+                  "Wording complete"
+                : "Wording incomplete"}
+                , {entry.approved ? "approved" : "approval missing"}
+              </p>
+            ))}
+          </section>
+        ))}
         {report && (
           <PublicationFindings
             report={report}
+            locate={(finding) => {
+              if (!group || isPending) return;
+              const params = { group, study: studyId };
+              const destination = readinessDestination(finding.path);
+              const component = report.questionnaires.find(
+                (q) => q.componentId === finding.componentId,
+              );
+              const collection = /^collectionRequirements\[\d+\]$/.test(
+                finding.path,
+              );
+              if (!destination && !component && !collection) return;
+              const hash =
+                destination?.hash ?? questionnaireTarget(finding, collection);
+              const showFinding = async () => {
+                onClose();
+                if (destination)
+                  await navigate({
+                    to: "/$group/$study/configuration/general",
+                    params,
+                    search: { language: destination.language },
+                    hash,
+                  });
+                else if (collection)
+                  await navigate({
+                    to: "/$group/$study/configuration/collection",
+                    params,
+                    hash,
+                  });
+                else if (component)
+                  await navigate({
+                    to: "/$group/$study/configuration/components/$componentType/$component",
+                    params: {
+                      ...params,
+                      componentType: "questionnaire",
+                      component: component.componentId,
+                    },
+                    hash,
+                  });
+                requestAnimationFrame(() => {
+                  const element = document.getElementById(hash);
+                  const editor =
+                    hash === "questionnaire-resource" &&
+                    element?.querySelector("textarea");
+                  if (!editor) {
+                    element?.focus();
+                    return;
+                  }
+                  editor.focus();
+                  const link = itemLinkId(editor.value, finding.path);
+                  const range = link && linkIdRange(editor.value, link);
+                  if (range) editor.setSelectionRange(...range);
+                });
+              };
+              return {
+                target: hash,
+                label:
+                  destination?.label ??
+                  (collection ?
+                    "Edit collection settings"
+                  : "Edit questionnaire"),
+                show: () => {
+                  void showFinding();
+                },
+              };
+            }}
             componentName={(id) =>
               components?.find((component) => component.id === id)?.name
             }

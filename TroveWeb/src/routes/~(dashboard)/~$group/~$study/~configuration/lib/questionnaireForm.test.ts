@@ -33,11 +33,21 @@ describe("questionnaire form", () => {
         id: "00000000-0000-4000-8000-000000000000",
         name: "Weekly check-in",
         data: { questionnaire: text },
+        sha256: "a".repeat(64),
+        languageApprovals: [],
+        administrationLanguages: [
+          fixture.language,
+          ...fixture.translationLanguages,
+        ],
         language: fixture.language,
         translationLanguages: fixture.translationLanguages,
       });
       expect(questionnaireFormSchema.safeParse(values).success).toBe(true);
       expect(questionnaireInput(values)).toEqual({
+        administrationLanguages: [
+          fixture.language,
+          ...fixture.translationLanguages,
+        ],
         name: "Weekly check-in",
         data: { questionnaire: text },
       });

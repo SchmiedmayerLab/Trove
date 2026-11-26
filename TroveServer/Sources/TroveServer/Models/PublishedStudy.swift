@@ -39,9 +39,28 @@ final class PublishedStudy: Model, @unchecked Sendable {
 
     @Field(key: "collection_policy") var collectionPolicy: PublishedCollectionPolicy
 
+    @Field(key: "definition_schema_version") var definitionSchemaVersion: String
+
+    @Field(key: "contract_version") var contractVersion: String
+
+    @Field(key: "contract_revision") var contractRevision: String
+
+    @Field(key: "validator_identity") var validatorIdentity: String
+
+    @Field(key: "execution_capability") var executionCapability: String
+
+    @Field(key: "instruments") private var instrumentDocument: PublicationEvidence.Instruments
+
+    /// Readiness facts the revision was validated with. They are not part of the participant bundle.
+    @Field(key: "readiness_facts") var readinessFacts: StudyReadinessFacts
+
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
+
+    var instruments: [PublishedInstrument] {
+        instrumentDocument.instruments
+    }
 
     init() {}
 
@@ -56,6 +75,7 @@ final class PublishedStudy: Model, @unchecked Sendable {
         artifactID: UUID,
         consentSnapshot: LocalizationsDictionary<String>,
         collectionPolicy: PublishedCollectionPolicy,
+        evidence: PublicationEvidence,
         id: UUID? = nil
     ) {
         self.id = id
@@ -69,5 +89,12 @@ final class PublishedStudy: Model, @unchecked Sendable {
         self.artifactID = artifactID
         self.consentSnapshot = consentSnapshot
         self.collectionPolicy = collectionPolicy
+        self.definitionSchemaVersion = evidence.definitionSchemaVersion
+        self.contractVersion = evidence.contractVersion
+        self.contractRevision = evidence.contractRevision
+        self.validatorIdentity = evidence.validatorIdentity
+        self.executionCapability = evidence.executionCapability
+        self.instrumentDocument = .init(instruments: evidence.instruments)
+        self.readinessFacts = evidence.readinessFacts
     }
 }

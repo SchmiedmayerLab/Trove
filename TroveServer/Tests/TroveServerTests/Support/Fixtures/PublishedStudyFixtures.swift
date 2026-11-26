@@ -58,6 +58,7 @@ enum PublishedStudyFixtures {
         collectionRequirements: [CollectionRequirement] = [],
         enrollmentPeriod: EnrollmentPeriod = .ongoing,
         receivesDeviceUnitIdentifiers: Bool = false,
+        instruments: [PublishedInstrument] = [],
         save: Bool = true
     ) async throws -> PublishedStudy {
         let metadata = StudyDefinition.Metadata(
@@ -90,11 +91,25 @@ enum PublishedStudyFixtures {
                 requirements: collectionRequirements,
                 receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
                 enrollmentPeriod: enrollmentPeriod
-            )
+            ),
+            evidence: evidence(instruments: instruments)
         )
         if save {
             try await published.save(on: database)
         }
         return published
+    }
+
+    /// Evidence of the current schema and contract, as a publication accepted by this release records it.
+    static func evidence(instruments: [PublishedInstrument] = []) -> PublicationEvidence {
+        .init(
+            definitionSchemaVersion: PublicationEvidence.currentDefinitionSchemaVersion,
+            contractVersion: FHIRValidationClient.contractVersion,
+            contractRevision: FHIRValidationClient.contractRevision,
+            validatorIdentity: QuestionnaireWorkerReply.identity,
+            executionCapability: QuestionnaireValidationService.executionCapability,
+            instruments: instruments,
+            readinessFacts: StudyFixtures.completeReadinessFacts()
+        )
     }
 }

@@ -137,20 +137,9 @@ final class ProviderRegistrationService: Module, Sendable {
 
     /// Publication checks the actual receiver/acquisition intersection again under the acceptance transaction.
     func validate(requirements: [CollectionRequirement], on transaction: any Database) async throws {
-        guard transaction.inTransaction else { throw AuditError.transactionRequired }
-        let required = requirements.filter { $0.sourceKind == .serverWorker }
-        let identifiers = Set(required.compactMap(\.providerRegistrationID)).sorted { $0.uuidString < $1.uuidString }
-        guard required.allSatisfy({ $0.providerRegistrationID != nil && $0.sourceTypeIdentifier != nil }) else {
-            throw ProviderFailure.scopeLost
-        }
-        for id in identifiers {
-            let registration = try await ProviderRegistrationStore.requireApproved(id, on: transaction, lock: true).configuration
-            let capabilities = capabilities(for: registration)
-            for requirement in required where requirement.providerRegistrationID == id {
-                guard capabilities.contains(where: {
-                    $0.sourceTypeIdentifier == requirement.sourceTypeIdentifier && $0.profiles.contains(requirement.profile)
-                }) else { throw ProviderFailure.scopeLost }
-            }
+        let admitted = try await routes(for: requirements, on: transaction)
+        guard admitted.allSatisfy(\.available) else {
+            throw ServerError.conflict("A collection route changed after validation; validate the study draft again")
         }
     }
 

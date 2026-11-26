@@ -165,6 +165,7 @@ extension StudyPublicationCandidateTests {
             id: componentID
         )
         try await component.create(on: app.db)
+        try await StudyFixtures.approveAdministrationLanguages(studyID: study.requireId(), on: app.db)
         return study
     }
 

@@ -208,18 +208,15 @@ struct AuthIntegrationTests {
             let informationalId = try informational.requireId()
             let questionnaire = try await ComponentFixtures.createQuestionnaireComponent(on: app.db, studyId: studyId)
             let questionnaireId = try questionnaire.requireId()
+            try await StudyFixtures.approveAdministrationLanguages(studyID: studyId, on: app.db)
             let schedule = try await ComponentFixtures.createSchedule(on: app.db, componentId: questionnaireId)
             let scheduleId = try schedule.requireId()
-            let validationID: UUID
-            if preparePublication {
-                // Keep the retained-study deletion control independent of endpoint execution order.
-                try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId)
-                let response = try await PublicationWorkflowFixtures.validate(studyId, app: app, token: token)
-                try #require(response.status == .created)
-                validationID = try #require(UUID(uuidString: response.content.decode(StudyDraftValidation.self).candidate?.id ?? ""))
-            } else {
-                validationID = UUID()
-            }
+            let validationID = try await Self.validationID(
+                studyId: studyId,
+                preparePublication: preparePublication,
+                app: app,
+                token: token
+            )
 
             if case .participant(let subject, _) = tokenConfig {
                 try await ParticipantFixtures.createParticipant(on: app.db, identityProviderId: subject)
@@ -269,5 +266,25 @@ struct AuthIntegrationTests {
         }) { response in
             #expect(response.status == expected, "Expected \(expected.code) for \(endpoint.method.rawValue) \(endpoint.path), got \(response.status.code)")
         }
+    }
+}
+
+
+extension AuthIntegrationTests {
+    /// A validated candidate when the publication is prepared, otherwise an unknown candidate ID.
+    private static func validationID(
+        studyId: UUID,
+        preparePublication: Bool,
+        app: Application,
+        token: String?
+    ) async throws -> UUID {
+        guard preparePublication else {
+            return UUID()
+        }
+        // Keep the retained-study deletion control independent of endpoint execution order.
+        try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyId)
+        let response = try await PublicationWorkflowFixtures.validate(studyId, app: app, token: token)
+        try #require(response.status == .created)
+        return try #require(UUID(uuidString: response.content.decode(StudyDraftValidation.self).candidate?.id ?? ""))
     }
 }

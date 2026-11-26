@@ -20,10 +20,12 @@ import { cn } from "@/utils/cn";
 import { enhanceField } from "@/utils/enhanceField";
 import type { GeneralForm as GeneralFormType } from "../lib/useGeneralForm";
 import { LocaleSuffix } from "./LocaleSuffix";
+import { ReadinessFields } from "./ReadinessFields";
 
 interface GeneralFormProps {
   form: GeneralFormType;
   language: string;
+  sourceLanguage?: string;
   onSubmit: () => void;
   onFieldFocus?: (fieldName: string) => void;
   onFieldBlur?: () => void;
@@ -32,6 +34,7 @@ interface GeneralFormProps {
 export const GeneralForm = ({
   form,
   language,
+  sourceLanguage,
   onSubmit,
   onFieldFocus,
   onFieldBlur,
@@ -152,6 +155,11 @@ export const GeneralForm = ({
         render={({ field }) => (
           <Textarea lang={language} dir="auto" {...enhanceField(field)} />
         )}
+      />
+      <ReadinessFields
+        form={form}
+        language={language}
+        source={language === sourceLanguage}
       />
     </form>
   );

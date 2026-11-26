@@ -34,6 +34,18 @@ The study-definition schema, the FHIR package set and the published study revisi
 
 A change to one does not silently update the others. This distinction lets software evolve while preserving the meaning of historical consent and collected data.
 
+Each publication records these separately: the Grove study definition schema version of its participant bundle, the version and source revision of the Grove FHIR IG package that validated it, the validator identity and the execution capability, next to its revision number. A collection policy written by an earlier release stays readable; policies of version 6, which have no requirement levels, read every requirement as required.
+
+### Publication Readiness
+
+Draft validation checks, besides every questionnaire, three groups of facts, and each finding names its field or path, its rule and the next action.
+
+- Readiness facts: aims, population, procedures, participant burden, data retention and withdrawal, each written in the source language of the study details, and at least one responsible contact with a name, a role and an email address or phone number. A missing fact or contact blocks publication. A fact missing in another language of the study details is an advisory. The check tests presence and basic form; it does not judge the content. Publications record the facts they were validated with; the participant bundle does not contain them.
+- Administration languages: each questionnaire component names the languages in which participants may answer it, by default its base language. Each one must be the base language or a translation language of the resource, every displayed string must carry a translation into it, and a study administrator must have approved that exact resource for that language. An approval names the resource's SHA-256 digest, so any edit requires new approvals. Delegated clients and researchers without administrator authority cannot approve or revoke. A single-language questionnaire needs only the approval of its base language. Approving does not change the draft revision; publication requires validating again, and a candidate whose approval was revoked cannot be published.
+- Collection routes: a requirement is required unless it is marked optional. A route is available when the participant app implements its native source, or when an approved provider registration qualifies its source and profile. An unavailable required route blocks publication. An unavailable optional route is an advisory; the publication lists that requirement as unavailable and grants no collection for it.
+
+The dashboard edits the readiness facts with the study details, the administration languages and approvals on the questionnaire form, and the requirement level in the collection settings. The CLI approves and revokes with `trove study approve-language` and `trove study revoke-language-approval`. An approval records a decision in Trove; it does not establish that an institution reviewed the instrument or its translation.
+
 Publishing creates an immutable revision. Artifacts have unique identities; the revision, references and publication receipt commit together. Concurrent publication cannot overwrite an accepted artifact. A participant continues under the revision they adopted until an explicit transition is permitted. Changes requiring renewed consent cannot be treated as a routine content refresh; history retains the versions that actually applied.
 
 ## Enrollment, Consent and Lifecycle

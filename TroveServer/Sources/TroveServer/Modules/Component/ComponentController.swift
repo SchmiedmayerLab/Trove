@@ -99,14 +99,42 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.createComponent(
-            studyId: studyId,
+        let component = try await componentService.createQuestionnaire(
+            studyID: studyId,
             expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            data: .questionnaire(schema.data)
+            content: schema.data,
+            administrationLanguages: schema.administrationLanguages
         )
 
         return .created(.init(body: .json(try .init(component))))
+    }
+
+    func approveQuestionnaireLanguage(
+        _ input: Operations.ApproveQuestionnaireLanguage.Input
+    ) async throws -> Operations.ApproveQuestionnaireLanguage.Output {
+        guard case .json(let request) = input.body else {
+            throw ServerError.jsonBodyRequired
+        }
+        let result = try await componentService.approveLanguage(
+            studyID: input.path.studyId.requireId(),
+            componentID: input.path.componentId.requireId(),
+            sha256: request.sha256,
+            language: request.language
+        )
+        let body = try Components.Schemas.QuestionnaireLanguageApproval(result.approval)
+        return result.created ? .created(.init(body: .json(body))) : .ok(.init(body: .json(body)))
+    }
+
+    func revokeQuestionnaireLanguageApproval(
+        _ input: Operations.RevokeQuestionnaireLanguageApproval.Input
+    ) async throws -> Operations.RevokeQuestionnaireLanguageApproval.Output {
+        let approval = try await componentService.revokeLanguageApproval(
+            studyID: input.path.studyId.requireId(),
+            componentID: input.path.componentId.requireId(),
+            approvalID: input.path.approvalId.requireId()
+        )
+        return .ok(.init(body: .json(try .init(approval))))
     }
 
     func validateStudyComponent(_ input: Operations.ValidateStudyComponent.Input) async throws -> Operations.ValidateStudyComponent.Output {
@@ -135,11 +163,7 @@ extension Controller {
         let studyId = try input.path.studyId.requireId()
         let componentId = try input.path.componentId.requireId()
 
-        let component = try await componentService.getComponent(
-            studyId: studyId,
-            id: componentId,
-            expectedType: .questionnaire
-        )
+        let component = try await componentService.getQuestionnaire(studyID: studyId, id: componentId)
 
         return .ok(.init(body: .json(try .init(component))))
     }
@@ -154,12 +178,13 @@ extension Controller {
             throw ServerError.jsonBodyRequired
         }
 
-        let component = try await componentService.replaceComponent(
-            studyId: studyId,
+        let component = try await componentService.replaceQuestionnaire(
+            studyID: studyId,
             id: componentId,
             expectedRevision: DraftRevision.parse(ifMatch: input.headers.ifMatch),
             name: schema.name,
-            data: .questionnaire(schema.data)
+            content: schema.data,
+            administrationLanguages: schema.administrationLanguages
         )
 
         return .ok(.init(body: .json(try .init(component))))

@@ -49,6 +49,8 @@ struct AuditEvent: Sendable {
         case studyDraftEdited = "study.draft.edited"
         case studyDraftValidated = "study.draft.validated"
         case studyDraftDisclosure = "study.draft.disclosure"
+        case studyLanguageApproved = "study.language.approved"
+        case studyLanguageApprovalRevoked = "study.language.approval.revoked"
         case delegationCreated = "delegation.created"
         case delegationRevoked = "delegation.revoked"
         case delegationDisclosure = "delegation.disclosure"
@@ -103,7 +105,8 @@ struct AuditEvent: Sendable {
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
                  .studyDataGranted, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
-                 .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure: .study
+                 .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure,
+                 .studyLanguageApproved, .studyLanguageApprovalRevoked: .study
             }
         }
 
@@ -122,7 +125,8 @@ struct AuditEvent: Sendable {
                  .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
                  .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .studyDataGranted,
-                 .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked: false
+                 .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked,
+                 .studyLanguageApproved, .studyLanguageApprovalRevoked: false
             }
         }
     }

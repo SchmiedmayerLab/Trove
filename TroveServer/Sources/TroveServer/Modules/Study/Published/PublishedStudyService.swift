@@ -50,6 +50,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
 
             try study.requireDraftRevision(expectedRevision)
             try candidate.requireCurrentEvidence(validatorIdentity: self.validationService.validator.expectedIdentity, now: Date())
+            try await StudyValidationService.requireApprovals(candidate.snapshot.instruments, on: transaction)
             guard try await StudyValidationService.nextPublicationRevision(studyID: studyId, on: transaction) == candidate.publicationRevision else {
                 throw ServerError.conflict("A publication was accepted after validation; validate the draft again")
             }
@@ -73,6 +74,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
             artifactID: candidate.artifactID,
             consentSnapshot: snapshot.consent,
             collectionPolicy: snapshot.collectionPolicy,
+            evidence: candidate.evidence,
             id: try candidate.requireId()
         )
         try await artifacts.retain(candidate.artifact, on: transaction)

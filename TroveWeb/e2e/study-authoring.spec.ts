@@ -7,7 +7,11 @@
 //
 
 import type { Page } from "@playwright/test";
-import { zStudyDraftValidation } from "../src/lib/api/generated/zod.gen";
+import {
+  zStudyDraftValidation,
+  zStudyResponse,
+  zStudyPatchInput,
+} from "../src/lib/api/generated/zod.gen";
 import { expect, openNewStudyDialog, test } from "./fixtures";
 
 const questionnaire = JSON.stringify({
@@ -65,6 +69,33 @@ const chooseComponentType = async (page: Page, name: string) => {
   await openNewComponentDialog(page);
   await page.getByRole("radio", { name }).check();
   await page.getByRole("link", { name: "Create component" }).click();
+};
+
+const completeReadiness = async (page: Page) => {
+  for (const [name, value] of Object.entries({
+    Aims: "Measure daily activity",
+    Population: "Adults",
+    "Procedures and collected data": "Answer a daily survey",
+    "Participant burden": "Five minutes a day",
+    "Data retention": "One year",
+    Withdrawal: "Contact the coordinator",
+  }))
+    await page.getByRole("textbox", { name, exact: true }).fill(value);
+  await page.getByRole("button", { name: "Add contact" }).press("Enter");
+  const contact = page.getByRole("group", { name: "Contact 1", exact: true });
+  await expect(contact.getByLabel("Name", { exact: true })).toBeFocused();
+  await contact.getByLabel("Name", { exact: true }).fill("Study coordinator");
+  await contact.getByLabel("Role", { exact: true }).fill("Coordinator");
+  await contact
+    .getByLabel("Email", { exact: true })
+    .fill("coordinator@example.org");
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PATCH" &&
+      /\/studies\/[^/]+$/.test(response.url()),
+  );
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  expect((await saved).status()).toBe(200);
 };
 
 const reviewPublicationCandidate = async (page: Page) => {
@@ -134,6 +165,171 @@ test.describe("study authoring", () => {
     await expect(page.getByRole("radio", { name: /^Unlisted/ })).toBeChecked();
   });
 
+  test("keeps translated facts separate and contacts shared", async ({
+    researcherPage: page,
+  }) => {
+    await openNewStudyDialog(page);
+    await page.getByLabel("Study title").fill(`Readiness E2E ${Date.now()}`);
+    await page.getByRole("button", { name: "Create study" }).click();
+    await page.getByTestId("edit-general").click();
+    await completeReadiness(page);
+    await page.getByLabel("Add a language").fill("de");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const aims = page.getByRole("textbox", { name: "Aims", exact: true });
+    await expect(aims).toHaveValue("");
+    await expect(page.getByLabel("Email", { exact: true })).toHaveValue(
+      "coordinator@example.org",
+    );
+    await page
+      .getByRole("textbox", { name: /^Title\b/ })
+      .fill("Aktivitätsstudie");
+    await aims.fill("Aktivität beschreiben");
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        /\/studies\/[^/]+$/.test(response.url()),
+    );
+    const studyPatch = "**/studies/*";
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(studyPatch, async (route) => {
+      if (route.request().method() === "PATCH") await hold;
+      await route.continue();
+    });
+    try {
+      await aims.press("Control+Enter");
+      await expect(aims).toBeDisabled();
+      await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "Add contact" }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "Remove contact 1" }),
+      ).toBeDisabled();
+    } finally {
+      release();
+    }
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    await page.unroute(studyPatch);
+    const translated = zStudyResponse.parse(await response.json());
+    expect(translated.readinessFacts).toMatchObject({
+      content: {
+        en: { aims: "Measure daily activity" },
+        de: { aims: "Aktivität beschreiben" },
+      },
+      contacts: [{ email: "coordinator@example.org" }],
+    });
+    await expect(aims).toBeEnabled();
+    await page.getByRole("button", { name: "Remove language" }).click();
+    const removal = page.waitForResponse(
+      (result) =>
+        result.url() === response.url() &&
+        result.request().method() === "PATCH",
+    );
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Delete language" })
+      .click();
+    const removed = await removal;
+    expect(removed.status()).toBe(200);
+    expect(await removed.request().headerValue("if-match")).toBe(
+      `"${translated.draftRevision}"`,
+    );
+    const expected = {
+      details: {
+        ...translated.details,
+        content: { en: translated.details.content.en },
+      },
+      readinessFacts: {
+        ...translated.readinessFacts,
+        content: { en: translated.readinessFacts.content.en },
+      },
+    };
+    expect(removed.request().postDataJSON()).toEqual(expected);
+    const persisted = zStudyResponse.parse(await removed.json());
+    expect(persisted.details).toEqual(expected.details);
+    expect(persisted.readinessFacts).toEqual(expected.readinessFacts);
+    await page.reload();
+    await page.getByLabel("Add a language").fill("de");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(aims).toHaveValue("");
+    await expect(page.getByLabel("Email", { exact: true })).toHaveValue(
+      "coordinator@example.org",
+    );
+  });
+
+  test("keeps the implicit editing language and revision when the source changes", async ({
+    researcherPage: page,
+  }) => {
+    await openNewStudyDialog(page);
+    await page.getByLabel("Study title").fill("Source language refetch");
+    const created = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/groups\/[^/]+\/studies$/.test(response.url()),
+    );
+    await page.getByRole("button", { name: "Create study" }).click();
+    const original = zStudyResponse.parse(await (await created).json());
+    await page.getByTestId("edit-general").click();
+    const aims = page.getByRole("textbox", { name: "Aims", exact: true });
+    await aims.fill("Unsaved source wording");
+    const other = await page.context().newPage();
+    try {
+      await other.goto(page.url());
+      await other.getByLabel("Add a language").fill("de");
+      await other.getByRole("button", { name: "Add", exact: true }).click();
+      const title = other.getByRole("textbox", { name: /^Title\b/ });
+      await expect(title).toHaveValue("");
+      await title.fill("Deutscher Titel");
+      const studyPath = "**/studies/" + original.id;
+      const patch = (tab: Page) =>
+        tab.waitForResponse(
+          (response) =>
+            response.url().endsWith("/studies/" + original.id) &&
+            response.request().method() === "PATCH",
+        );
+      const saved = patch(other);
+      await other.getByRole("button", { name: "Save", exact: true }).click();
+      expect((await saved).status()).toBe(200);
+      const switched = patch(other);
+      await other.getByRole("button", { name: "Make source language" }).click();
+      expect((await switched).status()).toBe(200);
+      const refetched = page.waitForResponse(studyPath);
+      await page.bringToFront();
+      await page.evaluate(() =>
+        window.dispatchEvent(new Event("visibilitychange")),
+      );
+      expect(
+        zStudyResponse.parse(await (await refetched).json()).details
+          .sourceLanguage,
+      ).toBe("de");
+      await expect(aims).toHaveAttribute(
+        "lang",
+        original.details.sourceLanguage,
+      );
+      await expect(aims).toHaveValue("Unsaved source wording");
+      const stale = patch(page);
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      const rejected = await stale;
+      expect(rejected.status()).toBe(412);
+      expect(await rejected.request().headerValue("if-match")).toBe(
+        `"${original.draftRevision}"`,
+      );
+      const body = zStudyPatchInput.parse(rejected.request().postDataJSON());
+      expect(Object.keys(body.readinessFacts?.content ?? {})).toEqual([
+        original.details.sourceLanguage,
+      ]);
+      expect(
+        body.readinessFacts?.content[original.details.sourceLanguage]?.aims,
+      ).toBe("Unsaved source wording");
+    } finally {
+      await other.close();
+    }
+  });
+
   test("preserves unsaved work and rejects a stale draft from another tab", async ({
     researcherPage: page,
   }, testInfo) => {
@@ -153,6 +349,7 @@ test.describe("study authoring", () => {
     await page.getByTestId("edit-general").click();
     const title = page.getByRole("textbox", { name: /^Title\b/ });
     await expect(title).toHaveValue(original);
+    await completeReadiness(page);
     const other = await page.context().newPage();
     try {
       await other.goto(page.url());
@@ -251,6 +448,8 @@ test.describe("study authoring", () => {
       page.getByRole("button", { name: studyTitle, exact: true }),
     ).toBeVisible();
 
+    await page.getByTestId("edit-general").click();
+    await completeReadiness(page);
     await page.getByRole("link", { name: "Components", exact: true }).click();
 
     await chooseComponentType(page, "Information");
@@ -290,6 +489,25 @@ test.describe("study authoring", () => {
       page.getByRole("link", { name: questionnaireName, exact: true }),
     ).toBeVisible();
 
+    await page
+      .getByRole("link", { name: questionnaireName, exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Approve en-US", exact: true })
+      .press("Enter");
+    const revoke = page.getByRole("button", {
+      name: "Revoke approval for en-US",
+    });
+    await expect(revoke).toBeEnabled();
+    await revoke.press("Enter");
+    const approve = page.getByRole("button", {
+      name: "Approve en-US",
+      exact: true,
+    });
+    await expect(approve).toBeEnabled();
+    await approve.press("Enter");
+    await expect(revoke).toBeEnabled();
+    await page.getByRole("link", { name: "Back", exact: true }).click();
     await chooseComponentType(page, "Health data");
     await page.getByRole("textbox", { name: /^Name\b/ }).fill(healthDataName);
     await page.getByRole("combobox").click();
@@ -384,5 +602,9 @@ test.describe("study authoring", () => {
     await expect(page.getByRole("button", { name: /^Publish v/ })).toHaveCount(
       0,
     );
+    await page.getByRole("button", { name: /^Edit aims \(/ }).press("Enter");
+    await expect(
+      page.getByRole("textbox", { name: "Aims", exact: true }),
+    ).toBeFocused();
   });
 });

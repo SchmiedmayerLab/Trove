@@ -50,7 +50,7 @@ struct ValidationClientTests {
     @Test
     func validatesCapturedDraft() async throws {
         let receipt = Components.Schemas.StudyDraftValidation(
-            draftRevision: revision.uuidString, status: .valid, blockers: [], advisories: [], questionnaires: [], candidate: candidate
+            draftRevision: revision.uuidString, status: .valid, blockers: [], advisories: [], questionnaires: [], candidate: candidate, routes: []
         )
         let transport = try AuthoringTransport(response: receipt, status: 201)
         #expect(try await client(transport).validateStudy(study, revision: revision, delegation: delegation) == receipt)
@@ -64,7 +64,7 @@ struct ValidationClientTests {
     @Test(arguments: [Components.Schemas.ValidationStatus.invalid, .incomplete, .unavailable])
     func returnsBlockersWithoutCandidate(status: Components.Schemas.ValidationStatus) async throws {
         let report = Components.Schemas.StudyDraftValidation(
-            draftRevision: revision.uuidString, status: status, blockers: [Self.blocker], advisories: [], questionnaires: []
+            draftRevision: revision.uuidString, status: status, blockers: [Self.blocker], advisories: [], questionnaires: [], routes: []
         )
         let transport = try AuthoringTransport(response: report, status: 200)
         #expect(try await client(transport).validateStudy(study, revision: revision, delegation: nil) == report)
@@ -79,7 +79,8 @@ struct ValidationClientTests {
             blockers: [],
             advisories: [],
             questionnaires: [],
-            candidate: change == "valid-without-candidate" ? nil : candidate
+            candidate: change == "valid-without-candidate" ? nil : candidate,
+            routes: []
         )
         let created = !["valid-not-created", "candidate-without-valid"].contains(change)
         let transport = try AuthoringTransport(response: report, status: created ? 201 : 200)

@@ -134,6 +134,26 @@ export const seedDocumentationStudy = async () => {
     create,
   );
   const patch: StudyPatchInput = {
+    readinessFacts: {
+      content: {
+        en: {
+          aims: "Describe daily activity.",
+          population: "Adults aged 18 and older.",
+          procedures: "Share daily heart rate data.",
+          burden: "Review activity once per day.",
+          retention:
+            "The demonstration retains synthetic records for one year.",
+          withdrawal: "Contact the coordinator to withdraw.",
+        },
+      },
+      contacts: [
+        {
+          name: "Demo coordinator",
+          role: "Study coordinator",
+          email: "coordinator@example.org",
+        },
+      ],
+    },
     details: {
       sourceLanguage: "en",
       content: {

@@ -10,9 +10,8 @@ import {
   ConfirmDeleteDialog,
   useOpenState,
 } from "@schmiedmayerlab/grove-design-system";
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { NavigationBlocker } from "@/components/interfaces/NavigationBlocker";
 import { PhonePreview } from "@/components/interfaces/PhonePreview";
@@ -20,19 +19,19 @@ import { Card } from "@/components/ui/Card";
 import { SaveButton } from "@/components/ui/SaveButton";
 import type {
   StudyDetailContent,
-  StudyDetailData,
+  StudyPatchInput,
 } from "@/lib/api/generated/types.gen";
+import { isLanguageTag } from "@/lib/languageTags";
 import { draftHeaders } from "@/lib/queries/draft";
-import {
-  studyResponseQueryOptions,
-  useUpdateStudyMutation,
-} from "@/lib/queries/study";
+import { useUpdateStudyMutation } from "@/lib/queries/study";
 import { DetailLanguageBar } from "./components/DetailLanguageBar";
 import { GeneralForm } from "./components/GeneralForm";
 import { GeneralLayout } from "./components/GeneralLayout";
 import { GeneralPreview } from "./components/GeneralPreview";
 import {
   detailLanguages,
+  generalFormValues,
+  withReadinessContent,
   withDetailContent,
   withSourceLanguage,
   withoutLanguage,
@@ -41,12 +40,21 @@ import { useGeneralForm } from "./lib/useGeneralForm";
 
 const GeneralRouteComponent = () => {
   const params = Route.useParams();
-  const { data: study } = useQuery(
-    studyResponseQueryOptions({ studyId: params.study }),
-  );
-  const [selectedLanguage, setSelectedLanguage] = useState<string>();
-  const language = selectedLanguage ?? study?.details.sourceLanguage ?? "";
-  const { form, getStudySnapshot, getDraftHeaders } = useGeneralForm(language);
+  const { language: selectedLanguage } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const setSelectedLanguage = (language?: string) =>
+    void navigate({ search: { language }, replace: true });
+  const hash = useLocation({ select: (location) => location.hash });
+  const { form, study, language, getStudySnapshot, getDraftHeaders } =
+    useGeneralForm(selectedLanguage);
+  const loaded = !!study;
+  useEffect(() => {
+    if (!loaded || !hash) return;
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(hash)?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [loaded, hash]);
   const updateStudy = useUpdateStudyMutation();
   const removeDialog = useOpenState();
 
@@ -57,19 +65,23 @@ const GeneralRouteComponent = () => {
   const languages =
     study ? [...new Set([...detailLanguages(study.details), language])] : [];
 
-  const saveDetails = (details: StudyDetailData, onSuccess?: () => void) => {
+  const saveDetails = (
+    body: Pick<StudyPatchInput, "details" | "readinessFacts">,
+    onSuccess?: () => void,
+  ) => {
     const snapshot = getStudySnapshot();
     updateStudy.mutate(
       {
         path: { studyId: params.study },
         headers: draftHeaders(snapshot.draftRevision),
-        body: { details },
+        body,
       },
       { onSuccess },
     );
   };
 
   const handleSubmit = form.handleSubmit((data) => {
+    if (updateStudy.isPending) return;
     const { icon, ...textFields } = data;
     const languageContent: StudyDetailContent = {
       title: textFields.title,
@@ -89,6 +101,12 @@ const GeneralRouteComponent = () => {
         path: { studyId: params.study },
         headers: getDraftHeaders(),
         body: {
+          readinessFacts: withReadinessContent(
+            getStudySnapshot().readinessFacts,
+            language,
+            data.facts,
+            data.contacts,
+          ),
           ...(icon != null && { icon }),
           details: withDetailContent(
             getStudySnapshot().details,
@@ -98,25 +116,17 @@ const GeneralRouteComponent = () => {
         },
       },
       {
-        onSuccess: (response) => {
-          const details = response.details.content[language];
-          form.reset({
-            icon: response.icon,
-            title: details?.title ?? "",
-            shortTitle: details?.shortTitle ?? null,
-            explanationText: details?.explanationText ?? null,
-            shortExplanationText: details?.shortExplanationText ?? null,
-          });
-        },
+        onSuccess: (response) =>
+          form.reset(generalFormValues(response, language)),
       },
     );
   });
 
   useHotkeys(
-    "meta+enter",
+    ["meta+enter", "ctrl+enter"],
     () => void handleSubmit(),
-    { enableOnFormTags: ["input", "textarea"] },
-    [form],
+    { preventDefault: true, enableOnFormTags: ["input", "textarea"] },
+    [handleSubmit],
   );
 
   return (
@@ -144,21 +154,27 @@ const GeneralRouteComponent = () => {
                 disabled={form.formState.isDirty || updateStudy.isPending}
                 onSelect={setSelectedLanguage}
                 onMakeSource={() =>
-                  saveDetails(
-                    withSourceLanguage(getStudySnapshot().details, language),
-                  )
+                  saveDetails({
+                    details: withSourceLanguage(
+                      getStudySnapshot().details,
+                      language,
+                    ),
+                  })
                 }
                 onRemove={removeDialog.open}
               />
             </div>
           )}
-          <GeneralForm
-            form={form}
-            language={language}
-            onSubmit={handleSubmit}
-            onFieldFocus={setHighlightedField}
-            onFieldBlur={() => setHighlightedField(undefined)}
-          />
+          <fieldset className="min-w-0" disabled={updateStudy.isPending}>
+            <GeneralForm
+              form={form}
+              language={language}
+              onSubmit={handleSubmit}
+              sourceLanguage={study?.details.sourceLanguage}
+              onFieldFocus={setHighlightedField}
+              onFieldBlur={() => setHighlightedField(undefined)}
+            />
+          </fieldset>
         </Card>
         <PhonePreview>
           <GeneralPreview
@@ -171,16 +187,14 @@ const GeneralRouteComponent = () => {
       <ConfirmDeleteDialog
         open={removeDialog.isOpen}
         onOpenChange={removeDialog.setIsOpen}
+        isPending={updateStudy.isPending}
         entityName="language"
         itemName={language}
         onDelete={() =>
-          saveDetails(
-            withoutLanguage(getStudySnapshot().details, language),
-            () => {
-              removeDialog.close();
-              setSelectedLanguage(undefined);
-            },
-          )
+          saveDetails(withoutLanguage(getStudySnapshot(), language), () => {
+            removeDialog.close();
+            setSelectedLanguage();
+          })
         }
       />
       <NavigationBlocker shouldBlock={form.formState.isDirty} />
@@ -191,5 +205,9 @@ const GeneralRouteComponent = () => {
 export const Route = createFileRoute(
   "/(dashboard)/$group/$study/configuration/general",
 )({
+  validateSearch: (search: Record<string, unknown>): { language?: string } =>
+    typeof search.language === "string" && isLanguageTag(search.language) ?
+      { language: search.language }
+    : {},
   component: GeneralRouteComponent,
 });

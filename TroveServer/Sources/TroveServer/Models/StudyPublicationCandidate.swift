@@ -28,6 +28,10 @@ final class StudyPublicationCandidate: Model, @unchecked Sendable {
         let enrollmentCondition: EnrollmentConditions
         let collectionPolicy: PublishedCollectionPolicy
         let questionnaires: [QuestionnaireEvidence]
+        let instruments: [PublishedInstrument]
+        let readinessFacts: StudyReadinessFacts
+        let definitionSchemaVersion: String
+        let contractVersion: String
     }
 
     static let schema = "study_publication_candidates"
@@ -55,6 +59,18 @@ final class StudyPublicationCandidate: Model, @unchecked Sendable {
             digest: bundleDigest,
             byteCount: byteCount,
             scope: .study(.init(studyID: studyID, groupID: groupID))
+        )
+    }
+
+    var evidence: PublicationEvidence {
+        .init(
+            definitionSchemaVersion: snapshot.definitionSchemaVersion,
+            contractVersion: snapshot.contractVersion,
+            contractRevision: contractRevision,
+            validatorIdentity: validatorIdentity,
+            executionCapability: executionCapability,
+            instruments: snapshot.instruments,
+            readinessFacts: snapshot.readinessFacts
         )
     }
 
@@ -91,6 +107,8 @@ final class StudyPublicationCandidate: Model, @unchecked Sendable {
         guard createdAt <= now, expiresAt > now,
               self.validatorIdentity == validatorIdentity,
               contractRevision == FHIRValidationClient.contractRevision,
+              snapshot.contractVersion == FHIRValidationClient.contractVersion,
+              snapshot.definitionSchemaVersion == PublicationEvidence.currentDefinitionSchemaVersion,
               executionCapability == QuestionnaireValidationService.executionCapability else {
             throw ServerError.conflict("Validation is no longer current; validate the study draft again")
         }

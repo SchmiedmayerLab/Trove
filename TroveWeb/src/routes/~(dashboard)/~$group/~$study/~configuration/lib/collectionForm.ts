@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { hashKey } from "@tanstack/react-query";
 import { z } from "zod";
 import type {
   CollectionCapability,
@@ -77,6 +78,19 @@ export const measurementsFromProviderRegistrations = (
       })),
     ),
   );
+
+export const collectionRouteKey = (
+  route: Pick<
+    CollectionMeasurement,
+    "profile" | "sourceKind" | "providerRegistrationId" | "sourceTypeIdentifier"
+  >,
+) =>
+  JSON.stringify([
+    route.profile,
+    route.sourceKind ?? "participant-app",
+    route.providerRegistrationId,
+    route.sourceTypeIdentifier,
+  ]);
 
 export const matchesCollectionMeasurement = (
   requirement: CollectionRequirement,
@@ -157,73 +171,87 @@ const measurementWindow = zCollectionMeasurementWindow
     "The end must be later than the start. The end is excluded from collection.",
   );
 
-const requirementsSchema = (measurements: readonly CollectionMeasurement[]) =>
-  z
+// An unavailable saved route can keep its exact scope or change its requirement level.
+const savedScopeKey = (item: CollectionRequirement) =>
+  hashKey([
+    {
+      ...item,
+      includeWorkoutRoutes: item.includeWorkoutRoutes ?? false,
+      requirement: undefined,
+    },
+  ]);
+
+export const routeAvailable = (
+  item: CollectionRequirement,
+  measurements: readonly CollectionMeasurement[],
+) =>
+  measurements.some((measurement) =>
+    matchesCollectionMeasurement(item, measurement),
+  );
+
+const requirementsSchema = (
+  measurements: readonly CollectionMeasurement[],
+  saved: readonly CollectionRequirement[] = [],
+) => {
+  const unavailable = new Set(
+    saved
+      .filter((item) => !routeAvailable(item, measurements))
+      .map(savedScopeKey),
+  );
+  return z
     .array(
       zCollectionRequirement
-        .extend({
-          profile: z
-            .string()
-            .refine(
-              (value) => measurements.some(({ profile }) => value === profile),
-              "Unsupported collection measurement.",
-            ),
-          measurementWindow: measurementWindow.optional(),
-        })
+        .extend({ measurementWindow: measurementWindow.optional() })
         .strict()
-        .refine(
-          (item) =>
-            measurements.some(
-              (measurement) =>
-                matchesCollectionMeasurement(item, measurement) &&
-                (item.timeBasis ?? "measurement-time") ===
-                  (measurement.timeBasis ?? "measurement-time"),
-            ),
-          "Choose the exact source stream for this measurement.",
-        )
-        .refine(
-          (item) =>
-            !item.includeWorkoutRoutes ||
-            measurements.some(
-              (measurement) =>
-                matchesCollectionMeasurement(item, measurement) &&
-                measurement.supportsWorkoutRoutes === true,
-            ),
-          "Workout routes require workout collection.",
-        ),
+        .refine((item) => {
+          if (!routeAvailable(item, measurements)) {
+            const validSource =
+              item.sourceKind === "server-worker" ?
+                !!item.providerRegistrationId && !!item.sourceTypeIdentifier
+              : !item.providerRegistrationId;
+            return (
+              validSource &&
+              unavailable.has(savedScopeKey(item)) &&
+              (!item.includeWorkoutRoutes ||
+                (item.sourceKind === "participant-app" &&
+                  item.profile === workoutProfile))
+            );
+          }
+          return measurements.some(
+            (measurement) =>
+              matchesCollectionMeasurement(item, measurement) &&
+              (item.timeBasis ?? "measurement-time") ===
+                (measurement.timeBasis ?? "measurement-time") &&
+              (!item.includeWorkoutRoutes ||
+                measurement.supportsWorkoutRoutes === true),
+          );
+        }, "Choose the exact source stream for this measurement."),
     )
     .max(512)
     .refine(
-      (items) =>
-        new Set(
-          items.map((item) =>
-            JSON.stringify([
-              item.profile,
-              item.sourceKind,
-              item.providerRegistrationId ?? null,
-              item.sourceTypeIdentifier ?? null,
-            ]),
-          ),
-        ).size === items.length,
+      (items) => new Set(items.map(collectionRouteKey)).size === items.length,
       "Each measurement may appear only once.",
     );
+};
 
 export const canEditCollection = (
   requirements: unknown,
   measurements: readonly CollectionMeasurement[] = collectionMeasurements,
-) => requirementsSchema(measurements).safeParse(requirements).success;
+  saved: readonly CollectionRequirement[] = [],
+) => requirementsSchema(measurements, saved).safeParse(requirements).success;
 
 // Validate without transforming or dropping fields from the accepted API shape.
 // A single field-level error is announced beside the grouped collection controls.
 export const makeCollectionFormSchema = (
   measurements: readonly CollectionMeasurement[],
+  saved: readonly CollectionRequirement[] = [],
 ) =>
   z.object({
     receivesDeviceUnitIdentifiers: z.boolean().optional(),
     collectionRequirements: z
       .custom<CollectionRequirement[]>()
       .superRefine((value, context) => {
-        const result = requirementsSchema(measurements).safeParse(value);
+        const result = requirementsSchema(measurements, saved).safeParse(value);
         if (!result.success)
           context.addIssue({
             code: "custom",
@@ -246,7 +274,7 @@ export const collectionSummary = (
   measurements: readonly CollectionMeasurement[] = collectionMeasurements,
 ) => {
   if (!requirements.length) return "No health measurements requested.";
-  if (!canEditCollection(requirements, measurements))
+  if (!canEditCollection(requirements, measurements, requirements))
     return "Review the collection settings before saving.";
   return requirements
     .map((requirement) => requirementSummary(requirement, measurements))
@@ -292,7 +320,9 @@ const requirementSummary = (
   const measurement = measurements.find((candidate) =>
     matchesCollectionMeasurement(requirement, candidate),
   );
-  const label = measurement?.label ?? "Measurements";
+  if (!measurement)
+    return `Unavailable ${requirement.requirement ?? "required"} route: ${requirement.profile}.`;
+  const label = measurement.label;
   let overlap = "";
   if (requirement.profile === workoutProfile) {
     overlap =
@@ -308,7 +338,7 @@ const requirementSummary = (
     overlap =
       " Complete sleep records are included when they overlap this window, even if they start before it or end after it.";
   }
-  const effectiveTime = measurement?.effectiveTime;
+  const effectiveTime = measurement.effectiveTime;
   if (!overlap && effectiveTime && effectiveTime !== "point") {
     overlap =
       " Complete interval records are included when they overlap this window, even if they start before it or end after it.";

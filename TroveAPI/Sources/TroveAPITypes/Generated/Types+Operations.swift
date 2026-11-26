@@ -3070,7 +3070,7 @@ public enum Operations {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, checks the readiness facts, the administration languages of each Questionnaire and the route of each collection requirement, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Each administration language must be the base language or a translation language of the resource, every displayed string must carry a translation into it, and a study administrator must have approved it for the exact resource. A required collection requirement whose route is unavailable blocks publication; an optional one is reported as unavailable and published as unavailable. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -3318,7 +3318,7 @@ public enum Operations {
     }
     /// Publish a study
     ///
-    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
+    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities, the language approvals the candidate recorded and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/publish`.
@@ -5424,6 +5424,397 @@ public enum Operations {
             /// Operation denied or unavailable; no protected change or disclosure was accepted.
             ///
             /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Approve one administration language of a questionnaire's exact resource
+    ///
+    /// Records that a study administrator approved the stored Questionnaire with the given SHA-256 for administration in one language. Requires interactive administrator authority; delegated clients cannot approve. The digest must be the digest of the stored resource, and the language must be the resource's base language or one of its translation languages. An approval applies only to that exact resource: any edit changes the digest, and publication then requires a new approval for every administration language. Approving does not change the draft revision; validate the draft again before publishing. Repeating an approval that is in force returns it unchanged with status 200.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)`.
+    public enum ApproveQuestionnaireLanguage {
+        public static let id: Swift.String = "approveQuestionnaireLanguage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/path/componentId`.
+                public var componentId: Components.Parameters.ComponentId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - componentId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    componentId: Components.Parameters.ComponentId
+                ) {
+                    self.studyId = studyId
+                    self.componentId = componentId
+                }
+            }
+            public var path: Operations.ApproveQuestionnaireLanguage.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApproveQuestionnaireLanguage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApproveQuestionnaireLanguage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ApproveQuestionnaireLanguage.Input.Headers
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.QuestionnaireLanguageApprovalInput)
+            }
+            public var body: Operations.ApproveQuestionnaireLanguage.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.ApproveQuestionnaireLanguage.Input.Path,
+                headers: Operations.ApproveQuestionnaireLanguage.Input.Headers = .init(),
+                body: Operations.ApproveQuestionnaireLanguage.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Created: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/responses/201/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/responses/201/content/application\/json`.
+                    case json(Components.Schemas.QuestionnaireLanguageApproval)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.QuestionnaireLanguageApproval {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ApproveQuestionnaireLanguage.Output.Created.Body
+                /// Creates a new `Created`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ApproveQuestionnaireLanguage.Output.Created.Body) {
+                    self.body = body
+                }
+            }
+            /// Approval recorded
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)/responses/201`.
+            ///
+            /// HTTP response code: `201 created`.
+            case created(Operations.ApproveQuestionnaireLanguage.Output.Created)
+            /// The associated value of the enum case if `self` is `.created`.
+            ///
+            /// - Throws: An error if `self` is not `.created`.
+            /// - SeeAlso: `.created`.
+            public var created: Operations.ApproveQuestionnaireLanguage.Output.Created {
+                get throws {
+                    switch self {
+                    case let .created(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "created",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.QuestionnaireLanguageApproval)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.QuestionnaireLanguageApproval {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ApproveQuestionnaireLanguage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ApproveQuestionnaireLanguage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The same approval is already in force
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ApproveQuestionnaireLanguage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ApproveQuestionnaireLanguage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Revoke a questionnaire language approval
+    ///
+    /// Ends an approval that is in force. Requires interactive administrator authority. A revoked approval no longer permits publication; a candidate validated with it cannot be published. Publications already accepted keep the approval evidence they recorded. Revoking a revoked approval returns it unchanged.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/post(revokeQuestionnaireLanguageApproval)`.
+    public enum RevokeQuestionnaireLanguageApproval {
+        public static let id: Swift.String = "revokeQuestionnaireLanguageApproval"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/path/componentId`.
+                public var componentId: Components.Parameters.ComponentId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/path/approvalId`.
+                public var approvalId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - componentId:
+                ///   - approvalId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    componentId: Components.Parameters.ComponentId,
+                    approvalId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.componentId = componentId
+                    self.approvalId = approvalId
+                }
+            }
+            public var path: Operations.RevokeQuestionnaireLanguageApproval.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeQuestionnaireLanguageApproval.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeQuestionnaireLanguageApproval.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RevokeQuestionnaireLanguageApproval.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RevokeQuestionnaireLanguageApproval.Input.Path,
+                headers: Operations.RevokeQuestionnaireLanguageApproval.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.QuestionnaireLanguageApproval)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.QuestionnaireLanguageApproval {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RevokeQuestionnaireLanguageApproval.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RevokeQuestionnaireLanguageApproval.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The revoked approval
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/post(revokeQuestionnaireLanguageApproval)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RevokeQuestionnaireLanguageApproval.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RevokeQuestionnaireLanguageApproval.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/post(revokeQuestionnaireLanguageApproval)/responses/default`.
             ///
             /// HTTP response code: `default`.
             case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)

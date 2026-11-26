@@ -22,6 +22,7 @@ struct AuthoringClientTests {
         get throws {
             try .init(
                 enrollmentPeriod: .init(calendar: .gregorian, timeZone: "UTC"),
+                readinessFacts: .init(content: .init(), contacts: []),
                 draftRevision: revision.uuidString,
                 collectionRequirements: [],
                 receivesDeviceUnitIdentifiers: false,
@@ -98,7 +99,10 @@ struct AuthoringClientTests {
                 name: input.name,
                 data: input.data,
                 language: fixture.language,
-                translationLanguages: fixture.translationLanguages
+                translationLanguages: fixture.translationLanguages,
+                sha256: String(repeating: "0", count: 64),
+                administrationLanguages: [fixture.language],
+                languageApprovals: []
             )
             let component = try #require(UUID(uuidString: response.id))
             let transport = try AuthoringTransport(response: response, status: 201)
@@ -131,7 +135,10 @@ struct AuthoringClientTests {
                 name: "Wellbeing",
                 data: QuestionnaireContent(questionnaire: String(decoding: bytes, as: UTF8.self)),
                 language: fixture.language,
-                translationLanguages: fixture.translationLanguages
+                translationLanguages: fixture.translationLanguages,
+                sha256: String(repeating: "0", count: 64),
+                administrationLanguages: [fixture.language],
+                languageApprovals: []
             )
             let output = FileManager.default.temporaryDirectory.appendingPathComponent("trove-cli-export-\(UUID()).json")
             try Data().write(to: output)
@@ -152,7 +159,13 @@ struct AuthoringClientTests {
     @Test
     func exportRejectsADifferentComponent() async throws {
         let response = Components.Schemas.QuestionnaireComponentResponse(
-            id: UUID().uuidString, name: "Other", data: QuestionnaireContent(questionnaire: "{}"), translationLanguages: []
+            id: UUID().uuidString,
+            name: "Other",
+            data: QuestionnaireContent(questionnaire: "{}"),
+            translationLanguages: [],
+            sha256: String(repeating: "0", count: 64),
+            administrationLanguages: [],
+            languageApprovals: []
         )
         let transport = try AuthoringTransport(response: response)
         await #expect(throws: CLIError.requestFailed) {
@@ -163,7 +176,18 @@ struct AuthoringClientTests {
     @Test
     func publicationUsesOnlySelectedCandidateAndRevision() async throws {
         let response = Components.Schemas.PublishedStudyResponse(
-            id: UUID().uuidString, studyId: study.uuidString, revision: 1, visibility: .unlisted, publishedAt: Date(timeIntervalSince1970: 0)
+            id: UUID().uuidString,
+            studyId: study.uuidString,
+            revision: 1,
+            visibility: .unlisted,
+            publishedAt: Date(timeIntervalSince1970: 0),
+            definitionSchemaVersion: "0.14.0",
+            contractVersion: "0.8.2",
+            contractRevision: "synthetic-contract",
+            validatorIdentity: "synthetic-validator",
+            executionCapability: "synthetic-capability",
+            instruments: [],
+            unavailableCollectionRequirements: []
         )
         let validation = UUID()
         let transport = try AuthoringTransport(response: response, status: 201)
