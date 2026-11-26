@@ -2028,7 +2028,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph`.
         public struct QuestionnaireGraph: Codable, Hashable, Sendable {
-            /// True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles and expressions that are not evaluated make the analysis incomplete.
+            /// True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles, expressions that are not evaluated, references that can read another repeat instance and codings without a system make the analysis incomplete.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph/complete`.
@@ -2047,7 +2047,7 @@ extension Components {
             /// Creates a new `QuestionnaireGraph`.
             ///
             /// - Parameters:
-            ///   - complete: True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles and expressions that are not evaluated make the analysis incomplete.
+            ///   - complete: True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles, expressions that are not evaluated, references that can read another repeat instance and codings without a system make the analysis incomplete.
             ///   - nodes: Every item in document order.
             ///   - edges: `containment` connects a group or question to each nested item, `order` connects consecutive siblings, and `dependency` connects the question an `enableWhen` condition names to the item it gates. An expression adds no edge.
             ///   - diagnostics:
@@ -2587,7 +2587,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/answers`.
             public var answers: [Components.Schemas.QuestionnaireScenarioAnswer]
-            /// The repeat context of the question instance the condition read: an enclosing instance of the question, otherwise the instance in the nearest enclosing group instance or answer that contains the question; when several remain, the nearest preceding one, otherwise the nearest following one. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
+            /// The repeat context of the question instance the condition read, by the FHIR R4 rule: an enclosing instance on the ancestor axis, otherwise the nearest preceding instance, otherwise the nearest following one, in document order of the form's item instances. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/questionInstance`.
@@ -2600,7 +2600,7 @@ extension Components {
             ///   - _operator:
             ///   - outcome:
             ///   - answers: The answers the condition compared. The answers of a disabled question count as absent and are not listed.
-            ///   - questionInstance: The repeat context of the question instance the condition read: an enclosing instance of the question, otherwise the instance in the nearest enclosing group instance or answer that contains the question; when several remain, the nearest preceding one, otherwise the nearest following one. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
+            ///   - questionInstance: The repeat context of the question instance the condition read, by the FHIR R4 rule: an enclosing instance on the ancestor axis, otherwise the nearest preceding instance, otherwise the nearest following one, in document order of the form's item instances. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
             public init(
                 index: Swift.Int,
                 question: Swift.String? = nil,
