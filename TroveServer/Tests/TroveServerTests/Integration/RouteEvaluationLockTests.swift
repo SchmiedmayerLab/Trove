@@ -81,18 +81,17 @@ struct RouteEvaluationLockTests {
             let evaluated = Gate()
             let release = Gate()
             let holder = Task {
-                try await app.db.transaction { transaction in
-                    let routes: [CollectionRouteAvailability]
-                    do {
-                        routes = try await service.routes(for: [requirement], lock: lock, on: transaction)
-                    } catch {
-                        // Release the waiting test instead of leaving it blocked; the holder reports the error.
+                do {
+                    try await app.db.transaction { transaction in
+                        let routes = try await service.routes(for: [requirement], lock: lock, on: transaction)
+                        #expect(routes.map(\.available) == [true])
                         await evaluated.open()
-                        throw error
+                        await release.wait()
                     }
-                    #expect(routes.map(\.available) == [true])
+                } catch {
+                    // Release the waiting test instead of leaving it blocked; the holder reports the error.
                     await evaluated.open()
-                    await release.wait()
+                    throw error
                 }
             }
             await evaluated.wait()
