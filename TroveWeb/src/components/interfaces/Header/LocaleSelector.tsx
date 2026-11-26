@@ -15,6 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   Field,
   Input,
@@ -185,27 +186,27 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
           Consent and informational document locales
         </HeaderSelectorMenuLabel>
         {locales.map((locale) => (
-          <HeaderSelectorMenuItem
-            key={locale}
-            onSelect={() => setLocale(locale)}
-          >
-            <span className="flex-1">{locale}</span>
+          <div key={locale} className="flex items-center gap-1">
+            <HeaderSelectorMenuItem
+              className="flex-1"
+              onSelect={() => setLocale(locale)}
+            >
+              {locale}
+            </HeaderSelectorMenuItem>
             {locales.length > 1 && (
-              <button
-                type="button"
+              <DropdownMenuItem
                 aria-label={`Remove ${locale}`}
-                className="text-text-tertiary hover:text-text -mr-1 rounded p-0.5"
-                onClick={(event) => {
-                  event.stopPropagation();
+                className="text-text-tertiary p-2!"
+                onSelect={() => {
                   if (!study) return;
                   setPendingDeleteLocale({ locale, study });
                   deleteDialog.open();
                 }}
               >
-                <X className="size-3.5" />
-              </button>
+                <X />
+              </DropdownMenuItem>
             )}
-          </HeaderSelectorMenuItem>
+          </div>
         ))}
         <DropdownMenuSeparator />
         <HeaderSelectorMenuItem
