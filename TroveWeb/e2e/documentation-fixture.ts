@@ -18,7 +18,7 @@ import {
 } from "../src/lib/api/generated/zod.gen.ts";
 
 export const studyTitle = "Daily Activity Study";
-export const consentTitle = "Daily Activity Study — Consent";
+export const consentTitle = "Daily Activity Study Consent";
 export const consent = `## About this study
 
 We are exploring everyday movement and wellbeing. Participation is **voluntary**. You may leave the study at any time.
