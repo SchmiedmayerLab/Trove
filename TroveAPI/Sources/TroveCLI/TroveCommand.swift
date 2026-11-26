@@ -22,7 +22,7 @@ struct StudyCommand: AsyncParsableCommand {
 struct QuestionnaireCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "questionnaire",
-        subcommands: [ImportQuestionnaire.self, ExportQuestionnaire.self, ValidateQuestionnaire.self]
+        subcommands: [ImportQuestionnaire.self, ExportQuestionnaire.self, ValidateQuestionnaire.self, EvaluateQuestionnaireScenarios.self]
     )
 }
 

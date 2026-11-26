@@ -1,0 +1,156 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Typed comparisons for integer, decimal, date, dateTime, time, string, coding, quantity and open-choice answers, including values whose precision or unit leaves the comparison not evaluated.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-typed",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      { "linkId": "age", "type": "integer", "text": "Age" },
+      { "linkId": "adult", "type": "display", "text": "Adult", "enableWhen": [{ "question": "age", "operator": ">=", "answerInteger": 18 }] },
+      { "linkId": "weight", "type": "decimal", "text": "Weight" },
+      { "linkId": "heavy", "type": "display", "text": "Above 70.5", "enableWhen": [{ "question": "weight", "operator": ">", "answerDecimal": 70.5 }] },
+      { "linkId": "heavy-integer", "type": "display", "text": "At least 80", "enableWhen": [{ "question": "weight", "operator": ">=", "answerInteger": 80 }] },
+      { "linkId": "onset", "type": "date", "text": "Onset" },
+      { "linkId": "early", "type": "display", "text": "Before 2020", "enableWhen": [{ "question": "onset", "operator": "<", "answerDate": "2020-01-01" }] },
+      { "linkId": "visit", "type": "dateTime", "text": "Visit" },
+      {
+        "linkId": "after-visit", "type": "display", "text": "After noon",
+        "enableWhen": [{ "question": "visit", "operator": ">", "answerDateTime": "2024-03-01T12:00:00+01:00" }]
+      },
+      { "linkId": "wake", "type": "time", "text": "Wake-up time" },
+      { "linkId": "early-riser", "type": "display", "text": "Early riser", "enableWhen": [{ "question": "wake", "operator": "<=", "answerTime": "07:00:00" }] },
+      { "linkId": "name", "type": "string", "text": "Name" },
+      { "linkId": "named", "type": "display", "text": "Alex", "enableWhen": [{ "question": "name", "operator": "=", "answerString": "Alex" }] },
+      {
+        "linkId": "color", "type": "choice", "text": "Color",
+        "answerOption": [
+          { "valueCoding": { "system": "http://example.org/colors", "code": "red", "display": "Red" } },
+          { "valueCoding": { "system": "http://example.org/colors", "code": "blue", "display": "Blue" } }
+        ]
+      },
+      {
+        "linkId": "red", "type": "display", "text": "Red in the color system",
+        "enableWhen": [{ "question": "color", "operator": "=", "answerCoding": { "system": "http://example.org/colors", "code": "red" } }]
+      },
+      {
+        "linkId": "red-any-system", "type": "display", "text": "Red in any system",
+        "enableWhen": [{ "question": "color", "operator": "=", "answerCoding": { "code": "red" } }]
+      },
+      { "linkId": "temperature", "type": "quantity", "text": "Temperature" },
+      {
+        "linkId": "fever", "type": "display", "text": "Fever",
+        "enableWhen": [{ "question": "temperature", "operator": ">=", "answerQuantity": { "value": 38, "system": "http://unitsofmeasure.org", "code": "Cel" } }]
+      },
+      { "linkId": "pet", "type": "open-choice", "text": "Pet", "answerOption": [{ "valueCoding": { "system": "http://example.org/pets", "code": "dog" } }] },
+      { "linkId": "other-pet", "type": "display", "text": "Ferret", "enableWhen": [{ "question": "pet", "operator": "=", "answerString": "ferret" }] }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "typed values",
+        "item": [
+          { "linkId": "age", "answer": [{ "valueInteger": 17 }] },
+          { "linkId": "weight", "answer": [{ "valueDecimal": 70.5 }] },
+          { "linkId": "onset", "answer": [{ "valueDate": "2019-12-31" }] },
+          { "linkId": "visit", "answer": [{ "valueDateTime": "2024-03-01T12:30:00+01:00" }] },
+          { "linkId": "wake", "answer": [{ "valueTime": "06:45:00" }] },
+          { "linkId": "name", "answer": [{ "valueString": "Alex" }] },
+          { "linkId": "color", "answer": [{ "valueCoding": { "system": "http://example.org/colors", "code": "red", "display": "Red" } }] },
+          { "linkId": "temperature", "answer": [{ "valueQuantity": { "value": 38.5, "unit": "°C", "system": "http://unitsofmeasure.org", "code": "Cel" } }] },
+          { "linkId": "pet", "answer": [{ "valueString": "ferret" }] }
+        ]
+      },
+      {
+        "name": "precision and units",
+        "item": [
+          { "linkId": "age", "answer": [{ "valueInteger": 18 }] },
+          { "linkId": "weight", "answer": [{ "valueDecimal": 80 }] },
+          { "linkId": "onset", "answer": [{ "valueDate": "2020-01" }] },
+          { "linkId": "visit", "answer": [{ "valueDateTime": "2024-03-01" }] },
+          { "linkId": "wake", "answer": [{ "valueTime": "07:30:00" }] },
+          { "linkId": "name", "answer": [{ "valueString": "alex" }] },
+          { "linkId": "color", "answer": [{ "valueCoding": { "system": "http://other.example/colors", "code": "red" } }] },
+          { "linkId": "temperature", "answer": [{ "valueQuantity": { "value": 101, "unit": "°F", "system": "http://unitsofmeasure.org", "code": "[degF]" } }] },
+          { "linkId": "pet", "answer": [{ "valueCoding": { "system": "http://example.org/pets", "code": "dog" } }] }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": { "complete": true, "diagnostics": [] },
+    "scenarios": [
+      {
+        "name": "typed values",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "disabled", "reason": "conditionsNotMet", "conditions": [{ "outcome": "notMet", "answers": [{ "valueInteger": 17 }] }] },
+          { "path": "Questionnaire.item[2]", "state": "enabled" },
+          { "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled" },
+          { "path": "Questionnaire.item[6]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[7]", "state": "enabled" },
+          { "path": "Questionnaire.item[8]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[9]", "state": "enabled" },
+          { "path": "Questionnaire.item[10]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[11]", "state": "enabled" },
+          { "path": "Questionnaire.item[12]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[13]", "state": "enabled" },
+          { "path": "Questionnaire.item[14]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[15]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[16]", "state": "enabled" },
+          { "path": "Questionnaire.item[17]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[18]", "state": "enabled" },
+          { "path": "Questionnaire.item[19]", "state": "enabled", "reason": "conditionsMet" }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "precision and units",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[2]", "state": "enabled" },
+          { "path": "Questionnaire.item[3]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled" },
+          {
+            "path": "Questionnaire.item[6]", "state": "notEvaluated", "reason": "conditionNotEvaluated",
+            "conditions": [{ "outcome": "notEvaluated", "answers": [{ "valueDate": "2020-01" }] }]
+          },
+          { "path": "Questionnaire.item[7]", "state": "enabled" },
+          { "path": "Questionnaire.item[8]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[9]", "state": "enabled" },
+          { "path": "Questionnaire.item[10]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[11]", "state": "enabled" },
+          { "path": "Questionnaire.item[12]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[13]", "state": "enabled" },
+          { "path": "Questionnaire.item[14]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[15]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[16]", "state": "enabled" },
+          { "path": "Questionnaire.item[17]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[18]", "state": "enabled" },
+          { "path": "Questionnaire.item[19]", "state": "disabled", "reason": "conditionsNotMet" }
+        ],
+        "response": [
+          { "linkId": "age", "answer": [{ "valueInteger": 18 }] },
+          { "linkId": "weight", "answer": [{ "valueDecimal": 80 }] },
+          { "linkId": "onset", "answer": [{ "valueDate": "2020-01" }] },
+          { "linkId": "visit", "answer": [{ "valueDateTime": "2024-03-01" }] },
+          { "linkId": "wake", "answer": [{ "valueTime": "07:30:00" }] },
+          { "linkId": "name", "answer": [{ "valueString": "alex" }] },
+          { "linkId": "color", "answer": [{ "valueCoding": { "system": "http://other.example/colors", "code": "red" } }] },
+          { "linkId": "temperature", "answer": [{ "valueQuantity": { "value": 101, "unit": "°F", "system": "http://unitsofmeasure.org", "code": "[degF]" } }] },
+          { "linkId": "pet", "answer": [{ "valueCoding": { "system": "http://example.org/pets", "code": "dog" } }] }
+        ],
+        "diagnostics": []
+      }
+    ]
+  }
+}

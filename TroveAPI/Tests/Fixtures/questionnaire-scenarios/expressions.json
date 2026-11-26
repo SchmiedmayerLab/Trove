@@ -1,0 +1,127 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "SDC and FHIRPath expressions are preserved, reported and not evaluated: an enableWhenExpression leaves the item and its descendants not evaluated, a calculated answer leaves conditions on it not evaluated, and no edge is drawn for an expression.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-expressions",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": { "name": "total", "language": "text/fhirpath", "expression": "%resource.item.answer.value.sum()" }
+      }
+    ],
+    "item": [
+      {
+        "linkId": "score", "type": "integer", "text": "Score",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+            "valueExpression": { "language": "text/fhirpath", "expression": "%total" }
+          }
+        ]
+      },
+      { "linkId": "high-score", "type": "display", "text": "High score", "enableWhen": [{ "question": "score", "operator": ">", "answerInteger": 10 }] },
+      {
+        "linkId": "gated", "type": "group", "text": "Gated by an expression",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+            "valueExpression": { "language": "text/fhirpath", "expression": "%total > 3" }
+          }
+        ],
+        "item": [
+          { "linkId": "child", "type": "string", "text": "Child" },
+          { "linkId": "child-off", "type": "display", "text": "Flagged", "enableWhen": [{ "question": "flag", "operator": "=", "answerBoolean": true }] }
+        ]
+      },
+      { "linkId": "flag", "type": "boolean", "text": "Flag" },
+      {
+        "linkId": "both", "type": "display", "text": "Both kinds of condition",
+        "enableWhen": [{ "question": "flag", "operator": "=", "answerBoolean": true }],
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression",
+            "valueExpression": { "language": "text/fhirpath", "expression": "true" }
+          }
+        ]
+      },
+      {
+        "linkId": "dynamic-text", "type": "display", "text": "Your score",
+        "_text": {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-expression",
+              "valueExpression": { "language": "text/fhirpath", "expression": "'Score: ' + %total" }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "flag false",
+        "item": [
+          { "linkId": "score", "answer": [{ "valueInteger": 12 }] },
+          { "linkId": "gated", "item": [{ "linkId": "child", "answer": [{ "valueString": "Kept" }] }] },
+          { "linkId": "flag", "answer": [{ "valueBoolean": false }] }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "edges": [
+        { "kind": "containment", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[2].item[0]" },
+        { "kind": "containment", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[2].item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[2]" },
+        { "kind": "order", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[3]" },
+        { "kind": "order", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]" },
+        { "kind": "order", "from": "Questionnaire.item[4]", "to": "Questionnaire.item[5]" },
+        { "kind": "order", "from": "Questionnaire.item[2].item[0]", "to": "Questionnaire.item[2].item[1]" },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
+        { "kind": "dependency", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[2].item[1]" },
+        { "kind": "dependency", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]" }
+      ],
+      "diagnostics": [
+        { "severity": "error", "source": "trove", "rule": "enable-when-expression-conflict", "path": "Questionnaire.item[4]" },
+        { "severity": "warning", "source": "trove", "rule": "expression-not-evaluated", "path": "Questionnaire.extension[0]" },
+        { "severity": "warning", "source": "trove", "rule": "expression-not-evaluated", "path": "Questionnaire.item[0].extension[0]" },
+        { "severity": "warning", "source": "trove", "rule": "expression-not-evaluated", "path": "Questionnaire.item[2].extension[0]" },
+        { "severity": "warning", "source": "trove", "rule": "expression-not-evaluated", "path": "Questionnaire.item[4].extension[0]" },
+        { "severity": "warning", "source": "trove", "rule": "expression-not-evaluated", "path": "Questionnaire.item[5].text.extension[0]" }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "flag false",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled", "reason": "unconditional" },
+          {
+            "path": "Questionnaire.item[1]", "state": "notEvaluated", "reason": "conditionNotEvaluated",
+            "conditions": [{ "outcome": "notEvaluated", "answers": [{ "valueInteger": 12 }] }]
+          },
+          { "path": "Questionnaire.item[2]", "state": "notEvaluated", "reason": "expressionNotEvaluated" },
+          { "path": "Questionnaire.item[2].item[0]", "state": "notEvaluated", "reason": "ancestorNotEvaluated" },
+          { "path": "Questionnaire.item[2].item[1]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[3]", "state": "enabled" },
+          { "path": "Questionnaire.item[4]", "state": "notEvaluated", "reason": "expressionNotEvaluated" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "unconditional" }
+        ],
+        "response": [
+          { "linkId": "score", "answer": [{ "valueInteger": 12 }] },
+          { "linkId": "gated", "item": [{ "linkId": "child", "answer": [{ "valueString": "Kept" }] }] },
+          { "linkId": "flag", "answer": [{ "valueBoolean": false }] }
+        ],
+        "diagnostics": []
+      }
+    ]
+  }
+}

@@ -98,17 +98,9 @@ final class StudyValidationService: Module, @unchecked Sendable {
 
     /// Validates one questionnaire component's stored resource without staging or recording anything.
     func validateComponent(studyID: UUID, componentID: UUID) async throws -> (draftRevision: UUID, result: QuestionnaireValidationService.Result) {
-        let (draftRevision, content) = try await studyService.readDraft(id: studyID, operation: .validate) { study, transaction in
-            guard let component = try await ComponentRepository(database: transaction).find(id: componentID, studyId: studyID) else {
-                throw ServerError.notFound(resource: "Component", identifier: componentID.uuidString)
-            }
-            guard case .questionnaire(let content) = component.data else {
-                throw ServerError(
-                    status: .unprocessableContent, title: "Unsupported Validation", detail: "Only questionnaire components have validation"
-                )
-            }
-            return (study.draftRevision, content)
-        }
+        let (draftRevision, content) = try await studyService.readQuestionnaire(
+            studyID: studyID, componentID: componentID, operation: .validate, purpose: "validation"
+        )
         let result = try await QuestionnaireValidationService(validator: validator)
             .validate(bytes: Data(content.questionnaire.utf8), evaluationInstant: Date())
         return (draftRevision, result)

@@ -159,6 +159,27 @@ struct AuthoringClient: Sendable {
         }
     }
 
+    func evaluateScenarios(
+        _ study: UUID,
+        component: UUID,
+        delegation: UUID?,
+        input: Components.Schemas.QuestionnaireScenarioInput
+    ) async throws -> Components.Schemas.QuestionnaireScenarioReport {
+        try await request(revision: nil) { client in
+            let report = try await client.evaluateQuestionnaireScenarios(.init(
+                path: .init(studyId: study.uuidString, componentId: component.uuidString),
+                headers: .init(troveDelegationID: delegation?.uuidString),
+                body: .json(input)
+            )).ok.body.json
+            // One result per requested scenario, in request order.
+            guard UUID(uuidString: report.componentId) == component,
+                  report.scenarios.map(\.name) == input.scenarios.map(\.name) else {
+                throw CLIError.requestFailed
+            }
+            return report
+        }
+    }
+
     func publishStudy(_ study: UUID, revision: UUID, validation: UUID) async throws -> Components.Schemas.PublishedStudyResponse {
         try await request(revision: revision) { client in
             try await client.postStudiesStudyIdPublish(.init(

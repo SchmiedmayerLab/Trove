@@ -1,0 +1,93 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Synthetic answers that do not fit the Questionnaire are reported at their response paths and left out of the evaluation and the response.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-answers",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      { "linkId": "name", "type": "string", "text": "Name" },
+      { "linkId": "age", "type": "integer", "text": "Age" },
+      { "linkId": "visits", "type": "group", "text": "Visits", "item": [{ "linkId": "when", "type": "date", "text": "When" }] },
+      {
+        "linkId": "colors", "type": "choice", "text": "Color",
+        "answerOption": [
+          { "valueCoding": { "system": "http://example.org/colors", "code": "red" } },
+          { "valueCoding": { "system": "http://example.org/colors", "code": "blue" } }
+        ]
+      },
+      { "linkId": "info", "type": "display", "text": "Information" },
+      { "linkId": "smoker", "type": "boolean", "text": "Smoker", "item": [{ "linkId": "packs", "type": "integer", "text": "Packs" }] }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "malformed answers",
+        "item": [
+          { "linkId": "unknown", "answer": [{ "valueString": "Unknown" }] },
+          { "linkId": "name", "answer": [{ "valueInteger": 3, "item": [{ "linkId": "nested", "answer": [{ "valueString": "Ignored" }] }] }] },
+          { "linkId": "age", "answer": [{}] },
+          { "linkId": "age", "answer": [{ "valueInteger": 40 }] },
+          {
+            "linkId": "visits",
+            "answer": [{ "valueString": "Not an answer" }],
+            "item": [{ "linkId": "when", "answer": [{ "valueDate": "2024-02-30" }] }]
+          },
+          { "linkId": "visits", "item": [{ "linkId": "when", "answer": [{ "valueDate": "2024-02-01" }] }] },
+          {
+            "linkId": "colors",
+            "answer": [
+              { "valueCoding": { "system": "http://example.org/colors", "code": "red" } },
+              { "valueCoding": { "system": "http://example.org/colors", "code": "blue" } }
+            ]
+          },
+          { "linkId": "info", "answer": [{ "valueString": "Not an answer" }] },
+          {
+            "linkId": "smoker",
+            "answer": [{ "valueBoolean": true, "item": [{ "linkId": "packs", "answer": [{ "valueInteger": 1 }] }] }],
+            "item": [{ "linkId": "packs", "answer": [{ "valueInteger": 2 }] }]
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": { "complete": true, "diagnostics": [] },
+    "scenarios": [
+      {
+        "name": "malformed answers",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "enabled" },
+          { "path": "Questionnaire.item[2]", "instance": [], "state": "enabled" },
+          { "path": "Questionnaire.item[2].item[0]", "instance": [], "state": "enabled" },
+          { "path": "Questionnaire.item[3]", "state": "enabled" },
+          { "path": "Questionnaire.item[4]", "state": "enabled" },
+          { "path": "Questionnaire.item[5]", "state": "enabled" },
+          { "path": "Questionnaire.item[5].item[0]", "instance": [{ "path": "Questionnaire.item[5]", "index": 0 }], "state": "enabled" }
+        ],
+        "response": [
+          { "linkId": "colors", "answer": [{ "valueCoding": { "system": "http://example.org/colors", "code": "red" } }] },
+          { "linkId": "smoker", "answer": [{ "valueBoolean": true, "item": [{ "linkId": "packs", "answer": [{ "valueInteger": 1 }] }] }] }
+        ],
+        "diagnostics": [
+          { "severity": "error", "source": "trove", "rule": "answer-item", "path": "QuestionnaireResponse.item[0]" },
+          { "severity": "error", "source": "trove", "rule": "answer-type", "path": "QuestionnaireResponse.item[1].answer[0].valueInteger" },
+          { "severity": "error", "source": "trove", "rule": "answer-item", "path": "QuestionnaireResponse.item[1].answer[0].item[0]" },
+          { "severity": "error", "source": "trove", "rule": "answer-duplicate", "path": "QuestionnaireResponse.item[3]" },
+          { "severity": "error", "source": "trove", "rule": "answer-value", "path": "QuestionnaireResponse.item[2].answer[0]" },
+          { "severity": "error", "source": "trove", "rule": "answer-repeats", "path": "QuestionnaireResponse.item[5]" },
+          { "severity": "error", "source": "trove", "rule": "answer-on-group", "path": "QuestionnaireResponse.item[4].answer[0]" },
+          { "severity": "error", "source": "trove", "rule": "answer-value", "path": "QuestionnaireResponse.item[4].item[0].answer[0].valueDate" },
+          { "severity": "error", "source": "trove", "rule": "answer-repeats", "path": "QuestionnaireResponse.item[6].answer[1]" },
+          { "severity": "error", "source": "trove", "rule": "answer-not-answerable", "path": "QuestionnaireResponse.item[7].answer[0]" },
+          { "severity": "error", "source": "trove", "rule": "answer-nesting", "path": "QuestionnaireResponse.item[8].item[0]" }
+        ]
+      }
+    ]
+  }
+}

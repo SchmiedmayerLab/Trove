@@ -1,0 +1,213 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Conditions inside a repeating group read their own instance, a question outside the group reads the nearest preceding instance, items nested under a question read their enclosing answer and the siblings under that same answer, a condition on a later sibling in a repeating group reads the same instance, and a condition on a later question reads the following occurrence.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-repeats",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      {
+        "linkId": "medication", "type": "group", "repeats": true, "text": "Medication",
+        "item": [
+          { "linkId": "taking", "type": "boolean", "text": "Currently taking" },
+          { "linkId": "dose", "type": "decimal", "text": "Dose", "enableWhen": [{ "question": "taking", "operator": "=", "answerBoolean": true }] }
+        ]
+      },
+      { "linkId": "any-taking", "type": "display", "text": "Last medication is taken", "enableWhen": [{ "question": "taking", "operator": "=", "answerBoolean": true }] },
+      {
+        "linkId": "pain", "type": "boolean", "repeats": true, "text": "Pain",
+        "item": [
+          { "linkId": "pain-site", "type": "string", "text": "Where?", "enableWhen": [{ "question": "pain", "operator": "=", "answerBoolean": true }] }
+        ]
+      },
+      { "linkId": "intro", "type": "display", "text": "You will be asked a final question", "enableWhen": [{ "question": "later", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "later", "type": "string", "text": "Final question" },
+      {
+        "linkId": "allergy", "type": "boolean", "repeats": true, "text": "Allergy",
+        "item": [
+          { "linkId": "severe", "type": "boolean", "text": "Severe" },
+          { "linkId": "reaction", "type": "string", "text": "Reaction", "enableWhen": [{ "question": "severe", "operator": "=", "answerBoolean": true }] }
+        ]
+      },
+      {
+        "linkId": "visit", "type": "group", "repeats": true, "text": "Visit",
+        "item": [
+          { "linkId": "note", "type": "string", "text": "Notes on the visit", "enableWhen": [{ "question": "attended", "operator": "=", "answerBoolean": true }] },
+          { "linkId": "attended", "type": "boolean", "text": "Attended" }
+        ]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "two medications",
+        "item": [
+          {
+            "linkId": "medication",
+            "item": [
+              { "linkId": "taking", "answer": [{ "valueBoolean": true }] },
+              { "linkId": "dose", "answer": [{ "valueDecimal": 5 }] }
+            ]
+          },
+          {
+            "linkId": "medication",
+            "item": [
+              { "linkId": "taking", "answer": [{ "valueBoolean": false }] },
+              { "linkId": "dose", "answer": [{ "valueDecimal": 10 }] }
+            ]
+          },
+          {
+            "linkId": "pain",
+            "answer": [
+              { "valueBoolean": true, "item": [{ "linkId": "pain-site", "answer": [{ "valueString": "Knee" }] }] },
+              { "valueBoolean": false, "item": [{ "linkId": "pain-site", "answer": [{ "valueString": "Ankle" }] }] }
+            ]
+          },
+          {
+            "linkId": "allergy",
+            "answer": [
+              { "valueBoolean": true, "item": [{ "linkId": "severe", "answer": [{ "valueBoolean": true }] }] },
+              { "valueBoolean": true, "item": [{ "linkId": "severe", "answer": [{ "valueBoolean": false }] }] }
+            ]
+          },
+          { "linkId": "visit", "item": [{ "linkId": "attended", "answer": [{ "valueBoolean": true }] }] },
+          { "linkId": "visit", "item": [{ "linkId": "attended", "answer": [{ "valueBoolean": false }] }] }
+        ]
+      },
+      {
+        "name": "no medication",
+        "item": [
+          { "linkId": "pain", "answer": [{ "valueBoolean": false }] },
+          { "linkId": "later", "answer": [{ "valueString": "Done" }] }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        { "severity": "warning", "source": "trove", "rule": "repeat-context", "path": "Questionnaire.item[1].enableWhen[0].question" }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "two medications",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "instance": [{ "path": "Questionnaire.item[0]", "index": 0 }], "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[0].item[0]", "instance": [{ "path": "Questionnaire.item[0]", "index": 0 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[0].item[1]", "instance": [{ "path": "Questionnaire.item[0]", "index": 0 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [{ "path": "Questionnaire.item[0]", "index": 0 }] }]
+          },
+          { "path": "Questionnaire.item[0]", "instance": [{ "path": "Questionnaire.item[0]", "index": 1 }], "state": "enabled" },
+          { "path": "Questionnaire.item[0].item[0]", "instance": [{ "path": "Questionnaire.item[0]", "index": 1 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[0].item[1]", "instance": [{ "path": "Questionnaire.item[0]", "index": 1 }], "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [{ "path": "Questionnaire.item[0]", "index": 1 }] }]
+          },
+          {
+            "path": "Questionnaire.item[1]", "instance": [], "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [{ "path": "Questionnaire.item[0]", "index": 1 }] }]
+          },
+          { "path": "Questionnaire.item[2]", "instance": [], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 0 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [] }]
+          },
+          {
+            "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 1 }], "state": "disabled",
+            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [] }]
+          },
+          {
+            "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "outcome": "notMet", "answers": [], "questionInstance": [] }]
+          },
+          { "path": "Questionnaire.item[4]", "state": "enabled" },
+          { "path": "Questionnaire.item[5]", "instance": [], "state": "enabled" },
+          { "path": "Questionnaire.item[5].item[0]", "instance": [{ "path": "Questionnaire.item[5]", "index": 0 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[5].item[1]", "instance": [{ "path": "Questionnaire.item[5]", "index": 0 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [{ "path": "Questionnaire.item[5]", "index": 0 }] }]
+          },
+          { "path": "Questionnaire.item[5].item[0]", "instance": [{ "path": "Questionnaire.item[5]", "index": 1 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[5].item[1]", "instance": [{ "path": "Questionnaire.item[5]", "index": 1 }], "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [{ "path": "Questionnaire.item[5]", "index": 1 }] }]
+          },
+          { "path": "Questionnaire.item[6]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[6].item[0]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [{ "path": "Questionnaire.item[6]", "index": 0 }] }]
+          },
+          { "path": "Questionnaire.item[6].item[1]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled" },
+          { "path": "Questionnaire.item[6]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "enabled" },
+          {
+            "path": "Questionnaire.item[6].item[0]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [{ "path": "Questionnaire.item[6]", "index": 1 }] }]
+          },
+          { "path": "Questionnaire.item[6].item[1]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "enabled" }
+        ],
+        "response": [
+          {
+            "linkId": "medication",
+            "item": [
+              { "linkId": "taking", "answer": [{ "valueBoolean": true }] },
+              { "linkId": "dose", "answer": [{ "valueDecimal": 5 }] }
+            ]
+          },
+          { "linkId": "medication", "item": [{ "linkId": "taking", "answer": [{ "valueBoolean": false }] }] },
+          {
+            "linkId": "pain",
+            "answer": [
+              { "valueBoolean": true, "item": [{ "linkId": "pain-site", "answer": [{ "valueString": "Knee" }] }] },
+              { "valueBoolean": false }
+            ]
+          },
+          {
+            "linkId": "allergy",
+            "answer": [
+              { "valueBoolean": true, "item": [{ "linkId": "severe", "answer": [{ "valueBoolean": true }] }] },
+              { "valueBoolean": true, "item": [{ "linkId": "severe", "answer": [{ "valueBoolean": false }] }] }
+            ]
+          },
+          { "linkId": "visit", "item": [{ "linkId": "attended", "answer": [{ "valueBoolean": true }] }] },
+          { "linkId": "visit", "item": [{ "linkId": "attended", "answer": [{ "valueBoolean": false }] }] }
+        ],
+        "diagnostics": [
+          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[1].item[1].answer[0]" },
+          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[2].answer[1].item[0].answer[0]" }
+        ]
+      },
+      {
+        "name": "no medication",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "instance": [{ "path": "Questionnaire.item[0]", "index": 0 }], "state": "enabled" },
+          { "path": "Questionnaire.item[0].item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[0].item[1]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[1]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[2]", "state": "enabled" },
+          { "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 0 }], "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[3]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4]", "state": "enabled" },
+          { "path": "Questionnaire.item[5]", "instance": [], "state": "enabled" },
+          { "path": "Questionnaire.item[5].item[0]", "instance": [{ "path": "Questionnaire.item[5]", "index": 0 }], "state": "enabled" },
+          { "path": "Questionnaire.item[5].item[1]", "instance": [{ "path": "Questionnaire.item[5]", "index": 0 }], "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[6]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled" },
+          { "path": "Questionnaire.item[6].item[0]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[6].item[1]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled" }
+        ],
+        "response": [
+          { "linkId": "pain", "answer": [{ "valueBoolean": false }] },
+          { "linkId": "later", "answer": [{ "valueString": "Done" }] }
+        ],
+        "diagnostics": []
+      }
+    ]
+  }
+}

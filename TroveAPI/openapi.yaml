@@ -762,6 +762,42 @@ paths:
         default:
           $ref: '#/components/responses/OperationFailure'
 
+  /studies/{studyId}/components/{componentId}/scenarios:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
+    post:
+      operationId: evaluateQuestionnaireScenarios
+      tags:
+        - Components
+      summary: Evaluate named synthetic answer sets against a questionnaire component's stored resource
+      description: >
+        Derives the branching graph of the exact stored Questionnaire and evaluates each named
+        scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules,
+        including `exists`, typed comparisons, multiple answers, ancestor gating and repeat
+        instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is
+        `notEvaluated` when its state depends on an expression, a dependency cycle or a
+        condition that cannot be evaluated. The result is not stored, creates no participant
+        records and does not change the draft. Other component types return 422, and a request
+        whose evaluation exceeds its bounds returns 422.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireScenarioInput'
+      responses:
+        '200':
+          description: Graph and scenario results for the stored resource at the returned draft revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireScenarioReport'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
   # ── Informational Components ──
 
   /studies/{studyId}/components/informational:
@@ -3335,6 +3371,392 @@ components:
         sha256:
           type: string
           pattern: '^[0-9a-f]{64}$'
+
+    QuestionnaireScenarioInput:
+      type: object
+      additionalProperties: false
+      required: [scenarios]
+      properties:
+        scenarios:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: Named synthetic answer sets. Names are unique within one request.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenario'
+
+    QuestionnaireScenario:
+      type: object
+      additionalProperties: false
+      required: [name, item]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        item:
+          type: array
+          maxItems: 512
+          description: >
+            Synthetic answers in the shape of `QuestionnaireResponse.item`. A repeating group
+            appears once per instance, the answers of a question appear in `answer`, and the
+            items nested under a question appear in that answer's `item`.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioItem'
+
+    QuestionnaireScenarioItem:
+      type: object
+      additionalProperties: false
+      required: [linkId]
+      properties:
+        linkId:
+          type: string
+          maxLength: 255
+        answer:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioAnswer'
+        item:
+          type: array
+          maxItems: 512
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioItem'
+
+    QuestionnaireScenarioAnswer:
+      type: object
+      additionalProperties: false
+      description: >
+        One FHIR R4 answer value, named as in `QuestionnaireResponse.item.answer`. Exactly one
+        value is set. The same shape states the expected answer of an `enableWhen` condition.
+      properties:
+        valueBoolean:
+          type: boolean
+        valueDecimal:
+          type: number
+        valueInteger:
+          type: integer
+        valueDate:
+          type: string
+          maxLength: 10
+        valueDateTime:
+          type: string
+          maxLength: 40
+        valueTime:
+          type: string
+          maxLength: 20
+        valueString:
+          type: string
+          maxLength: 10000
+        valueUri:
+          type: string
+          maxLength: 2000
+        valueCoding:
+          $ref: '#/components/schemas/QuestionnaireScenarioCoding'
+        valueQuantity:
+          $ref: '#/components/schemas/QuestionnaireScenarioQuantity'
+        valueReference:
+          $ref: '#/components/schemas/QuestionnaireScenarioReference'
+        valueAttachment:
+          $ref: '#/components/schemas/QuestionnaireScenarioAttachment'
+        item:
+          type: array
+          maxItems: 512
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioItem'
+
+    QuestionnaireScenarioCoding:
+      type: object
+      additionalProperties: false
+      properties:
+        system:
+          type: string
+          maxLength: 2000
+        version:
+          type: string
+          maxLength: 200
+        code:
+          type: string
+          maxLength: 1000
+        display:
+          type: string
+          maxLength: 10000
+
+    QuestionnaireScenarioQuantity:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: number
+        comparator:
+          type: string
+          enum: ['<', '<=', '>=', '>']
+        unit:
+          type: string
+          maxLength: 200
+        system:
+          type: string
+          maxLength: 2000
+        code:
+          type: string
+          maxLength: 200
+
+    QuestionnaireScenarioReference:
+      type: object
+      additionalProperties: false
+      properties:
+        reference:
+          type: string
+          maxLength: 2000
+        display:
+          type: string
+          maxLength: 10000
+
+    QuestionnaireScenarioAttachment:
+      type: object
+      additionalProperties: false
+      properties:
+        contentType:
+          type: string
+          maxLength: 200
+        url:
+          type: string
+          maxLength: 2000
+        title:
+          type: string
+          maxLength: 1000
+
+    QuestionnaireScenarioReport:
+      type: object
+      additionalProperties: false
+      required: [componentId, draftRevision, sha256, evaluator, graph, scenarios]
+      properties:
+        componentId:
+          type: string
+          format: uuid
+        draftRevision:
+          type: string
+          format: uuid
+          description: Draft revision at which the stored resource was read.
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the exact evaluated bytes.
+        evaluator:
+          type: string
+          description: Identity of the evaluation rules. The shared scenario fixtures name the identity they expect.
+        graph:
+          $ref: '#/components/schemas/QuestionnaireGraph'
+        scenarios:
+          type: array
+          description: One result per requested scenario, in request order.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioResult'
+
+    QuestionnaireGraph:
+      type: object
+      additionalProperties: false
+      required: [complete, nodes, edges, diagnostics]
+      properties:
+        complete:
+          type: boolean
+          description: >
+            True when no finding is an error or a warning. Broken references, unsupported or
+            mismatched conditions, dependency cycles and expressions that are not evaluated
+            make the analysis incomplete.
+        nodes:
+          type: array
+          description: Every item in document order.
+          items:
+            $ref: '#/components/schemas/QuestionnaireGraphNode'
+        edges:
+          type: array
+          description: >
+            `containment` connects a group or question to each nested item, `order` connects
+            consecutive siblings, and `dependency` connects the question an `enableWhen`
+            condition names to the item it gates. An expression adds no edge.
+          items:
+            $ref: '#/components/schemas/QuestionnaireGraphEdge'
+        diagnostics:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
+
+    QuestionnaireGraphNode:
+      type: object
+      additionalProperties: false
+      required: [path, repeats, required]
+      properties:
+        path:
+          type: string
+          description: FHIRPath of the item, for example `Questionnaire.item[0].item[1]`; the node's identity in edges.
+        linkId:
+          type: string
+        type:
+          type: string
+        parent:
+          type: string
+          description: Path of the enclosing item. Omitted at the top level.
+        text:
+          type: string
+          description: The item's base-language text.
+        enableBehavior:
+          type: string
+        repeats:
+          type: boolean
+        required:
+          type: boolean
+
+    QuestionnaireGraphEdge:
+      type: object
+      additionalProperties: false
+      required: [kind, from, to]
+      properties:
+        kind:
+          type: string
+          enum: [containment, order, dependency]
+        from:
+          type: string
+          description: Path of the enclosing item, the preceding sibling or the question a condition names.
+        to:
+          type: string
+          description: Path of the nested item, the following sibling or the gated item.
+        condition:
+          $ref: '#/components/schemas/QuestionnaireCondition'
+
+    QuestionnaireCondition:
+      type: object
+      additionalProperties: false
+      required: [index, question]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          description: Position in the gated item's `enableWhen`.
+        question:
+          type: string
+        operator:
+          type: string
+        answer:
+          $ref: '#/components/schemas/QuestionnaireScenarioAnswer'
+
+    QuestionnaireScenarioResult:
+      type: object
+      additionalProperties: false
+      required: [name, complete, items, response, diagnostics]
+      properties:
+        name:
+          type: string
+        complete:
+          type: boolean
+          description: True when every item is `enabled` or `disabled` and no finding about the answers is an error.
+        items:
+          type: array
+          description: >
+            The state of every item instance in document order. An item inside a repeating
+            group or nested under a question has one state per instance; an instance without
+            answers is evaluated as an unanswered instance with index 0.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioItemState'
+        response:
+          type: array
+          description: >
+            The answers a completed response keeps, in document order. Answers of disabled
+            items and the answers the findings reject are removed; answers of `notEvaluated`
+            items remain.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioItem'
+        diagnostics:
+          type: array
+          description: Findings about the synthetic answers, with paths into `QuestionnaireResponse.item`.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
+
+    QuestionnaireScenarioItemState:
+      type: object
+      additionalProperties: false
+      required: [path, instance, state, reason, conditions]
+      properties:
+        path:
+          type: string
+        linkId:
+          type: string
+        instance:
+          type: array
+          description: The repeat context, one entry for each enclosing repeating group or question.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioInstance'
+        state:
+          type: string
+          enum: [enabled, disabled, notEvaluated]
+        reason:
+          type: string
+          description: >
+            `unconditional`: no condition and every enclosing item enabled. `conditionsMet` or
+            `conditionsNotMet`: the item's own conditions decide. `ancestorDisabled` or
+            `ancestorNotEvaluated`: an enclosing item decides. `conditionNotEvaluated`: a
+            condition or the item's `enableBehavior` cannot be evaluated.
+            `expressionNotEvaluated`: the item uses an `enableWhenExpression`.
+            `dependencyCycle`: the item's conditions depend on its own state.
+          enum:
+            - unconditional
+            - conditionsMet
+            - conditionsNotMet
+            - ancestorDisabled
+            - ancestorNotEvaluated
+            - conditionNotEvaluated
+            - expressionNotEvaluated
+            - dependencyCycle
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioConditionResult'
+
+    QuestionnaireScenarioInstance:
+      type: object
+      additionalProperties: false
+      required: [path, index]
+      properties:
+        path:
+          type: string
+          description: Path of the enclosing repeating group or question.
+        index:
+          type: integer
+          minimum: 0
+          description: Position of the group instance or of the question's answer among those the scenario keeps, as in `response`.
+
+    QuestionnaireScenarioConditionResult:
+      type: object
+      additionalProperties: false
+      required: [index, outcome, answers]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        question:
+          type: string
+        operator:
+          type: string
+        outcome:
+          type: string
+          enum: [met, notMet, notEvaluated]
+        answers:
+          type: array
+          description: >
+            The answers the condition compared. The answers of a disabled question count as
+            absent and are not listed.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioAnswer'
+        questionInstance:
+          type: array
+          description: >
+            The repeat context of the question instance the condition read: an enclosing
+            instance of the question, otherwise the instance in the nearest enclosing group
+            instance or answer that contains the question; when several remain, the nearest
+            preceding one, otherwise the nearest following one. Omitted when the condition
+            names no question instance: an invalid condition or one on a dependency cycle.
+          items:
+            $ref: '#/components/schemas/QuestionnaireScenarioInstance'
 
     StudyDelegationPreset:
       type: string

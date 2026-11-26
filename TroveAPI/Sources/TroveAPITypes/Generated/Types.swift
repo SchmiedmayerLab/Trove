@@ -171,6 +171,14 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/validations`.
     /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/validations/post(validateStudyComponent)`.
     func validateStudyComponent(_ input: Operations.ValidateStudyComponent.Input) async throws -> Operations.ValidateStudyComponent.Output
+    /// Evaluate named synthetic answer sets against a questionnaire component's stored resource
+    ///
+    /// Derives the branching graph of the exact stored Questionnaire and evaluates each named scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules, including `exists`, typed comparisons, multiple answers, ancestor gating and repeat instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is `notEvaluated` when its state depends on an expression, a dependency cycle or a condition that cannot be evaluated. The result is not stored, creates no participant records and does not change the draft. Other component types return 422, and a request whose evaluation exceeds its bounds returns 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/scenarios`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)`.
+    func evaluateQuestionnaireScenarios(_ input: Operations.EvaluateQuestionnaireScenarios.Input) async throws -> Operations.EvaluateQuestionnaireScenarios.Output
     /// Add an informational component to a study
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/components/informational`.
@@ -809,6 +817,24 @@ extension APIProtocol {
         try await validateStudyComponent(Operations.ValidateStudyComponent.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Evaluate named synthetic answer sets against a questionnaire component's stored resource
+    ///
+    /// Derives the branching graph of the exact stored Questionnaire and evaluates each named scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules, including `exists`, typed comparisons, multiple answers, ancestor gating and repeat instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is `notEvaluated` when its state depends on an expression, a dependency cycle or a condition that cannot be evaluated. The result is not stored, creates no participant records and does not change the draft. Other component types return 422, and a request whose evaluation exceeds its bounds returns 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/scenarios`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)`.
+    public func evaluateQuestionnaireScenarios(
+        path: Operations.EvaluateQuestionnaireScenarios.Input.Path,
+        headers: Operations.EvaluateQuestionnaireScenarios.Input.Headers = .init(),
+        body: Operations.EvaluateQuestionnaireScenarios.Input.Body
+    ) async throws -> Operations.EvaluateQuestionnaireScenarios.Output {
+        try await evaluateQuestionnaireScenarios(Operations.EvaluateQuestionnaireScenarios.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Add an informational component to a study

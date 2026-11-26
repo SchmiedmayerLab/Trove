@@ -1,0 +1,131 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Dangling, ambiguous and unanswerable references, type and operator mismatches, a missing enableBehavior and malformed items stay visible and are never evaluated as verified, while any and all still decide when the known conditions suffice.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-broken",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      { "linkId": "q1", "type": "boolean", "text": "First question" },
+      { "linkId": "dangling", "type": "display", "text": "Dangling", "enableWhen": [{ "question": "missing", "operator": "=", "answerBoolean": true }] },
+      { "linkId": "group-target", "type": "display", "text": "Group target", "enableWhen": [{ "question": "section", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "mismatch", "type": "display", "text": "Mismatch", "enableWhen": [{ "question": "q1", "operator": "=", "answerInteger": 1 }] },
+      { "linkId": "ordered-bool", "type": "display", "text": "Ordered boolean", "enableWhen": [{ "question": "q1", "operator": ">", "answerBoolean": true }] },
+      {
+        "linkId": "no-behavior", "type": "display", "text": "No behavior",
+        "enableWhen": [
+          { "question": "q1", "operator": "=", "answerBoolean": true },
+          { "question": "q1", "operator": "exists", "answerBoolean": true }
+        ]
+      },
+      { "linkId": "bad-operator", "type": "display", "text": "Bad operator", "enableWhen": [{ "question": "q1", "operator": "~", "answerBoolean": true }] },
+      {
+        "linkId": "two-answers", "type": "display", "text": "Two answers",
+        "enableWhen": [{ "question": "q1", "operator": "=", "answerBoolean": true, "answerString": "yes" }]
+      },
+      { "linkId": "section", "type": "group", "text": "Section", "item": [{ "linkId": "dup", "type": "string", "text": "First use" }] },
+      { "linkId": "dup", "type": "string", "text": "Second use" },
+      { "linkId": "dup-ref", "type": "display", "text": "Ambiguous", "enableWhen": [{ "question": "dup", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "untyped", "text": "No type" },
+      { "type": "display", "text": "No linkId" },
+      {
+        "linkId": "any-dangling", "type": "display", "text": "Any with a dangling condition", "enableBehavior": "any",
+        "enableWhen": [
+          { "question": "q1", "operator": "=", "answerBoolean": true },
+          { "question": "missing", "operator": "=", "answerBoolean": true }
+        ]
+      },
+      {
+        "linkId": "all-dangling", "type": "display", "text": "All with a dangling condition", "enableBehavior": "all",
+        "enableWhen": [
+          { "question": "q1", "operator": "=", "answerBoolean": true },
+          { "question": "missing", "operator": "=", "answerBoolean": true }
+        ]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      { "name": "first is true", "item": [{ "linkId": "q1", "answer": [{ "valueBoolean": true }] }] },
+      { "name": "first is false", "item": [{ "linkId": "q1", "answer": [{ "valueBoolean": false }] }] }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        { "severity": "error", "source": "trove", "rule": "enable-when-question", "path": "Questionnaire.item[1].enableWhen[0].question" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-not-answerable", "path": "Questionnaire.item[2].enableWhen[0].question" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-type", "path": "Questionnaire.item[3].enableWhen[0]" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-operator-type", "path": "Questionnaire.item[4].enableWhen[0].operator" },
+        { "severity": "error", "source": "trove", "rule": "enable-behavior-required", "path": "Questionnaire.item[5].enableBehavior" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-operator", "path": "Questionnaire.item[6].enableWhen[0].operator" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-answer", "path": "Questionnaire.item[7].enableWhen[0]" },
+        { "severity": "error", "source": "trove", "rule": "link-id-unique", "path": "Questionnaire.item[9].linkId" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-question", "path": "Questionnaire.item[10].enableWhen[0].question" },
+        { "severity": "error", "source": "trove", "rule": "item-type", "path": "Questionnaire.item[11].type" },
+        { "severity": "error", "source": "trove", "rule": "link-id-missing", "path": "Questionnaire.item[12].linkId" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-question", "path": "Questionnaire.item[13].enableWhen[1].question" },
+        { "severity": "error", "source": "trove", "rule": "enable-when-question", "path": "Questionnaire.item[14].enableWhen[1].question" }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "first is true",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "notEvaluated", "reason": "conditionNotEvaluated", "conditions": [{ "index": 0, "question": "missing", "outcome": "notEvaluated", "answers": [] }] },
+          { "path": "Questionnaire.item[2]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[3]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[4]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          {
+            "path": "Questionnaire.item[5]", "state": "notEvaluated", "reason": "conditionNotEvaluated",
+            "conditions": [{ "index": 0, "outcome": "met" }, { "index": 1, "outcome": "met" }]
+          },
+          { "path": "Questionnaire.item[6]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[7]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[8]", "state": "enabled" },
+          { "path": "Questionnaire.item[8].item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[9]", "state": "enabled" },
+          { "path": "Questionnaire.item[10]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[11]", "linkId": "untyped", "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[12]", "state": "enabled", "reason": "unconditional" },
+          {
+            "path": "Questionnaire.item[13]", "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "index": 0, "outcome": "met" }, { "index": 1, "outcome": "notEvaluated" }]
+          },
+          { "path": "Questionnaire.item[14]", "state": "notEvaluated", "reason": "conditionNotEvaluated" }
+        ],
+        "response": [{ "linkId": "q1", "answer": [{ "valueBoolean": true }] }],
+        "diagnostics": []
+      },
+      {
+        "name": "first is false",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[2]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[3]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[4]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[5]", "state": "notEvaluated", "conditions": [{ "index": 0, "outcome": "notMet" }, { "index": 1, "outcome": "met" }] },
+          { "path": "Questionnaire.item[6]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[7]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[8]", "state": "enabled" },
+          { "path": "Questionnaire.item[8].item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[9]", "state": "enabled" },
+          { "path": "Questionnaire.item[10]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[11]", "state": "enabled" },
+          { "path": "Questionnaire.item[12]", "state": "enabled" },
+          { "path": "Questionnaire.item[13]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
+          { "path": "Questionnaire.item[14]", "state": "disabled", "reason": "conditionsNotMet" }
+        ],
+        "response": [{ "linkId": "q1", "answer": [{ "valueBoolean": false }] }],
+        "diagnostics": []
+      }
+    ]
+  }
+}

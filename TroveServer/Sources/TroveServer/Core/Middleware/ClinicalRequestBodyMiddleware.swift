@@ -11,8 +11,10 @@ import OpenAPIRuntime
 import TroveAPIServer
 
 
-/// Bound ingestion envelopes before generated JSON decoding; authentication runs first.
+/// Bound ingestion envelopes and scenario requests before generated JSON decoding; authentication runs first.
 struct ClinicalRequestBodyMiddleware: ServerMiddleware {
+    static let scenarioBytes = 4 * 1024 * 1024
+
     var limits: EventSubmissionLimits.Configuration = .standard
 
     func intercept(
@@ -23,6 +25,7 @@ struct ClinicalRequestBodyMiddleware: ServerMiddleware {
         next: (HTTPRequest, HTTPBody?, ServerRequestMetadata) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
         let limit: Int
+        var participantOnly = true
         switch operationID {
         case Operations.UploadParticipantRecordingTransfer.id:
             return try await next(request, recordingBody(request, body: body), metadata)
@@ -32,23 +35,35 @@ struct ClinicalRequestBodyMiddleware: ServerMiddleware {
              Operations.SubmitParticipantRecordBundle.id:
             limit = limits.envelopeBytes
         case Operations.LookupParticipantEventReceipt.id, Operations.AttributeParticipantEvent.id: limit = 1024 * 1024
+        case Operations.EvaluateQuestionnaireScenarios.id:
+            // Researcher draft access is authorized by the operation itself.
+            limit = Self.scenarioBytes
+            participantOnly = false
         default:
             return try await next(request, body, metadata)
         }
-        _ = try AuthContext.checkIsParticipant()
+        if participantOnly {
+            _ = try AuthContext.checkIsParticipant()
+        }
+        return try await next(request, try await collect(body, upTo: limit, participantOnly: participantOnly), metadata)
+    }
+
+    private func collect(_ body: HTTPBody?, upTo limit: Int, participantOnly: Bool) async throws -> HTTPBody {
         guard let body else { throw ServerError.invalidRequestBody }
-        let bounded: HTTPBody
         do {
-            bounded = HTTPBody(try await BoundedRequestBody.collect(body, upTo: limit))
+            return HTTPBody(try await BoundedRequestBody.collect(body, upTo: limit))
         } catch BoundedRequestBody.ReadError.tooLarge {
-            throw ServerError(status: .contentTooLarge, title: "Request Too Large", detail: "Clinical request exceeds its supported size")
+            throw ServerError(
+                status: .contentTooLarge,
+                title: "Request Too Large",
+                detail: participantOnly ? "Clinical request exceeds its supported size" : "The request exceeds its supported size"
+            )
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             try Task.checkCancellation()
             throw ServerError(status: .serviceUnavailable, title: "Upload Interrupted", detail: "Retry the unchanged request")
         }
-        return try await next(request, bounded, metadata)
     }
 
     /// Preserve streaming while checking transport metadata before any byte can reach storage.
