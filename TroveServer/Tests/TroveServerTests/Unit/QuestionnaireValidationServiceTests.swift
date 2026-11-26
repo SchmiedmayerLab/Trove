@@ -137,6 +137,37 @@ struct QuestionnaireValidationServiceTests {
         #expect(unnamed.diagnostics.first?.nextAction != nil)
     }
 
+    /// A coding without a system matches only another coding without one, so validation warns without blocking publication.
+    @Test
+    func codingsWithoutSystemAreWarnings() async throws {
+        var resource = try JSONDecoder().decode(ModelsR4.Questionnaire.self, from: Self.fixture)
+        resource.item = [
+            .init(
+                answerOption: [
+                    .init(value: .coding(.init(code: "red", system: "https://example.org/colors"))),
+                    .init(value: .coding(.init(code: "blue")))
+                ],
+                linkId: "color",
+                text: "Synthetic color",
+                type: .init(.choice)
+            ),
+            .init(
+                enableWhen: [.init(answer: .coding(.init(code: "red")), operator: .init(.equal), question: "color")],
+                linkId: "red",
+                text: "Synthetic follow-up",
+                type: .init(.display)
+            )
+        ]
+        let result = try await Self.service().validate(bytes: JSONEncoder().encode(resource), evaluationInstant: Self.instant)
+        #expect(result.status == .valid, "\(result.diagnostics)")
+        #expect(result.evidence != nil)
+        #expect(result.diagnostics.map(\.rule) == ["coding-system", "coding-system"])
+        #expect(result.diagnostics.allSatisfy { $0.severity == .warning && $0.source == .trove })
+        #expect(result.diagnostics.map(\.path) == [
+            "Questionnaire.item[0].answerOption[1].valueCoding", "Questionnaire.item[1].enableWhen[0].answerCoding"
+        ])
+    }
+
     @Test(arguments: ["required-group", "choice-initial"])
     func rejectsSemanticsTheConverterWouldDiscard(change: String) async throws {
         var resource = try JSONDecoder().decode(ModelsR4.Questionnaire.self, from: Self.fixture)

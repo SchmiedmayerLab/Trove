@@ -58,27 +58,28 @@ struct ScenarioClientTests {
     func repeatAnswerEvidenceSurvivesClientRoundTrip() async throws {
         let path = "Questionnaire.item[2]"
         var expected = report()
-        expected.scenarios[0].items = [true, false].enumerated().map { index, enabled in
-            let condition = Components.Schemas.QuestionnaireScenarioConditionResult(
-                index: 0,
-                question: "pain",
-                _operator: "=",
-                outcome: enabled ? .met : .notMet,
-                answers: [.init(valueBoolean: enabled)],
-                questionInstance: []
-            )
-            return .init(
+        // Items under each answer of a repeating question read all of its answers.
+        let condition = Components.Schemas.QuestionnaireScenarioConditionResult(
+            index: 0,
+            question: "pain",
+            _operator: "=",
+            outcome: .met,
+            answers: [.init(valueBoolean: true), .init(valueBoolean: false)],
+            questionInstance: []
+        )
+        expected.scenarios[0].items = [0, 1].map { index in
+            .init(
                 path: path + ".item[0]",
                 linkId: "pain-site",
                 instance: [.init(path: path, index: index)],
-                state: enabled ? .enabled : .disabled,
-                reason: enabled ? .conditionsMet : .conditionsNotMet,
+                state: .enabled,
+                reason: .conditionsMet,
                 conditions: [condition]
             )
         }
         let retained: [Components.Schemas.QuestionnaireScenarioAnswer] = [
             .init(valueBoolean: true, item: [.init(linkId: "pain-site", answer: [.init(valueString: "Knee")])]),
-            .init(valueBoolean: false)
+            .init(valueBoolean: false, item: [.init(linkId: "pain-site", answer: [.init(valueString: "Ankle")])])
         ]
         expected.scenarios[0].response = [.init(linkId: "pain", answer: retained)]
         let transport = try AuthoringTransport(response: expected)

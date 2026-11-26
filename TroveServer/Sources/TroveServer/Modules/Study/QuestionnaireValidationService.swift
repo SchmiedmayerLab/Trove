@@ -278,6 +278,22 @@ extension QuestionnaireValidationService {
         if type == nil || [.attachment, .reference, .question].contains(type) {
             add("item-type", "type", "The supported study client does not present this item type.")
         }
+        return diagnostics + missingSystems(item, path: path)
+    }
+
+    /// Codings without a system, which a condition matches only against another coding without one.
+    private static func missingSystems(_ item: QuestionnaireItem, path: String) -> [ValidationDiagnostic] {
+        var diagnostics: [ValidationDiagnostic] = []
+        for (index, option) in (item.answerOption ?? []).enumerated() {
+            if case .coding(let coding) = option.value, coding.system == nil {
+                diagnostics.append(QuestionnaireStructure.missingSystem(at: "\(path).answerOption[\(index)].valueCoding"))
+            }
+        }
+        for (index, condition) in (item.enableWhen ?? []).enumerated() {
+            if case .coding(let coding) = condition.answer, coding.system == nil {
+                diagnostics.append(QuestionnaireStructure.missingSystem(at: "\(path).enableWhen[\(index)].answerCoding"))
+            }
+        }
         return diagnostics
     }
 

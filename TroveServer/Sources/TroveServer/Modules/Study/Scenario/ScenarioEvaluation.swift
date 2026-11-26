@@ -50,6 +50,14 @@ struct ScenarioEvaluation {
             }
             return result
         }
+
+        static func not(_ value: Self) -> Self {
+            switch value {
+            case .met: .notMet
+            case .notMet: .met
+            case .unknown: .unknown
+            }
+        }
     }
 
     let form: ScenarioForm
@@ -64,10 +72,8 @@ struct ScenarioEvaluation {
         states = Array(repeating: nil, count: form.occurrences.count)
     }
 
-    /// Every operator except `exists` holds when at least one answer satisfies it. R4's operator code system reads "at least no
-    /// answer" for `!=` and the ordered operators; R5 corrects the ordered operators to "at least one answer" and states `!=` as
-    /// "no answer has a value that is equal". This evaluator reads `!=` as "at least one answer differs", as the pinned Grove
-    /// questionnaire runtime does, so the preview matches what participants are shown.
+    /// The FHIR operator semantics as R5 words them, which is also R4's intent: `=` and the ordered operators hold when at least one
+    /// answer satisfies them, and `!=` holds when no answer has a value equal to the expected one.
     static func test(_ operation: String, expected: ScenarioValue, answers: [ScenarioValue]) -> Truth {
         switch operation {
         case "exists":
@@ -78,7 +84,8 @@ struct ScenarioEvaluation {
         case "=":
             return Truth.any(answers.map { Self.truth($0.equals(expected)) })
         case "!=":
-            return Truth.any(answers.map { answer in Self.truth(answer.equals(expected).map { !$0 }) })
+            // `!=` holds when no answer equals the expected value, so it holds without an answer.
+            return Truth.not(Truth.any(answers.map { Self.truth($0.equals(expected)) }))
         default:
             return Truth.any(answers.map { answer in
                 switch answer.order(comparedTo: expected) {
@@ -165,7 +172,7 @@ struct ScenarioEvaluation {
               let source = resolve(target, from: occurrence) else {
             return Self.notEvaluated(condition)
         }
-        let answers = sourceAnswers(source, for: occurrence)
+        let answers = form.occurrences[source].answers
         let sourceState = state(of: source).state
         let outcome: Truth
         switch sourceState {
@@ -198,50 +205,20 @@ struct ScenarioEvaluation {
 
 
 extension ScenarioEvaluation {
-    /// Descendants of an answer see only that answer when a condition refers to its question.
-    private func sourceAnswers(_ source: Int, for occurrence: Int) -> ArraySlice<ScenarioForm.Answer> {
-        let question = form.occurrences[source]
-        let path = structure.items[question.item].path
-        guard let instance = form.occurrences[occurrence].instance.first(where: { $0.path == path }) else {
-            return question.answers[...]
-        }
-        return question.answers.dropFirst(instance.index).prefix(1)
-    }
-
-    /// The instance of `target` that a condition of `occurrence` reads.
-    ///
-    /// An enclosing instance of the question comes first. Otherwise the condition reads the question in the nearest enclosing group
-    /// instance or answer that contains it; when several instances remain, the nearest preceding one, otherwise the nearest following one.
+    /// The instance of `target` that a condition of `occurrence` reads, by the FHIR R4 rule: the nearest occurrence on the ancestor
+    /// axis, then on the preceding axis, then on the following axis, in document order of the form's item instances.
     func resolve(_ target: Int, from occurrence: Int) -> Int? {
-        let chain = Array(sequence(first: occurrence) { form.occurrences[$0].parent })
-        if let enclosing = chain.first(where: { form.occurrences[$0].item == target }) {
+        if let enclosing = sequence(first: occurrence, next: { form.occurrences[$0].parent }).first(where: { form.occurrences[$0].item == target }) {
             return enclosing
         }
-        let enclosingItems = Set(structure.ancestors(of: form.occurrences[occurrence].item) + [form.occurrences[occurrence].item])
-        let shared = structure.ancestors(of: target).first(where: enclosingItems.contains)
-        let candidates = (form.instances[target] ?? []).filter { candidate in
-            guard let shared else {
-                return true
-            }
-            guard let scope = chain.firstIndex(where: { form.occurrences[$0].item == shared }) else {
-                return false
-            }
-            // Within a question, only the answer that encloses `occurrence` is shared.
-            let answer = scope > 0 ? form.occurrences[chain[scope - 1]].answerIndex : nil
-            return contains(chain[scope], answer: structure.items[shared].isGroup ? nil : answer, candidate)
-        }
-        return candidates.last(where: { $0 < occurrence }) ?? candidates.first(where: { $0 > occurrence })
+        let candidates = form.instances[target] ?? []
+        // Instances are stored in document order, and an ancestor of `occurrence` is never an instance of `target` here.
+        return candidates.last(where: { $0 < occurrence })
+            ?? candidates.first(where: { $0 > occurrence && !isDescendant($0, of: occurrence) })
     }
 
-    private func contains(_ scope: Int, answer: Int?, _ candidate: Int) -> Bool {
-        var child = candidate
-        while let parent = form.occurrences[child].parent {
-            if parent == scope {
-                return answer == nil || form.occurrences[child].answerIndex == answer
-            }
-            child = parent
-        }
-        return false
+    private func isDescendant(_ candidate: Int, of occurrence: Int) -> Bool {
+        sequence(first: candidate) { form.occurrences[$0].parent }.dropFirst().contains(occurrence)
     }
 }
 
@@ -261,7 +238,7 @@ extension ScenarioEvaluation {
                 guard !item.cyclic, condition.isValid, let target = condition.target,
                       let source = resolve(target, from: index) else { continue }
                 for instance in form.occurrences[source].instance { try budget.reserveText(instance.path) }
-                for answer in sourceAnswers(source, for: index) { try budget.reserveAnswer(answer.api) }
+                for answer in form.occurrences[source].answers { try budget.reserveAnswer(answer.api) }
             }
         }
     }

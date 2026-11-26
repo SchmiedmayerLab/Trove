@@ -36,7 +36,7 @@
         "enableWhen": [{ "question": "color", "operator": "=", "answerCoding": { "system": "http://example.org/colors", "code": "red" } }]
       },
       {
-        "linkId": "red-any-system", "type": "display", "text": "Red in any system",
+        "linkId": "red-without-system", "type": "display", "text": "Red without a system",
         "enableWhen": [{ "question": "color", "operator": "=", "answerCoding": { "code": "red" } }]
       },
       { "linkId": "temperature", "type": "quantity", "text": "Temperature" },
@@ -81,7 +81,12 @@
     ]
   },
   "expected": {
-    "graph": { "complete": true, "diagnostics": [] },
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        { "severity": "warning", "source": "trove", "rule": "coding-system", "path": "Questionnaire.item[15].enableWhen[0].answerCoding" }
+      ]
+    },
     "scenarios": [
       {
         "name": "typed values",
@@ -102,7 +107,7 @@
           { "path": "Questionnaire.item[12]", "state": "enabled", "reason": "conditionsMet" },
           { "path": "Questionnaire.item[13]", "state": "enabled" },
           { "path": "Questionnaire.item[14]", "state": "enabled", "reason": "conditionsMet" },
-          { "path": "Questionnaire.item[15]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[15]", "state": "disabled", "reason": "conditionsNotMet" },
           { "path": "Questionnaire.item[16]", "state": "enabled" },
           { "path": "Questionnaire.item[17]", "state": "enabled", "reason": "conditionsMet" },
           { "path": "Questionnaire.item[18]", "state": "enabled" },
@@ -132,7 +137,7 @@
           { "path": "Questionnaire.item[12]", "state": "disabled", "reason": "conditionsNotMet" },
           { "path": "Questionnaire.item[13]", "state": "enabled" },
           { "path": "Questionnaire.item[14]", "state": "disabled", "reason": "conditionsNotMet" },
-          { "path": "Questionnaire.item[15]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[15]", "state": "disabled", "reason": "conditionsNotMet" },
           { "path": "Questionnaire.item[16]", "state": "enabled" },
           { "path": "Questionnaire.item[17]", "state": "notEvaluated", "reason": "conditionNotEvaluated" },
           { "path": "Questionnaire.item[18]", "state": "enabled" },

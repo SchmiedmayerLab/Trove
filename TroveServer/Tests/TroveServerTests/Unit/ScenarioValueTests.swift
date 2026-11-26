@@ -73,12 +73,15 @@ struct ScenarioValueTests {
     }
 
     @Test
-    func codingsMatchOnSystemUnlessTheConditionOmitsIt() {
+    func codingsMatchOnlyWithEqualSystemAndCode() {
         let answer = ScenarioValue.coding(system: "http://example.org/a", code: "x")
+        let systemless = ScenarioValue.coding(system: nil, code: "x")
         #expect(answer.equals(.coding(system: "http://example.org/a", code: "x")) == true)
         #expect(answer.equals(.coding(system: "http://example.org/b", code: "x")) == false)
-        #expect(answer.equals(.coding(system: nil, code: "x")) == true)
-        #expect(ScenarioValue.coding(system: nil, code: "x").equals(.coding(system: "http://example.org/a", code: "x")) == false)
+        #expect(answer.equals(.coding(system: "http://example.org/a", code: "y")) == false)
+        #expect(answer.equals(systemless) == false)
+        #expect(systemless.equals(.coding(system: "http://example.org/a", code: "x")) == false)
+        #expect(systemless.equals(.coding(system: nil, code: "x")) == true)
         #expect(ScenarioValue.coding(system: "http://example.org/a", code: nil).equals(.coding(system: nil, code: "x")) == false)
     }
 
@@ -149,16 +152,25 @@ struct ScenarioValueTests {
     }
 
     @Test
-    func operatorsHoldWhenAnyAnswerSatisfiesThem() {
+    func operatorsHoldWhenAnyAnswerSatisfiesThem() throws {
         let answers: [ScenarioValue] = [.integer(3), .integer(9)]
         #expect(ScenarioEvaluation.test(">", expected: .integer(5), answers: answers) == .met)
         #expect(ScenarioEvaluation.test("<", expected: .integer(5), answers: answers) == .met)
         #expect(ScenarioEvaluation.test(">=", expected: .integer(10), answers: answers) == .notMet)
         #expect(ScenarioEvaluation.test("<=", expected: .integer(3), answers: answers) == .met)
         #expect(ScenarioEvaluation.test("=", expected: .integer(9), answers: answers) == .met)
-        #expect(ScenarioEvaluation.test("!=", expected: .integer(3), answers: answers) == .met)
+        // `!=` holds when no answer is equal: not with one equal answer among several, and always without an answer.
+        #expect(ScenarioEvaluation.test("!=", expected: .integer(3), answers: answers) == .notMet)
+        #expect(ScenarioEvaluation.test("!=", expected: .integer(5), answers: answers) == .met)
         #expect(ScenarioEvaluation.test("!=", expected: .integer(3), answers: [.integer(3)]) == .notMet)
-        #expect(ScenarioEvaluation.test("!=", expected: .integer(3), answers: []) == .notMet)
+        #expect(ScenarioEvaluation.test("!=", expected: .integer(3), answers: []) == .met)
+        // An equality of unknown outcome leaves `!=` unknown unless another answer is known to be equal.
+        let day = ScenarioValue.date(try #require(ScenarioTemporal.date("2020-01-01")))
+        let month = ScenarioValue.date(try #require(ScenarioTemporal.date("2020-01")))
+        let other = ScenarioValue.date(try #require(ScenarioTemporal.date("2019-05-05")))
+        #expect(ScenarioEvaluation.test("!=", expected: day, answers: [month]) == .unknown)
+        #expect(ScenarioEvaluation.test("!=", expected: day, answers: [month, day]) == .notMet)
+        #expect(ScenarioEvaluation.test("!=", expected: day, answers: [month, other]) == .unknown)
         #expect(ScenarioEvaluation.test("exists", expected: .boolean(true), answers: answers) == .met)
         #expect(ScenarioEvaluation.test("exists", expected: .boolean(false), answers: []) == .met)
         let fahrenheit = ScenarioValue.quantity(.init(value: 101, comparator: nil, system: nil, code: "[degF]"))
@@ -177,5 +189,6 @@ struct ScenarioValueTests {
         #expect(Truth.all([.unknown, .notMet]) == .notMet)
         #expect(Truth.all([.unknown, .met]) == .unknown)
         #expect(Truth.all([Truth]()) == .met)
+        #expect(Truth.not(.met) == .notMet && Truth.not(.notMet) == .met && Truth.not(.unknown) == .unknown)
     }
 }

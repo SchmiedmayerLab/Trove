@@ -1,0 +1,808 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "A coding condition matches only when system and code are both equal, so a coding without a system matches only an answer without a system, and `!=` holds when no answer has an equal coding. Answer options and conditions without a system are reported as warnings.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-coding-systems",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      {
+        "linkId": "color",
+        "type": "choice",
+        "repeats": true,
+        "text": "Colors",
+        "answerOption": [
+          {
+            "valueCoding": {
+              "system": "http://example.org/colors",
+              "code": "red"
+            }
+          },
+          {
+            "valueCoding": {
+              "system": "http://example.org/colors",
+              "code": "blue"
+            }
+          },
+          {
+            "valueCoding": {
+              "code": "red"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "with-system",
+        "type": "display",
+        "text": "Red in the color system",
+        "enableWhen": [
+          {
+            "question": "color",
+            "operator": "=",
+            "answerCoding": {
+              "system": "http://example.org/colors",
+              "code": "red"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "without-system",
+        "type": "display",
+        "text": "Red without a system",
+        "enableWhen": [
+          {
+            "question": "color",
+            "operator": "=",
+            "answerCoding": {
+              "code": "red"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "other-system",
+        "type": "display",
+        "text": "Red in another system",
+        "enableWhen": [
+          {
+            "question": "color",
+            "operator": "=",
+            "answerCoding": {
+              "system": "http://other.example/colors",
+              "code": "red"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "not-blue",
+        "type": "display",
+        "text": "No answer is blue",
+        "enableWhen": [
+          {
+            "question": "color",
+            "operator": "!=",
+            "answerCoding": {
+              "system": "http://example.org/colors",
+              "code": "blue"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "not-red-without-system",
+        "type": "display",
+        "text": "No answer is red without a system",
+        "enableWhen": [
+          {
+            "question": "color",
+            "operator": "!=",
+            "answerCoding": {
+              "code": "red"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "system red",
+        "item": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "red without a system",
+        "item": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "several, none blue",
+        "item": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              },
+              {
+                "valueCoding": {
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "several, one blue",
+        "item": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              },
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "blue"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "unanswered",
+        "item": []
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "coding-system",
+          "path": "Questionnaire.item[0].answerOption[2].valueCoding"
+        },
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "coding-system",
+          "path": "Questionnaire.item[2].enableWhen[0].answerCoding"
+        },
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "coding-system",
+          "path": "Questionnaire.item[5].enableWhen[0].answerCoding"
+        }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "system red",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[3]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[4]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[5]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "response": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "red without a system",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[3]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[4]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[5]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "response": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "several, none blue",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[3]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[4]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[5]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "code": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "response": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              },
+              {
+                "valueCoding": {
+                  "code": "red"
+                }
+              }
+            ]
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "several, one blue",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "blue"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "blue"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[3]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "blue"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[4]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "blue"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[5]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "red"
+                    }
+                  },
+                  {
+                    "valueCoding": {
+                      "system": "http://example.org/colors",
+                      "code": "blue"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "response": [
+          {
+            "linkId": "color",
+            "answer": [
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "red"
+                }
+              },
+              {
+                "valueCoding": {
+                  "system": "http://example.org/colors",
+                  "code": "blue"
+                }
+              }
+            ]
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "unanswered",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": []
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": []
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[3]",
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": []
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[4]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": []
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[5]",
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": []
+              }
+            ]
+          }
+        ],
+        "response": [],
+        "diagnostics": []
+      }
+    ]
+  }
+}

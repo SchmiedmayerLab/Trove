@@ -1,6 +1,6 @@
 {
   "evaluator": "trove-questionnaire-scenarios-1",
-  "description": "Boolean equality, inequality and exists, with answers of disabled items left out of the response.",
+  "description": "Boolean equality, inequality and exists, where `!=` holds when no answer is equal and therefore without an answer or when its question is disabled, with answers of disabled items left out of the response.",
   "questionnaire": {
     "resourceType": "Questionnaire",
     "url": "https://example.org/fhir/Questionnaire/scenario-exists",
@@ -24,6 +24,10 @@
       {
         "linkId": "not-smoker", "type": "string", "text": "Why not?",
         "enableWhen": [{ "question": "smoker", "operator": "!=", "answerBoolean": true }]
+      },
+      {
+        "linkId": "not-one-pack", "type": "display", "text": "Not one pack",
+        "enableWhen": [{ "question": "packs", "operator": "!=", "answerInteger": 1 }]
       }
     ]
   },
@@ -54,13 +58,15 @@
         { "path": "Questionnaire.item[1]", "linkId": "packs", "type": "integer", "text": "Packs per day", "repeats": false, "required": false },
         { "path": "Questionnaire.item[2]", "linkId": "answered", "type": "display", "text": "Thank you for answering.", "repeats": false, "required": false },
         { "path": "Questionnaire.item[3]", "linkId": "unanswered", "type": "display", "text": "Please answer the first question.", "repeats": false, "required": false },
-        { "path": "Questionnaire.item[4]", "linkId": "not-smoker", "type": "string", "text": "Why not?", "repeats": false, "required": false }
+        { "path": "Questionnaire.item[4]", "linkId": "not-smoker", "type": "string", "text": "Why not?", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[5]", "linkId": "not-one-pack", "type": "display", "text": "Not one pack", "repeats": false, "required": false }
       ],
       "edges": [
         { "kind": "order", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
         { "kind": "order", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[2]" },
         { "kind": "order", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[3]" },
         { "kind": "order", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]" },
+        { "kind": "order", "from": "Questionnaire.item[4]", "to": "Questionnaire.item[5]" },
         {
           "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]",
           "condition": { "index": 0, "question": "smoker", "operator": "=", "answer": { "valueBoolean": true } }
@@ -76,6 +82,10 @@
         {
           "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[4]",
           "condition": { "index": 0, "question": "smoker", "operator": "!=", "answer": { "valueBoolean": true } }
+        },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[5]",
+          "condition": { "index": 0, "question": "packs", "operator": "!=", "answer": { "valueInteger": 1 } }
         }
       ],
       "diagnostics": []
@@ -95,7 +105,8 @@
             "path": "Questionnaire.item[3]", "state": "enabled", "reason": "conditionsMet",
             "conditions": [{ "index": 0, "question": "smoker", "operator": "exists", "outcome": "met", "answers": [] }]
           },
-          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet" }
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [] }] }
         ],
         "response": [],
         "diagnostics": []
@@ -111,7 +122,8 @@
           },
           { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
           { "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet" },
-          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet" }
+          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [{ "valueInteger": 2 }] }] }
         ],
         "response": [
           { "linkId": "smoker", "answer": [{ "valueBoolean": true }] },
@@ -127,7 +139,8 @@
           { "path": "Questionnaire.item[1]", "state": "disabled", "reason": "conditionsNotMet" },
           { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
           { "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet" },
-          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" }
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [] }] }
         ],
         "response": [
           { "linkId": "smoker", "answer": [{ "valueBoolean": false }] }

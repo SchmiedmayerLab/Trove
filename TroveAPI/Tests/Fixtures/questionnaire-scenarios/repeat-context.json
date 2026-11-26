@@ -1,6 +1,6 @@
 {
   "evaluator": "trove-questionnaire-scenarios-1",
-  "description": "Conditions inside a repeating group read their own instance, a question outside the group reads the nearest preceding instance, items nested under a question read their enclosing answer and the siblings under that same answer, a condition on a later sibling in a repeating group reads the same instance, and a condition on a later question reads the following occurrence.",
+  "description": "A condition reads the nearest occurrence of its question by the FHIR R4 rule: the ancestor axis, then the preceding axis, then the following axis. A question before the gated item in a repeating group is read in the same instance; a question after it is read in the previous instance, except in the first; items under a question's answers read the whole question; a question inside a repeating group read from outside it, or one after the gated item inside the group, is reported as a cross-instance reference.",
   "questionnaire": {
     "resourceType": "Questionnaire",
     "url": "https://example.org/fhir/Questionnaire/scenario-repeats",
@@ -90,7 +90,8 @@
     "graph": {
       "complete": false,
       "diagnostics": [
-        { "severity": "warning", "source": "trove", "rule": "repeat-context", "path": "Questionnaire.item[1].enableWhen[0].question" }
+        { "severity": "warning", "source": "trove", "rule": "repeat-context", "path": "Questionnaire.item[1].enableWhen[0].question" },
+        { "severity": "warning", "source": "trove", "rule": "repeat-context", "path": "Questionnaire.item[6].item[0].enableWhen[0].question" }
       ]
     },
     "scenarios": [
@@ -117,11 +118,11 @@
           { "path": "Questionnaire.item[2]", "instance": [], "state": "enabled" },
           {
             "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 0 }], "state": "enabled", "reason": "conditionsMet",
-            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [] }]
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }, { "valueBoolean": false }], "questionInstance": [] }]
           },
           {
-            "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 1 }], "state": "disabled",
-            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [] }]
+            "path": "Questionnaire.item[2].item[0]", "instance": [{ "path": "Questionnaire.item[2]", "index": 1 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }, { "valueBoolean": false }], "questionInstance": [] }]
           },
           {
             "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet",
@@ -147,8 +148,8 @@
           { "path": "Questionnaire.item[6].item[1]", "instance": [{ "path": "Questionnaire.item[6]", "index": 0 }], "state": "enabled" },
           { "path": "Questionnaire.item[6]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "enabled" },
           {
-            "path": "Questionnaire.item[6].item[0]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "disabled", "reason": "conditionsNotMet",
-            "conditions": [{ "outcome": "notMet", "answers": [{ "valueBoolean": false }], "questionInstance": [{ "path": "Questionnaire.item[6]", "index": 1 }] }]
+            "path": "Questionnaire.item[6].item[0]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "outcome": "met", "answers": [{ "valueBoolean": true }], "questionInstance": [{ "path": "Questionnaire.item[6]", "index": 0 }] }]
           },
           { "path": "Questionnaire.item[6].item[1]", "instance": [{ "path": "Questionnaire.item[6]", "index": 1 }], "state": "enabled" }
         ],
@@ -165,7 +166,7 @@
             "linkId": "pain",
             "answer": [
               { "valueBoolean": true, "item": [{ "linkId": "pain-site", "answer": [{ "valueString": "Knee" }] }] },
-              { "valueBoolean": false }
+              { "valueBoolean": false, "item": [{ "linkId": "pain-site", "answer": [{ "valueString": "Ankle" }] }] }
             ]
           },
           {
@@ -179,8 +180,7 @@
           { "linkId": "visit", "item": [{ "linkId": "attended", "answer": [{ "valueBoolean": false }] }] }
         ],
         "diagnostics": [
-          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[1].item[1].answer[0]" },
-          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[2].answer[1].item[0].answer[0]" }
+          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[1].item[1].answer[0]" }
         ]
       },
       {

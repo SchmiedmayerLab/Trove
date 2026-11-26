@@ -3562,7 +3562,8 @@ components:
           type: boolean
           description: >
             True when no finding is an error or a warning. Broken references, unsupported or
-            mismatched conditions, dependency cycles and expressions that are not evaluated
+            mismatched conditions, dependency cycles, expressions that are not evaluated,
+            references that can read another repeat instance and codings without a system
             make the analysis incomplete.
         nodes:
           type: array
@@ -3750,11 +3751,11 @@ components:
         questionInstance:
           type: array
           description: >
-            The repeat context of the question instance the condition read: an enclosing
-            instance of the question, otherwise the instance in the nearest enclosing group
-            instance or answer that contains the question; when several remain, the nearest
-            preceding one, otherwise the nearest following one. Omitted when the condition
-            names no question instance: an invalid condition or one on a dependency cycle.
+            The repeat context of the question instance the condition read, by the FHIR R4
+            rule: an enclosing instance on the ancestor axis, otherwise the nearest preceding
+            instance, otherwise the nearest following one, in document order of the form's
+            item instances. Omitted when the condition names no question instance: an
+            invalid condition or one on a dependency cycle.
           items:
             $ref: '#/components/schemas/QuestionnaireScenarioInstance'
 

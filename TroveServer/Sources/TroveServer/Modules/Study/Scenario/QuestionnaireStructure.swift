@@ -166,6 +166,11 @@ struct QuestionnaireStructure: Sendable {
         if item.type.map({ !item.isAnswerable && !["group", "display"].contains($0) }) ?? true {
             found.append(.trove("item-type", path: "\(item.path).type", message: "The item has no FHIR R4 Questionnaire item type."))
         }
+        for (position, option) in (object["answerOption"]?.array ?? []).enumerated() {
+            if let coding = option["valueCoding"]?.object, coding["system"]?.string == nil {
+                found.append(Self.missingSystem(at: "\(item.path).answerOption[\(position)].valueCoding"))
+            }
+        }
         for element in object["extension"]?.array ?? [] where element["valueExpression"] != nil {
             switch element["url"]?.string {
             case Self.enableWhenExpressionURL: items[index].enableExpression = true
@@ -183,6 +188,17 @@ struct QuestionnaireStructure: Sendable {
 extension QuestionnaireStructure {
     static let enableWhenExpressionURL = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
     static let calculatedExpressionURL = "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression"
+
+    /// A coding without a system equals only another coding without one, which conditions rarely intend.
+    static func missingSystem(at path: String) -> ValidationDiagnostic {
+        .trove(
+            "coding-system",
+            path: path,
+            message: "The coding has no system, so it matches only a coding that has no system either.",
+            severity: .warning,
+            nextAction: "Add the code system's URL."
+        )
+    }
 
     /// Every expression found anywhere in `json`, which this evaluator does not evaluate.
     static func scanExpressions(in json: ScenarioJSON, path: String, into found: inout [ValidationDiagnostic]) {

@@ -179,7 +179,11 @@ extension QuestionnaireStructure {
             target: target,
             isValid: findings.isEmpty && target != nil
         )
-        return (condition, findings + repeatContext(of: index, target: target, path: path))
+        var notes: [ValidationDiagnostic] = []
+        if case .coding(nil, _) = expected {
+            notes.append(Self.missingSystem(at: "\(path).answerCoding"))
+        }
+        return (condition, findings + notes + repeatContext(of: index, target: target, path: path))
     }
 
     private func checkTypes(_ expected: ScenarioValue, operation: String, target: Int?, path: String) -> [ValidationDiagnostic] {
@@ -216,25 +220,26 @@ extension QuestionnaireStructure {
         return findings
     }
 
-    /// Information when the question sits in a repeat context that does not enclose the gated item, so several occurrences can match.
+    /// A warning when the condition can read another instance of its question: the question repeats outside the gated item's repeat
+    /// context, or it follows the gated item inside a repeating context.
     private func repeatContext(of index: Int, target: Int?, path: String) -> [ValidationDiagnostic] {
-        guard let target, target != index, !ancestors(of: index).contains(target) else {
+        guard let target, target != index, !ancestors(of: index).contains(target), !ancestors(of: target).contains(index) else {
             return []
         }
         let shared = Set(ancestors(of: index) + [index])
-        let between = ancestors(of: target).prefix { !shared.contains($0) }
-        guard between.contains(where: { items[$0].formsInstances && items[$0].repeats }) else {
+        let repeating = { (item: Int) in items[item].formsInstances && items[item].repeats }
+        let message: String
+        if ancestors(of: target).prefix(while: { !shared.contains($0) }).contains(where: repeating) {
+            message = "The question repeats outside the gated item's repeat context, so document order decides: the nearest "
+                + "preceding occurrence, otherwise the nearest following one."
+        } else if target > index, ancestors(of: target).contains(where: { shared.contains($0) && repeating($0) }) {
+            // Items are stored in document order, so a larger index follows the gated item.
+            message = "The question follows the gated item inside a repeating context, so every instance after the first reads "
+                + "the preceding instance's occurrence of the question."
+        } else {
             return []
         }
-        return [
-            .trove(
-                "repeat-context",
-                path: "\(path).question",
-                message: "The question repeats outside the gated item's repeat context, so document order decides: the nearest "
-                    + "preceding occurrence, otherwise the nearest following one.",
-                severity: .warning
-            )
-        ]
+        return [.trove("repeat-context", path: "\(path).question", message: message, severity: .warning)]
     }
 }
 

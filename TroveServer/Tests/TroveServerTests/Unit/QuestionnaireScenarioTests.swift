@@ -28,7 +28,7 @@ struct QuestionnaireScenarioTests {
 
     @Test
     func everySharedFixtureIsEvaluated() throws {
-        #expect(try QuestionnaireScenarioFixture.all().count == 8)
+        #expect(try QuestionnaireScenarioFixture.all().count == 10)
     }
 
     /// Translations change labels, not logic: the bilingual fixtures have the same complete graph in every language.

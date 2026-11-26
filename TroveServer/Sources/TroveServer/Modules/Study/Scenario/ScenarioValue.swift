@@ -141,11 +141,11 @@ enum ScenarioValue: Equatable, Sendable {
         case let (.string(answer), .string(value)):
             return answer.utf8.elementsEqual(value.utf8)
         case let (.coding(system, code), .coding(expectedSystem, expectedCode)):
-            // A condition coding without a system names the code in any system.
+            // System and code must both be equal; a coding without a system equals only another coding without one.
             guard let code, let expectedCode else {
                 return false
             }
-            return code == expectedCode && (expectedSystem == nil || system == expectedSystem)
+            return code == expectedCode && system == expectedSystem
         case let (.reference(answer), .reference(value)):
             return answer != nil && answer == value
         default:

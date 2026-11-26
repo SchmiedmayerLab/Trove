@@ -1,6 +1,6 @@
 {
   "evaluator": "trove-questionnaire-scenarios-1",
-  "description": "Multiple answers, nested groups gated with any and all, disabled descendants, and changed earlier answers that recompute later items.",
+  "description": "Multiple answers (`!=` is not met when one of several answers is equal), nested groups gated with any and all, disabled descendants, and changed earlier answers that recompute later items.",
   "questionnaire": {
     "resourceType": "Questionnaire",
     "url": "https://example.org/fhir/Questionnaire/scenario-nested",
@@ -127,7 +127,7 @@
         "items": [
           { "path": "Questionnaire.item[0]", "state": "enabled", "reason": "unconditional" },
           { "path": "Questionnaire.item[1]", "state": "enabled", "reason": "conditionsMet" },
-          { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[2]", "state": "disabled", "reason": "conditionsNotMet" },
           { "path": "Questionnaire.item[3]", "state": "enabled", "reason": "unconditional" },
           {
             "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet",
