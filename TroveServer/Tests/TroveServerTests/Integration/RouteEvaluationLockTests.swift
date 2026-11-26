@@ -8,6 +8,7 @@
 
 import Fluent
 import Foundation
+import PostgresNIO
 import SQLKit
 import Synchronization
 import Testing
@@ -41,8 +42,15 @@ struct RouteEvaluationLockTests {
         }
     }
 
+    /// How the concurrent registration update ended.
+    private enum Update: Equatable, Sendable {
+        case committed
+        case lockTimeout
+        case failed
+    }
+
     private final class Outcome: Sendable {
-        let value = Mutex(false)
+        let value = Mutex<Update?>(nil)
     }
 
     private static func service(on app: Application, registrationID: UUID) -> ProviderRegistrationService {
@@ -55,8 +63,8 @@ struct RouteEvaluationLockTests {
         )
     }
 
-    /// Whether a registration update on another connection completes while a transaction holds the route evaluation.
-    private static func updateCompletes(whileEvaluatingWith lock: Bool) async throws -> Bool {
+    /// How a registration update on another connection ends while a transaction holds the route evaluation.
+    private static func update(whileEvaluatingWith lock: Bool) async throws -> Update? {
         let completed = Outcome()
         try await TestApp.withApp { app, _ in
             let registration = try ProviderFixture.registration()
@@ -74,36 +82,49 @@ struct RouteEvaluationLockTests {
             let release = Gate()
             let holder = Task {
                 try await app.db.transaction { transaction in
-                    let routes = try await service.routes(for: [requirement], lock: lock, on: transaction)
+                    let routes: [CollectionRouteAvailability]
+                    do {
+                        routes = try await service.routes(for: [requirement], lock: lock, on: transaction)
+                    } catch {
+                        // Release the waiting test instead of leaving it blocked; the holder reports the error.
+                        await evaluated.open()
+                        throw error
+                    }
                     #expect(routes.map(\.available) == [true])
                     await evaluated.open()
                     await release.wait()
                 }
             }
             await evaluated.wait()
-            do {
-                try await app.db.transaction { transaction in
-                    let sql = try #require(transaction as? any SQLDatabase)
-                    try await sql.raw("SET LOCAL lock_timeout = '2s'").run()
-                    try await sql.raw("UPDATE provider_registrations SET generation = generation WHERE id = \(bind: registration.id)").run()
-                }
-                completed.value.withLock { $0 = true }
-            } catch {
-                completed.value.withLock { $0 = false }
-            }
+            let result = await Self.updateRegistration(registration.id, on: app.db)
+            completed.value.withLock { $0 = result }
             await release.open()
             try await holder.value
         }
         return completed.value.withLock { $0 }
     }
 
+    /// Updates the registration row on another connection, waiting at most 500 ms for a row lock.
+    private static func updateRegistration(_ id: UUID, on database: any Database) async -> Update {
+        do {
+            try await database.transaction { transaction in
+                guard let sql = transaction as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
+                try await sql.raw("SET LOCAL lock_timeout = '500ms'").run()
+                try await sql.raw("UPDATE provider_registrations SET generation = generation WHERE id = \(bind: id)").run()
+            }
+            return .committed
+        } catch {
+            return (error as? PSQLError)?.serverInfo?[.sqlState] == "55P03" ? .lockTimeout : .failed
+        }
+    }
+
     @Test(.enabled(if: Environment.get("TROVE_TEST_POSTGRES_PORT") != nil, "Row locks require the isolated PostgreSQL store"))
     func validationDoesNotBlockARegistrationUpdate() async throws {
-        #expect(try await Self.updateCompletes(whileEvaluatingWith: false))
+        #expect(try await Self.update(whileEvaluatingWith: false) == .committed)
     }
 
     @Test(.enabled(if: Environment.get("TROVE_TEST_POSTGRES_PORT") != nil, "Row locks require the isolated PostgreSQL store"))
     func publicationKeepsTheRegistrationLockedUntilItCommits() async throws {
-        #expect(try await !Self.updateCompletes(whileEvaluatingWith: true))
+        #expect(try await Self.update(whileEvaluatingWith: true) == .lockTimeout)
     }
 }
