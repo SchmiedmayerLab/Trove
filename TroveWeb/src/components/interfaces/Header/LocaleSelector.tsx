@@ -171,7 +171,16 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
 
   return (
     <>
-      <HeaderSelector selectedItem={{ title: `Documents · ${activeLocale}` }}>
+      <HeaderSelector
+        selectedItem={{
+          title: (
+            <>
+              <span className="text-text-secondary">Documents</span>{" "}
+              {activeLocale}
+            </>
+          ),
+        }}
+      >
         <HeaderSelectorMenuLabel>
           Consent and informational document locales
         </HeaderSelectorMenuLabel>
@@ -184,6 +193,7 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
             {locales.length > 1 && (
               <button
                 type="button"
+                aria-label={`Remove ${locale}`}
                 className="text-text-tertiary hover:text-text -mr-1 rounded p-0.5"
                 onClick={(event) => {
                   event.stopPropagation();
