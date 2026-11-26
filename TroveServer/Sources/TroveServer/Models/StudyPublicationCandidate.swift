@@ -27,6 +27,7 @@ final class StudyPublicationCandidate: Model, @unchecked Sendable {
         let visibility: StudyVisibility
         let enrollmentCondition: EnrollmentConditions
         let collectionPolicy: PublishedCollectionPolicy
+        let taskPlan: PublishedTaskPlan
         let questionnaires: [QuestionnaireEvidence]
         let instruments: [PublishedInstrument]
         let readinessFacts: StudyReadinessFacts

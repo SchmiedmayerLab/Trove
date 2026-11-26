@@ -2224,6 +2224,65 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /studies/{studyId}/tasks:
+    get:
+      operationId: getStudyTasks
+      tags: [Studies]
+      summary: Read current materialized questionnaire assignments for a study
+      description: >
+        Requires interactive researcher membership and data-reader access in the study group.
+        Returns assignments for active enrollments, ordered by occurrence ID. Each page
+        reflects current assignments. Pass nextAfter as after on the same study.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: after
+          in: query
+          schema: {type: string, pattern: '^[0-9a-f]{64}$'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: Authorized page of assignments
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudyTaskPage'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/enrollments/{enrollmentId}/tasks:
+    get:
+      operationId: getParticipantTasks
+      tags: [Participant]
+      summary: Synchronize questionnaire assignments for an owned enrollment
+      description: >
+        Start without a cursor for a snapshot. Apply each page in change-version order.
+        Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor
+        for the next delta. Invalidated identifiers remove obsolete assignments. Each
+        series ends at a fixed committed watermark. A 410 requires a new snapshot.
+      parameters:
+        - $ref: '#/components/parameters/EnrollmentId'
+        - name: cursor
+          in: query
+          schema: {type: string, format: uuid}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: A page from the authorized task stream
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ParticipantTaskPage'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
   /participant/enrollments/{enrollmentId}/collection-plan:
     get:
       operationId: getParticipantCollectionPlan
@@ -3252,6 +3311,9 @@ components:
         - consent.recorded
         - consent.pdf.disclosure
         - consent.records.disclosure
+        - tasks.assigned
+        - tasks.invalidated
+        - tasks.disclosure
         - collection.plan.disclosure
         - collection.reconciliation.issued
         - collection.reconciliation.completed
@@ -4437,6 +4499,84 @@ components:
         nodeCount:
           type: integer
           minimum: 1
+
+    StudyTaskPage:
+      type: object
+      additionalProperties: false
+      required: [studyId, items]
+      properties:
+        studyId: {type: string, format: uuid}
+        items:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/ParticipantTaskOccurrence'}
+        nextAfter: {type: string, pattern: '^[0-9a-f]{64}$'}
+
+    ParticipantTaskPage:
+      type: object
+      additionalProperties: false
+      required: [snapshotVersion, items, invalidated]
+      properties:
+        snapshotVersion: {type: integer, format: int64}
+        items:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/ParticipantTaskOccurrence'}
+        invalidated:
+          type: array
+          maxItems: 100
+          items: {type: string, pattern: '^[0-9a-f]{64}$'}
+        nextCursor: {type: string, format: uuid}
+        checkpoint: {type: string, format: uuid}
+
+    ParticipantTaskOccurrence:
+      type: object
+      additionalProperties: false
+      required: [id, enrollmentId, publicationId, revision, artifactId, componentId, scheduleId, sha256, questionnaireCanonical, language, administrationLanguages, opensAt, dueAt, timeZone, state, version, assignedAt, resultReferences]
+      properties:
+        id: {type: string, pattern: '^[0-9a-f]{64}$'}
+        enrollmentId: {type: string, format: uuid}
+        publicationId: {type: string, format: uuid}
+        revision: {type: integer}
+        artifactId: {type: string, format: uuid}
+        componentId: {type: string, format: uuid}
+        scheduleId: {type: string, format: uuid}
+        sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        questionnaireCanonical:
+          type: string
+          description: The published Questionnaire's url and version, joined by a vertical bar.
+        language:
+          type: string
+          description: The base language of the Questionnaire.
+        administrationLanguages:
+          type: array
+          description: The languages the publication approved for administering this Questionnaire.
+          items: {type: string}
+        opensAt:
+          type: string
+          format: date-time
+          description: Start of the performance window.
+        dueAt:
+          type: string
+          format: date-time
+          description: The scheduled time of the occurrence.
+        cutoffAt:
+          type: string
+          format: date-time
+          description: >
+            End of the performance window, exclusive. Omitted when the occurrence has no
+            deadline: it is never missed, and every time from opensAt on lies within its
+            window.
+        timeZone: {type: string}
+        state: {type: string, enum: [assigned]}
+        version: {type: integer, format: int64}
+        assignedAt:
+          type: string
+          format: date-time
+          description: When the server recorded the assignment.
+        resultReferences:
+          type: array
+          items: {type: string}
 
     ParticipantCollectionPlan:
       type: object

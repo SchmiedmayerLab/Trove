@@ -76,9 +76,11 @@ final class PublishedStudyService: Module, @unchecked Sendable {
             artifactID: candidate.artifactID,
             consentSnapshot: snapshot.consent,
             collectionPolicy: snapshot.collectionPolicy,
+            taskPlan: snapshot.taskPlan,
             evidence: candidate.evidence,
             id: try candidate.requireId()
         )
+        try snapshot.taskPlan.validate(timeZone: snapshot.collectionPolicy.enrollmentPeriod.timeZone)
         try await artifacts.retain(candidate.artifact, on: transaction)
         try await publication.create(on: transaction)
         try await AuditRepository.recordMutation(AuditEvent(

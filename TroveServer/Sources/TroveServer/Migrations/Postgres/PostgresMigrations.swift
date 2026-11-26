@@ -37,4 +37,6 @@ func configurePostgresMigrations(for app: Application) {
     // Readiness facts, administration languages, publication evidence and language approvals.
     app.migrations.add(AddPublicationReadiness())
     app.migrations.add(CreateQuestionnaireLanguageApprovals())
+    // Task occurrences, their synchronization cursors and the published task plan.
+    app.migrations.add(CreateTaskOccurrences())
 }

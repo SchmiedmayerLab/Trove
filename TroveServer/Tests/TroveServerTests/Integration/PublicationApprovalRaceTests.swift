@@ -109,6 +109,7 @@ extension PublicationApprovalRaceTests {
             visibility: .public,
             enrollmentCondition: .none,
             collectionPolicy: try .compile(studyID: studyID, revision: 1, requirements: []),
+            taskPlan: .init(schedules: []),
             questionnaires: [],
             instruments: [],
             readinessFacts: StudyFixtures.completeReadinessFacts(),

@@ -75,25 +75,26 @@ struct ComponentScheduleIntegrationTests {
             let componentId = try component.requireId()
             let draftRevision = study.draftRevision
 
-            try await app.test(.POST, basePath(studyId: studyId, componentId: componentId), beforeRequest: { req in
+            let response = try await app.sendRequest(.POST, basePath(studyId: studyId, componentId: componentId), beforeRequest: { req in
                 req.bearerAuth(token)
                 req.headers.replaceOrAdd(name: "If-Match", value: "\"\(draftRevision)\"")
                 try req.encodeJSONBody(scheduleBody())
-            }) { response in
-                #expect(response.status == .created)
+            })
+            #expect(response.status == .created)
 
-                let schedule = try response.content.decode(Components.Schemas.ComponentSchedule.self)
-                #expect(schedule.id.isEmpty == false)
-                #expect(schedule.completionPolicy == .anytime)
-                if case .repeated(let value) = schedule.scheduleDefinition {
-                    if case .daily(let daily) = value.pattern {
-                        #expect(daily.hour == 9)
-                    } else {
-                        Issue.record("Expected daily pattern")
-                    }
+            let schedule = try response.content.decode(Components.Schemas.ComponentSchedule.self)
+            let scheduleID = try #require(UUID(uuidString: schedule.id))
+            let stored = try #require(try await ComponentSchedule.find(scheduleID, on: app.db))
+            #expect(stored.scheduleData.id == scheduleID)
+            #expect(schedule.completionPolicy == .anytime)
+            if case .repeated(let value) = schedule.scheduleDefinition {
+                if case .daily(let daily) = value.pattern {
+                    #expect(daily.hour == 9)
                 } else {
-                    Issue.record("Expected repeated schedule")
+                    Issue.record("Expected daily pattern")
                 }
+            } else {
+                Issue.record("Expected repeated schedule")
             }
         }
     }

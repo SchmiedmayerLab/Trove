@@ -225,6 +225,9 @@ final class ConsentService: Module, @unchecked Sendable {
                 guard let stored = try await EnrollmentConsent.find(record.requireID(), on: transaction) else {
                     throw ServerError.unexpectedError
                 }
+                guard let adopted = try await Enrollment.find(command.enrollmentID, on: transaction) else { throw ServerError.unexpectedError }
+                let tasks = try TaskOccurrenceStore(on: transaction, enrollment: adopted, context: event.context, scope: event.scope)
+                _ = try await tasks.reconcile(now: Date(), adoptingRevision: true)
                 return (stored, false)
             }
         } catch where (error as? any DatabaseError)?.isConstraintFailure == true {

@@ -156,6 +156,15 @@ final class StudyValidationService: Module, @unchecked Sendable {
                 visibility: publication.visibility,
                 enrollmentCondition: publication.enrollmentCondition,
                 collectionPolicy: publication.collectionPolicy,
+                taskPlan: .init(schedules: try publication.taskSchedules.compactMap { schedule -> PublishedTaskSchedule? in
+                    guard let instrument = instruments.first(where: { $0.componentID == schedule.componentId }) else {
+                        return nil
+                    }
+                    guard let resource = publication.questionnaires.first(where: { $0.componentID == schedule.componentId }) else {
+                        throw ServerError.internalServerError("A scheduled instrument has no archived Questionnaire")
+                    }
+                    return try PublishedTaskSchedule(schedule: schedule, instrument: instrument, questionnaire: resource.bytes)
+                }),
                 questionnaires: evidence,
                 instruments: instruments,
                 readinessFacts: study.readinessFacts,

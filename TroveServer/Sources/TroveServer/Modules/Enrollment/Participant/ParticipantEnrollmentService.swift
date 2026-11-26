@@ -90,6 +90,13 @@ final class ParticipantEnrollmentService: Module, @unchecked Sendable {
                 scope: .study(studyID: enrollment.$study.id, groupID: study.$group.id),
                 target: .init(id: enrollmentId, version: String(enrollment.stateVersion))
             ), on: transaction)
+            let tasks = try TaskOccurrenceStore(
+                on: transaction,
+                enrollment: enrollment,
+                context: actor.auditContext,
+                scope: .study(studyID: enrollment.$study.id, groupID: study.$group.id)
+            )
+            _ = try await tasks.reconcile(now: Date())
             return enrollment
         }
     }

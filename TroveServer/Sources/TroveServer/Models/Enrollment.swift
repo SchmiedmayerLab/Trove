@@ -32,6 +32,8 @@ final class Enrollment: Model, @unchecked Sendable {
     /// Monotonic concurrency token, initialized to 1 for a new enrollment.
     @Field(key: "state_version") var stateVersion: Int64
 
+    @OptionalField(key: "task_closure_base") var taskClosureBase: Int64?
+
     @Field(key: "participation_data") var participationData: ParticipationData
     
     /// Resolved from the publication selected when joining; later revisions never renew it.

@@ -39,6 +39,7 @@ struct ConsentPresentationTests {
                 .enUS: "---\ntitle: Consent\nversion: 1.0.0\n---\n<toggle id=agree expected-value=true>Agree</toggle>"
             ]),
             collectionPolicy: try .compile(studyID: studyID, revision: 3, requirements: []),
+            taskPlan: .init(schedules: []),
             evidence: PublishedStudyFixtures.evidence(),
             id: UUID()
         )

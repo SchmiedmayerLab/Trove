@@ -17,6 +17,22 @@ import VaporTesting
 
 struct StudyPublicationCandidateTests {
     private static let identity = QuestionnaireWorkerReply.identity
+    private static var invalidSchedules: [Components.Schemas.ScheduleDefinition] {
+        let dates = [Components.Schemas.DateComponents(month: 2, day: 1), .init(year: 2028, month: 2, day: 30)]
+        let patterns: [Components.Schemas.RepetitionPattern] = [
+            .daily(.init(_type: .daily, interval: 0, hour: 9)),
+            .weekly(.init(_type: .weekly, interval: -1, hour: 9)),
+            .daily(.init(_type: .daily, hour: 24)),
+            .weekly(.init(_type: .weekly, hour: 9, minute: 60)),
+            .monthly(.init(_type: .monthly, hour: 9, second: -1)),
+            .monthly(.init(_type: .monthly, day: 0, hour: 9)),
+            .monthly(.init(_type: .monthly, day: 32, hour: 9))
+        ]
+        return dates.map { .once(.init(_type: .once, pattern: .date(.init(_type: .date, dateComponents: $0)))) }
+            + patterns.map { .repeated(.init(_type: .repeated, pattern: $0)) }
+            + [.repeated(.init(_type: .repeated, pattern: .daily(.init(_type: .daily, hour: 9)), offset: .init(day: -1)))]
+    }
+
     private static var authority: GrantorAuthorityProvider {
         .init { actor in
             .init(
@@ -65,6 +81,35 @@ struct StudyPublicationCandidateTests {
             let wrongRevision = try await Self.publish(study, candidate: candidate, app: app, token: token, revision: UUID())
             #expect(wrongRevision.status == .preconditionFailed)
             #expect(try await PublishedStudy.query(on: app.db).count() == 1)
+        }
+    }
+
+    @Test(arguments: invalidSchedules)
+    func invalidSchedulesCannotCreatePublicationCandidates(definition: Components.Schemas.ScheduleDefinition) async throws {
+        try await TestApp.withApp(validator: Self.validator(), grantorAuthority: Self.authority) { app, credential in
+            let study = try await Self.study(on: app)
+            let studyID = try study.requireId()
+            let components = Component.query(on: app.db).filter(\.$study.$id == studyID)
+            let component = try #require(try await components.first())
+            let path = "\(apiBasePath)/studies/\(studyID)/components/\(try component.requireId())/schedules"
+            let schedule = Components.Schemas.ComponentScheduleInput(
+                scheduleDefinition: definition,
+                completionPolicy: .anytime,
+                notification: false
+            )
+            let created = try await app.sendRequest(.POST, path, beforeRequest: { request in
+                request.bearerAuth(credential)
+                request.headers.replaceOrAdd(name: "If-Match", value: Self.tag(study.draftRevision))
+                try request.encodeJSONBody(schedule)
+            })
+            try #require(created.status == .created)
+            let scheduleID = try created.content.decode(Components.Schemas.ComponentSchedule.self).id
+            let response = try await PublicationWorkflowFixtures.validate(studyID, app: app, token: credential)
+            try #require(response.status.code == 422)
+            let problem = try JSONDecoder().decode(Components.Schemas.ProblemDetails.self, from: Data(response.body.readableBytesView))
+            #expect(problem.detail?.contains(scheduleID.lowercased()) == true)
+            #expect(try await StudyPublicationCandidate.query(on: app.db).count() == 0)
+            #expect(try await StoredArtifact.query(on: app.db).count() == 0)
         }
     }
 

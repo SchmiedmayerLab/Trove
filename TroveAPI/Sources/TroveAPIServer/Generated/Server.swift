@@ -718,6 +718,28 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.getStudyTasks(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/tasks")
+        )
+        try transport.register(
+            {
+                try await server.getParticipantTasks(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/participant/enrollments/{enrollmentId}/tasks")
+        )
+        try transport.register(
+            {
                 try await server.getParticipantCollectionPlan(
                     request: $0,
                     body: $1,
@@ -10070,6 +10092,198 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     return (response, body)
                 case let .undocumented(statusCode, _):
                     return (.init(soar_statusCode: statusCode), nil)
+                }
+            }
+        )
+    }
+    /// Read current materialized questionnaire assignments for a study
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Returns assignments for active enrollments, ordered by occurrence ID. Each page reflects current assignments. Pass nextAfter as after on the same study.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/tasks`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)`.
+    func getStudyTasks(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetStudyTasks.id,
+            using: {
+                APIHandler.getStudyTasks($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetStudyTasks.Input.Path = .init(studyId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "studyId",
+                    as: Components.Parameters.StudyId.self
+                ))
+                let query: Operations.GetStudyTasks.Input.Query = .init(
+                    after: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "after",
+                        as: Swift.String.self
+                    ),
+                    limit: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "limit",
+                        as: Swift.Int.self
+                    )
+                )
+                let headers: Operations.GetStudyTasks.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetStudyTasks.Input(
+                    path: path,
+                    query: query,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Synchronize questionnaire assignments for an owned enrollment
+    ///
+    /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/tasks`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)`.
+    func getParticipantTasks(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetParticipantTasks.id,
+            using: {
+                APIHandler.getParticipantTasks($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetParticipantTasks.Input.Path = .init(enrollmentId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "enrollmentId",
+                    as: Components.Parameters.EnrollmentId.self
+                ))
+                let query: Operations.GetParticipantTasks.Input.Query = .init(
+                    cursor: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "cursor",
+                        as: Swift.String.self
+                    ),
+                    limit: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "limit",
+                        as: Swift.Int.self
+                    )
+                )
+                let headers: Operations.GetParticipantTasks.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetParticipantTasks.Input(
+                    path: path,
+                    query: query,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
                 }
             }
         )

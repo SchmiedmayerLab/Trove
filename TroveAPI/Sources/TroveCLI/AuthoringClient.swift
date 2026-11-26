@@ -190,6 +190,17 @@ struct AuthoringClient: Sendable {
         }
     }
 
+    func getStudyTasks(_ study: UUID, after: String?, limit: Int) async throws -> Components.Schemas.StudyTaskPage {
+        guard (1...100).contains(limit) else { throw CLIError.invalidInput }
+        return try await request(revision: nil) { client in
+            let page = try await client.getStudyTasks(.init(
+                path: .init(studyId: study.uuidString), query: .init(after: after, limit: limit)
+            )).ok.body.json
+            guard UUID(uuidString: page.studyId) == study, page.items.count <= limit else { throw CLIError.requestFailed }
+            return page
+        }
+    }
+
     func getStudyData(
         _ study: UUID,
         versions: Components.Schemas.StudyDataVersions,

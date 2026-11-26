@@ -9,6 +9,7 @@
 import Fluent
 import Foundation
 import GroveLocalization
+import GroveStudyDefinition
 import Testing
 import TroveAPIServer
 @testable import TroveServer
@@ -173,6 +174,35 @@ struct StudyBundleSnapshotTests {
         } catch let error as ServerError {
             #expect(error.status == .unprocessableContent)
         }
+    }
+
+    @Test
+    func legacyDraftUsesAuthoringIDInArchiveAndTaskPlan() throws {
+        let study = try Self.study()
+        let componentID = UUID()
+        let component = Self.questionnaire(studyID: try study.requireId(), id: componentID)
+        let embeddedID = UUID()
+        let schedule = ComponentSchedule(componentId: componentID, scheduleData: .init(
+            id: embeddedID,
+            componentId: componentID,
+            scheduleDefinition: .repeated(.daily(hour: 9)),
+            completionPolicy: .anytime,
+            notifications: .disabled
+        ))
+        let authoringID = UUID()
+        schedule.id = authoringID
+        component.$schedules.value = [schedule]
+        study.$components.value = [component]
+
+        let publication = try StudyBundleService().preparePublication(from: study, revision: 1)
+        let archive = try Archive(data: publication.bundle, accessMode: .read)
+        let entry = try #require(archive.first { $0.path.hasSuffix("/definition.json") })
+        var bytes = Data()
+        _ = try archive.extract(entry) { bytes.append($0) }
+        let definition = try JSONDecoder().decode(StudyDefinition.self, from: bytes, configuration: .init(allowTrivialSchemaMigrations: false))
+        #expect(definition.componentSchedules.map(\.id) == [authoringID])
+        #expect(publication.taskSchedules.map(\.id) == [authoringID])
+        #expect(schedule.scheduleData.id == embeddedID)
     }
 
     @Test("Schedule references and identities must close over the captured components", arguments: [true, false])
