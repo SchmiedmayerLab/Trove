@@ -47,15 +47,20 @@ struct CollectionRouteAvailability: Sendable {
 
 
 extension ProviderRegistrationService {
-    /// Evaluates every requirement's route under the caller's transaction, locking each named registration as
-    /// publication does. A registration that is not approved, or that does not qualify the source and profile,
-    /// makes its route unavailable; other failures propagate.
-    func routes(for requirements: [CollectionRequirement], on transaction: any Database) async throws -> [CollectionRouteAvailability] {
+    /// Evaluates every requirement's route under the caller's transaction. A registration that is not approved, or that
+    /// does not qualify the source and profile, makes its route unavailable; other failures propagate.
+    ///
+    /// Draft validation reads the registrations without row locks, so it never waits for or delays an operator's
+    /// registration change. Publication locks each named registration (`lock: true`) so the registrations it
+    /// accepts cannot change before it commits.
+    func routes(
+        for requirements: [CollectionRequirement], lock: Bool, on transaction: any Database
+    ) async throws -> [CollectionRouteAvailability] {
         guard transaction.inTransaction else { throw AuditError.transactionRequired }
         var capabilities: [UUID: [Capability]] = [:]
         for id in Set(requirements.compactMap(\.providerRegistrationID)).sorted(by: { $0.uuidString < $1.uuidString }) {
             do {
-                let registration = try await ProviderRegistrationStore.requireApproved(id, on: transaction, lock: true).configuration
+                let registration = try await ProviderRegistrationStore.requireApproved(id, on: transaction, lock: lock).configuration
                 capabilities[id] = self.capabilities(for: registration)
             } catch ProviderFailure.fenced {
                 capabilities[id] = []

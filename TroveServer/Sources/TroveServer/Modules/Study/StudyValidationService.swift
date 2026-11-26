@@ -177,7 +177,7 @@ final class StudyValidationService: Module, @unchecked Sendable {
             guard let snapshot = try await self.repository.loadWithComponentsAndSchedules(id: studyID, on: transaction) else {
                 throw ServerError.notFound("Study draft not found")
             }
-            let routes = try await self.providerRuntime.registrations.routes(for: snapshot.collectionRequirements, on: transaction)
+            let routes = try await self.providerRuntime.registrations.routes(for: snapshot.collectionRequirements, lock: false, on: transaction)
             let questionnaireIDs = try (snapshot.$components.value ?? []).filter { $0.type == .questionnaire }.map { try $0.requireId() }
             let approvals = try await QuestionnaireLanguageApproval.inForce(componentIDs: questionnaireIDs, on: transaction)
             try await AuditRepository.recordDisclosureIntent(AuditEvent(

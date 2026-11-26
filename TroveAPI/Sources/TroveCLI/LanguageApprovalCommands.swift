@@ -47,7 +47,7 @@ struct ApproveLanguage: AsyncParsableCommand {
 
     mutating func run() async throws {
         guard sha256.utf8.count == 64, sha256.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
-              (1...35).contains(language.count) else {
+              (1...35).contains(language.count), !language.contains(where: \.isWhitespace) else {
             throw CLIError.invalidInput
         }
         let client = try connection.client()

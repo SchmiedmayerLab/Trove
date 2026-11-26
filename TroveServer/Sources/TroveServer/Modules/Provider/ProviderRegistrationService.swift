@@ -137,7 +137,7 @@ final class ProviderRegistrationService: Module, Sendable {
 
     /// Publication checks the actual receiver/acquisition intersection again under the acceptance transaction.
     func validate(requirements: [CollectionRequirement], on transaction: any Database) async throws {
-        let admitted = try await routes(for: requirements, on: transaction)
+        let admitted = try await routes(for: requirements, lock: true, on: transaction)
         guard admitted.allSatisfy(\.available) else {
             throw ServerError.conflict("A collection route changed after validation; validate the study draft again")
         }

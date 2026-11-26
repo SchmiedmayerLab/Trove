@@ -47,7 +47,7 @@ struct CollectionRouteAvailabilityTests {
                 requirement: .optional
             )
             await #expect(throws: ProviderFailure.unavailable) {
-                try await app.db.transaction { try await service.routes(for: [optional], on: $0) }
+                try await app.db.transaction { try await service.routes(for: [optional], lock: false, on: $0) }
             }
         }
     }
@@ -79,16 +79,16 @@ struct CollectionRouteAvailabilityTests {
             )
             let native = CollectionRequirement(profile: CollectionObservationProfile.heartRate.rawValue, sourceKind: .participantApp)
             let requirements = [qualified, otherProfile, unknownRegistration, native]
-            let routes = try await app.db.transaction { try await service.routes(for: requirements, on: $0) }
+            let routes = try await app.db.transaction { try await service.routes(for: requirements, lock: false, on: $0) }
             #expect(routes.map(\.available) == [true, false, false, true])
             #expect(routes.map(\.index) == [0, 1, 2, 3])
             #expect(routes.map { $0.diagnostic?.rule } == [nil, "route-optional-unavailable", "route-unavailable", nil])
             #expect(routes[1].diagnostic?.severity == .warning && routes[2].diagnostic?.severity == .error)
 
             try await Self.setApproval(false, for: registration, on: app)
-            let withdrawn = try await app.db.transaction { try await service.routes(for: [qualified], on: $0) }
+            let withdrawn = try await app.db.transaction { try await service.routes(for: [qualified], lock: true, on: $0) }
             #expect(withdrawn.map(\.available) == [false])
-            await #expect(throws: AuditError.transactionRequired) { try await service.routes(for: [qualified], on: app.db) }
+            await #expect(throws: AuditError.transactionRequired) { try await service.routes(for: [qualified], lock: false, on: app.db) }
         }
     }
 }

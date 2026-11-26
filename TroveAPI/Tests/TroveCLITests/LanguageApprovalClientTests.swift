@@ -87,4 +87,20 @@ struct LanguageApprovalClientTests {
         ])
         await #expect(throws: CLIError.invalidInput) { try await command.run() }
     }
+
+    @Test(arguments: ["de DE", " de", "de\t", String(repeating: "x", count: 36), ""])
+    func approvalCommandRejectsMalformedLanguagesBeforeConnecting(language: String) async throws {
+        var command = try ApproveLanguage.parse([
+            study.uuidString,
+            "--component",
+            component.uuidString,
+            "--sha256",
+            digest,
+            "--language",
+            language,
+            "--server",
+            "https://research.example/api/v0"
+        ])
+        await #expect(throws: CLIError.invalidInput) { try await command.run() }
+    }
 }
