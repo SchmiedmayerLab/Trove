@@ -185,6 +185,7 @@ struct PublicationRouteLossTests {
                 )
             )
             #expect(refusal.diagnostics?.map(\.path) == ["collectionRequirements[0]"])
+            #expect(refusal.diagnostics?.map(\.rule) == ["route-unavailable"])
             #expect(try await PublishedStudy.query(on: app.db).count() == 0)
         }
     }

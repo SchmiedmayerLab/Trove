@@ -3,10 +3,10 @@
 
 import { describe, expect, it } from "vitest";
 import type { StudyDetailData } from "@/lib/api/generated/types.gen";
+import { readinessFactKeys } from "@/lib/readinessFacts";
 import {
   detailLanguages,
   generalFormValues,
-  readinessFactKeys,
   withReadinessContent,
   withDetailContent,
   withSourceLanguage,

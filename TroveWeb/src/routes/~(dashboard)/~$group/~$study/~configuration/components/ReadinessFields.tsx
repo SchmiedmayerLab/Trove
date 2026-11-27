@@ -6,7 +6,6 @@ import { useFieldArray } from "react-hook-form";
 import { readinessFactKeys, readinessFactLabels } from "@/lib/readinessFacts";
 import type { GeneralForm } from "../lib/useGeneralForm";
 
-
 const factHints: Partial<Record<(typeof readinessFactKeys)[number], string>> = {
   concernRoute:
     "How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route suffices.",
@@ -40,7 +39,7 @@ export const ReadinessFields = ({
           <div key={fact} className="grid gap-1">
             <label htmlFor={id}>{readinessFactLabels[fact]}</label>
             {hint && (
-              <p id={`${id}.hint`} className="text-sm text-muted-foreground">
+              <p id={`${id}.hint`} className="text-muted-foreground text-sm">
                 {hint}
               </p>
             )}

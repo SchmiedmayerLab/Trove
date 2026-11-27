@@ -63,8 +63,6 @@ export const withoutLanguage = (
   };
 };
 
-export { readinessFactKeys };
-
 const emptyReadinessFacts = Object.fromEntries(
   readinessFactKeys.map((key) => [key, ""]),
 ) as Required<StudyReadinessContent>;

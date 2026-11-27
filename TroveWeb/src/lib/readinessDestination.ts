@@ -6,7 +6,9 @@ import { isReadinessFactKey, readinessFactLabels } from "./readinessFacts";
 
 /** Map only paths emitted by the readiness checks to editable controls. */
 export const readinessDestination = (path: string) => {
-  const fact = /^readinessFacts\.content\.([^.]+)(?:\.([A-Za-z]+))?$/.exec(path);
+  const fact = /^readinessFacts\.content\.([^.]+)(?:\.([A-Za-z]+))?$/.exec(
+    path,
+  );
   if (fact && isLanguageTag(fact[1])) {
     const field = fact.at(2);
     if (field === undefined)

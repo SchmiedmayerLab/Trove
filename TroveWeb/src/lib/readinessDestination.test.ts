@@ -22,9 +22,15 @@ describe("readinessDestination", () => {
     expect(readinessDestination("readinessFacts.content.de")?.label).toBe(
       "Edit translated facts (de)",
     );
-    expect(readinessDestination("readinessFacts.content.en.unknown")).toBeUndefined();
-    expect(readinessDestination("readinessFacts.content.en.toString")).toBeUndefined();
-    expect(readinessDestination("readinessFacts.content.not a tag.aims")).toBeUndefined();
+    expect(
+      readinessDestination("readinessFacts.content.en.unknown"),
+    ).toBeUndefined();
+    expect(
+      readinessDestination("readinessFacts.content.en.toString"),
+    ).toBeUndefined();
+    expect(
+      readinessDestination("readinessFacts.content.not a tag.aims"),
+    ).toBeUndefined();
   });
 
   it("links contacts to their first or named field", () => {
