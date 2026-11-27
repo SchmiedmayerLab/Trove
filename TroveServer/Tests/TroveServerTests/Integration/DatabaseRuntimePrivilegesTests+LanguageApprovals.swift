@@ -24,22 +24,16 @@ extension DatabaseRuntimePrivilegesTests {
             .run()
     }
 
-    static func withGroup(on fixture: RuntimeFixture, _ body: (String) async throws -> Void) async throws {
-        let group = "trove_runtime_test_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        try await fixture.admin.raw("CREATE ROLE \(ident: group) NOLOGIN").run()
-        do {
-            try await body(group)
-        } catch {
-            try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
-            throw error
-        }
-        try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
-    }
-
     @Test
     func runtimeAppendsLanguageApprovalsAndRecordsOnlyTheirRevocation() async throws {
         try await Self.withRuntime { fixture in
             let sql = try #require(fixture.database as? any SQLDatabase)
+            let permissions = try #require(try await sql.raw("""
+                SELECT has_table_privilege(current_user, 'questionnaire_language_approvals', 'SELECT')
+                    AND has_table_privilege(current_user, 'questionnaire_language_approvals', 'INSERT') AS allowed
+                """)
+                .first())
+            #expect(try permissions.decode(column: "allowed", as: Bool.self))
             try await sql.raw("""
                 UPDATE questionnaire_language_approvals
                 SET revoked_at = CURRENT_TIMESTAMP, revoked_by_issuer = 'issuer', revoked_by_subject = 'subject' WHERE false
@@ -62,7 +56,8 @@ extension DatabaseRuntimePrivilegesTests {
         ("DELETE ON public.questionnaire_language_approvals", false),
         ("TRUNCATE ON public.questionnaire_language_approvals", false),
         ("INSERT ON public.questionnaire_language_approvals", true),
-        ("UPDATE (revoked_by_issuer) ON public.questionnaire_language_approvals", true)
+        ("UPDATE (revoked_by_issuer) ON public.questionnaire_language_approvals", true),
+        ("UPDATE (revoked_by_subject) ON public.questionnaire_language_approvals", true)
     ])
     func excessiveLanguageApprovalPrivilegesAreRejected(grant: String, delegated: Bool) async throws {
         try await Self.withRuntime { fixture in

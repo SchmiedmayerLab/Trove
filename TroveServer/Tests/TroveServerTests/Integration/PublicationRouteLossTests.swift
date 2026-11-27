@@ -17,7 +17,7 @@ import VaporTesting
 /// A provider route that becomes unavailable between validation and publication refuses publication with the
 /// route diagnostic draft validation reports, and nothing is published.
 struct PublicationRouteLossTests {
-    struct ValidatedDraft {
+    private struct ValidatedDraft {
         let studyID: UUID
         let revision: UUID
         let candidate: String
