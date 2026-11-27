@@ -216,7 +216,7 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
             <div key={locale} className="flex items-center gap-1">
               <DropdownMenuRadioItem
                 value={locale}
-                className="flex-1 py-2 pl-10 [&>span:first-child]:left-3.5"
+                className="flex-1 py-2! pl-10! [&>span:first-child]:left-3.5"
               >
                 {locale}
               </DropdownMenuRadioItem>

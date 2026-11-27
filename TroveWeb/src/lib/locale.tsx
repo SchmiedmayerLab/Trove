@@ -7,9 +7,7 @@
 //
 
 import {
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
   createContext,
   use,
   useEffect,
@@ -19,7 +17,7 @@ import {
 
 interface LocaleContextValue {
   locale: string;
-  setLocale: Dispatch<SetStateAction<string>>;
+  setLocale: (locale: string) => void;
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
