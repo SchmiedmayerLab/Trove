@@ -187,6 +187,10 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
     <>
       <HeaderSelector
         triggerRef={triggerRef}
+        onOpenChange={(open) => {
+          // A dialog chosen before the menu reopened no longer applies.
+          if (open) dialogAfterMenuRef.current = undefined;
+        }}
         onMenuUnmount={() => {
           dialogAfterMenuRef.current?.();
           dialogAfterMenuRef.current = undefined;
@@ -203,16 +207,22 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
         <HeaderSelectorMenuLabel>
           Consent and informational document locales
         </HeaderSelectorMenuLabel>
-        <DropdownMenuRadioGroup value={activeLocale} onValueChange={setLocale}>
+        <DropdownMenuRadioGroup
+          aria-label="Document locales"
+          value={activeLocale}
+          onValueChange={setLocale}
+        >
           {locales.map((locale) => (
             <div key={locale} className="flex items-center gap-1">
-              <DropdownMenuRadioItem value={locale} className="flex-1 py-2">
+              <DropdownMenuRadioItem
+                value={locale}
+                className="flex-1 py-2 pl-10 [&>span:first-child]:left-3.5"
+              >
                 {locale}
               </DropdownMenuRadioItem>
               {locales.length > 1 && (
                 <DropdownMenuItem
                   aria-label={`Remove ${locale}`}
-
                   className="text-text-tertiary p-2!"
                   onSelect={() => {
                     if (!study) return;

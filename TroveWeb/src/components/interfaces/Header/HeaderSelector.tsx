@@ -92,12 +92,14 @@ export const HeaderSelector = ({
   children,
   triggerRef,
   onMenuUnmount,
+  onOpenChange,
 }: {
   selectedItem: { title: ReactNode; icon?: IconName };
   children: ReactNode;
   triggerRef?: Ref<HTMLButtonElement>;
-  /** Called when the menu content has unmounted after closing. */
+  /** Called when the menu content unmounts. */
   onMenuUnmount?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) => {
   const onMenuUnmountRef = useRef(onMenuUnmount);
   useEffect(() => {
@@ -109,7 +111,7 @@ export const HeaderSelector = ({
   }, []);
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           ref={triggerRef}

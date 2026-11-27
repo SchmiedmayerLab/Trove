@@ -46,19 +46,18 @@ export const LocaleProvider = ({
       : fallback;
   });
 
-  useEffect(() => {
-    if (!supportedLocales.includes(locale)) {
-      // Falls back when the study's locale list changes underneath a stored choice.
-      // eslint-disable-next-line @eslint-react/set-state-in-effect -- reconciling with a changed prop
-      setLocale(fallback);
-    }
-  }, [supportedLocales, locale, fallback]);
+  // A choice the study's locales do not contain, such as a locale that was just
+  // removed or one added before the refreshed study arrives, reads as the fallback.
+  const activeLocale = supportedLocales.includes(locale) ? locale : fallback;
 
   useEffect(() => {
-    localStorage.setItem(localStorageKey, locale);
-  }, [localStorageKey, locale]);
+    localStorage.setItem(localStorageKey, activeLocale);
+  }, [localStorageKey, activeLocale]);
 
-  const contextValue = useMemo(() => ({ locale, setLocale }), [locale]);
+  const contextValue = useMemo(
+    () => ({ locale: activeLocale, setLocale }),
+    [activeLocale],
+  );
 
   return <LocaleContext value={contextValue}>{children}</LocaleContext>;
 };

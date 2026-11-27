@@ -47,7 +47,11 @@ test("marks the active document locale and returns focus after the locale dialog
   await page.keyboard.press("Enter");
   await expect(locale("de-DE")).toHaveAttribute("aria-checked", "true");
   await expect(locale("en-US")).toHaveAttribute("aria-checked", "false");
-  await expect(menu.locator("button")).toHaveCount(0);
+  for (const value of ["en-US", "de-DE"]) {
+    await expect(
+      menu.getByRole("menuitem", { name: `Remove ${value}`, exact: true }),
+    ).toHaveCount(1);
+  }
 
   // Selecting a locale checks it.
   await locale("en-US").click();
