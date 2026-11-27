@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   Field,
   Input,
@@ -25,7 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Languages, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { FeaturedIconContainer } from "@/components/ui/FeaturedIconContainer";
 import { FieldLabel } from "@/components/ui/FieldLabel";
@@ -134,6 +136,17 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
     study: StudyResponse;
   }>();
   const [pendingAddStudy, setPendingAddStudy] = useState<StudyResponse>();
+  // The locale dialogs have no trigger of their own, so focus returns to the
+  // selector when one closes. A dialog chosen in the menu opens once the menu
+  // content has unmounted, so no closing menu can take focus from the selector.
+  const dialogAfterMenuRef = useRef<() => void>(undefined);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const isDialogOpen = addLocaleDialog.isOpen || deleteDialog.isOpen;
+  const wasDialogOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasDialogOpenRef.current && !isDialogOpen) triggerRef.current?.focus();
+    wasDialogOpenRef.current = isDialogOpen;
+  }, [isDialogOpen]);
   const updateStudy = useUpdateStudyMutation();
 
   const { data: study } = useQuery({
@@ -173,6 +186,15 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
   return (
     <>
       <HeaderSelector
+        triggerRef={triggerRef}
+        onOpenChange={(open) => {
+          // A dialog chosen before the menu reopened no longer applies.
+          if (open) dialogAfterMenuRef.current = undefined;
+        }}
+        onMenuUnmount={() => {
+          dialogAfterMenuRef.current?.();
+          dialogAfterMenuRef.current = undefined;
+        }}
         selectedItem={{
           title: (
             <>
@@ -185,37 +207,47 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
         <HeaderSelectorMenuLabel>
           Consent and informational document locales
         </HeaderSelectorMenuLabel>
-        {locales.map((locale) => (
-          <div key={locale} className="flex items-center gap-1">
-            <HeaderSelectorMenuItem
-              className="flex-1"
-              onSelect={() => setLocale(locale)}
-            >
-              {locale}
-            </HeaderSelectorMenuItem>
-            {locales.length > 1 && (
-              <DropdownMenuItem
-                aria-label={`Remove ${locale}`}
-                className="text-text-tertiary p-2!"
-                onSelect={() => {
-                  if (!study) return;
-                  setPendingDeleteLocale({ locale, study });
-                  deleteDialog.open();
-                }}
+        <DropdownMenuRadioGroup
+          aria-label="Document locales"
+          value={activeLocale}
+          onValueChange={setLocale}
+        >
+          {locales.map((locale) => (
+            <div key={locale} className="flex items-center gap-1">
+              <DropdownMenuRadioItem
+                value={locale}
+                className="flex-1 py-2! pl-10! [&>span:first-child]:left-3.5"
               >
-                <X />
-              </DropdownMenuItem>
-            )}
-          </div>
-        ))}
+                {locale}
+              </DropdownMenuRadioItem>
+              {locales.length > 1 && (
+                <DropdownMenuItem
+                  aria-label={`Remove ${locale}`}
+                  className="text-text-tertiary p-2!"
+                  onSelect={() => {
+                    if (!study) return;
+                    dialogAfterMenuRef.current = () => {
+                      setPendingDeleteLocale({ locale, study });
+                      deleteDialog.open();
+                    };
+                  }}
+                >
+                  <X />
+                </DropdownMenuItem>
+              )}
+            </div>
+          ))}
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <HeaderSelectorMenuItem
           icon="plus"
           className="text-text-tertiary"
           onSelect={() => {
             if (!study) return;
-            setPendingAddStudy(study);
-            addLocaleDialog.open();
+            dialogAfterMenuRef.current = () => {
+              setPendingAddStudy(study);
+              addLocaleDialog.open();
+            };
           }}
         >
           Add locale
