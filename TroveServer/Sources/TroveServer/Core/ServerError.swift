@@ -35,6 +35,8 @@ struct ServerError: Error, Sendable {
     }
 
     let status: HTTPResponse.Status
+    /// A static name of the problem type, never built from request or stored data: server error responses and their
+    /// log entries include it while they withhold the detail.
     let title: String
     let detail: String
     /// Findings in the form draft validation reports them; empty for most problems.

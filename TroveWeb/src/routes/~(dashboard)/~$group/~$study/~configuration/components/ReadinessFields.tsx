@@ -3,22 +3,11 @@
 
 import { Button, Input, Textarea } from "@schmiedmayerlab/grove-design-system";
 import { useFieldArray } from "react-hook-form";
-import { readinessFactKeys } from "../lib/studyDetails";
+import { readinessFactKeys, readinessFactLabels } from "@/lib/readinessFacts";
 import type { GeneralForm } from "../lib/useGeneralForm";
 
-const factLabels = {
-  aims: "Aims",
-  population: "Population",
-  procedures: "Procedures and collected data",
-  burden: "Participant burden",
-  retention: "Data retention",
-  withdrawal: "Withdrawal",
-  concernRoute: "Concern and incidental-finding route",
-  coverage: "Responsible coverage",
-  coEnrollment: "Co-enrollment policy",
-} as const;
 
-const factHints: Partial<Record<keyof typeof factLabels, string>> = {
+const factHints: Partial<Record<(typeof readinessFactKeys)[number], string>> = {
   concernRoute:
     "How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route suffices.",
   coEnrollment: "The reviewed rule for participants enrolled in other studies.",
@@ -49,7 +38,7 @@ export const ReadinessFields = ({
         const hint = factHints[fact];
         return (
           <div key={fact} className="grid gap-1">
-            <label htmlFor={id}>{factLabels[fact]}</label>
+            <label htmlFor={id}>{readinessFactLabels[fact]}</label>
             {hint && (
               <p id={`${id}.hint`} className="text-sm text-muted-foreground">
                 {hint}

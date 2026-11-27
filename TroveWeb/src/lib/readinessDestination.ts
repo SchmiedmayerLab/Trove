@@ -2,22 +2,24 @@
 // SPDX-License-Identifier: MIT
 
 import { isLanguageTag } from "./languageTags";
+import { isReadinessFactKey, readinessFactLabels } from "./readinessFacts";
 
 /** Map only paths emitted by the readiness checks to editable controls. */
 export const readinessDestination = (path: string) => {
-  const fact =
-    /^readinessFacts\.content\.([^.]+)(?:\.(aims|population|procedures|burden|retention|withdrawal))?$/.exec(
-      path,
-    );
+  const fact = /^readinessFacts\.content\.([^.]+)(?:\.([A-Za-z]+))?$/.exec(path);
   if (fact && isLanguageTag(fact[1])) {
-    const field = fact[2];
+    const field = fact.at(2);
+    if (field === undefined)
+      return {
+        language: fact[1],
+        hash: path,
+        label: `Edit translated facts (${fact[1]})`,
+      };
+    if (!isReadinessFactKey(field)) return undefined;
     return {
       language: fact[1],
       hash: path,
-      label:
-        field ?
-          `Edit ${field} (${fact[1]})`
-        : `Edit translated facts (${fact[1]})`,
+      label: `Edit ${readinessFactLabels[field].toLowerCase()} (${fact[1]})`,
     };
   }
   const contact =

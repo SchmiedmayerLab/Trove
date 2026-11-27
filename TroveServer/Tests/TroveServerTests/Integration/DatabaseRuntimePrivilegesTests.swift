@@ -27,7 +27,8 @@ struct DatabaseRuntimePrivilegesTests {
             #expect(try row.decode(column: "authenticated", as: String.self) == fixture.role)
             try await DatabaseRuntimePrivileges.validate(on: fixture.database)
             for table in [
-                "study_delegations", "study_publication_candidates", "source_installations", "source_identity_keys", "source_identity_key_envelopes"
+                "study_delegations", "study_publication_candidates", "source_installations", "source_identity_keys", "source_identity_key_envelopes",
+                "questionnaire_language_approvals"
             ] {
                 let permissions = try #require(try await sql.raw("""
                     SELECT has_table_privilege(current_user, \(bind: table), 'SELECT')
@@ -37,6 +38,11 @@ struct DatabaseRuntimePrivilegesTests {
                 #expect(try permissions.decode(column: "allowed", as: Bool.self))
             }
             try await sql.raw("UPDATE study_delegations SET revoked_at = CURRENT_TIMESTAMP WHERE false").run()
+            try await sql.raw("""
+                UPDATE questionnaire_language_approvals
+                SET revoked_at = CURRENT_TIMESTAMP, revoked_by_issuer = 'issuer', revoked_by_subject = 'subject' WHERE false
+                """)
+                .run()
             let groups = try await Group.query(on: fixture.database).count()
             #expect(groups == 0)
             let event = AuditEvent(
@@ -72,6 +78,8 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM source_identity_key_envelopes WHERE false", "TRUNCATE source_identity_key_envelopes",
         "UPDATE study_delegations SET client_id = client_id WHERE false",
         "DELETE FROM study_delegations WHERE false", "TRUNCATE study_delegations",
+        "UPDATE questionnaire_language_approvals SET sha256 = sha256 WHERE false",
+        "DELETE FROM questionnaire_language_approvals WHERE false", "TRUNCATE questionnaire_language_approvals",
         "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
         "DELETE FROM study_publication_candidates WHERE false", "TRUNCATE study_publication_candidates",
         "UPDATE clinical_events SET raw_sha256 = raw_sha256 WHERE false", "DELETE FROM clinical_events WHERE false", "TRUNCATE clinical_events",
@@ -177,6 +185,8 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE ON public.study_delegations", "UPDATE (client_id) ON public.study_delegations",
         "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
+        "UPDATE ON public.questionnaire_language_approvals", "UPDATE (sha256) ON public.questionnaire_language_approvals",
+        "DELETE ON public.questionnaire_language_approvals",
         "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "DELETE ON public.study_publication_candidates", "TRUNCATE ON public.study_publication_candidates",
         "UPDATE ON public.clinical_event_representations", "UPDATE (raw_bytes) ON public.clinical_event_representations",
@@ -207,6 +217,7 @@ struct DatabaseRuntimePrivilegesTests {
         "SELECT ON public.source_installations", "UPDATE (revoked_at) ON public.source_installations",
         "SELECT ON public.source_identity_keys", "INSERT ON public.source_identity_key_envelopes",
         "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
+        "INSERT ON public.questionnaire_language_approvals", "UPDATE (revoked_by_subject) ON public.questionnaire_language_approvals",
         "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
         "SELECT ON public.clinical_event_representations", "INSERT ON public.clinical_event_representations",
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
@@ -288,7 +299,7 @@ extension DatabaseRuntimePrivilegesTests {
         "public.enrollment_consents", "public.source_bindings", "public.source_installations",
         "public.source_identity_keys", "public.source_identity_key_envelopes",
         "public.clinical_events", "public.clinical_event_representations",
-        "public.study_delegations", "public.study_publication_candidates",
+        "public.study_delegations", "public.study_publication_candidates", "public.questionnaire_language_approvals",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
         "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
@@ -368,6 +379,7 @@ extension DatabaseRuntimePrivilegesTests {
             .run()
         try await sql.raw("""
             GRANT SELECT, INSERT ON public.audit_events, public.published_studies, public.study_delegations, public.study_publication_candidates,
+                public.questionnaire_language_approvals,
                 public.enrollment_consents, public.source_bindings, public.source_installations,
                 public.source_identity_keys, public.source_identity_key_envelopes,
                 public.clinical_events, public.clinical_event_representations,
@@ -381,6 +393,10 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
+        try await sql.raw("""
+            GRANT UPDATE (revoked_at, revoked_by_issuer, revoked_by_subject) ON public.questionnaire_language_approvals TO \(ident: role)
+            """)
+            .run()
         try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 

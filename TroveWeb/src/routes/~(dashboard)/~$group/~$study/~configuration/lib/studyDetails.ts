@@ -9,6 +9,7 @@ import type {
   StudyReadinessContent,
 } from "@/lib/api/generated/types.gen";
 import { compareCodeUnits } from "@/lib/questionnaireLanguages";
+import { readinessFactKeys } from "@/lib/readinessFacts";
 
 /** The source language first, then every other language with details, sorted. */
 export const detailLanguages = (details: StudyDetailData): string[] => [
@@ -62,22 +63,11 @@ export const withoutLanguage = (
   };
 };
 
-const emptyReadinessFacts: Required<StudyReadinessContent> = {
-  aims: "",
-  population: "",
-  procedures: "",
-  burden: "",
-  retention: "",
-  withdrawal: "",
-  concernRoute: "",
-  coverage: "",
-  coEnrollment: "",
-};
+export { readinessFactKeys };
 
-/** The readiness facts in the order the General form shows them. */
-export const readinessFactKeys = Object.keys(
-  emptyReadinessFacts,
-) as ReadonlyArray<keyof StudyReadinessContent>;
+const emptyReadinessFacts = Object.fromEntries(
+  readinessFactKeys.map((key) => [key, ""]),
+) as Required<StudyReadinessContent>;
 
 /**
  * The stored facts of one language with every fact present. A fact without a stored value is an

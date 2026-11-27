@@ -174,6 +174,22 @@ struct PublicationRouteLossTests {
     }
 
     @Test
+    func aRemovedRegistrationRefusesPublicationWithTheRouteDiagnostic() async throws {
+        let registration = try ProviderFixture.registration()
+        try await Self.withApp(registration: registration) { app, token in
+            let draft = try await Self.validatedProviderDraft(registration, app: app, token: token)
+            try await ProviderSQL.sql(app.db).raw("DELETE FROM provider_registrations WHERE id = \(bind: registration.id)").run()
+            let refusal = try Self.refusal(
+                try await PublicationReadinessTests.publish(
+                    draft.studyID, revision: draft.revision, candidate: draft.candidate, app: app, token: token
+                )
+            )
+            #expect(refusal.diagnostics?.map(\.path) == ["collectionRequirements[0]"])
+            #expect(try await PublishedStudy.query(on: app.db).count() == 0)
+        }
+    }
+
+    @Test
     func anUnreadableStoredRegistrationIsATypedServerError() async throws {
         let registration = try ProviderFixture.registration()
         try await Self.withApp(registration: registration) { app, token in
