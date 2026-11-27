@@ -50,7 +50,7 @@ class DeploymentContractTests(unittest.TestCase):
             with self.subTest(path=path):
                 realm = json.loads(path.read_text())
                 group = next(item for item in realm["groups"] if item["name"] == "Schmiedmayer Lab")
-                for capability in ("audit-reader", "data-reader"):
+                for capability in ("audit-reader", "data-reader", "principal-investigator"):
                     readers = [item for item in group["subGroups"] if item["name"] == capability]
                     self.assertEqual(readers, [{"name": capability, "subGroups": []}])
                     for user in realm.get("users", []):

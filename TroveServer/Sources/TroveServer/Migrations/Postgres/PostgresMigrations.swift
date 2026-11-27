@@ -41,4 +41,6 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateTaskOccurrences())
     // Task sessions, accepted completions, failures and excusals.
     app.migrations.add(CreateTaskCompletions())
+    // Frozen study export jobs and their written files.
+    app.migrations.add(CreateStudyExports())
 }

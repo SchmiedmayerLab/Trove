@@ -15,6 +15,7 @@ data:
   KEYCLOAK_URL: https://console.troveplatform.org/auth
   KEYCLOAK_ISSUER: https://console.troveplatform.org/auth/realms/trove
   APP_ENVIRONMENT: production
+  TROVE_STUDY_CANONICAL_BASE: https://console.troveplatform.org/fhir
   LOG_LEVEL: warning
   TLS_CA_FILE: /run/secrets/database/ca.crt
   TLS_CERTIFICATE_FILE: /run/secrets/https/tls.crt

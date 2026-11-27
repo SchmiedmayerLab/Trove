@@ -113,6 +113,7 @@ let package = Package(
         .executableTarget(
             name: "TroveCLI",
             dependencies: [
+                .product(name: "Crypto", package: "swift-crypto"),
                 .target(name: "TroveAPIClient"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),

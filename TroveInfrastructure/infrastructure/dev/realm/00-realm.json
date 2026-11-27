@@ -21,7 +21,8 @@
         { "name": "admin", "subGroups": [] },
         { "name": "researcher", "subGroups": [] },
         { "name": "audit-reader", "subGroups": [] },
-        { "name": "data-reader", "subGroups": [] }
+        { "name": "data-reader", "subGroups": [] },
+        { "name": "principal-investigator", "subGroups": [] }
       ]
     },
     { "name": "ArgoCDAdmins", "subGroups": [] }

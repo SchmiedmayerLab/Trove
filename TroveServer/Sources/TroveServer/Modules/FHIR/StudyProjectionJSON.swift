@@ -126,7 +126,27 @@ indirect enum StudyProjectionJSON: Sendable {
 
     static func read(_ record: ExchangeRecord) throws -> Self {
         guard record.json.count <= FHIRValidationClient.maximumBytes else { throw FHIRValidationClient.invalid }
-        var reader = StudyProjectionJSONReader(bytes: Array(record.json))
+        return try readCompact(Array(record.json))
+    }
+
+    /// The retained FHIR result is validated before projection. Preserve the lexical form of every numeric answer.
+    static func readResult(_ bytes: Data) throws -> Self {
+        guard bytes.count <= FHIRValidationClient.maximumBytes, (try JSONSerialization.jsonObject(with: bytes)) is [String: Any] else {
+            throw FHIRValidationClient.invalid
+        }
+        var compact = [UInt8]()
+        var quoted = false
+        var escaped = false
+        for byte in bytes {
+            if !quoted && [9, 10, 13, 32].contains(byte) { continue }
+            compact.append(byte)
+            if escaped { escaped = false } else if quoted && byte == 92 { escaped = true } else if byte == 34 { quoted.toggle() }
+        }
+        return try readCompact(compact)
+    }
+
+    private static func readCompact(_ bytes: [UInt8]) throws -> Self {
+        var reader = StudyProjectionJSONReader(bytes: bytes)
         let result = try reader.read(depth: 0)
         guard reader.offset == reader.bytes.count else { throw FHIRValidationClient.invalid }
         return result

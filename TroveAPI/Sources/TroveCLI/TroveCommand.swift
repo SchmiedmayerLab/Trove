@@ -34,6 +34,6 @@ struct TroveCommand: AsyncParsableCommand {
         commandName: "trove",
         abstract: "Read study data and author study drafts through the Trove API.",
         discussion: "Writes use the revision you reviewed. A conflict requires a new read and review, never an automatic retry.",
-        subcommands: [StudyCommand.self, QuestionnaireCommand.self]
+        subcommands: [StudyCommand.self, QuestionnaireCommand.self, ExportCommand.self]
     )
 }

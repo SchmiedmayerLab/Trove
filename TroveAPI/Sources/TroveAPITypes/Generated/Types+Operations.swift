@@ -2337,6 +2337,961 @@ public enum Operations {
             }
         }
     }
+    /// Capture the membership of a frozen study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)`.
+    public enum CreateStudyExport {
+        public static let id: Swift.String = "createStudyExport"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                public init(studyId: Components.Parameters.StudyId) {
+                    self.studyId = studyId
+                }
+            }
+            public var path: Operations.CreateStudyExport.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateStudyExport.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateStudyExport.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CreateStudyExport.Input.Headers
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.FrozenExportRequest)
+            }
+            public var body: Operations.CreateStudyExport.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.CreateStudyExport.Input.Path,
+                headers: Operations.CreateStudyExport.Input.Headers = .init(),
+                body: Operations.CreateStudyExport.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.CreateStudyExport.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.CreateStudyExport.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CreateStudyExport.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.FrozenExport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.FrozenExport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CreateStudyExport.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CreateStudyExport.Output.Ok.Headers,
+                    body: Operations.CreateStudyExport.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized study export
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.CreateStudyExport.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.CreateStudyExport.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Read the manifest of a study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)`.
+    public enum GetStudyExport {
+        public static let id: Swift.String = "getStudyExport"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/path/exportId`.
+                public var exportId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - exportId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    exportId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.exportId = exportId
+                }
+            }
+            public var path: Operations.GetStudyExport.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyExport.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyExport.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyExport.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyExport.Input.Path,
+                headers: Operations.GetStudyExport.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetStudyExport.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.GetStudyExport.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyExport.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.FrozenExport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.FrozenExport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyExport.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyExport.Output.Ok.Headers,
+                    body: Operations.GetStudyExport.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized study export
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyExport.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyExport.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Write the NDJSON file of a captured study export once
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports/{exportId}/execution`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)`.
+    public enum ExecuteStudyExport {
+        public static let id: Swift.String = "executeStudyExport"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/path/exportId`.
+                public var exportId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - exportId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    exportId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.exportId = exportId
+                }
+            }
+            public var path: Operations.ExecuteStudyExport.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ExecuteStudyExport.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ExecuteStudyExport.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ExecuteStudyExport.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ExecuteStudyExport.Input.Path,
+                headers: Operations.ExecuteStudyExport.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.ExecuteStudyExport.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.ExecuteStudyExport.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ExecuteStudyExport.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/execution/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.FrozenExport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.FrozenExport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ExecuteStudyExport.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ExecuteStudyExport.Output.Ok.Headers,
+                    body: Operations.ExecuteStudyExport.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized study export
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ExecuteStudyExport.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ExecuteStudyExport.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Page the line index of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/records`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)`.
+    public enum GetStudyExportPage {
+        public static let id: Swift.String = "getStudyExportPage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/path/exportId`.
+                public var exportId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - exportId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    exportId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.exportId = exportId
+                }
+            }
+            public var path: Operations.GetStudyExportPage.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/query/offset`.
+                public var offset: Swift.Int?
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - offset:
+                ///   - limit:
+                public init(
+                    offset: Swift.Int? = nil,
+                    limit: Swift.Int? = nil
+                ) {
+                    self.offset = offset
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.GetStudyExportPage.Input.Query
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyExportPage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyExportPage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyExportPage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyExportPage.Input.Path,
+                query: Operations.GetStudyExportPage.Input.Query = .init(),
+                headers: Operations.GetStudyExportPage.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetStudyExportPage.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.GetStudyExportPage.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyExportPage.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/records/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.FrozenExportPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.FrozenExportPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyExportPage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyExportPage.Output.Ok.Headers,
+                    body: Operations.GetStudyExportPage.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized study export
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyExportPage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyExportPage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Download the NDJSON file of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/download`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)`.
+    public enum DownloadStudyExport {
+        public static let id: Swift.String = "downloadStudyExport"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/path/exportId`.
+                public var exportId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - exportId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    exportId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.exportId = exportId
+                }
+            }
+            public var path: Operations.DownloadStudyExport.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DownloadStudyExport.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DownloadStudyExport.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DownloadStudyExport.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DownloadStudyExport.Input.Path,
+                headers: Operations.DownloadStudyExport.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.DownloadStudyExport.Output.Ok.Headers.CacheControlPayload
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.DownloadStudyExport.Output.Ok.Headers.CacheControlPayload) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DownloadStudyExport.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/exports/{exportId}/download/GET/responses/200/content/application\/octet-stream`.
+                    case binary(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.binary`.
+                    ///
+                    /// - Throws: An error if `self` is not `.binary`.
+                    /// - SeeAlso: `.binary`.
+                    public var binary: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .binary(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DownloadStudyExport.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DownloadStudyExport.Output.Ok.Headers,
+                    body: Operations.DownloadStudyExport.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized study export
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DownloadStudyExport.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DownloadStudyExport.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case binary
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/octet-stream":
+                    self = .binary
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .binary:
+                    return "application/octet-stream"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .binary,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Read an authorized page of derived study data
     ///
     /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot. Device unit identifiers are withheld from a record unless every grant of this study for the record comes from a publication that receives them; the derivation Provenance then names the withholding policy.

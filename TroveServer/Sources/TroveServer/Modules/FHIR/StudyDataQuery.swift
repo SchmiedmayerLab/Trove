@@ -21,7 +21,7 @@ struct StudyDataQuery: Sendable {
         case history
     }
 
-    struct Output: Sendable, Equatable {
+    struct Output: Codable, Sendable, Equatable {
         let nodeID: UUID
         let eventID: UUID
         let sourceID: UUID

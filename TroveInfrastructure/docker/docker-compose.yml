@@ -145,6 +145,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET}
       S3_REGION: ${S3_REGION}
+      TROVE_STUDY_CANONICAL_BASE: ${TROVE_STUDY_CANONICAL_BASE}
     depends_on:
       server-grants:
         condition: service_completed_successfully

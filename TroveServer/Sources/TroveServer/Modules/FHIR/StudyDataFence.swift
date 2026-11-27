@@ -51,29 +51,33 @@ extension StudyDataQuery {
     /// Never refill a captured page after locking: replacement candidates could have owners
     /// outside the lock set. Changed eligibility requires a new page and transaction instead.
     /// Keep these locks through projection and committed disclosure intent before releasing data.
-    func fence(_ page: Page, studyID: UUID, versions: Versions = .current) async throws -> StudyDataFence {
+    func fence(_ page: Page, studyID: UUID, versions: Versions = .current, tasks: [TaskExportMember] = []) async throws -> StudyDataFence {
         guard database.inTransaction else { throw AuditError.transactionRequired }
         guard let sql = database as? any SQLDatabase else { throw AuditError.unsupportedDatabase }
         let ids = page.outputs.map(\.nodeID)
         guard ids.count <= Self.maximumPageOutputs, Set(ids).count == ids.count,
               page.nextBefore == nil || page.nextBefore == ids.last else { throw ServerError.unexpectedError }
-        guard !ids.isEmpty else {
+        guard !ids.isEmpty || !tasks.isEmpty else {
             return .init(page: page, grants: [], enrollments: [])
         }
 
         let repository = ConsentRepository(database: database)
         // Admission, attribution and source lifecycle all lock participant before enrollment.
-        for id in Set(page.outputs.map(\.participantID)).sorted(by: { $0.uuidString < $1.uuidString }) {
+        for id in Set(page.outputs.map(\.participantID) + tasks.map(\.participant)).sorted(by: { $0.uuidString < $1.uuidString }) {
             _ = try await repository.lockParticipant(id: id, on: database)
         }
         var enrollments: [StudyDataFence.EnrollmentSnapshot] = []
-        for id in Set(page.outputs.map(\.enrollmentID)).sorted(by: { $0.uuidString < $1.uuidString }) {
+        for id in Set(page.outputs.map(\.enrollmentID) + tasks.map(\.enrollment)).sorted(by: { $0.uuidString < $1.uuidString }) {
             let enrollment = try await repository.lockEnrollment(id: id, on: database)
             guard enrollment.$study.id == studyID, enrollment.withdrawnAt == nil,
+                  tasks.filter({ $0.enrollment == id }).allSatisfy({ $0.participant == enrollment.$participant.id }),
                   page.outputs.filter({ $0.enrollmentID == id }).allSatisfy({ $0.participantID == enrollment.$participant.id }) else {
-                throw Self.changedPage
+                throw tasks.contains(where: { $0.enrollment == id }) ? ServerError.forbidden : Self.changedPage
             }
             enrollments.append(.init(id: id, endsAt: enrollment.endsAt))
+        }
+        guard !ids.isEmpty else {
+            return .init(page: page, grants: [], enrollments: enrollments)
         }
         let eligible = Self.eligibleOutputs(studyID: studyID, versions: versions, on: sql)
         let rows = try await sql.raw("""

@@ -33,6 +33,10 @@
         {
           "name": "data-reader",
           "subGroups": []
+        },
+        {
+          "name": "principal-investigator",
+          "subGroups": []
         }
       ]
     }

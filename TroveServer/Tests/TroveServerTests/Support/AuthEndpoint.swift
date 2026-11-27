@@ -16,6 +16,8 @@ enum AuthEndpointRole: Sendable {
     /// Independent capability, not another rank in the researcher/admin hierarchy.
     case auditReader
     case dataReader
+    /// Study exports need both the data-reader and the principal-investigator capability.
+    case investigator
     case participant
     case authenticated
 }
@@ -47,7 +49,7 @@ struct AuthEndpoint: Sendable {
     var requiresGroupAccess: Bool {
         switch role {
         case .researcher(_, let required): required
-        case .auditReader, .dataReader: true
+        case .auditReader, .dataReader, .investigator: true
         case .participant, .authenticated: false
         }
     }
@@ -56,7 +58,7 @@ struct AuthEndpoint: Sendable {
         switch role {
         case .researcher(let role, _): role
         case .auditReader: .admin
-        case .participant, .dataReader, .authenticated: .researcher
+        case .participant, .dataReader, .investigator, .authenticated: .researcher
         }
     }
 
@@ -69,6 +71,13 @@ struct AuthEndpoint: Sendable {
 
     var requiresDataReader: Bool {
         if case .dataReader = role {
+            return true
+        }
+        return false
+    }
+
+    var requiresInvestigator: Bool {
+        if case .investigator = role {
             return true
         }
         return false

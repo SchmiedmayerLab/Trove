@@ -16,6 +16,7 @@ final class StudyService: Module, @unchecked Sendable {
     @Dependency(StudyRepository.self) var repository
     @Dependency(AuthorizationService.self) var authorizationService
     @Dependency(RecordingDownloadService.self) var recordingDownloads
+    @Dependency(ObjectStorageService.self) var exportStorage
     let exportLimits: StudyExportLimits
 
     init(exportLimits: StudyExportLimits = .standard) {

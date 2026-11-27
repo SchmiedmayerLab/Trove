@@ -33,6 +33,13 @@ struct ArtifactStore: Sendable {
         return count
     }
 
+    private static func verified(_ bytes: Data, _ reference: ArtifactReference) throws -> Data {
+        guard bytes.count == reference.byteCount, digest(bytes) == reference.digest else {
+            throw ServerError.internalServerError("Accepted artifact integrity check failed")
+        }
+        return bytes
+    }
+
     func stage(
         _ data: Data, purpose: ArtifactReference.Purpose, ownerID: UUID, scope: StudyArtifactScope, now: Date = Date()
     ) async throws -> ArtifactReference {
@@ -132,8 +139,21 @@ struct ArtifactStore: Sendable {
         guard retained != nil else { throw ServerError.conflict("Artifact is not available for acceptance") }
     }
 
-    /// Call only after domain authorization and the corresponding disclosure audit gate.
+    /// Release the bytes only after domain authorization and the corresponding disclosure audit gate.
     func download(id: UUID, ownerID: UUID, purpose: ArtifactReference.Purpose, expected: (key: String, digest: String)) async throws -> Data {
+        let reference = try await retainedReference(id: id, ownerID: ownerID, purpose: purpose, expected: expected)
+        return try Self.verified(try await storage.download(key: reference.key, maximumBytes: reference.byteCount), reference)
+    }
+
+    /// Checks bytes downloaded earlier against the current retained record, without another storage read.
+    func check(_ bytes: Data, id: UUID, ownerID: UUID, purpose: ArtifactReference.Purpose, expected: (key: String, digest: String)) async throws
+        -> Data {
+        try Self.verified(bytes, try await retainedReference(id: id, ownerID: ownerID, purpose: purpose, expected: expected))
+    }
+
+    private func retainedReference(
+        id: UUID, ownerID: UUID, purpose: ArtifactReference.Purpose, expected: (key: String, digest: String)
+    ) async throws -> ArtifactReference {
         guard purpose != .recording else { throw ServerError.badRequest("Recording artifacts require authorized file transfer") }
         guard let record = try await StoredArtifact.find(id, on: database), record.state == .retained,
               record.ownerID == ownerID, record.purpose == purpose, record.digest == expected.digest,
@@ -142,10 +162,6 @@ struct ArtifactStore: Sendable {
         }
         let reference = try record.reference()
         guard reference.key == expected.key else { throw ServerError.internalServerError("Accepted artifact locator does not match") }
-        let bytes = try await storage.download(key: reference.key, maximumBytes: reference.byteCount)
-        guard bytes.count == reference.byteCount, Self.digest(bytes) == reference.digest else {
-            throw ServerError.internalServerError("Accepted artifact integrity check failed")
-        }
-        return bytes
+        return reference
     }
 }

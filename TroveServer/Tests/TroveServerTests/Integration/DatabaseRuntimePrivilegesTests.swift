@@ -290,7 +290,8 @@ extension DatabaseRuntimePrivilegesTests {
         "public.clinical_events", "public.clinical_event_representations",
         "public.study_delegations", "public.study_publication_candidates", "public.questionnaire_language_approvals",
         "public.task_occurrences", "public.task_sessions", "public.task_completions", "public.task_failures", "public.task_excusals",
-        "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
+        "public.study_export_jobs", "public.study_export_files", "public.clinical_event_nodes", "public.clinical_point_facts",
+        "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
         "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
         "public.clinical_attribution_commands"

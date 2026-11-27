@@ -245,3 +245,12 @@ The full validator reuses one bounded engine after loading its pinned packages.
 Every event and replay still undergoes full validation; startup and admission costs
 must remain separate. Bulk-COPY throughput does not describe this path. Larger
 scheduled workloads belong to the same benchmark family once this boundary is established.
+
+## Frozen study export
+
+Run `python3 frozen_export.py --port PORT --study STUDY_UUID` with the local
+synthetic study investigator credential on standard input. The command uses
+the `trove` executable on PATH or the executable supplied with `--trove`.
+Each run creates one retained export. It reports record and byte counts and
+elapsed milliseconds for capture, execution, the first index page and a
+checksum-verified download, including CLI startup.

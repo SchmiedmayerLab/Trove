@@ -739,6 +739,417 @@ extension Components {
                 ])
             }
         }
+        /// - Remark: Generated from `#/components/schemas/FrozenExportRequest`.
+        public struct FrozenExportRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FrozenExportRequest/requestId`.
+            public var requestId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExportRequest/versions`.
+            public var versions: Components.Schemas.StudyDataVersions
+            /// Creates a new `FrozenExportRequest`.
+            ///
+            /// - Parameters:
+            ///   - requestId:
+            ///   - versions:
+            public init(
+                requestId: Swift.String,
+                versions: Components.Schemas.StudyDataVersions
+            ) {
+                self.requestId = requestId
+                self.versions = versions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case requestId
+                case versions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.requestId = try container.decode(
+                    Swift.String.self,
+                    forKey: .requestId
+                )
+                self.versions = try container.decode(
+                    Components.Schemas.StudyDataVersions.self,
+                    forKey: .versions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "requestId",
+                    "versions"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FrozenExport`.
+        public struct FrozenExport: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/studyId`.
+            public var studyId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/versions`.
+            public var versions: Components.Schemas.StudyDataVersions
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/capturedAt`.
+            public var capturedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case queued = "queued"
+                case ready = "ready"
+            }
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/status`.
+            public var status: Components.Schemas.FrozenExport.StatusPayload
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/outputCount`.
+            public var outputCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/projection`.
+            public var projection: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/sha256`.
+            public var sha256: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/byteCount`.
+            public var byteCount: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/recordCount`.
+            public var recordCount: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/codebook`.
+            public var codebook: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/FrozenExport/exclusions`.
+            public var exclusions: [Swift.String]
+            /// Creates a new `FrozenExport`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - studyId:
+            ///   - versions:
+            ///   - capturedAt:
+            ///   - status:
+            ///   - outputCount:
+            ///   - projection:
+            ///   - sha256:
+            ///   - byteCount:
+            ///   - recordCount:
+            ///   - codebook:
+            ///   - exclusions:
+            public init(
+                id: Swift.String,
+                studyId: Swift.String,
+                versions: Components.Schemas.StudyDataVersions,
+                capturedAt: Foundation.Date,
+                status: Components.Schemas.FrozenExport.StatusPayload,
+                outputCount: Swift.Int,
+                projection: Swift.String? = nil,
+                sha256: Swift.String? = nil,
+                byteCount: Swift.Int? = nil,
+                recordCount: Swift.Int? = nil,
+                codebook: [Swift.String],
+                exclusions: [Swift.String]
+            ) {
+                self.id = id
+                self.studyId = studyId
+                self.versions = versions
+                self.capturedAt = capturedAt
+                self.status = status
+                self.outputCount = outputCount
+                self.projection = projection
+                self.sha256 = sha256
+                self.byteCount = byteCount
+                self.recordCount = recordCount
+                self.codebook = codebook
+                self.exclusions = exclusions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case studyId
+                case versions
+                case capturedAt
+                case status
+                case outputCount
+                case projection
+                case sha256
+                case byteCount
+                case recordCount
+                case codebook
+                case exclusions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.versions = try container.decode(
+                    Components.Schemas.StudyDataVersions.self,
+                    forKey: .versions
+                )
+                self.capturedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .capturedAt
+                )
+                self.status = try container.decode(
+                    Components.Schemas.FrozenExport.StatusPayload.self,
+                    forKey: .status
+                )
+                self.outputCount = try container.decode(
+                    Swift.Int.self,
+                    forKey: .outputCount
+                )
+                self.projection = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .projection
+                )
+                self.sha256 = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.byteCount = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .byteCount
+                )
+                self.recordCount = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .recordCount
+                )
+                self.codebook = try container.decode(
+                    [Swift.String].self,
+                    forKey: .codebook
+                )
+                self.exclusions = try container.decode(
+                    [Swift.String].self,
+                    forKey: .exclusions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "studyId",
+                    "versions",
+                    "capturedAt",
+                    "status",
+                    "outputCount",
+                    "projection",
+                    "sha256",
+                    "byteCount",
+                    "recordCount",
+                    "codebook",
+                    "exclusions"
+                ])
+            }
+        }
+        /// One NDJSON line of a ready export. Record and task lines name their study-scoped subject.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FrozenExportMember`.
+        public struct FrozenExportMember: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/line`.
+            public var line: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case record = "record"
+                case definitions = "definitions"
+                case task = "task"
+            }
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/kind`.
+            public var kind: Components.Schemas.FrozenExportMember.KindPayload
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/bundleId`.
+            public var bundleId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/subjectSystem`.
+            public var subjectSystem: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/subjectId`.
+            public var subjectId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/taskStatus`.
+            @frozen public enum TaskStatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case ready = "ready"
+                case completed = "completed"
+                case failed = "failed"
+                case cancelled = "cancelled"
+            }
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/taskStatus`.
+            public var taskStatus: Components.Schemas.FrozenExportMember.TaskStatusPayload?
+            /// Present only on a cancelled task the study released the participant from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/taskStatusReason`.
+            @frozen public enum TaskStatusReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case excused = "excused"
+            }
+            /// Present only on a cancelled task the study released the participant from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/taskStatusReason`.
+            public var taskStatusReason: Components.Schemas.FrozenExportMember.TaskStatusReasonPayload?
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/versions`.
+            public var versions: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/outputs`.
+            public var outputs: [Components.Schemas.StudyDataOutput]
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/sha256`.
+            public var sha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/byteCount`.
+            public var byteCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/FrozenExportMember/publicationRevisions`.
+            public var publicationRevisions: [Swift.Int]
+            /// Creates a new `FrozenExportMember`.
+            ///
+            /// - Parameters:
+            ///   - line:
+            ///   - kind:
+            ///   - bundleId:
+            ///   - subjectSystem:
+            ///   - subjectId:
+            ///   - taskStatus:
+            ///   - taskStatusReason: Present only on a cancelled task the study released the participant from.
+            ///   - versions:
+            ///   - outputs:
+            ///   - sha256:
+            ///   - byteCount:
+            ///   - publicationRevisions:
+            public init(
+                line: Swift.Int,
+                kind: Components.Schemas.FrozenExportMember.KindPayload,
+                bundleId: Swift.String,
+                subjectSystem: Swift.String? = nil,
+                subjectId: Swift.String? = nil,
+                taskStatus: Components.Schemas.FrozenExportMember.TaskStatusPayload? = nil,
+                taskStatusReason: Components.Schemas.FrozenExportMember.TaskStatusReasonPayload? = nil,
+                versions: [Swift.String],
+                outputs: [Components.Schemas.StudyDataOutput],
+                sha256: Swift.String,
+                byteCount: Swift.Int,
+                publicationRevisions: [Swift.Int]
+            ) {
+                self.line = line
+                self.kind = kind
+                self.bundleId = bundleId
+                self.subjectSystem = subjectSystem
+                self.subjectId = subjectId
+                self.taskStatus = taskStatus
+                self.taskStatusReason = taskStatusReason
+                self.versions = versions
+                self.outputs = outputs
+                self.sha256 = sha256
+                self.byteCount = byteCount
+                self.publicationRevisions = publicationRevisions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case line
+                case kind
+                case bundleId
+                case subjectSystem
+                case subjectId
+                case taskStatus
+                case taskStatusReason
+                case versions
+                case outputs
+                case sha256
+                case byteCount
+                case publicationRevisions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.line = try container.decode(
+                    Swift.Int.self,
+                    forKey: .line
+                )
+                self.kind = try container.decode(
+                    Components.Schemas.FrozenExportMember.KindPayload.self,
+                    forKey: .kind
+                )
+                self.bundleId = try container.decode(
+                    Swift.String.self,
+                    forKey: .bundleId
+                )
+                self.subjectSystem = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .subjectSystem
+                )
+                self.subjectId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .subjectId
+                )
+                self.taskStatus = try container.decodeIfPresent(
+                    Components.Schemas.FrozenExportMember.TaskStatusPayload.self,
+                    forKey: .taskStatus
+                )
+                self.taskStatusReason = try container.decodeIfPresent(
+                    Components.Schemas.FrozenExportMember.TaskStatusReasonPayload.self,
+                    forKey: .taskStatusReason
+                )
+                self.versions = try container.decode(
+                    [Swift.String].self,
+                    forKey: .versions
+                )
+                self.outputs = try container.decode(
+                    [Components.Schemas.StudyDataOutput].self,
+                    forKey: .outputs
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.byteCount = try container.decode(
+                    Swift.Int.self,
+                    forKey: .byteCount
+                )
+                self.publicationRevisions = try container.decode(
+                    [Swift.Int].self,
+                    forKey: .publicationRevisions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "line",
+                    "kind",
+                    "bundleId",
+                    "subjectSystem",
+                    "subjectId",
+                    "taskStatus",
+                    "taskStatusReason",
+                    "versions",
+                    "outputs",
+                    "sha256",
+                    "byteCount",
+                    "publicationRevisions"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FrozenExportPage`.
+        public struct FrozenExportPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FrozenExportPage/exportId`.
+            public var exportId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/FrozenExportPage/members`.
+            public var members: [Components.Schemas.FrozenExportMember]
+            /// - Remark: Generated from `#/components/schemas/FrozenExportPage/nextOffset`.
+            public var nextOffset: Swift.Int?
+            /// Creates a new `FrozenExportPage`.
+            ///
+            /// - Parameters:
+            ///   - exportId:
+            ///   - members:
+            ///   - nextOffset:
+            public init(
+                exportId: Swift.String,
+                members: [Components.Schemas.FrozenExportMember],
+                nextOffset: Swift.Int? = nil
+            ) {
+                self.exportId = exportId
+                self.members = members
+                self.nextOffset = nextOffset
+            }
+            public enum CodingKeys: String, CodingKey {
+                case exportId
+                case members
+                case nextOffset
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.exportId = try container.decode(
+                    Swift.String.self,
+                    forKey: .exportId
+                )
+                self.members = try container.decode(
+                    [Components.Schemas.FrozenExportMember].self,
+                    forKey: .members
+                )
+                self.nextOffset = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .nextOffset
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "exportId",
+                    "members",
+                    "nextOffset"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/StudyDataPage`.
         public struct StudyDataPage: Codable, Hashable, Sendable {
             /// Page identity recorded in the committed disclosure-intent audit.
@@ -863,6 +1274,9 @@ extension Components {
             case artifact_discard_scheduled = "artifact.discard.scheduled"
             case study_data_granted = "study.data.granted"
             case study_audit_disclosure = "study.audit.disclosure"
+            case study_export_created = "study.export.created"
+            case study_export_executed = "study.export.executed"
+            case study_export_disclosure = "study.export.disclosure"
             case study_data_disclosure = "study.data.disclosure"
             case study_recording_disclosure = "study.recording.disclosure"
         }

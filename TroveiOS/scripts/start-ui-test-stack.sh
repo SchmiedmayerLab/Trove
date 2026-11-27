@@ -141,6 +141,7 @@ validator_identity="sha256:$(shasum --algorithm 256 TroveInfrastructure/validato
         KEYCLOAK_CLIENT_SECRET="$server_client_secret" \
         KEYCLOAK_RESEARCHER_ROLE=trove-researcher \
         KEYCLOAK_PARTICIPANT_ROLE=trove-participant \
+        TROVE_STUDY_CANONICAL_BASE=http://localhost:8080/fhir \
         "${server_command[@]}" serve \
             --env testing \
             --hostname 127.0.0.1 \

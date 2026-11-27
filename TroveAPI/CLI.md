@@ -217,3 +217,40 @@ Publication never implicitly validates or selects the latest draft. Retain the
 candidate ID and revision: the server uses that pair for an exact authorized
 publication retry if a response is lost. Other writes are not retried automatically;
 after an ambiguous transport failure, inspect server state before repeating them.
+
+## Frozen study exports
+
+Export operations require an interactive researcher with a study-group role and
+both the `data-reader` and `principal-investigator` capabilities in that group.
+Supply the normal connection options to each command.
+
+```sh
+trove export create --server "$server" --token-file "$token_file" --study "$study" --request-id "$request"
+trove export get --server "$server" --token-file "$token_file" "$export_id" --study "$study"
+trove export page --server "$server" --token-file "$token_file" "$export_id" --study "$study" --offset 0 --limit 20
+trove export download --server "$server" --token-file "$token_file" "$export_id" --study "$study" > study.ndjson
+```
+
+Creation captures current versions. Use `--history` to include eligible superseded
+versions. Reuse the same request ID after an interrupted creation. Add `--queue-only`
+to stop after capture and run `trove export execute --server "$server" --token-file "$token_file" "$export_id" --study "$study"`
+to prepare the file under a fresh authorization check.
+
+One snapshot contains up to 100 clinical records with 1,024 outputs and up to 1,000
+task occurrences, within the configured study projection byte budget. Oversized
+selections fail without returning a partial dataset. The manifest describes the
+projection, exclusions and file checksum. Each index entry names its line kind
+(`record`, `definitions` or `task`), the study-scoped subject, output versions,
+publication revisions and the SHA-256 of its NDJSON line without the trailing line
+feed. Every download rechecks current access to every member. A denied member
+blocks disclosure of the whole snapshot.
+
+Task occurrences follow the experimental Grove Study Exchange. A `definitions` line
+holds the protocol PlanDefinition, the questionnaire ActivityDefinitions and their
+exact Questionnaires of one published revision. Each `task` line holds one Task with
+the status it had at capture, `ready`, `completed`, `failed` or `cancelled`. A completed
+Task links its accepted QuestionnaireResponse version in the same line. A `failed` Task
+was attempted in its session but could not be completed. An occurrence the study excused
+is `cancelled` with the status reason `excused`. The index lists the
+result reference in `versions` and the status in `taskStatus` and `taskStatusReason`.
+A performance window without an end has no deadline.

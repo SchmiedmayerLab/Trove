@@ -1521,6 +1521,483 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// Capture the membership of a frozen study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)`.
+    public func createStudyExport(_ input: Operations.CreateStudyExport.Input) async throws -> Operations.CreateStudyExport.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.CreateStudyExport.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/exports",
+                    parameters: [
+                        input.path.studyId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.CreateStudyExport.Output.Ok.Headers = .init(cacheControl: try converter.getRequiredHeaderFieldAsURI(
+                        in: response.headerFields,
+                        name: "Cache-Control",
+                        as: Operations.CreateStudyExport.Output.Ok.Headers.CacheControlPayload.self
+                    ))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.CreateStudyExport.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.FrozenExport.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Read the manifest of a study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)`.
+    public func getStudyExport(_ input: Operations.GetStudyExport.Input) async throws -> Operations.GetStudyExport.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetStudyExport.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/exports/{}",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.exportId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetStudyExport.Output.Ok.Headers = .init(cacheControl: try converter.getRequiredHeaderFieldAsURI(
+                        in: response.headerFields,
+                        name: "Cache-Control",
+                        as: Operations.GetStudyExport.Output.Ok.Headers.CacheControlPayload.self
+                    ))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetStudyExport.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.FrozenExport.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Write the NDJSON file of a captured study export once
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports/{exportId}/execution`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)`.
+    public func executeStudyExport(_ input: Operations.ExecuteStudyExport.Input) async throws -> Operations.ExecuteStudyExport.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ExecuteStudyExport.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/exports/{}/execution",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.exportId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ExecuteStudyExport.Output.Ok.Headers = .init(cacheControl: try converter.getRequiredHeaderFieldAsURI(
+                        in: response.headerFields,
+                        name: "Cache-Control",
+                        as: Operations.ExecuteStudyExport.Output.Ok.Headers.CacheControlPayload.self
+                    ))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ExecuteStudyExport.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.FrozenExport.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Page the line index of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/records`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)`.
+    public func getStudyExportPage(_ input: Operations.GetStudyExportPage.Input) async throws -> Operations.GetStudyExportPage.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetStudyExportPage.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/exports/{}/records",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.exportId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "offset",
+                    value: input.query.offset
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetStudyExportPage.Output.Ok.Headers = .init(cacheControl: try converter.getRequiredHeaderFieldAsURI(
+                        in: response.headerFields,
+                        name: "Cache-Control",
+                        as: Operations.GetStudyExportPage.Output.Ok.Headers.CacheControlPayload.self
+                    ))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetStudyExportPage.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.FrozenExportPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Download the NDJSON file of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/download`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)`.
+    public func downloadStudyExport(_ input: Operations.DownloadStudyExport.Input) async throws -> Operations.DownloadStudyExport.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DownloadStudyExport.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/exports/{}/download",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.exportId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.DownloadStudyExport.Output.Ok.Headers = .init(cacheControl: try converter.getRequiredHeaderFieldAsURI(
+                        in: response.headerFields,
+                        name: "Cache-Control",
+                        as: Operations.DownloadStudyExport.Output.Ok.Headers.CacheControlPayload.self
+                    ))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DownloadStudyExport.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/octet-stream"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/octet-stream":
+                        body = try converter.getResponseBodyAsBinary(
+                            OpenAPIRuntime.HTTPBody.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .binary(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
     /// Read an authorized page of derived study data
     ///
     /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot. Device unit identifiers are withheld from a record unless every grant of this study for the record comes from a publication that receives them; the derivation Provenance then names the withholding policy.

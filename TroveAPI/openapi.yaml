@@ -302,6 +302,143 @@ paths:
         default:
           $ref: '#/components/responses/OperationFailure'
 
+  /studies/{studyId}/exports:
+    post:
+      operationId: createStudyExport
+      tags: [Studies]
+      summary: Capture the membership of a frozen study export
+      description: >
+        Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FrozenExportRequest'}
+      responses:
+        '200':
+          description: Authorized study export
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FrozenExport'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/exports/{exportId}:
+    get:
+      operationId: getStudyExport
+      tags: [Studies]
+      summary: Read the manifest of a study export
+      description: >
+        Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: exportId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Authorized study export
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FrozenExport'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/exports/{exportId}/execution:
+    post:
+      operationId: executeStudyExport
+      tags: [Studies]
+      summary: Write the NDJSON file of a captured study export once
+      description: >
+        Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: exportId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Authorized study export
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FrozenExport'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/exports/{exportId}/records:
+    get:
+      operationId: getStudyExportPage
+      tags: [Studies]
+      summary: Page the line index of a ready study export
+      description: >
+        Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: exportId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: offset
+          in: query
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        '200':
+          description: Authorized study export
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FrozenExportPage'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/exports/{exportId}/download:
+    get:
+      operationId: downloadStudyExport
+      tags: [Studies]
+      summary: Download the NDJSON file of a ready study export
+      description: >
+        Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: exportId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Authorized study export
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
   /studies/{studyId}/data:
     get:
       operationId: getStudyData
@@ -3459,6 +3596,60 @@ components:
           items:
             $ref: '#/components/schemas/StudyDataOutput'
 
+    FrozenExportRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, versions]
+      properties:
+        requestId: {type: string, format: uuid}
+        versions: {$ref: '#/components/schemas/StudyDataVersions'}
+    FrozenExport:
+      type: object
+      additionalProperties: false
+      required: [id, studyId, versions, capturedAt, status, outputCount, codebook, exclusions]
+      properties:
+        id: {type: string, format: uuid}
+        studyId: {type: string, format: uuid}
+        versions: {$ref: '#/components/schemas/StudyDataVersions'}
+        capturedAt: {type: string, format: date-time}
+        status: {type: string, enum: [queued, ready]}
+        outputCount: {type: integer}
+        projection: {type: string}
+        sha256: {type: string}
+        byteCount: {type: integer}
+        recordCount: {type: integer}
+        codebook: {type: array, items: {type: string}}
+        exclusions: {type: array, items: {type: string}}
+    FrozenExportMember:
+      type: object
+      additionalProperties: false
+      description: One NDJSON line of a ready export. Record and task lines name their study-scoped subject.
+      required: [line, kind, bundleId, versions, outputs, sha256, byteCount, publicationRevisions]
+      properties:
+        line: {type: integer}
+        kind: {type: string, enum: [record, definitions, task]}
+        bundleId: {type: string}
+        subjectSystem: {type: string}
+        subjectId: {type: string}
+        taskStatus: {type: string, enum: [ready, completed, failed, cancelled]}
+        taskStatusReason: {type: string, enum: [excused], description: Present only on a cancelled task the study released the participant from.}
+        versions: {type: array, items: {type: string}}
+        outputs:
+          type: array
+          items: {$ref: '#/components/schemas/StudyDataOutput'}
+        sha256: {type: string}
+        byteCount: {type: integer}
+        publicationRevisions: {type: array, items: {type: integer}}
+    FrozenExportPage:
+      type: object
+      additionalProperties: false
+      required: [exportId, members]
+      properties:
+        exportId: {type: string, format: uuid}
+        members:
+          type: array
+          items: {$ref: '#/components/schemas/FrozenExportMember'}
+        nextOffset: {type: integer}
     StudyDataPage:
       type: object
       additionalProperties: false
@@ -3521,6 +3712,9 @@ components:
         - artifact.discard.scheduled
         - study.data.granted
         - study.audit.disclosure
+        - study.export.created
+        - study.export.executed
+        - study.export.disclosure
         - study.data.disclosure
         - study.recording.disclosure
 

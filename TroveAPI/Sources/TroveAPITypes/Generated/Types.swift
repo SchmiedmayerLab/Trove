@@ -88,6 +88,46 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /studies/{studyId}/delegations/{delegationId}/revoke`.
     /// - Remark: Generated from `#/paths//studies/{studyId}/delegations/{delegationId}/revoke/post(revokeStudyDelegation)`.
     func revokeStudyDelegation(_ input: Operations.RevokeStudyDelegation.Input) async throws -> Operations.RevokeStudyDelegation.Output
+    /// Capture the membership of a frozen study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)`.
+    func createStudyExport(_ input: Operations.CreateStudyExport.Input) async throws -> Operations.CreateStudyExport.Output
+    /// Read the manifest of a study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)`.
+    func getStudyExport(_ input: Operations.GetStudyExport.Input) async throws -> Operations.GetStudyExport.Output
+    /// Write the NDJSON file of a captured study export once
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports/{exportId}/execution`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)`.
+    func executeStudyExport(_ input: Operations.ExecuteStudyExport.Input) async throws -> Operations.ExecuteStudyExport.Output
+    /// Page the line index of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/records`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)`.
+    func getStudyExportPage(_ input: Operations.GetStudyExportPage.Input) async throws -> Operations.GetStudyExportPage.Output
+    /// Download the NDJSON file of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/download`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)`.
+    func downloadStudyExport(_ input: Operations.DownloadStudyExport.Input) async throws -> Operations.DownloadStudyExport.Output
     /// Read an authorized page of derived study data
     ///
     /// Requires interactive researcher identity, researcher or admin membership, and explicit data-reader membership in the study's group. Admin and audit-reader membership alone do not authorize clinical data access. Selects each granted point output once, with current versions by default. History includes superseded versions with isCurrent false; neither mode includes withdrawn or retracted data. Enrollment end alone preserves history. Each record is a derived FHIR collection Bundle with exact clinical numeric tokens, study-specific subject/context and derivation Provenance. It is not the original custody Bundle. Original profile names describe source lineage, not conformance claims for derived resources. Records are Base64 encoded to prevent JSON clients from rounding FHIR numeric values. The server holds the current-authority fence through committed disclosure intent. A page contains up to 100 records and 1024 outputs, without splitting a record. The configured response budget defaults to 24 MiB and cannot exceed 96 MiB of encoded response data; a byte-capacity failure returns no partial page. Request fewer records to reduce page size. before is an opaque cursor scoped to this study and version view, not an authorization token. Changed eligibility can require restarting from the first page. Newly attributed historical data also requires a fresh first page. This is a live view, not a frozen dataset snapshot. Device unit identifiers are withheld from a record unless every grant of this study for the record comes from a publication that receives them; the derivation Provenance then names the withholding policy.
@@ -682,6 +722,90 @@ extension APIProtocol {
         headers: Operations.RevokeStudyDelegation.Input.Headers = .init()
     ) async throws -> Operations.RevokeStudyDelegation.Output {
         try await revokeStudyDelegation(Operations.RevokeStudyDelegation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Capture the membership of a frozen study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)`.
+    public func createStudyExport(
+        path: Operations.CreateStudyExport.Input.Path,
+        headers: Operations.CreateStudyExport.Input.Headers = .init(),
+        body: Operations.CreateStudyExport.Input.Body
+    ) async throws -> Operations.CreateStudyExport.Output {
+        try await createStudyExport(Operations.CreateStudyExport.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Read the manifest of a study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)`.
+    public func getStudyExport(
+        path: Operations.GetStudyExport.Input.Path,
+        headers: Operations.GetStudyExport.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyExport.Output {
+        try await getStudyExport(Operations.GetStudyExport.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Write the NDJSON file of a captured study export once
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports/{exportId}/execution`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)`.
+    public func executeStudyExport(
+        path: Operations.ExecuteStudyExport.Input.Path,
+        headers: Operations.ExecuteStudyExport.Input.Headers = .init()
+    ) async throws -> Operations.ExecuteStudyExport.Output {
+        try await executeStudyExport(Operations.ExecuteStudyExport.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Page the line index of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/records`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)`.
+    public func getStudyExportPage(
+        path: Operations.GetStudyExportPage.Input.Path,
+        query: Operations.GetStudyExportPage.Input.Query = .init(),
+        headers: Operations.GetStudyExportPage.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyExportPage.Output {
+        try await getStudyExportPage(Operations.GetStudyExportPage.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Download the NDJSON file of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/download`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)`.
+    public func downloadStudyExport(
+        path: Operations.DownloadStudyExport.Input.Path,
+        headers: Operations.DownloadStudyExport.Input.Headers = .init()
+    ) async throws -> Operations.DownloadStudyExport.Output {
+        try await downloadStudyExport(Operations.DownloadStudyExport.Input(
             path: path,
             headers: headers
         ))

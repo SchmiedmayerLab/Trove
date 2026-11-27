@@ -85,6 +85,9 @@ extension Components.Schemas.StudyAuditAction {
         case .artifactDiscardScheduled: self = .artifact_discard_scheduled
         case .studyDataGranted: self = .study_data_granted
         case .studyAuditDisclosure: self = .study_audit_disclosure
+        case .exportCreated: self = .study_export_created
+        case .exportExecuted: self = .study_export_executed
+        case .exportDisclosure: self = .study_export_disclosure
         case .studyDataDisclosure: self = .study_data_disclosure
         case .studyRecordingDisclosure: self = .study_recording_disclosure
         case .recordingTransferDeclared, .recordingTransferStored, .recordingTransferReceiptDisclosure,
