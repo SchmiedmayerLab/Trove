@@ -289,6 +289,7 @@ extension DatabaseRuntimePrivilegesTests {
         "public.source_identity_keys", "public.source_identity_key_envelopes",
         "public.clinical_events", "public.clinical_event_representations",
         "public.study_delegations", "public.study_publication_candidates", "public.questionnaire_language_approvals",
+        "public.task_occurrences",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
         "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
@@ -382,6 +383,7 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
         try await grantLanguageApprovals(role: role, on: sql)
+        try await grantTaskOccurrences(role: role, on: sql)
         try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 
