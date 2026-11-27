@@ -42,7 +42,9 @@ READINESS = {
     "content": {"en": {
         "aims": "Verify validator process restarts.", "population": "Synthetic participants.",
         "procedures": "Consent and heart rate collection.", "burden": "None.",
-        "retention": "Removed with the verification stack.", "withdrawal": "Participants withdraw in the app."}},
+        "retention": "Removed with the verification stack.", "withdrawal": "Participants withdraw in the app.",
+        "concernRoute": "Participants contact the synthetic coordinator.", "coverage": "The coordinator, on working days.",
+        "coEnrollment": "Synthetic participants may enroll in other studies."}},
     "contacts": [{"name": "Synthetic Coordinator", "role": "Coordinator", "email": "coordinator@example.org"}],
 }
 POSTGRES_IMAGE = "timescale/timescaledb:2.32.0-pg18@sha256:83952d54cfc74d9aebe4aba6ecf2af829c2bcf1f30058dded4c18ab3720a247a"

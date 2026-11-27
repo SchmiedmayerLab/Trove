@@ -69,6 +69,9 @@ const emptyReadinessFacts: Required<StudyReadinessContent> = {
   burden: "",
   retention: "",
   withdrawal: "",
+  concernRoute: "",
+  coverage: "",
+  coEnrollment: "",
 };
 
 /** The readiness facts in the order the General form shows them. */

@@ -80,6 +80,9 @@ describe("readiness form values", () => {
       burden: "",
       retention: "",
       withdrawal: "",
+      concernRoute: "",
+      coverage: "",
+      coEnrollment: "",
     });
     expect(generalFormValues(study, "ar")).toMatchObject({
       contacts: study.readinessFacts.contacts,

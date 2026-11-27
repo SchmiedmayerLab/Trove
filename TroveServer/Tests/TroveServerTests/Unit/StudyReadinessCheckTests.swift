@@ -25,7 +25,9 @@ struct StudyReadinessCheckTests {
         #expect(StudyReadinessCheck.diagnostics(details: try Self.details(), facts: StudyFixtures.completeReadinessFacts()).isEmpty)
     }
 
-    @Test(arguments: ["aims", "population", "procedures", "burden", "retention", "withdrawal"])
+    @Test(arguments: [
+        "aims", "population", "procedures", "burden", "retention", "withdrawal", "concernRoute", "coverage", "coEnrollment"
+    ])
     func eachMissingFactIsABlockerNamingItsField(fact: String) throws {
         var facts = StudyFixtures.completeReadinessFacts()
         var content = try #require(facts.content.additionalProperties["en"])
@@ -35,7 +37,10 @@ struct StudyReadinessCheckTests {
         case "procedures": content.procedures = " \n "
         case "burden": content.burden = nil
         case "retention": content.retention = nil
-        default: content.withdrawal = nil
+        case "withdrawal": content.withdrawal = nil
+        case "concernRoute": content.concernRoute = nil
+        case "coverage": content.coverage = "  "
+        default: content.coEnrollment = nil
         }
         facts.content.additionalProperties["en"] = content
         let diagnostics = StudyReadinessCheck.diagnostics(details: try Self.details(), facts: facts)
@@ -46,10 +51,20 @@ struct StudyReadinessCheckTests {
     }
 
     @Test
+    func aMissingConcernRouteAcceptsAnApprovedExternalRoute() throws {
+        var facts = StudyFixtures.completeReadinessFacts()
+        facts.content.additionalProperties["en"]?.concernRoute = nil
+        let finding = try #require(StudyReadinessCheck.diagnostics(details: try Self.details(), facts: facts).first)
+        #expect(finding.rule == "readiness-concernRoute-missing" && finding.path == "readinessFacts.content.en.concernRoute")
+        #expect(finding.nextAction?.contains("approved external route") == true)
+        #expect(finding.nextAction?.hasSuffix("in en.") == true)
+    }
+
+    @Test
     func factsInAnotherLanguageDoNotReplaceTheSourceLanguage() throws {
         let german = StudyFixtures.completeReadinessFacts(language: "de")
         let diagnostics = StudyReadinessCheck.diagnostics(details: try Self.details(["en", "de"]), facts: german)
-        #expect(diagnostics.filter { $0.severity == .error }.count == 6)
+        #expect(diagnostics.filter { $0.severity == .error }.count == 9)
         #expect(!diagnostics.contains { $0.rule == "readiness-translation-missing" })
     }
 

@@ -5850,6 +5850,19 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/withdrawal`.
             public var withdrawal: Swift.String?
+            /// How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route, such as an institutional contact, suffices.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/concernRoute`.
+            public var concernRoute: Swift.String?
+            /// Who is responsible for answering concerns and incidental findings, and when.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/coverage`.
+            public var coverage: Swift.String?
+            /// The reviewed rule for participants who are enrolled in other studies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/coEnrollment`.
+            public var coEnrollment: Swift.String?
             /// Creates a new `StudyReadinessContent`.
             ///
             /// - Parameters:
@@ -5859,13 +5872,19 @@ extension Components {
             ///   - burden: The time and effort participation takes.
             ///   - retention: How long the study keeps the data and what happens to it afterwards.
             ///   - withdrawal: How participants withdraw and what happens to their data.
+            ///   - concernRoute: How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route, such as an institutional contact, suffices.
+            ///   - coverage: Who is responsible for answering concerns and incidental findings, and when.
+            ///   - coEnrollment: The reviewed rule for participants who are enrolled in other studies.
             public init(
                 aims: Swift.String? = nil,
                 population: Swift.String? = nil,
                 procedures: Swift.String? = nil,
                 burden: Swift.String? = nil,
                 retention: Swift.String? = nil,
-                withdrawal: Swift.String? = nil
+                withdrawal: Swift.String? = nil,
+                concernRoute: Swift.String? = nil,
+                coverage: Swift.String? = nil,
+                coEnrollment: Swift.String? = nil
             ) {
                 self.aims = aims
                 self.population = population
@@ -5873,6 +5892,9 @@ extension Components {
                 self.burden = burden
                 self.retention = retention
                 self.withdrawal = withdrawal
+                self.concernRoute = concernRoute
+                self.coverage = coverage
+                self.coEnrollment = coEnrollment
             }
             public enum CodingKeys: String, CodingKey {
                 case aims
@@ -5881,6 +5903,9 @@ extension Components {
                 case burden
                 case retention
                 case withdrawal
+                case concernRoute
+                case coverage
+                case coEnrollment
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -5908,13 +5933,28 @@ extension Components {
                     Swift.String.self,
                     forKey: .withdrawal
                 )
+                self.concernRoute = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .concernRoute
+                )
+                self.coverage = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .coverage
+                )
+                self.coEnrollment = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .coEnrollment
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "aims",
                     "population",
                     "procedures",
                     "burden",
                     "retention",
-                    "withdrawal"
+                    "withdrawal",
+                    "concernRoute",
+                    "coverage",
+                    "coEnrollment"
                 ])
             }
         }
@@ -5980,7 +6020,7 @@ extension Components {
                 ])
             }
         }
-        /// Baseline facts that publication requires. Draft validation checks that each text fact is present in the source language of the study details and that at least one contact names a person, a role and an email address or phone number. A fact missing in another details language is an advisory. Publications record the facts they were validated with; the participant bundle does not contain them.
+        /// Baseline facts that publication requires, including the concern route, responsible coverage and co-enrollment policy that a study needs before it opens for enrollment. Draft validation checks that each text fact is present in the source language of the study details and that at least one contact names a person, a role and an email address or phone number. A fact missing in another details language is an advisory. Publications record the facts they were validated with; the participant bundle does not contain them.
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/StudyReadinessFacts`.

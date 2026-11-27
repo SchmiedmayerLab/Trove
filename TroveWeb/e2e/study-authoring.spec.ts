@@ -79,6 +79,9 @@ const completeReadiness = async (page: Page) => {
     "Participant burden": "Five minutes a day",
     "Data retention": "One year",
     Withdrawal: "Contact the coordinator",
+    "Concern and incidental-finding route": "Contact the coordinator",
+    "Responsible coverage": "The coordinator, on working days",
+    "Co-enrollment policy": "Other studies are allowed",
   }))
     await page.getByRole("textbox", { name, exact: true }).fill(value);
   await page.getByRole("button", { name: "Add contact" }).press("Enter");

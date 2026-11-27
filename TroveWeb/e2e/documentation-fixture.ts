@@ -144,6 +144,10 @@ export const seedDocumentationStudy = async () => {
           retention:
             "The demonstration retains synthetic records for one year.",
           withdrawal: "Contact the coordinator to withdraw.",
+          concernRoute:
+            "Contact the coordinator; incidental findings go to the principal investigator.",
+          coverage: "The coordinator answers within two working days.",
+          coEnrollment: "Participants in other studies may also enroll.",
         },
       },
       contacts: [

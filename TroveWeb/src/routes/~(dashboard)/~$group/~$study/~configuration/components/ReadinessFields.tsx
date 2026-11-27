@@ -13,7 +13,16 @@ const factLabels = {
   burden: "Participant burden",
   retention: "Data retention",
   withdrawal: "Withdrawal",
+  concernRoute: "Concern and incidental-finding route",
+  coverage: "Responsible coverage",
+  coEnrollment: "Co-enrollment policy",
 } as const;
+
+const factHints: Partial<Record<keyof typeof factLabels, string>> = {
+  concernRoute:
+    "How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route suffices.",
+  coEnrollment: "The reviewed rule for participants enrolled in other studies.",
+};
 
 export const ReadinessFields = ({
   form,
@@ -35,18 +44,28 @@ export const ReadinessFields = ({
           `These facts are required in the source language (${language}) before publication.`
         : `Missing translations in ${language} appear as advisories.`}
       </p>
-      {readinessFactKeys.map((fact) => (
-        <label key={fact} className="grid gap-1">
-          {factLabels[fact]}
-          <Textarea
-            id={`readinessFacts.content.${language}.${fact}`}
-            lang={language}
-            dir="auto"
-            maxLength={10000}
-            {...form.register(`facts.${fact}`)}
-          />
-        </label>
-      ))}
+      {readinessFactKeys.map((fact) => {
+        const id = `readinessFacts.content.${language}.${fact}`;
+        const hint = factHints[fact];
+        return (
+          <div key={fact} className="grid gap-1">
+            <label htmlFor={id}>{factLabels[fact]}</label>
+            {hint && (
+              <p id={`${id}.hint`} className="text-sm text-muted-foreground">
+                {hint}
+              </p>
+            )}
+            <Textarea
+              id={id}
+              lang={language}
+              dir="auto"
+              maxLength={10000}
+              aria-describedby={hint ? `${id}.hint` : undefined}
+              {...form.register(`facts.${fact}`)}
+            />
+          </div>
+        );
+      })}
       <h3>Responsible contacts</h3>
       <p>
         Each contact needs a name, a role and an email address or phone number.

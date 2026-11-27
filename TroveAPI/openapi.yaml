@@ -5083,6 +5083,21 @@ components:
           type: string
           maxLength: 10000
           description: How participants withdraw and what happens to their data.
+        concernRoute:
+          type: string
+          maxLength: 10000
+          description: >
+            How participants reach a person about concerns, and how incidental findings
+            reach a responsible person. A reference to an approved external route, such as
+            an institutional contact, suffices.
+        coverage:
+          type: string
+          maxLength: 10000
+          description: Who is responsible for answering concerns and incidental findings, and when.
+        coEnrollment:
+          type: string
+          maxLength: 10000
+          description: The reviewed rule for participants who are enrolled in other studies.
 
     StudyContact:
       type: object
@@ -5107,8 +5122,10 @@ components:
       type: object
       additionalProperties: false
       description: >
-        Baseline facts that publication requires. Draft validation checks that each text
-        fact is present in the source language of the study details and that at least
+        Baseline facts that publication requires, including the concern route, responsible
+        coverage and co-enrollment policy that a study needs before it opens for enrollment.
+        Draft validation checks that each text fact is present in the source language of
+        the study details and that at least
         one contact names a person, a role and an email address or phone number. A fact
         missing in another details language is an advisory. Publications record the
         facts they were validated with; the participant bundle does not contain them.

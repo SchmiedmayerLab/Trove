@@ -47,7 +47,10 @@ enum StudyFixtures {
                     procedures: "A daily questionnaire and heart rate collection.",
                     burden: "About two minutes each day.",
                     retention: "Data is kept for five years after the study ends.",
-                    withdrawal: "Participants withdraw in the app at any time."
+                    withdrawal: "Participants withdraw in the app at any time.",
+                    concernRoute: "Participants contact the study coordinator; incidental findings go to the principal investigator.",
+                    coverage: "The coordinator answers within two working days.",
+                    coEnrollment: "Participants in other studies may enroll after the coordinator confirms there is no conflict."
                 )
             ]),
             contacts: [.init(name: "Study Coordinator", role: "Coordinator", email: "study@example.org")]

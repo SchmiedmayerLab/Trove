@@ -25,7 +25,7 @@ enum StudyReadinessCheck {
                 "readiness-\(fact.key)-missing",
                 path: "readinessFacts.content.\(source).\(fact.key)",
                 message: "Missing in \(source), the source language of the study details: the study's \(fact.label).",
-                nextAction: "Describe the study's \(fact.label) in \(source)."
+                nextAction: fact.nextAction(in: "\(source)")
             ))
         }
         for language in details.content.keys.sorted() where language != source {
