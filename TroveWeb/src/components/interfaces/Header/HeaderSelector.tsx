@@ -20,7 +20,13 @@ import {
 } from "@tanstack/react-router";
 import { ChevronsUpDown } from "lucide-react";
 import { DynamicIcon, type IconName } from "lucide-react/dynamic";
-import type { ReactNode } from "react";
+import {
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { cn } from "@/utils/cn";
 
 export const HeaderSelectorMenuLabel = ({
@@ -84,14 +90,31 @@ export const HeaderSelectorMenuItem = <
 export const HeaderSelector = ({
   selectedItem,
   children,
+  triggerRef,
+  onMenuUnmount,
+  onOpenChange,
 }: {
   selectedItem: { title: ReactNode; icon?: IconName };
   children: ReactNode;
+  triggerRef?: Ref<HTMLButtonElement>;
+  /** Called when the menu content unmounts. */
+  onMenuUnmount?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) => {
+  const onMenuUnmountRef = useRef(onMenuUnmount);
+  useEffect(() => {
+    onMenuUnmountRef.current = onMenuUnmount;
+  });
+  const contentRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    return () => onMenuUnmountRef.current?.();
+  }, []);
+
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           data-element="header-selector"
           className={cn(
@@ -119,6 +142,7 @@ export const HeaderSelector = ({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
+        ref={contentRef}
         className="max-h-(--radix-dropdown-menu-content-available-height) min-w-60! overflow-y-auto rounded-lg"
         align="start"
         side="bottom"
