@@ -19,10 +19,11 @@ struct StudyArtifactScope: Sendable, Equatable {
 
 struct ArtifactReference: Sendable {
     enum Purpose: String, Codable, Sendable {
-        case consent, publication, recording
+        case consent, publication, recording, taskResponse
 
         var contentType: String {
             switch self {
+            case .taskResponse: "application/fhir+json"
             case .consent: "application/pdf"
             case .publication: "application/zip"
             case .recording: "application/octet-stream"
@@ -30,6 +31,7 @@ struct ArtifactReference: Sendable {
         }
         var maximumBytes: Int {
             switch self {
+            case .taskResponse: FHIRValidationClient.maximumBytes
             case .consent: 10 * 1024 * 1024
             case .publication: 50 * 1024 * 1024
             case .recording: Int(Int32.max)
@@ -37,6 +39,7 @@ struct ArtifactReference: Sendable {
         }
         var directory: String {
             switch self {
+            case .taskResponse: "task-responses"
             case .consent: "consents"
             case .publication: "publications"
             case .recording: "recordings"
@@ -101,7 +104,7 @@ final class StoredArtifact: Model, @unchecked Sendable {
     func reference() throws -> ArtifactReference {
         let scope: ArtifactScope
         switch (purpose, studyID, groupID, participantID, sourceBindingID) {
-        case let (.consent, study?, group, nil, nil), let (.publication, study?, group, nil, nil):
+        case let (.consent, study?, group, nil, nil), let (.publication, study?, group, nil, nil), let (.taskResponse, study?, group, nil, nil):
             scope = .study(.init(studyID: study, groupID: group))
         case let (.recording, nil, nil, participant?, source?) where ownerID == participant:
             scope = .participantSource(.init(participantID: participant, sourceBindingID: source))

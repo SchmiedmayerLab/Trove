@@ -28,6 +28,7 @@ FULL_VALIDATOR_TESTS = {
     ("TroveServerTests.ReceiverRevisionCorpusTests", "completeRevisionSequenceAndRestart(index:)"),
     ("TroveServerTests.MultilingualQuestionnaireValidationTests", "fullValidatorAcceptsBilingualQuestionnairesAndRejectsConflictingTranslations()"),
     ("TroveServerTests.QuestionnaireResponseValidationTests", "fullValidatorChecksResponsesAgainstTheirExactQuestionnaire()"),
+    ("TroveServerTests.QuestionnaireResponseValidationTests", "fullValidatorChecksTaskResponseStructure()"),
 }
 
 

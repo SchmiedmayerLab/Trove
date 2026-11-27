@@ -6,8 +6,10 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Fluent
 import Foundation
 import Testing
+import TroveAPIServer
 @testable import TroveServer
 import VaporTesting
 
@@ -43,7 +45,7 @@ struct QuestionnaireResponseValidationTests {
     /// The official validator refuses example.org canonicals in a response, so the pair uses a reserved `.test` domain.
     private static let canonical = "https://questionnaires.trove.test/fhir/Questionnaire/bilingual-de"
 
-    private static func questionnaire() throws -> Data {
+    static func questionnaire() throws -> Data {
         let fixture = try #require(try MultilingualQuestionnaireFixture.all().first { $0.translationLanguage == "de" })
         let text = String(decoding: try fixture.bytes(), as: UTF8.self)
         return Data(text.replacingOccurrences(of: "https://example.org/fhir/Questionnaire/bilingual-de", with: canonical).utf8)
@@ -64,7 +66,7 @@ struct QuestionnaireResponseValidationTests {
     }
 
     /// A completed German response to the German fixture, changed by `mismatch`.
-    private static func response(_ mismatch: Mismatch? = nil) throws -> Data {
+    static func response(_ mismatch: Mismatch? = nil) throws -> Data {
         var visited: [String: Any] = ["linkId": "visited", "answer": [["valueBoolean": true]]]
         var resource: [String: Any] = [
             "resourceType": "QuestionnaireResponse",
@@ -86,6 +88,48 @@ struct QuestionnaireResponseValidationTests {
             resource["item"] = [visited, drink]
         }
         return try JSONSerialization.data(withJSONObject: resource, options: [.sortedKeys])
+    }
+
+    /// Duplicate members are rejected by the validator's structure route; its worker tests cover them.
+    @Test
+    func completionRejectsMislabeledResponseBytes() throws {
+        let original = String(decoding: try Self.response(), as: UTF8.self)
+        let type = #""resourceType":"QuestionnaireResponse""#
+        let mutations = [
+            (type + ",", ""),
+            (type, #""resourceType":"Observation""#)
+        ]
+        let language = try #require(LanguageTag(rawValue: "de"))
+        for (pattern, replacement) in mutations {
+            let changed = original.replacingOccurrences(of: pattern, with: replacement)
+            try #require(changed != original)
+            let check = QuestionnaireResponseValidationService.validateCompletion(
+                questionnaire: try Self.questionnaire(), response: Data(changed.utf8), language: language
+            )
+            #expect(check.status == .invalid && check.diagnostics.contains { $0.rule == "fhir-structure" })
+        }
+    }
+
+    @Test
+    func completionRequiresTheFrozenLanguageAndFinalStatus() throws {
+        let questionnaire = try Self.questionnaire()
+        let response = try Self.response()
+        let german = try #require(LanguageTag(rawValue: "de"))
+        let english = try #require(LanguageTag(rawValue: "en-US"))
+        let valid = QuestionnaireResponseValidationService.validateCompletion(questionnaire: questionnaire, response: response, language: german)
+        #expect(valid.status == .valid)
+        #expect(valid.questionnaireSHA256 == FHIRValidationClient.digest(questionnaire))
+        #expect(valid.responseSHA256 == FHIRValidationClient.digest(response))
+        let wrongLanguage = QuestionnaireResponseValidationService.validateCompletion(
+            questionnaire: questionnaire, response: response, language: english
+        )
+        #expect(wrongLanguage.status == .invalid && wrongLanguage.diagnostics.contains { $0.rule == "completion-language" })
+        var json = try #require(JSONSerialization.jsonObject(with: response) as? [String: Any])
+        json["status"] = "in-progress"
+        let unfinished = QuestionnaireResponseValidationService.validateCompletion(
+            questionnaire: questionnaire, response: try JSONSerialization.data(withJSONObject: json), language: german
+        )
+        #expect(unfinished.status == .invalid && unfinished.diagnostics.contains { $0.rule == "completion-status" })
     }
 
     @Test
@@ -161,6 +205,83 @@ struct QuestionnaireResponseValidationTests {
             )
             #expect(uncheckable.status == .incomplete, "\(uncheckable.diagnostics)")
             #expect(uncheckable.diagnostics.contains { $0.rule == "Questionnaire_QR_Item_EnableWhen_Uncheckable" })
+        }
+    }
+}
+
+extension QuestionnaireResponseValidationTests {
+    private static func editDraft(_ original: String, study: Study, component: Component, app: Application, token: String?) async throws {
+        var resource = try #require(JSONSerialization.jsonObject(with: Data(original.utf8)) as? [String: Any])
+        resource["version"] = "2.0.0"
+        let edited = String(decoding: try JSONSerialization.data(withJSONObject: resource, options: [.sortedKeys]), as: UTF8.self)
+        let path = try "\(apiBasePath)/studies/\(study.requireId())/components/questionnaire/\(component.requireId())"
+        let update = try await app.sendRequest(.PUT, path, beforeRequest: { request in
+            request.bearerAuth(token)
+            request.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
+            try request.encodeJSONBody(Components.Schemas.QuestionnaireComponentInput(name: component.name, data: .init(questionnaire: edited)))
+        })
+        try #require(update.status == .ok)
+        #expect(try update.content.decode(Components.Schemas.QuestionnaireComponentResponse.self).data.questionnaire == edited)
+    }
+
+    @Test
+    func participantAnswersUsePublishedBytesAfterADraftEdit() async throws {
+        try await PublicationWorkflowFixtures.withApp(validator: QuestionnaireWorkerReply.validator()) { app, token in
+            let group = try await GroupFixtures.createGroup(on: app.db)
+            let study = try await StudyFixtures.createStudy(on: app.db, groupId: group.requireId())
+            let studyID = try study.requireId()
+            let bytes = try Self.questionnaire()
+            let original = String(decoding: bytes, as: UTF8.self)
+            let component = Component(
+                studyId: studyID, data: .questionnaire(.init(questionnaire: original)), name: "Bilingual questionnaire", id: UUID()
+            )
+            try await component.create(on: app.db)
+            let published = try await PublicationWorkflowFixtures.publish(studyID, app: app, token: token)
+            try #require(published.status == .created)
+            let publishedID = try published.content.decode(Components.Schemas.PublishedStudyResponse.self).id
+            let revision = try #require(try await PublishedStudy.find(UUID(uuidString: publishedID), on: app.db))
+            let componentID = try component.requireId()
+            try await Self.editDraft(original, study: study, component: component, app: app, token: token)
+
+            let service = app.grove[PublishedStudyService.self]
+            let instrument = PublishedStudyService.TaskInstrument(
+                studyID: studyID,
+                publicationID: try revision.requireId(),
+                revision: revision.revision,
+                artifactID: revision.artifactID,
+                componentID: componentID,
+                baseLanguage: "en-US",
+                sha256: FHIRValidationClient.digest(bytes)
+            )
+            let language = try #require(LanguageTag(rawValue: "de"))
+            let accepted = try await service.checkTaskResponse(instrument: instrument, sessionLanguage: language, response: Self.response())
+            #expect(accepted.status == .valid && accepted.questionnaireSHA256 == instrument.sha256)
+            let newer = try await service.checkTaskResponse(
+                instrument: instrument, sessionLanguage: language, response: Self.response(.questionnaireVersion)
+            )
+            #expect(newer.status == .invalid && newer.diagnostics.contains { $0.rule == Mismatch.questionnaireVersion.rule })
+        }
+    }
+}
+
+
+extension QuestionnaireResponseValidationTests {
+    /// Task admission checks the response's own structure with the reusable engine, without its Questionnaire.
+    @Test(.enabled(if: Environment.get("TROVE_TEST_VALIDATOR_ASSETS") != nil, "Requires the isolated pinned full validator"))
+    func fullValidatorChecksTaskResponseStructure() async throws {
+        try #require(Environment.get("FHIR_VALIDATOR_URL") != nil && Environment.get("FHIR_VALIDATOR_IDENTITY") != nil)
+        try await TestApp.withApp { app, _ in
+            let official = try FHIRValidationClient(application: app)
+            #expect(try await official.validateResponseStructure(Self.response()) == Environment.get("FHIR_VALIDATOR_IDENTITY"))
+            let duplicate = String(decoding: try Self.response(), as: UTF8.self)
+                .replacingOccurrences(of: #""language":"de""#, with: #""language":"de","language":"en-US""#)
+            let invalidStatus = String(decoding: try Self.response(), as: UTF8.self)
+                .replacingOccurrences(of: #""status":"completed""#, with: #""status":"finished""#)
+            for invalid in [duplicate, invalidStatus] {
+                await #expect { try await official.validateResponseStructure(Data(invalid.utf8)) } throws: {
+                    ($0 as? ServerError)?.status == .unprocessableContent
+                }
+            }
         }
     }
 }

@@ -29,6 +29,7 @@ struct ClinicalRequestBodyMiddleware: ServerMiddleware {
         switch operationID {
         case Operations.UploadParticipantRecordingTransfer.id:
             return try await next(request, recordingBody(request, body: body), metadata)
+        case Operations.StartTaskSession.id: limit = 4096
         case Operations.DeclareParticipantRecordingTransfer.id:
             limit = RecordingTransferDeclaration.maximumBytes
         case Operations.PostParticipantSourcesSourceIdEvents.id, Operations.SubmitParticipantEventBatch.id,

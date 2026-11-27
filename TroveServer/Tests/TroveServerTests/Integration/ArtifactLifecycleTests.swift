@@ -22,6 +22,7 @@ private actor ArtifactStorage: BufferedTestObjectStorageProvider {
     func interceptUpload(_ action: @escaping @Sendable () async throws -> Void) { beforeUpload = action }
     func failDeletes(_ value: Bool) { failDeletion = value }
     func contains(_ key: String) -> Bool { objects[key] != nil }
+    func keys(prefix: String) async throws -> [String] { objects.keys.filter { $0.hasPrefix(prefix) } }
 
     func uploadBuffered(data: Data, key: String, contentType: String) async throws {
         let action = beforeUpload
@@ -71,6 +72,25 @@ struct ArtifactLifecycleTests {
                 id: reference.id, ownerID: Self.owner, purpose: .consent, expected: (reference.key, reference.digest)
             )
             #expect(bytes == Self.bytes)
+        }
+    }
+
+    /// Cleanup deletes the entries derived from the deleted bytes, unless another kept artifact holds the same bytes.
+    @Test(arguments: [false, true])
+    func cleanupDeletesDerivedEntriesWithTheLastSourceArtifact(shared: Bool) async throws {
+        let provider = ArtifactStorage()
+        try await TestApp.withApp(storageProvider: provider) { app, _ in
+            let store = ArtifactStore(database: app.db, storage: app.grove[ObjectStorageService.self])
+            let reference = try await store.stage(Self.bytes, purpose: .consent, ownerID: Self.owner, scope: Self.scope)
+            if shared {
+                let kept = try await store.stage(Self.bytes, purpose: .consent, ownerID: UUID(), scope: Self.scope)
+                try await app.db.transaction { transaction in try await store.retain(kept, on: transaction) }
+            }
+            let cache = DerivedArtifactCache(storage: app.grove[ObjectStorageService.self])
+            try await cache.store(Data("derived".utf8), source: reference.digest, kind: .questionnaire)
+            #expect(try await !provider.keys(prefix: DerivedArtifactCache.prefix(source: reference.digest)).isEmpty)
+            #expect(try await store.cleanup(now: Date().addingTimeInterval(7200)).deleted == 1)
+            #expect(try await provider.keys(prefix: DerivedArtifactCache.prefix(source: reference.digest)).isEmpty == !shared)
         }
     }
 

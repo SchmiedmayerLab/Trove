@@ -45,13 +45,36 @@ enum QuestionnaireWorkerReply {
     }
 
     /// A validator whose authoring routes answer with `status`, and whose event route is never contacted.
+    /// The response structure route's reply: `nil` code for a valid response, otherwise `invalid_fhir` or another code.
+    static func structureBody(for bytes: Data, code: String? = nil, identity: String = identity) throws -> Data {
+        var payload: [String: Any] = [
+            "valid": code == nil,
+            "sha256": FHIRValidationClient.digest(bytes),
+            "contractRevision": FHIRValidationClient.contractRevision,
+            "validatorIdentity": identity,
+            "purpose": FHIRValidationClient.Purpose.questionnaireResponseStructure.rawValue
+        ]
+        if let code {
+            payload["code"] = code
+        }
+        return try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    }
+
     static func validator(
         status: ValidationStatus = .valid,
         diagnostics: [ValidationDiagnostic] = [],
-        identity: String = identity
+        identity: String = identity,
+        structure: ValidationStatus = .valid
     ) -> FHIRValidationClient {
         FHIRValidationClient(expectedIdentity: identity, sendForPurpose: { purpose, bytes in
             guard purpose != .event else { throw FHIRValidationClient.unavailable }
+            if purpose == .questionnaireResponseStructure {
+                switch structure {
+                case .valid: return (200, try structureBody(for: bytes, identity: identity))
+                case .invalid, .incomplete: return (422, try structureBody(for: bytes, code: "invalid_fhir", identity: identity))
+                case .unavailable: return (503, try structureBody(for: bytes, code: "validator_unavailable", identity: identity))
+                }
+            }
             return (
                 httpStatus(for: status),
                 try body(for: bytes, status: status, purpose: purpose, diagnostics: diagnostics, identity: identity)

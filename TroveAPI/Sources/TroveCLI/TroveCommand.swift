@@ -14,7 +14,7 @@ struct StudyCommand: AsyncParsableCommand {
         commandName: "study",
         subcommands: [
             CreateStudy.self, GetStudy.self, GetStudyTasks.self, GetStudyData.self, GetStudyRecording.self,
-            EditStudy.self, ValidateStudy.self, PublishStudy.self, ApproveLanguage.self, RevokeLanguageApproval.self
+            EditStudy.self, ScheduleCommand.self, ValidateStudy.self, PublishStudy.self, ApproveLanguage.self, RevokeLanguageApproval.self
         ]
     )
 }

@@ -31,6 +31,7 @@ extension ArtifactStore {
             try Task.checkCancellation()
             do {
                 try await storage.delete(key: reference.key)
+                try await deleteDerivedArtifacts(of: reference)
                 try await StoredArtifact.query(on: database)
                     .filter(\.$id == reference.id)
                     .filter(\.$state == .discarding)
@@ -46,6 +47,21 @@ extension ArtifactStore {
         return report
     }
 
+    /// Entries derived from the deleted bytes go with them, unless another kept artifact holds the same bytes.
+    private func deleteDerivedArtifacts(of reference: ArtifactReference) async throws {
+        guard let sql = database as? any SQLDatabase else { throw Failure.unsupportedDatabase }
+        let kept = try await sql.raw("""
+            SELECT id FROM stored_artifacts
+            WHERE digest = \(bind: reference.digest) AND id <> \(bind: reference.id) AND state <> 'discarding'
+            LIMIT 1
+            """)
+            .all()
+        guard kept.isEmpty else {
+            return
+        }
+        try await DerivedArtifactCache(storage: storage).deleteSource(reference.digest)
+    }
+
     private func claimCleanup(limit: Int, now: Date, auditContext: AuditEvent.Context) async throws -> [ArtifactReference] {
         try await database.transaction { transaction in
             let records = try await StoredArtifact.query(on: transaction)
@@ -57,6 +73,7 @@ extension ArtifactStore {
                     NOT EXISTS (SELECT 1 FROM enrollment_consents WHERE artifact_id = stored_artifacts.id)
                     AND NOT EXISTS (SELECT 1 FROM published_studies WHERE artifact_id = stored_artifacts.id)
                     AND NOT EXISTS (SELECT 1 FROM clinical_recording_attachments WHERE artifact_id = stored_artifacts.id)
+                    AND NOT EXISTS (SELECT 1 FROM task_completions WHERE response_artifact_id = stored_artifacts.id)
                     """)))
                 .sort(\.$cleanupAfter)
                 .sort(\.$id)
@@ -86,6 +103,7 @@ extension ArtifactStore {
               AND NOT EXISTS (SELECT 1 FROM enrollment_consents WHERE artifact_id = stored_artifacts.id)
               AND NOT EXISTS (SELECT 1 FROM published_studies WHERE artifact_id = stored_artifacts.id)
               AND NOT EXISTS (SELECT 1 FROM clinical_recording_attachments WHERE artifact_id = stored_artifacts.id)
+              AND NOT EXISTS (SELECT 1 FROM task_completions WHERE response_artifact_id = stored_artifacts.id)
             RETURNING id
             """)
             .first()

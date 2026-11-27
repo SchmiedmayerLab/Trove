@@ -16,30 +16,35 @@ import TroveAPIServer
 
 extension Components.Schemas.ComponentSchedule {
     init(_ model: ComponentSchedule) throws {
-        let notificationEnabled: Bool
-        switch model.scheduleData.notifications {
-        case .disabled:
-            notificationEnabled = false
-        case .enabled:
-            notificationEnabled = true
-        }
+        let notifications = model.scheduleData.notifications
+        let enabled = if case .disabled = notifications { false } else { true }
         self.init(
             id: try model.requireId().uuidString,
             scheduleDefinition: try .init(model.scheduleData.scheduleDefinition),
             completionPolicy: .init(model.scheduleData.completionPolicy),
-            notification: notificationEnabled
+            notification: enabled,
+            reminderTime: notifications.time.map { .init($0) }
         )
     }
 }
 
 extension StudyDefinition.ComponentSchedule {
     init(id: UUID, componentId: UUID, _ schema: Components.Schemas.ComponentScheduleInput) throws {
+        let notifications: NotificationsConfig
+        switch (schema.notification, schema.reminderTime) {
+        case (false, nil):
+            notifications = .disabled
+        case (false, .some):
+            throw ServerError.badRequest("A reminder time requires notifications")
+        case let (true, time):
+            notifications = .enabled(thread: .task, time: try time.map { try GroveScheduler.NotificationTime($0) })
+        }
         self.init(
             id: id,
             componentId: componentId,
             scheduleDefinition: try .init(schema.scheduleDefinition),
             completionPolicy: .init(schema.completionPolicy),
-            notifications: schema.notification ? .enabled(thread: .task, time: nil) : .disabled
+            notifications: notifications
         )
     }
 }
@@ -264,6 +269,28 @@ extension StudyDefinition.ComponentSchedule.Time {
             minute: schema.minute ?? 0,
             second: schema.second ?? 0
         )
+    }
+}
+
+// MARK: - ScheduleTime / NotificationTime
+
+extension Components.Schemas.ScheduleTime {
+    init(_ model: GroveScheduler.NotificationTime) {
+        self.init(
+            hour: model.hour,
+            minute: model.minute == 0 ? nil : model.minute,
+            second: model.second == 0 ? nil : model.second
+        )
+    }
+}
+
+extension GroveScheduler.NotificationTime {
+    init(_ schema: Components.Schemas.ScheduleTime) throws {
+        // `NotificationTime` traps on an out-of-range component, so the range is checked first.
+        guard TaskRecurrence.validTime(hour: schema.hour, minute: schema.minute ?? 0, second: schema.second ?? 0) else {
+            throw ServerError.badRequest("Invalid reminder time")
+        }
+        self.init(hour: schema.hour, minute: schema.minute ?? 0, second: schema.second ?? 0)
     }
 }
 

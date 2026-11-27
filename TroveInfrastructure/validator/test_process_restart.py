@@ -3,9 +3,11 @@
 # SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 # SPDX-License-Identifier: MIT
 
+import ast
 import copy
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -75,8 +77,9 @@ class ProcessRestartIdentityTests(unittest.TestCase):
 
     def test_relay_forwards_every_route_the_worker_serves(self):
         # The questionnaire routes are reached through the same relay as event validation.
-        routes = "','".join(("/health",) + worker.ROUTES)
-        self.assertIn(f"if self.path not in ('{routes}'):", RELAY)
+        relayed = re.search(r"if self\.path not in (\([^)]*\)):", RELAY)
+        self.assertIsNotNone(relayed)
+        self.assertEqual(ast.literal_eval(relayed.group(1)), ("/health",) + worker.ROUTES)
         source = (ROOT / "TroveInfrastructure/validator/worker.py").read_text()
         self.assertIn("if self.path not in ROUTES", source)
 

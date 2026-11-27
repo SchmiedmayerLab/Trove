@@ -25,6 +25,12 @@ struct ServerError: Error, Sendable {
         "A stored provider registration cannot be read; an operator must configure it again",
         title: "Provider Registration Unreadable"
     )
+    /// Another session of the task occurrence was confirmed first; the device keeps its own response as not accepted.
+    static let taskSessionSuperseded = Self(
+        status: .conflict,
+        title: "Task Session Superseded",
+        detail: "Another session of this task was accepted first; this session's outcome is not accepted"
+    )
     static let endpointNotImplemented = Self(status: .notImplemented, title: "Not Implemented", detail: "Endpoint not implemented")
 
     let status: HTTPResponse.Status

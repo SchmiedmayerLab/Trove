@@ -832,6 +832,12 @@ extension Components {
         /// - Remark: Generated from `#/components/schemas/StudyAuditAction`.
         @frozen public enum StudyAuditAction: String, Codable, Hashable, Sendable, CaseIterable {
             case consent_recorded = "consent.recorded"
+            case task_session_started = "task.session.started"
+            case task_completion_accepted = "task.completion.accepted"
+            case task_receipt_disclosure = "task.receipt.disclosure"
+            case task_session_disclosure = "task.session.disclosure"
+            case task_excused = "task.excused"
+            case task_failed = "task.failed"
             case consent_pdf_disclosure = "consent.pdf.disclosure"
             case consent_records_disclosure = "consent.records.disclosure"
             case tasks_assigned = "tasks.assigned"
@@ -4475,6 +4481,11 @@ extension Components {
             public var revision: Swift.Int
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/artifactId`.
             public var artifactId: Swift.String
+            /// SHA-256 of the exact bundle archive of the revision this occurrence pins, as the participant bundle download returns it.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/bundleSha256`.
+            public var bundleSha256: Swift.String
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/componentId`.
             public var componentId: Swift.String
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/scheduleId`.
@@ -4508,18 +4519,49 @@ extension Components {
             public var cutoffAt: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/timeZone`.
             public var timeZone: Swift.String
+            /// Whether the published schedule of this occurrence enables a reminder. Reminders use the schedule's task notification thread, as in the published study definition.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/notification`.
+            public var notification: Swift.Bool
+            /// Present only when notification is true and the published schedule sets a reminder time: the time of day, in timeZone, at which the reminder fires on the day of dueAt. Without it, the reminder fires at dueAt.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/reminderTime`.
+            public var reminderTime: Components.Schemas.ScheduleTime?
+            /// An assigned occurrence whose cutoffAt has passed is missed. A response authored or a failure recorded within the window may still arrive while the enrollment is open, and the occurrence then becomes completed or failed. An occurrence without cutoffAt has no deadline and is never missed. Completed occurrences carry the accepted receipt. A failed occurrence was attempted in its session but could not be completed. A cancelled occurrence remains in the stream with its statusReason.
+            ///
+            ///
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/state`.
             @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case assigned = "assigned"
+                case completed = "completed"
+                case failed = "failed"
+                case cancelled = "cancelled"
             }
+            /// An assigned occurrence whose cutoffAt has passed is missed. A response authored or a failure recorded within the window may still arrive while the enrollment is open, and the occurrence then becomes completed or failed. An occurrence without cutoffAt has no deadline and is never missed. Completed occurrences carry the accepted receipt. A failed occurrence was attempted in its session but could not be completed. A cancelled occurrence remains in the stream with its statusReason.
+            ///
+            ///
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/state`.
             public var state: Components.Schemas.ParticipantTaskOccurrence.StatePayload
+            /// Present only on a cancelled occurrence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/statusReason`.
+            @frozen public enum StatusReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case excused = "excused"
+            }
+            /// Present only on a cancelled occurrence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/statusReason`.
+            public var statusReason: Components.Schemas.ParticipantTaskOccurrence.StatusReasonPayload?
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/version`.
             public var version: Swift.Int64
             /// When the server recorded the assignment.
             ///
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/assignedAt`.
             public var assignedAt: Foundation.Date
+            /// ID of the accepted TaskCompletionReceipt on a completed occurrence, otherwise empty.
+            ///
             /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/resultReferences`.
             public var resultReferences: [Swift.String]
             /// Creates a new `ParticipantTaskOccurrence`.
@@ -4530,6 +4572,7 @@ extension Components {
             ///   - publicationId:
             ///   - revision:
             ///   - artifactId:
+            ///   - bundleSha256: SHA-256 of the exact bundle archive of the revision this occurrence pins, as the participant bundle download returns it.
             ///   - componentId:
             ///   - scheduleId:
             ///   - sha256:
@@ -4540,16 +4583,20 @@ extension Components {
             ///   - dueAt: The scheduled time of the occurrence.
             ///   - cutoffAt: End of the performance window, exclusive. Omitted when the occurrence has no deadline: it is never missed, and every time from opensAt on lies within its window.
             ///   - timeZone:
-            ///   - state:
+            ///   - notification: Whether the published schedule of this occurrence enables a reminder. Reminders use the schedule's task notification thread, as in the published study definition.
+            ///   - reminderTime: Present only when notification is true and the published schedule sets a reminder time: the time of day, in timeZone, at which the reminder fires on the day of dueAt. Without it, the reminder fires at dueAt.
+            ///   - state: An assigned occurrence whose cutoffAt has passed is missed. A response authored or a failure recorded within the window may still arrive while the enrollment is open, and the occurrence then becomes completed or failed. An occurrence without cutoffAt has no deadline and is never missed. Completed occurrences carry the accepted receipt. A failed occurrence was attempted in its session but could not be completed. A cancelled occurrence remains in the stream with its statusReason.
+            ///   - statusReason: Present only on a cancelled occurrence.
             ///   - version:
             ///   - assignedAt: When the server recorded the assignment.
-            ///   - resultReferences:
+            ///   - resultReferences: ID of the accepted TaskCompletionReceipt on a completed occurrence, otherwise empty.
             public init(
                 id: Swift.String,
                 enrollmentId: Swift.String,
                 publicationId: Swift.String,
                 revision: Swift.Int,
                 artifactId: Swift.String,
+                bundleSha256: Swift.String,
                 componentId: Swift.String,
                 scheduleId: Swift.String,
                 sha256: Swift.String,
@@ -4560,7 +4607,10 @@ extension Components {
                 dueAt: Foundation.Date,
                 cutoffAt: Foundation.Date? = nil,
                 timeZone: Swift.String,
+                notification: Swift.Bool,
+                reminderTime: Components.Schemas.ScheduleTime? = nil,
                 state: Components.Schemas.ParticipantTaskOccurrence.StatePayload,
+                statusReason: Components.Schemas.ParticipantTaskOccurrence.StatusReasonPayload? = nil,
                 version: Swift.Int64,
                 assignedAt: Foundation.Date,
                 resultReferences: [Swift.String]
@@ -4570,6 +4620,7 @@ extension Components {
                 self.publicationId = publicationId
                 self.revision = revision
                 self.artifactId = artifactId
+                self.bundleSha256 = bundleSha256
                 self.componentId = componentId
                 self.scheduleId = scheduleId
                 self.sha256 = sha256
@@ -4580,7 +4631,10 @@ extension Components {
                 self.dueAt = dueAt
                 self.cutoffAt = cutoffAt
                 self.timeZone = timeZone
+                self.notification = notification
+                self.reminderTime = reminderTime
                 self.state = state
+                self.statusReason = statusReason
                 self.version = version
                 self.assignedAt = assignedAt
                 self.resultReferences = resultReferences
@@ -4591,6 +4645,7 @@ extension Components {
                 case publicationId
                 case revision
                 case artifactId
+                case bundleSha256
                 case componentId
                 case scheduleId
                 case sha256
@@ -4601,7 +4656,10 @@ extension Components {
                 case dueAt
                 case cutoffAt
                 case timeZone
+                case notification
+                case reminderTime
                 case state
+                case statusReason
                 case version
                 case assignedAt
                 case resultReferences
@@ -4627,6 +4685,10 @@ extension Components {
                 self.artifactId = try container.decode(
                     Swift.String.self,
                     forKey: .artifactId
+                )
+                self.bundleSha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .bundleSha256
                 )
                 self.componentId = try container.decode(
                     Swift.String.self,
@@ -4668,9 +4730,21 @@ extension Components {
                     Swift.String.self,
                     forKey: .timeZone
                 )
+                self.notification = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .notification
+                )
+                self.reminderTime = try container.decodeIfPresent(
+                    Components.Schemas.ScheduleTime.self,
+                    forKey: .reminderTime
+                )
                 self.state = try container.decode(
                     Components.Schemas.ParticipantTaskOccurrence.StatePayload.self,
                     forKey: .state
+                )
+                self.statusReason = try container.decodeIfPresent(
+                    Components.Schemas.ParticipantTaskOccurrence.StatusReasonPayload.self,
+                    forKey: .statusReason
                 )
                 self.version = try container.decode(
                     Swift.Int64.self,
@@ -4690,6 +4764,7 @@ extension Components {
                     "publicationId",
                     "revision",
                     "artifactId",
+                    "bundleSha256",
                     "componentId",
                     "scheduleId",
                     "sha256",
@@ -4700,10 +4775,415 @@ extension Components {
                     "dueAt",
                     "cutoffAt",
                     "timeZone",
+                    "notification",
+                    "reminderTime",
                     "state",
+                    "statusReason",
                     "version",
                     "assignedAt",
                     "resultReferences"
+                ])
+            }
+        }
+        /// Performance period of the occurrence. Without an end, the occurrence has no deadline.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TaskPerformanceWindow`.
+        public struct TaskPerformanceWindow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TaskPerformanceWindow/start`.
+            public var start: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/TaskPerformanceWindow/end`.
+            public var end: Foundation.Date?
+            /// Creates a new `TaskPerformanceWindow`.
+            ///
+            /// - Parameters:
+            ///   - start:
+            ///   - end:
+            public init(
+                start: Foundation.Date,
+                end: Foundation.Date? = nil
+            ) {
+                self.start = start
+                self.end = end
+            }
+            public enum CodingKeys: String, CodingKey {
+                case start
+                case end
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.start = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .end
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "start",
+                    "end"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/TaskSession`.
+        public struct TaskSession: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TaskSession/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskSession/taskId`.
+            public var taskId: Swift.String
+            /// Accepted consent frozen when the session was confirmed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskSession/consentId`.
+            public var consentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskSession/language`.
+            public var language: Components.Schemas.LanguageTag
+            /// When the device started the session.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskSession/startedAt`.
+            public var startedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/TaskSession/performanceWindow`.
+            public var performanceWindow: Components.Schemas.TaskPerformanceWindow
+            /// - Remark: Generated from `#/components/schemas/TaskSession/subjectIdentifier`.
+            public var subjectIdentifier: Components.Schemas.TaskSubjectIdentifier
+            /// Creates a new `TaskSession`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - taskId:
+            ///   - consentId: Accepted consent frozen when the session was confirmed.
+            ///   - language:
+            ///   - startedAt: When the device started the session.
+            ///   - performanceWindow:
+            ///   - subjectIdentifier:
+            public init(
+                id: Swift.String,
+                taskId: Swift.String,
+                consentId: Swift.String,
+                language: Components.Schemas.LanguageTag,
+                startedAt: Foundation.Date,
+                performanceWindow: Components.Schemas.TaskPerformanceWindow,
+                subjectIdentifier: Components.Schemas.TaskSubjectIdentifier
+            ) {
+                self.id = id
+                self.taskId = taskId
+                self.consentId = consentId
+                self.language = language
+                self.startedAt = startedAt
+                self.performanceWindow = performanceWindow
+                self.subjectIdentifier = subjectIdentifier
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case taskId
+                case consentId
+                case language
+                case startedAt
+                case performanceWindow
+                case subjectIdentifier
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.taskId = try container.decode(
+                    Swift.String.self,
+                    forKey: .taskId
+                )
+                self.consentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .consentId
+                )
+                self.language = try container.decode(
+                    Components.Schemas.LanguageTag.self,
+                    forKey: .language
+                )
+                self.startedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .startedAt
+                )
+                self.performanceWindow = try container.decode(
+                    Components.Schemas.TaskPerformanceWindow.self,
+                    forKey: .performanceWindow
+                )
+                self.subjectIdentifier = try container.decode(
+                    Components.Schemas.TaskSubjectIdentifier.self,
+                    forKey: .subjectIdentifier
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "taskId",
+                    "consentId",
+                    "language",
+                    "startedAt",
+                    "performanceWindow",
+                    "subjectIdentifier"
+                ])
+            }
+        }
+        /// Study-scoped enrollment identifier for the Patient reference on the assignment and its result.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TaskSubjectIdentifier`.
+        public struct TaskSubjectIdentifier: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TaskSubjectIdentifier/system`.
+            public var system: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskSubjectIdentifier/value`.
+            public var value: Swift.String
+            /// Creates a new `TaskSubjectIdentifier`.
+            ///
+            /// - Parameters:
+            ///   - system:
+            ///   - value:
+            public init(
+                system: Swift.String,
+                value: Swift.String
+            ) {
+                self.system = system
+                self.value = value
+            }
+            public enum CodingKeys: String, CodingKey {
+                case system
+                case value
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.system = try container.decode(
+                    Swift.String.self,
+                    forKey: .system
+                )
+                self.value = try container.decode(
+                    Swift.String.self,
+                    forKey: .value
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "system",
+                    "value"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt`.
+        public struct TaskCompletionReceipt: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/taskId`.
+            public var taskId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/sessionId`.
+            public var sessionId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/consentId`.
+            public var consentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/revision`.
+            public var revision: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/questionnaireSHA256`.
+            public var questionnaireSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/responseSHA256`.
+            public var responseSHA256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/language`.
+            public var language: Components.Schemas.LanguageTag
+            /// The response's authored time as submitted, the reported completion time. acceptedAt is the receipt time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/authored`.
+            public var authored: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/acceptedAt`.
+            public var acceptedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/performanceWindow`.
+            public var performanceWindow: Components.Schemas.TaskPerformanceWindow
+            /// - Remark: Generated from `#/components/schemas/TaskCompletionReceipt/subjectIdentifier`.
+            public var subjectIdentifier: Components.Schemas.TaskSubjectIdentifier
+            /// Creates a new `TaskCompletionReceipt`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - taskId:
+            ///   - sessionId:
+            ///   - consentId:
+            ///   - revision:
+            ///   - questionnaireSHA256:
+            ///   - responseSHA256:
+            ///   - language:
+            ///   - authored: The response's authored time as submitted, the reported completion time. acceptedAt is the receipt time.
+            ///   - acceptedAt:
+            ///   - performanceWindow:
+            ///   - subjectIdentifier:
+            public init(
+                id: Swift.String,
+                taskId: Swift.String,
+                sessionId: Swift.String,
+                consentId: Swift.String,
+                revision: Swift.Int,
+                questionnaireSHA256: Swift.String,
+                responseSHA256: Swift.String,
+                language: Components.Schemas.LanguageTag,
+                authored: Swift.String,
+                acceptedAt: Foundation.Date,
+                performanceWindow: Components.Schemas.TaskPerformanceWindow,
+                subjectIdentifier: Components.Schemas.TaskSubjectIdentifier
+            ) {
+                self.id = id
+                self.taskId = taskId
+                self.sessionId = sessionId
+                self.consentId = consentId
+                self.revision = revision
+                self.questionnaireSHA256 = questionnaireSHA256
+                self.responseSHA256 = responseSHA256
+                self.language = language
+                self.authored = authored
+                self.acceptedAt = acceptedAt
+                self.performanceWindow = performanceWindow
+                self.subjectIdentifier = subjectIdentifier
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case taskId
+                case sessionId
+                case consentId
+                case revision
+                case questionnaireSHA256
+                case responseSHA256
+                case language
+                case authored
+                case acceptedAt
+                case performanceWindow
+                case subjectIdentifier
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.taskId = try container.decode(
+                    Swift.String.self,
+                    forKey: .taskId
+                )
+                self.sessionId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sessionId
+                )
+                self.consentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .consentId
+                )
+                self.revision = try container.decode(
+                    Swift.Int.self,
+                    forKey: .revision
+                )
+                self.questionnaireSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .questionnaireSHA256
+                )
+                self.responseSHA256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .responseSHA256
+                )
+                self.language = try container.decode(
+                    Components.Schemas.LanguageTag.self,
+                    forKey: .language
+                )
+                self.authored = try container.decode(
+                    Swift.String.self,
+                    forKey: .authored
+                )
+                self.acceptedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .acceptedAt
+                )
+                self.performanceWindow = try container.decode(
+                    Components.Schemas.TaskPerformanceWindow.self,
+                    forKey: .performanceWindow
+                )
+                self.subjectIdentifier = try container.decode(
+                    Components.Schemas.TaskSubjectIdentifier.self,
+                    forKey: .subjectIdentifier
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "taskId",
+                    "sessionId",
+                    "consentId",
+                    "revision",
+                    "questionnaireSHA256",
+                    "responseSHA256",
+                    "language",
+                    "authored",
+                    "acceptedAt",
+                    "performanceWindow",
+                    "subjectIdentifier"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt`.
+        public struct TaskFailureReceipt: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt/taskId`.
+            public var taskId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt/sessionId`.
+            public var sessionId: Swift.String
+            /// The occurrence's change version that records the failure.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt/version`.
+            public var version: Swift.Int64
+            /// The device time of the failed attempt
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskFailureReceipt/failedAt`.
+            public var failedAt: Foundation.Date
+            /// Creates a new `TaskFailureReceipt`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - taskId:
+            ///   - sessionId:
+            ///   - version: The occurrence's change version that records the failure.
+            ///   - failedAt: The device time of the failed attempt
+            public init(
+                id: Swift.String,
+                taskId: Swift.String,
+                sessionId: Swift.String,
+                version: Swift.Int64,
+                failedAt: Foundation.Date
+            ) {
+                self.id = id
+                self.taskId = taskId
+                self.sessionId = sessionId
+                self.version = version
+                self.failedAt = failedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case taskId
+                case sessionId
+                case version
+                case failedAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.taskId = try container.decode(
+                    Swift.String.self,
+                    forKey: .taskId
+                )
+                self.sessionId = try container.decode(
+                    Swift.String.self,
+                    forKey: .sessionId
+                )
+                self.version = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .version
+                )
+                self.failedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .failedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "taskId",
+                    "sessionId",
+                    "version",
+                    "failedAt"
                 ])
             }
         }
@@ -7314,25 +7794,34 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ComponentScheduleInput/notification`.
             public var notification: Swift.Bool
+            /// Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at the occurrence's due time.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ComponentScheduleInput/reminderTime`.
+            public var reminderTime: Components.Schemas.ScheduleTime?
             /// Creates a new `ComponentScheduleInput`.
             ///
             /// - Parameters:
             ///   - scheduleDefinition:
             ///   - completionPolicy:
             ///   - notification: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+            ///   - reminderTime: Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at the occurrence's due time.
             public init(
                 scheduleDefinition: Components.Schemas.ScheduleDefinition,
                 completionPolicy: Components.Schemas.AllowedCompletionPolicy,
-                notification: Swift.Bool
+                notification: Swift.Bool,
+                reminderTime: Components.Schemas.ScheduleTime? = nil
             ) {
                 self.scheduleDefinition = scheduleDefinition
                 self.completionPolicy = completionPolicy
                 self.notification = notification
+                self.reminderTime = reminderTime
             }
             public enum CodingKeys: String, CodingKey {
                 case scheduleDefinition
                 case completionPolicy
                 case notification
+                case reminderTime
             }
         }
         /// A schedule defining when a component should be presented to the participant
@@ -7351,6 +7840,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ComponentSchedule/notification`.
             public var notification: Swift.Bool
+            /// Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at the occurrence's due time.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ComponentSchedule/reminderTime`.
+            public var reminderTime: Components.Schemas.ScheduleTime?
             /// Creates a new `ComponentSchedule`.
             ///
             /// - Parameters:
@@ -7358,22 +7852,26 @@ extension Components {
             ///   - scheduleDefinition:
             ///   - completionPolicy:
             ///   - notification: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+            ///   - reminderTime: Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at the occurrence's due time.
             public init(
                 id: Swift.String,
                 scheduleDefinition: Components.Schemas.ScheduleDefinition,
                 completionPolicy: Components.Schemas.AllowedCompletionPolicy,
-                notification: Swift.Bool
+                notification: Swift.Bool,
+                reminderTime: Components.Schemas.ScheduleTime? = nil
             ) {
                 self.id = id
                 self.scheduleDefinition = scheduleDefinition
                 self.completionPolicy = completionPolicy
                 self.notification = notification
+                self.reminderTime = reminderTime
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case scheduleDefinition
                 case completionPolicy
                 case notification
+                case reminderTime
             }
         }
         /// Defines when and how often a schedule fires
@@ -9013,6 +9511,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PublishedStudyListItem/revision`.
             public var revision: Swift.Int
+            /// SHA-256 of the exact bundle archive of this revision, as the participant bundle download returns it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyListItem/bundleSha256`.
+            public var bundleSha256: Swift.String
             /// - Remark: Generated from `#/components/schemas/PublishedStudyListItem/metadata`.
             public var metadata: Components.Schemas.StudyMetadataCodable
             /// - Remark: Generated from `#/components/schemas/PublishedStudyListItem/enrollmentConditions`.
@@ -9022,22 +9524,26 @@ extension Components {
             /// - Parameters:
             ///   - studyId: The study ID
             ///   - revision: The latest published revision number
+            ///   - bundleSha256: SHA-256 of the exact bundle archive of this revision, as the participant bundle download returns it.
             ///   - metadata:
             ///   - enrollmentConditions:
             public init(
                 studyId: Swift.String,
                 revision: Swift.Int,
+                bundleSha256: Swift.String,
                 metadata: Components.Schemas.StudyMetadataCodable,
                 enrollmentConditions: Components.Schemas.EnrollmentConditions
             ) {
                 self.studyId = studyId
                 self.revision = revision
+                self.bundleSha256 = bundleSha256
                 self.metadata = metadata
                 self.enrollmentConditions = enrollmentConditions
             }
             public enum CodingKeys: String, CodingKey {
                 case studyId
                 case revision
+                case bundleSha256
                 case metadata
                 case enrollmentConditions
             }

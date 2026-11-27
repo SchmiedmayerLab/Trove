@@ -2253,6 +2253,38 @@ paths:
         default:
           $ref: '#/components/responses/OperationFailure'
 
+  /studies/{studyId}/tasks/{taskId}/excusal:
+    post:
+      operationId: excuseStudyTask
+      tags: [Studies]
+      summary: Excuse an open or missed questionnaire assignment
+      description: >
+        Requires interactive researcher membership and data-reader access in the study group. Cancels the
+        occurrence with the status reason excused, so it cannot be completed afterwards, and keeps it in the
+        participant's task stream. A completed, failed or already cancelled occurrence cannot be excused.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - name: taskId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^[0-9a-f]{64}$'}
+        - name: If-Match
+          in: header
+          required: true
+          description: Quoted decimal occurrence version.
+          schema: {type: string}
+      responses:
+        '200':
+          description: The cancelled occurrence
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ParticipantTaskOccurrence'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
   /participant/enrollments/{enrollmentId}/tasks:
     get:
       operationId: getParticipantTasks
@@ -2280,6 +2312,155 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ParticipantTaskPage'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/tasks/{taskId}/session:
+    post:
+      operationId: startTaskSession
+      tags: [Participant]
+      summary: Confirm a session that the device started for an owned assignment
+      description: >
+        The device starts a session, also while offline, with its own session ID, the chosen administration
+        language and its start time, and sends it at the next sync. The server confirms the first session of
+        an assigned occurrence and returns it again for the same ID, language and start time. The session
+        fixes the language, the start time, the accepted consent, the performance window and the subject
+        identifier. The start time must lie within the performance window and at most five minutes after
+        server time; the confirmation may arrive after the window ended while the enrollment is active. Once
+        a session is confirmed, any other session ID of the occurrence receives 409 with the title "Task Session
+        Superseded": another device started the occurrence first, and this device keeps its response as not
+        accepted. A session ID already used for another occurrence receives 409. The language must have a
+        publication approval for the exact Questionnaire digest.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^[0-9a-f]{64}$'}
+        - name: If-Match
+          in: header
+          required: true
+          description: Quoted decimal assignment version.
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, language, startedAt]
+              properties:
+                id: {type: string, format: uuid, description: Session ID chosen by the device.}
+                language: {$ref: '#/components/schemas/LanguageTag'}
+                startedAt: {type: string, format: date-time, description: When the device started the session.}
+      responses:
+        '200':
+          description: The session of the occurrence
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskSession'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/tasks/{taskId}/completion:
+    post:
+      operationId: completeParticipantTask
+      tags: [Participant]
+      summary: Accept a completed QuestionnaireResponse for an owned session
+      description: >
+        Send unchanged UTF-8 FHIR JSON bytes. The subject must be a Patient reference containing only type and the
+        exact identifier returned at session start. Authored must be an instant from the start of the performance
+        window, and not before the whole second of the session start, until its exclusive cutoff, and at most five
+        minutes after server time. The upload may arrive after the cutoff: a response authored within the window is
+        accepted while the enrollment and its consent remain active. A window without an end has no deadline. A
+        completion for a session other than the occurrence's confirmed session receives 409 "Task Session Superseded".
+        Responses are checked against the exact published Questionnaire bytes the occurrence pins. The first accepted
+        completion of an occurrence wins. Retrying the same bytes, session tag and command key returns the original
+        receipt while the enrollment is active; any other completion of the occurrence receives 409. The occurrence
+        then appears as completed in the task stream.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^[0-9a-f]{64}$'}
+        - name: If-Match
+          in: header
+          required: true
+          description: Exact quoted session ID returned at session start.
+          schema: {type: string}
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID scoped to this occurrence.
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '200':
+          description: The accepted receipt, also for an exact retry
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskCompletionReceipt'}
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /participant/tasks/{taskId}/failure:
+    post:
+      operationId: failParticipantTask
+      tags: [Participant]
+      summary: Record that an owned session could not be completed
+      description: >
+        Records the failed outcome of an occurrence whose session started: the participant attempted it, but no
+        response can be completed. The device reports when the attempt failed. A failure is accepted under the same
+        conditions as a completion: its time lies within the performance window, not before the whole second of the
+        session start, and at most five minutes after server time, the session's consent and language approval are
+        still current, and the enrollment is active; the report may arrive after the cutoff. It is final. The
+        occurrence then appears as failed in the task stream and accepts no completion or excusal. Retrying with the
+        same session tag and command key returns the original receipt while the enrollment is active; any other
+        outcome of the occurrence receives 409.
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^[0-9a-f]{64}$'}
+        - name: If-Match
+          in: header
+          required: true
+          description: Exact quoted session ID returned at session start.
+          schema: {type: string}
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID scoped to this occurrence.
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [failedAt]
+              properties:
+                failedAt: {type: string, format: date-time, description: When the attempt failed on the device.}
+      responses:
+        '200':
+          description: The failure receipt, also for an exact retry
+          headers:
+            Cache-Control:
+              schema: {type: string, enum: [no-store]}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskFailureReceipt'}
         default:
           $ref: '#/components/responses/OperationFailure'
 
@@ -3309,6 +3490,12 @@ components:
       type: string
       enum:
         - consent.recorded
+        - task.session.started
+        - task.completion.accepted
+        - task.receipt.disclosure
+        - task.session.disclosure
+        - task.excused
+        - task.failed
         - consent.pdf.disclosure
         - consent.records.disclosure
         - tasks.assigned
@@ -4532,13 +4719,19 @@ components:
     ParticipantTaskOccurrence:
       type: object
       additionalProperties: false
-      required: [id, enrollmentId, publicationId, revision, artifactId, componentId, scheduleId, sha256, questionnaireCanonical, language, administrationLanguages, opensAt, dueAt, timeZone, state, version, assignedAt, resultReferences]
+      required: [id, enrollmentId, publicationId, revision, artifactId, bundleSha256, componentId, scheduleId, sha256, questionnaireCanonical, language, administrationLanguages, opensAt, dueAt, timeZone, notification, state, version, assignedAt, resultReferences]
       properties:
         id: {type: string, pattern: '^[0-9a-f]{64}$'}
         enrollmentId: {type: string, format: uuid}
         publicationId: {type: string, format: uuid}
         revision: {type: integer}
         artifactId: {type: string, format: uuid}
+        bundleSha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: >
+            SHA-256 of the exact bundle archive of the revision this occurrence pins, as the participant bundle
+            download returns it.
         componentId: {type: string, format: uuid}
         scheduleId: {type: string, format: uuid}
         sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
@@ -4568,7 +4761,27 @@ components:
             deadline: it is never missed, and every time from opensAt on lies within its
             window.
         timeZone: {type: string}
-        state: {type: string, enum: [assigned]}
+        notification:
+          type: boolean
+          description: >
+            Whether the published schedule of this occurrence enables a reminder. Reminders use the schedule's
+            task notification thread, as in the published study definition.
+        reminderTime:
+          $ref: '#/components/schemas/ScheduleTime'
+          description: >
+            Present only when notification is true and the published schedule sets a reminder time: the time of
+            day, in timeZone, at which the reminder fires on the day of dueAt. Without it, the reminder fires at
+            dueAt.
+        state:
+          type: string
+          enum: [assigned, completed, failed, cancelled]
+          description: >
+            An assigned occurrence whose cutoffAt has passed is missed. A response authored or a failure recorded
+            within the window may still arrive while the enrollment is open, and the occurrence then becomes
+            completed or failed. An occurrence without cutoffAt has no deadline and is never missed. Completed occurrences carry the accepted receipt. A failed occurrence
+            was attempted in its session but could not be completed. A cancelled occurrence remains in the
+            stream with its statusReason.
+        statusReason: {type: string, enum: [excused], description: Present only on a cancelled occurrence.}
         version: {type: integer, format: int64}
         assignedAt:
           type: string
@@ -4576,7 +4789,74 @@ components:
           description: When the server recorded the assignment.
         resultReferences:
           type: array
-          items: {type: string}
+          maxItems: 1
+          description: ID of the accepted TaskCompletionReceipt on a completed occurrence, otherwise empty.
+          items: {type: string, format: uuid}
+
+    TaskPerformanceWindow:
+      type: object
+      additionalProperties: false
+      required: [start]
+      description: Performance period of the occurrence. Without an end, the occurrence has no deadline.
+      properties:
+        start: {type: string, format: date-time}
+        end: {type: string, format: date-time}
+
+    TaskSession:
+      type: object
+      additionalProperties: false
+      required: [id, taskId, consentId, language, startedAt, subjectIdentifier, performanceWindow]
+      properties:
+        id: {type: string, format: uuid}
+        taskId: {type: string, pattern: '^[0-9a-f]{64}$'}
+        consentId: {type: string, format: uuid, description: Accepted consent frozen when the session was confirmed.}
+        language: {$ref: '#/components/schemas/LanguageTag'}
+        startedAt: {type: string, format: date-time, description: When the device started the session.}
+        performanceWindow: {$ref: '#/components/schemas/TaskPerformanceWindow'}
+        subjectIdentifier: {$ref: '#/components/schemas/TaskSubjectIdentifier'}
+
+    TaskSubjectIdentifier:
+      type: object
+      additionalProperties: false
+      required: [system, value]
+      description: Study-scoped enrollment identifier for the Patient reference on the assignment and its result.
+      properties:
+        system: {type: string}
+        value: {type: string}
+
+    TaskCompletionReceipt:
+      type: object
+      additionalProperties: false
+      required: [id, taskId, sessionId, consentId, revision, questionnaireSHA256, responseSHA256, language, authored, acceptedAt, performanceWindow, subjectIdentifier]
+      properties:
+        id: {type: string, format: uuid}
+        taskId: {type: string, pattern: '^[0-9a-f]{64}$'}
+        sessionId: {type: string, format: uuid}
+        consentId: {type: string, format: uuid}
+        revision: {type: integer}
+        questionnaireSHA256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        responseSHA256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        language: {$ref: '#/components/schemas/LanguageTag'}
+        authored:
+          type: string
+          description: The response's authored time as submitted, the reported completion time. acceptedAt is the receipt time.
+        acceptedAt: {type: string, format: date-time}
+        performanceWindow: {$ref: '#/components/schemas/TaskPerformanceWindow'}
+        subjectIdentifier: {$ref: '#/components/schemas/TaskSubjectIdentifier'}
+
+    TaskFailureReceipt:
+      type: object
+      additionalProperties: false
+      required: [id, taskId, sessionId, version, failedAt]
+      properties:
+        id: {type: string, format: uuid}
+        taskId: {type: string, pattern: '^[0-9a-f]{64}$'}
+        sessionId: {type: string, format: uuid}
+        version:
+          type: integer
+          format: int64
+          description: The occurrence's change version that records the failure.
+        failedAt: {type: string, format: date-time, description: The device time of the failed attempt, as reported.}
 
     ParticipantCollectionPlan:
       type: object
@@ -5719,6 +5999,12 @@ components:
         notification:
           type: boolean
           description: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+        reminderTime:
+          $ref: '#/components/schemas/ScheduleTime'
+          description: >
+            Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on
+            the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at
+            the occurrence's due time.
 
     ComponentSchedule:
       type: object
@@ -5740,6 +6026,12 @@ components:
         notification:
           type: boolean
           description: Whether notifications are enabled for this schedule. When true, uses task-based notification threading.
+        reminderTime:
+          $ref: '#/components/schemas/ScheduleTime'
+          description: >
+            Time of day, in the study's enrollment time zone, at which the reminder of each occurrence fires on
+            the occurrence's due day. Allowed only when notification is true. Without it, the reminder fires at
+            the occurrence's due time.
 
     ScheduleDefinition:
       description: Defines when and how often a schedule fires
@@ -6452,6 +6744,7 @@ components:
       required:
         - studyId
         - revision
+        - bundleSha256
         - metadata
         - enrollmentConditions
       properties:
@@ -6463,6 +6756,10 @@ components:
           type: integer
           minimum: 1
           description: The latest published revision number
+        bundleSha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the exact bundle archive of this revision, as the participant bundle download returns it.
         metadata:
           $ref: '#/components/schemas/StudyMetadataCodable'
         enrollmentConditions:

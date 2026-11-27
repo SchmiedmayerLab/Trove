@@ -65,6 +65,10 @@ final class ObjectStorageService: Module, @unchecked Sendable {
         try await provider.delete(key: key)
     }
 
+    func keys(prefix: String) async throws -> [String] {
+        try await provider.keys(prefix: prefix)
+    }
+
     func ensureBucketExists() async throws {
         try await provider.ensureBucketExists()
     }

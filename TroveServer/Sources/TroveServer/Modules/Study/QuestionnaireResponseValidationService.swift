@@ -9,6 +9,7 @@
 import Foundation
 import GroveQuestionnaireFHIR
 import ModelsR4
+import TroveAPIServer
 
 
 /// Validates one QuestionnaireResponse against the exact Questionnaire it answers.
@@ -39,8 +40,11 @@ struct QuestionnaireResponseValidationService: Sendable {
 
     let validator: FHIRValidationClient
 
-    private static func pairRules(questionnaire: Data, response: Data) -> (status: ValidationStatus, diagnostics: [ValidationDiagnostic]) {
-        guard let definition = try? JSONDecoder().decode(ModelsR4.Questionnaire.self, from: questionnaire),
+    private static func pairRules(
+        questionnaire: Data, response: Data, completionLanguage: LanguageTag? = nil
+    ) -> (status: ValidationStatus, diagnostics: [ValidationDiagnostic]) {
+        guard resourceType(of: questionnaire) == "Questionnaire", resourceType(of: response) == "QuestionnaireResponse",
+              let definition = try? JSONDecoder().decode(ModelsR4.Questionnaire.self, from: questionnaire),
               let answers = try? JSONDecoder().decode(ModelsR4.QuestionnaireResponse.self, from: response) else {
             let finding = ValidationDiagnostic.trove(
                 "fhir-structure", path: "", message: "The Questionnaire or the QuestionnaireResponse cannot be read as an R4 resource."
@@ -50,9 +54,9 @@ struct QuestionnaireResponseValidationService: Sendable {
         // No expression evaluator: the supported Questionnaires carry no FHIRPath, and any that does is not evaluated.
         let issues = PairValidator().issues(questionnaire: definition, response: answers)
         let errors = issues.filter { $0.severity == .error }
-        let status: ValidationStatus = errors.contains { !notEvaluated.contains($0.code) } ? .invalid : errors.isEmpty ? .valid : .incomplete
+        var status: ValidationStatus = errors.contains { !notEvaluated.contains($0.code) } ? .invalid : errors.isEmpty ? .valid : .incomplete
         let language = answers.language?.value?.string
-        return (status, issues.map { issue in
+        var findings = issues.map { issue -> ValidationDiagnostic in
             .init(
                 severity: issue.severity == .error ? .error : .warning,
                 source: .grove,
@@ -61,7 +65,38 @@ struct QuestionnaireResponseValidationService: Sendable {
                 language: issue.code == .responseLanguage ? language : nil,
                 message: issue.message
             )
-        })
+        }
+        if let completionLanguage {
+            if answers.status.value != .completed {
+                status = .invalid
+                findings.append(.trove("completion-status", path: "status", message: "The response must be completed."))
+            }
+            if language != completionLanguage.rawValue {
+                status = .invalid
+                findings.append(.trove("completion-language", path: "language", message: "The response must use the session language."))
+            }
+        }
+        return (status, findings)
+    }
+
+    /// The typed decoders accept a document without, or with another, `resourceType`.
+    ///
+    /// Duplicate members are rejected before admission by the validator's strict JSON reading of the same bytes.
+    private static func resourceType(of document: Data) -> String? {
+        (try? JSONSerialization.jsonObject(with: document) as? [String: Any])?["resourceType"] as? String
+    }
+
+    /// Checks the submitted bytes against the instrument and language retained for this occurrence.
+    static func validateCompletion(questionnaire: Data, response: Data, language: LanguageTag) -> Result {
+        let check = pairRules(questionnaire: questionnaire, response: response, completionLanguage: language)
+        let reasons = [ValidationDiagnostic.reason(for: check.status)].compactMap { $0 }
+        return Result(
+            status: check.status,
+            questionnaireSHA256: FHIRValidationClient.digest(questionnaire),
+            responseSHA256: FHIRValidationClient.digest(response),
+            validatorIdentity: nil,
+            diagnostics: ValidationDiagnostic.ordered(reasons + check.diagnostics, limit: QuestionnaireValidationService.maximumDiagnostics)
+        )
     }
 
     /// Only `valid` means both checks reported no error and no skipped check. Throws only when cancelled.

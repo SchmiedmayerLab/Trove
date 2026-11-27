@@ -95,6 +95,23 @@ final class S3ObjectStorageProvider: ObjectStorageProvider, Sendable {
         _ = try await s3.deleteObject(.init(bucket: bucket, key: key))
     }
 
+    func keys(prefix: String) async throws -> [String] {
+        var keys: [String] = []
+        var token: String?
+        repeat {
+            try Task.checkCancellation()
+            let page = try await s3.listObjectsV2(.init(bucket: bucket, continuationToken: token, prefix: prefix))
+            keys += (page.contents ?? []).compactMap(\.key)
+            if page.isTruncated == true {
+                guard let next = page.nextContinuationToken else { throw ServerError.internalServerError("Object listing ended early") }
+                token = next
+            } else {
+                token = nil
+            }
+        } while token != nil
+        return keys
+    }
+
     func shutdown() async throws {
         try await client.shutdown()
         try await httpClient.shutdown()

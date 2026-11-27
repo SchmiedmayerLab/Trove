@@ -18,6 +18,7 @@ import VaporTesting
 
 let dummyUUID = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
 let dummyRevision = "99999"
+let dummyTask = String(repeating: "a", count: 64)
 
 struct FixtureIDs: Sendable {
     static let dummy = FixtureIDs(
@@ -193,6 +194,15 @@ extension AuthIntegrationTests {
                 successStatus: .ok
             ),
             AuthEndpoint(
+                method: .POST,
+                path: "\(base)/studies/\(studyId)/tasks/\(dummyTask)/excusal",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .notFound,
+                ifMatch: "\"1\""
+            ),
+            AuthEndpoint(
                 method: .GET,
                 path: "\(base)/studies/\(studyId)/tasks",
                 body: nil,
@@ -343,6 +353,24 @@ extension AuthIntegrationTests {
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/tasks", successStatus: .notFound),
             participant(
                 .POST,
+                "\(base)/participant/tasks/\(dummyTask)/session",
+                successStatus: .notFound,
+                body: jsonData(["id": UUID().uuidString, "language": "en-US", "startedAt": "2026-01-01T00:00:00Z"])
+            )
+                .with(ifMatch: "\"1\""),
+            participant(
+                .POST, "\(base)/participant/tasks/\(dummyTask)/completion", successStatus: .notFound, body: Data("{}".utf8), contentType: .binary
+            )
+                .with(ifMatch: "\"\(dummyId.uuidString.lowercased())\""),
+            participant(
+                .POST,
+                "\(base)/participant/tasks/\(dummyTask)/failure",
+                successStatus: .notFound,
+                body: jsonData(["failedAt": "2026-01-01T00:00:00Z"])
+            )
+                .with(ifMatch: "\"\(dummyId.uuidString.lowercased())\""),
+            participant(
+                .POST,
                 "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations",
                 successStatus: .notFound,
                 body: jsonData(Components.Schemas.NativeCollectionReconciliationRequest(sourceId: dummyId.uuidString))
@@ -396,6 +424,7 @@ extension AuthIntegrationTests {
                     "\($0.method.rawValue) /\($0.path.split(separator: "?", maxSplits: 1).first ?? "")"
                         .replacingOccurrences(of: dummyUUID.uuidString, with: "*")
                         .replacingOccurrences(of: dummyRevision, with: "*")
+                        .replacingOccurrences(of: dummyTask, with: "*")
                 }
         )
     }

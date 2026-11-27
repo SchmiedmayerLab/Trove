@@ -16,6 +16,9 @@ protocol ObjectStorageProvider: Sendable {
     /// Idempotent for an absent object; failures must not be reported as successful deletion.
     func delete(key: String) async throws
 
+    /// Every key that starts with `prefix`, in any order.
+    func keys(prefix: String) async throws -> [String]
+
     func ensureBucketExists() async throws
 
     func shutdown() async throws

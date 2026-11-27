@@ -68,6 +68,13 @@ if purpose=='questionnaire':
         questionnaire=json.loads(raw)
         answers['questionnaire']=questionnaire['url']+'|999.0.0'
         authoring('/validate/questionnaire-response',pair(raw,json.dumps(answers).encode()),'incomplete','Questionnaire_QR_Q_NotFound')
+        structure='/validate/questionnaire-response-structure'
+        for payload,status,code in ((response_fixture,200,None),(b'{"x":1,"x":2}',422,'invalid_json')):
+            http_status,data=post(structure,payload)
+            value=json.loads(data)
+            assert (http_status,value['valid'],value.get('code'),value['purpose'])==(status,status==200,code,'questionnaire-response-structure'),value
+            assert value['sha256']==hashlib.sha256(payload).hexdigest() and value['validatorIdentity']==expected and len(data)<=2048
+            print(json.dumps({'route':structure,'httpStatus':http_status,'sha256':value['sha256']}),flush=True)
     authoring('/validate/questionnaire-response',b'{"resourceType":"Bundle"}','invalid','pair-input')
     connection=http.client.HTTPConnection(host,8080,timeout=10)
     connection.request('GET','/health'); response=connection.getresponse(); response.read(); connection.close()

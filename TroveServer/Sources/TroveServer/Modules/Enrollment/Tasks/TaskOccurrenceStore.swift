@@ -8,6 +8,7 @@
 
 import Fluent
 import Foundation
+import GroveStudyDefinition
 import SQLKit
 import TroveAPITypes
 
@@ -41,6 +42,14 @@ struct TaskOccurrenceStore {
         """
     }
 
+    /// Whether the published schedule enables a reminder for its occurrences.
+    static func remindsParticipant(_ notifications: StudyDefinition.ComponentSchedule.NotificationsConfig) -> Bool {
+        switch notifications {
+        case .disabled: false
+        case .enabled: true
+        }
+    }
+
     func reconcile(now: Date, adoptingRevision: Bool = false) async throws -> Int64 {
         if let base = enrollment.taskClosureBase {
             return base * 2
@@ -48,7 +57,7 @@ struct TaskOccurrenceStore {
         var version = try await watermark()
         guard enrollment.withdrawnAt == nil, enrollment.endsAt.map({ now < $0 }) ?? true else {
             // One terminal mutation covers every still-active assignment. Its removal version
-            // is the stored base plus the immutable assignment version.
+            // is the stored base plus the occurrence's last change version, which no longer moves once the enrollment closes.
             guard version <= Int64.max / 2 else { throw ServerError.unexpectedError }
             enrollment.taskClosureBase = version
             try await sql.raw("UPDATE enrollments SET task_closure_base = \(bind: version) WHERE id = \(bind: enrollmentID)").run()
@@ -116,7 +125,11 @@ struct TaskOccurrenceStore {
             """
             SELECT id FROM task_occurrences WHERE enrollment_id = \(bind: enrollmentID)
                 AND invalidated_version IS NULL AND publication_id <> \(bind: publication)
-                AND due_at >= \(bind: adoptedAt) ORDER BY assigned_version
+                AND due_at >= \(bind: adoptedAt)
+                AND NOT EXISTS (SELECT 1 FROM task_completions c WHERE c.task_id = task_occurrences.id)
+                AND NOT EXISTS (SELECT 1 FROM task_failures f WHERE f.task_id = task_occurrences.id)
+                AND NOT EXISTS (SELECT 1 FROM task_excusals x WHERE x.task_id = task_occurrences.id)
+                ORDER BY assigned_version
             """
         )
             .all()
@@ -145,7 +158,7 @@ struct TaskOccurrenceStore {
             throw ServerError.conflict("The adopted publication has no executable schedule evidence")
         }
         let today = calendar.startOfDay(for: now)
-        let horizon = try TaskRecurrence.dayBoundary(after: 14, from: today, calendar: calendar)
+        let horizon = try TaskRecurrence.dayBoundary(after: Self.assignmentHorizonDays, from: today, calendar: calendar)
         let end = min(enrollment.endsAt ?? horizon, horizon)
         // The first consent can activate today's enrollment-triggered task. A later adoption starts a new window.
         let lower = max(today, firstAdoption ? enrolledAt : adoption.acceptedAt)
@@ -166,7 +179,7 @@ struct TaskOccurrenceStore {
                 backdated = true
                 dates = [due]
             }
-            for due in dates {
+            for due in try dates.map(Self.microseconds) where due < end {
                 let id = TaskOccurrenceID.make(
                     enrollment: enrollmentID,
                     publication: adoption.publicationID,
@@ -190,9 +203,10 @@ struct TaskOccurrenceStore {
         }
     }
 
-    private func insert(_ item: Item) async throws {
-        guard let publicationID = UUID(uuidString: item.publicationId) else { throw ServerError.unexpectedError }
-        let projection = String(decoding: try JSONEncoder().encode(item), as: UTF8.self)
+    private func insert(_ assigned: Item) async throws {
+        guard let publicationID = UUID(uuidString: assigned.publicationId) else { throw ServerError.unexpectedError }
+        let projection = try Self.encode(assigned)
+        let item = try Self.decode(projection)
         try await sql.raw(
             """
             INSERT INTO task_occurrences (id, enrollment_id, publication_id, due_at, cutoff_at, assigned_version, assigned_at, projection)
@@ -241,6 +255,7 @@ struct TaskOccurrenceStore {
             publicationId: adoption.publicationID.uuidString.lowercased(),
             revision: publication.revision,
             artifactId: publication.artifactID.uuidString.lowercased(),
+            bundleSha256: publication.bundleDigest,
             componentId: plan.schedule.componentId.uuidString.lowercased(),
             scheduleId: plan.schedule.id.uuidString.lowercased(),
             sha256: plan.questionnaireSHA256,
@@ -251,6 +266,8 @@ struct TaskOccurrenceStore {
             dueAt: due,
             cutoffAt: cutoff,
             timeZone: calendar.timeZone.identifier,
+            notification: Self.remindsParticipant(plan.schedule.notifications),
+            reminderTime: plan.schedule.notifications.time.map { .init($0) },
             state: .assigned,
             version: version,
             assignedAt: now,

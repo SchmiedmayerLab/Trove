@@ -122,6 +122,26 @@ struct StudyBundleSnapshotTests {
         } throws: { ($0 as? ServerError)?.status == .internalServerError }
     }
 
+    @Test
+    func taskResolvesOnlyItsPublishedQuestionnaire() throws {
+        let study = try Self.study()
+        let studyID = try study.requireId()
+        let componentID = UUID()
+        study.$components.value = [Self.questionnaire(studyID: studyID, id: componentID)]
+        let publication = try StudyBundleService().preparePublication(from: study, revision: 1)
+        let stored = try #require(publication.questionnaires.first)
+        let digest = FHIRValidationClient.digest(stored.bytes)
+        func read(study: UUID, component: UUID, digest: String) throws -> Data {
+            try StudyBundleService.publishedQuestionnaire(
+                in: publication.bundle, studyID: study, componentID: component, baseLanguage: stored.language, sha256: digest
+            )
+        }
+        #expect(try read(study: studyID, component: componentID, digest: digest) == stored.bytes)
+        #expect(throws: ServerError.self) { try read(study: UUID(), component: componentID, digest: digest) }
+        #expect(throws: ServerError.self) { try read(study: studyID, component: UUID(), digest: digest) }
+        #expect(throws: ServerError.self) { try read(study: studyID, component: componentID, digest: FHIRValidationClient.digest(Data())) }
+    }
+
     @Test("Duplicate component identities fail before resource writing")
     func duplicateIdentities() throws {
         let study = try Self.study()

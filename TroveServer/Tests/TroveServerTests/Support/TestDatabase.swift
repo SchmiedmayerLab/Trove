@@ -48,6 +48,7 @@ enum TestDatabase {
             CreateTaskOccurrences().name,
             CreateEnrollmentConsents().name,
             CreateNativeReconciliations().name,
+            CreateTaskCompletions().name,
             CreateAuditEvents().name,
             CreateClinicalEvents().name,
             CreateRecordingTransfers().name,

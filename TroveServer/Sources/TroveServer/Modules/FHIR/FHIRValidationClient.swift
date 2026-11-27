@@ -20,12 +20,14 @@ struct FHIRValidationClient: Sendable {
         case event
         case questionnaire
         case questionnaireResponse = "questionnaire-response"
+        case questionnaireResponseStructure = "questionnaire-response-structure"
 
         var route: String {
             switch self {
             case .event: ""
             case .questionnaire: "/questionnaire"
             case .questionnaireResponse: "/questionnaire-response"
+            case .questionnaireResponseStructure: "/questionnaire-response-structure"
             }
         }
     }
@@ -90,7 +92,7 @@ struct FHIRValidationClient: Sendable {
             request.headers = ["Content-Type": "application/fhir+json"]
             request.body = .bytes(ByteBuffer(data: bytes))
             let response = try await client.execute(request, timeout: .seconds(130))
-            let limit = purpose == .event ? 2048 : Self.maximumAuthoringReplyBytes
+            let limit = [.event, .questionnaireResponseStructure].contains(purpose) ? 2048 : Self.maximumAuthoringReplyBytes
             return (Int(response.status.code), Data(try await response.body.collect(upTo: limit).readableBytesView))
         }
     }
@@ -114,14 +116,26 @@ struct FHIRValidationClient: Sendable {
     }
 
     func validate(_ bytes: Data) async throws -> String {
+        try await validateAdmission(bytes, purpose: .event)
+    }
+
+    /// Checks one participant QuestionnaireResponse with the reusable engine, without its Questionnaire.
+    ///
+    /// The engine checks the response's own structure and profile. Whether it answers the Questionnaire is decided
+    /// separately against the exact published bytes.
+    func validateResponseStructure(_ bytes: Data) async throws -> String {
+        try await validateAdmission(bytes, purpose: .questionnaireResponseStructure)
+    }
+
+    private func validateAdmission(_ bytes: Data, purpose: Purpose) async throws -> String {
         guard bytes.count <= Self.maximumBytes else { throw Self.tooLarge }
         guard !bytes.isEmpty else { throw Self.invalid }
         let expectedIdentity = try requireIdentity()
-        let (status, data) = try await exchange(bytes, purpose: .event)
+        let (status, data) = try await exchange(bytes, purpose: purpose)
         guard data.count <= 2048, let reply = try? JSONDecoder().decode(Reply.self, from: data),
               reply.sha256 == Self.digest(bytes),
               reply.contractRevision == Self.contractRevision, reply.validatorIdentity == expectedIdentity,
-              reply.purpose == nil else {
+              reply.purpose == (purpose == .event ? nil : purpose) else {
             throw Self.unavailable
         }
         if status == 422 && !reply.valid && ["invalid_json", "invalid_fhir"].contains(reply.code) {

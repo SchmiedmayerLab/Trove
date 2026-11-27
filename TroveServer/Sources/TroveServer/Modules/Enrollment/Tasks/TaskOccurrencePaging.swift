@@ -74,7 +74,7 @@ extension TaskOccurrenceStore {
         for row in rows.prefix(limit) {
             after = try row.decode(column: "version", as: Int64.self)
             if let payload = try row.decode(column: "projection", as: String?.self) {
-                items.append(try JSONDecoder().decode(Item.self, from: Data(payload.utf8)))
+                items.append(try TaskOccurrenceStore.decode(payload))
             } else {
                 invalidated.append(try row.decode(column: "id", as: String.self))
             }

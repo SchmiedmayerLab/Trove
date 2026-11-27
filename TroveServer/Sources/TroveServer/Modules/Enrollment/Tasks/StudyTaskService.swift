@@ -15,7 +15,7 @@ import TroveAPIServer
 extension StudyService {
     private static func taskItem(_ row: any SQLRow) throws -> Components.Schemas.ParticipantTaskOccurrence {
         let projection = try row.decode(column: "projection", as: String.self)
-        let item = try JSONDecoder().decode(Components.Schemas.ParticipantTaskOccurrence.self, from: Data(projection.utf8))
+        let item = try TaskOccurrenceStore.decode(projection)
         guard try item.id == row.decode(column: "id", as: String.self),
               try UUID(uuidString: item.enrollmentId) == row.decode(column: "enrollment_id", as: UUID.self),
               try UUID(uuidString: item.publicationId) == row.decode(column: "publication_id", as: UUID.self) else {

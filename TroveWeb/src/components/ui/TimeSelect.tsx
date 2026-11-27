@@ -30,6 +30,7 @@ export interface TimeSelectProps extends Omit<
   "value" | "onChange" | "children"
 > {
   id?: string;
+  "aria-label"?: string;
   value?: TimeSelectValue | null;
   onChange: (value: TimeSelectValue) => void;
   placeholder?: string;
@@ -77,6 +78,7 @@ export const TimeSelect = ({
   onChange,
   placeholder = "Select time",
   className,
+  "aria-label": ariaLabel,
   ...props
 }: TimeSelectProps) => {
   const handleValueChange = (nextValue: string) => {
@@ -102,7 +104,7 @@ export const TimeSelect = ({
       onValueChange={handleValueChange}
       {...props}
     >
-      <SelectTrigger className={cn("w-full", className)}>
+      <SelectTrigger className={cn("w-full", className)} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent id={id}>
