@@ -209,19 +209,15 @@ func configureServices(
     let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
     let studies = StudyRepository(database: app.db(.psql))
     // Tests supply a runtime with fixed registrations; deployments configure it from the provider configuration.
-    let providers = if let providerRuntime {
-        providerRuntime(authorization, studies)
-    } else {
-        try await ProviderRuntime.configured(
-            application: app,
-            configuration: providerConfiguration,
-            sourceKeyring: sourceKeyring,
-            authorization: authorization,
-            studies: studies,
-            limits: collectionCapacity.admission,
-            validator: validator
-        )
-    }
+    let providers = if let providerRuntime { providerRuntime(authorization, studies) } else { try await ProviderRuntime.configured(
+        application: app,
+        configuration: providerConfiguration,
+        sourceKeyring: sourceKeyring,
+        authorization: authorization,
+        studies: studies,
+        limits: collectionCapacity.admission,
+        validator: validator
+    ) }
     await app.grove.configure {
         reconciliation
         providers

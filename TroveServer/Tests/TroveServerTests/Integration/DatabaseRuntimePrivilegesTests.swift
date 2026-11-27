@@ -27,8 +27,7 @@ struct DatabaseRuntimePrivilegesTests {
             #expect(try row.decode(column: "authenticated", as: String.self) == fixture.role)
             try await DatabaseRuntimePrivileges.validate(on: fixture.database)
             for table in [
-                "study_delegations", "study_publication_candidates", "source_installations", "source_identity_keys", "source_identity_key_envelopes",
-                "questionnaire_language_approvals"
+                "study_delegations", "study_publication_candidates", "source_installations", "source_identity_keys", "source_identity_key_envelopes"
             ] {
                 let permissions = try #require(try await sql.raw("""
                     SELECT has_table_privilege(current_user, \(bind: table), 'SELECT')
@@ -38,11 +37,6 @@ struct DatabaseRuntimePrivilegesTests {
                 #expect(try permissions.decode(column: "allowed", as: Bool.self))
             }
             try await sql.raw("UPDATE study_delegations SET revoked_at = CURRENT_TIMESTAMP WHERE false").run()
-            try await sql.raw("""
-                UPDATE questionnaire_language_approvals
-                SET revoked_at = CURRENT_TIMESTAMP, revoked_by_issuer = 'issuer', revoked_by_subject = 'subject' WHERE false
-                """)
-                .run()
             let groups = try await Group.query(on: fixture.database).count()
             #expect(groups == 0)
             let event = AuditEvent(
@@ -78,8 +72,6 @@ struct DatabaseRuntimePrivilegesTests {
         "DELETE FROM source_identity_key_envelopes WHERE false", "TRUNCATE source_identity_key_envelopes",
         "UPDATE study_delegations SET client_id = client_id WHERE false",
         "DELETE FROM study_delegations WHERE false", "TRUNCATE study_delegations",
-        "UPDATE questionnaire_language_approvals SET sha256 = sha256 WHERE false",
-        "DELETE FROM questionnaire_language_approvals WHERE false", "TRUNCATE questionnaire_language_approvals",
         "UPDATE study_publication_candidates SET bundle_digest = bundle_digest WHERE false",
         "DELETE FROM study_publication_candidates WHERE false", "TRUNCATE study_publication_candidates",
         "UPDATE clinical_events SET raw_sha256 = raw_sha256 WHERE false", "DELETE FROM clinical_events WHERE false", "TRUNCATE clinical_events",
@@ -185,8 +177,6 @@ struct DatabaseRuntimePrivilegesTests {
         "UPDATE (sealed_key) ON public.source_identity_key_envelopes",
         "UPDATE ON public.study_delegations", "UPDATE (client_id) ON public.study_delegations",
         "DELETE ON public.study_delegations", "TRUNCATE ON public.study_delegations",
-        "UPDATE ON public.questionnaire_language_approvals", "UPDATE (sha256) ON public.questionnaire_language_approvals",
-        "DELETE ON public.questionnaire_language_approvals", "TRUNCATE ON public.questionnaire_language_approvals",
         "UPDATE (bundle_digest) ON public.study_publication_candidates",
         "DELETE ON public.study_publication_candidates", "TRUNCATE ON public.study_publication_candidates",
         "UPDATE ON public.clinical_event_representations", "UPDATE (raw_bytes) ON public.clinical_event_representations",
@@ -217,8 +207,6 @@ struct DatabaseRuntimePrivilegesTests {
         "SELECT ON public.source_installations", "UPDATE (revoked_at) ON public.source_installations",
         "SELECT ON public.source_identity_keys", "INSERT ON public.source_identity_key_envelopes",
         "SELECT ON public.study_delegations", "UPDATE (revoked_at) ON public.study_delegations",
-        "INSERT ON public.questionnaire_language_approvals", "UPDATE (revoked_by_subject) ON public.questionnaire_language_approvals",
-        "UPDATE (revoked_by_issuer) ON public.questionnaire_language_approvals",
         "INSERT ON public.study_publication_candidates", "SELECT (bundle_digest) ON public.study_publication_candidates",
         "SELECT ON public.clinical_event_representations", "INSERT ON public.clinical_event_representations",
         "SELECT ON public.clinical_events", "INSERT ON public.clinical_event_nodes",
@@ -327,7 +315,7 @@ extension DatabaseRuntimePrivilegesTests {
         let databaseName: String
     }
 
-    private static func expectRejected(on database: any Database) async {
+    static func expectRejected(on database: any Database) async {
         await #expect {
             try await DatabaseRuntimePrivileges.validate(on: database)
         } throws: { error in
@@ -380,7 +368,6 @@ extension DatabaseRuntimePrivilegesTests {
             .run()
         try await sql.raw("""
             GRANT SELECT, INSERT ON public.audit_events, public.published_studies, public.study_delegations, public.study_publication_candidates,
-                public.questionnaire_language_approvals,
                 public.enrollment_consents, public.source_bindings, public.source_installations,
                 public.source_identity_keys, public.source_identity_key_envelopes,
                 public.clinical_events, public.clinical_event_representations,
@@ -394,10 +381,7 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
-        try await sql.raw("""
-            GRANT UPDATE (revoked_at, revoked_by_issuer, revoked_by_subject) ON public.questionnaire_language_approvals TO \(ident: role)
-            """)
-            .run()
+        try await grantLanguageApprovals(role: role, on: sql)
         try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 
@@ -492,7 +476,7 @@ extension DatabaseRuntimePrivilegesTests {
         }
     }
 
-    private static func removeRole(_ role: String, databaseName: String, on sql: any SQLDatabase) async throws {
+    static func removeRole(_ role: String, databaseName: String, on sql: any SQLDatabase) async throws {
         // Exact generated role, in its disposable database only. Ownership tests restore their
         // table owner first. DROP OWNED also removes column ACLs that table-level REVOKE misses.
         let result = try await sql.raw("SELECT current_database() AS name").first()
@@ -501,17 +485,5 @@ extension DatabaseRuntimePrivilegesTests {
         try #require(role.hasPrefix("trove_runtime_test_"))
         try await sql.raw("DROP OWNED BY \(ident: role)").run()
         try await sql.raw("DROP ROLE \(ident: role)").run()
-    }
-
-    private static func withGroup(on fixture: RuntimeFixture, _ body: (String) async throws -> Void) async throws {
-        let group = "trove_runtime_test_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        try await fixture.admin.raw("CREATE ROLE \(ident: group) NOLOGIN").run()
-        do {
-            try await body(group)
-        } catch {
-            try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
-            throw error
-        }
-        try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
     }
 }

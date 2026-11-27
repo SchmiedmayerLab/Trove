@@ -22,17 +22,10 @@ struct ServerError: Error, Sendable {
     static let unexpectedError = internalServerError("An unexpected error occurred")
     /// A stored provider registration violates its invariants and needs an operator to configure it again.
     static let providerRegistrationUnreadable = internalServerError(
-        title: "Provider Registration Unreadable",
-        "A stored provider registration cannot be read; an operator must configure it again"
+        "A stored provider registration cannot be read; an operator must configure it again",
+        title: "Provider Registration Unreadable"
     )
     static let endpointNotImplemented = Self(status: .notImplemented, title: "Not Implemented", detail: "Endpoint not implemented")
-
-    init(status: HTTPResponse.Status, title: String, detail: String, diagnostics: [ValidationDiagnostic] = []) {
-        self.status = status
-        self.title = title
-        self.detail = detail
-        self.diagnostics = diagnostics
-    }
 
     let status: HTTPResponse.Status
     /// A static name of the problem type, never built from request or stored data: server error responses and their
@@ -41,6 +34,13 @@ struct ServerError: Error, Sendable {
     let detail: String
     /// Findings in the form draft validation reports them; empty for most problems.
     let diagnostics: [ValidationDiagnostic]
+
+    init(status: HTTPResponse.Status, title: String, detail: String, diagnostics: [ValidationDiagnostic] = []) {
+        self.status = status
+        self.title = title
+        self.detail = detail
+        self.diagnostics = diagnostics
+    }
 
     static func badRequest(_ detail: String) -> Self {
         Self(status: .badRequest, title: "Bad Request", detail: detail)
@@ -74,7 +74,7 @@ struct ServerError: Error, Sendable {
         .conflict("\(resource) with identifier '\(identifier)' already exists")
     }
 
-    static func internalServerError(title: String = "Internal Server Error", _ detail: String) -> Self {
+    static func internalServerError(_ detail: String, title: String = "Internal Server Error") -> Self {
         Self(status: .internalServerError, title: title, detail: detail)
     }
 }
