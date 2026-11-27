@@ -54,15 +54,17 @@ final class PublishedStudyService: Module, @unchecked Sendable {
             guard try await StudyValidationService.nextPublicationRevision(studyID: studyId, on: transaction) == candidate.publicationRevision else {
                 throw ServerError.conflict("A publication was accepted after validation; validate the draft again")
             }
-            return try await self.accept(candidate, context: context, on: transaction)
+            return try await self.accept(candidate, draft: study, context: context, on: transaction)
         }
     }
 
     private func accept(
-        _ candidate: StudyPublicationCandidate, context: AuditEvent.Context, on transaction: any Database
+        _ candidate: StudyPublicationCandidate, draft: Study, context: AuditEvent.Context, on transaction: any Database
     ) async throws -> PublishedStudy {
         let snapshot = candidate.snapshot
-        try await providerRuntime.registrations.validate(requirements: snapshot.collectionPolicy.requirements, on: transaction)
+        try await providerRuntime.registrations.validate(
+            requirements: snapshot.collectionPolicy.requirements, draft: draft.collectionRequirements, on: transaction
+        )
         let publication = PublishedStudy(
             studyId: candidate.studyID,
             revision: candidate.publicationRevision,

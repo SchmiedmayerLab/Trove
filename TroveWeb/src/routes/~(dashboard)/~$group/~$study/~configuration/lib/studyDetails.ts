@@ -62,13 +62,36 @@ export const withoutLanguage = (
   };
 };
 
+const emptyReadinessFacts: Required<StudyReadinessContent> = {
+  aims: "",
+  population: "",
+  procedures: "",
+  burden: "",
+  retention: "",
+  withdrawal: "",
+};
+
+/** The readiness facts in the order the General form shows them. */
+export const readinessFactKeys = Object.keys(
+  emptyReadinessFacts,
+) as ReadonlyArray<keyof StudyReadinessContent>;
+
+/**
+ * The stored facts of one language with every fact present. A fact without a stored value is an
+ * empty string, so resetting the form to another language clears each field; a field reset to an
+ * undefined value keeps the text it showed before.
+ */
+export const readinessFormFacts = (
+  content: StudyReadinessContent | undefined,
+): Required<StudyReadinessContent> => ({ ...emptyReadinessFacts, ...content });
+
 export const generalFormValues = (
   study: Pick<StudyResponse, "icon" | "details" | "readinessFacts">,
   language: string,
 ) => {
   const details = study.details.content[language];
   return {
-    facts: study.readinessFacts.content[language] ?? {},
+    facts: readinessFormFacts(study.readinessFacts.content[language]),
     contacts: study.readinessFacts.contacts,
     title: details?.title ?? "",
     icon: study.icon,

@@ -3,6 +3,7 @@
 
 import { Button, Input, Textarea } from "@schmiedmayerlab/grove-design-system";
 import { useFieldArray } from "react-hook-form";
+import { readinessFactKeys } from "../lib/studyDetails";
 import type { GeneralForm } from "../lib/useGeneralForm";
 
 const factLabels = {
@@ -34,16 +35,7 @@ export const ReadinessFields = ({
           `These facts are required in the source language (${language}) before publication.`
         : `Missing translations in ${language} appear as advisories.`}
       </p>
-      {(
-        [
-          "aims",
-          "population",
-          "procedures",
-          "burden",
-          "retention",
-          "withdrawal",
-        ] as const
-      ).map((fact) => (
+      {readinessFactKeys.map((fact) => (
         <label key={fact} className="grid gap-1">
           {factLabels[fact]}
           <Textarea

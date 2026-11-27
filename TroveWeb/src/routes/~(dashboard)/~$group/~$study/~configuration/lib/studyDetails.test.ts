@@ -6,6 +6,7 @@ import type { StudyDetailData } from "@/lib/api/generated/types.gen";
 import {
   detailLanguages,
   generalFormValues,
+  readinessFactKeys,
   withReadinessContent,
   withDetailContent,
   withSourceLanguage,
@@ -64,20 +65,31 @@ describe("readiness form values", () => {
       "zh-Hant": details.content["zh-Hant"],
     });
     expect(patch.readinessFacts).toEqual(study.readinessFacts);
-    expect(generalFormValues({ ...study, ...patch }, "ar").facts).toEqual({});
+    expect(
+      Object.values(generalFormValues({ ...study, ...patch }, "ar").facts),
+    ).toEqual(readinessFactKeys.map(() => ""));
     expect(translated.readinessFacts.content.ar.aims).toBe("هدف");
     expect(() => withoutLanguage(translated, "en")).toThrow();
   });
 
   it("loads shared contacts and never borrows source facts for a translation", () => {
-    expect(generalFormValues(study, "en").facts).toEqual(
-      study.readinessFacts.content.en,
-    );
+    expect(generalFormValues(study, "en").facts).toEqual({
+      aims: "English aims",
+      population: "",
+      procedures: "Survey",
+      burden: "",
+      retention: "",
+      withdrawal: "",
+    });
     expect(generalFormValues(study, "ar")).toMatchObject({
-      facts: {},
       contacts: study.readinessFacts.contacts,
     });
-    expect(Object.keys(generalFormValues(study, "ar").facts)).toEqual([]);
+  });
+
+  it("gives every readiness field an empty value in a language without stored facts", () => {
+    const facts: Record<string, unknown> = generalFormValues(study, "ar").facts;
+    for (const key of readinessFactKeys) expect(facts[key]).toBe("");
+    expect(Object.keys(facts)).toEqual(readinessFactKeys);
   });
   it("updates the edited language and contacts without mutating the loaded snapshot", () => {
     const updated = withReadinessContent(

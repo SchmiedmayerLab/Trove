@@ -46,8 +46,10 @@ struct CollectionRouteAvailabilityTests {
                 sourceTypeIdentifier: "getmeas:1",
                 requirement: .optional
             )
-            await #expect(throws: ProviderFailure.unavailable) {
+            await #expect {
                 try await app.db.transaction { try await service.routes(for: [optional], lock: false, on: $0) }
+            } throws: { error in
+                (error as? ServerError)?.title == ServerError.providerRegistrationUnreadable.title
             }
         }
     }

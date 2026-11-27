@@ -43,6 +43,26 @@ struct CollectionRouteAvailability: Sendable {
             )
         }
     }
+
+    /// Why publication refuses a route the accepted candidate granted and that became unavailable after validation.
+    var publicationRefusal: ValidationDiagnostic {
+        let route = requirement.sourceKind == .serverWorker ? "provider registration" : "participant app"
+        let nextAction = switch (requirement.requirement, requirement.sourceKind) {
+        case (.required, .serverWorker):
+            "Select an approved provider registration that qualifies this source, or mark the requirement optional, "
+                + "and validate the draft again."
+        case (.required, .participantApp):
+            "Select a source the participant app supports, or mark the requirement optional, and validate the draft again."
+        case (.optional, _):
+            "Validate the draft again; the publication then records the optional requirement as unavailable."
+        }
+        return .trove(
+            "route-unavailable",
+            path: "collectionRequirements[\(index)]",
+            message: "The \(requirement.profile) output through the \(route) route became unavailable after validation.",
+            nextAction: nextAction
+        )
+    }
 }
 
 
@@ -64,6 +84,13 @@ extension ProviderRegistrationService {
                 capabilities[id] = self.capabilities(for: registration)
             } catch ProviderFailure.fenced {
                 capabilities[id] = []
+            } catch let failure as ProviderFailure where failure == .unavailable || failure == .invalidConfiguration {
+                // A stored configuration that no longer decodes or validates is operator data that violates the
+                // registration invariants, never an author's draft, so it stays a server error.
+                transaction.logger.error("Stored provider registration is unreadable", metadata: [
+                    "providerRegistrationID": .string(id.uuidString), "failure": .string(String(describing: failure))
+                ])
+                throw ServerError.providerRegistrationUnreadable
             }
         }
         return requirements.enumerated().map { index, requirement in

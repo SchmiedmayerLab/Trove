@@ -18,7 +18,7 @@ import {
 } from "@/lib/api/generated/zod.gen";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
-import { generalFormValues } from "./studyDetails";
+import { generalFormValues, readinessFormFacts } from "./studyDetails";
 
 // Extend the generated StudyDetailContent schema with icon and form-specific
 // nullable semantics (form fields can be explicitly cleared)
@@ -33,7 +33,7 @@ const generalFormSchema = zStudyDetailContent.extend({
 });
 
 const defaultValues: z.infer<typeof generalFormSchema> = {
-  facts: {},
+  facts: readinessFormFacts(undefined),
   contacts: [],
   title: "",
   shortTitle: null,

@@ -20,11 +20,25 @@ struct ServerError: Error, Sendable {
     static let invalidToken = unauthorized("Invalid or expired token")
     static let forbidden = Self(status: .forbidden, title: "Forbidden", detail: "Insufficient permissions")
     static let unexpectedError = internalServerError("An unexpected error occurred")
+    /// A stored provider registration violates its invariants and needs an operator to configure it again.
+    static let providerRegistrationUnreadable = internalServerError(
+        title: "Provider Registration Unreadable",
+        "A stored provider registration cannot be read; an operator must configure it again"
+    )
     static let endpointNotImplemented = Self(status: .notImplemented, title: "Not Implemented", detail: "Endpoint not implemented")
+
+    init(status: HTTPResponse.Status, title: String, detail: String, diagnostics: [ValidationDiagnostic] = []) {
+        self.status = status
+        self.title = title
+        self.detail = detail
+        self.diagnostics = diagnostics
+    }
 
     let status: HTTPResponse.Status
     let title: String
     let detail: String
+    /// Findings in the form draft validation reports them; empty for most problems.
+    let diagnostics: [ValidationDiagnostic]
 
     static func badRequest(_ detail: String) -> Self {
         Self(status: .badRequest, title: "Bad Request", detail: detail)
@@ -58,14 +72,16 @@ struct ServerError: Error, Sendable {
         .conflict("\(resource) with identifier '\(identifier)' already exists")
     }
 
-    static func internalServerError(_ detail: String) -> Self {
-        Self(status: .internalServerError, title: "Internal Server Error", detail: detail)
+    static func internalServerError(title: String = "Internal Server Error", _ detail: String) -> Self {
+        Self(status: .internalServerError, title: title, detail: detail)
     }
 }
 
 extension ServerError {
     var httpResponse: (HTTPResponse, HTTPBody?) {
-        let problemDetails = Components.Schemas.ProblemDetails(title: title, status: status.code, detail: detail)
+        let problemDetails = Components.Schemas.ProblemDetails(
+            title: title, status: status.code, detail: detail, diagnostics: diagnostics.isEmpty ? nil : diagnostics
+        )
 
         var headerFields = HTTPFields()
         headerFields[.contentType] = "application/problem+json; charset=utf-8"

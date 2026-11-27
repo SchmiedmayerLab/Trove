@@ -199,7 +199,8 @@ func configureServices(
     recordingDownloadByteLimit: String? = nil,
     collectionCapacity: CollectionCapacityConfiguration = .standard,
     providerConfiguration: ProviderRuntimeConfiguration? = nil,
-    nativeReconciliationSettings: NativeReconciliationSettings? = nil
+    nativeReconciliationSettings: NativeReconciliationSettings? = nil,
+    providerRuntime: (@Sendable (AuthorizationService, StudyRepository) -> ProviderRuntime)? = nil
 ) async throws {
     let reconciliation = try nativeReconciliationSettings ?? NativeReconciliationSettings()
     let storage = ObjectStorageService(provider: storageProvider)
@@ -207,15 +208,20 @@ func configureServices(
     let downloads = try RecordingDownloadService(storage: storage, maximumByteCount: recordingDownloadByteLimit)
     let authorization = AuthorizationService(grantorAuthority: grantorAuthority)
     let studies = StudyRepository(database: app.db(.psql))
-    let providers = try await ProviderRuntime.configured(
-        application: app,
-        configuration: providerConfiguration,
-        sourceKeyring: sourceKeyring,
-        authorization: authorization,
-        studies: studies,
-        limits: collectionCapacity.admission,
-        validator: validator
-    )
+    // Tests supply a runtime with fixed registrations; deployments configure it from the provider configuration.
+    let providers = if let providerRuntime {
+        providerRuntime(authorization, studies)
+    } else {
+        try await ProviderRuntime.configured(
+            application: app,
+            configuration: providerConfiguration,
+            sourceKeyring: sourceKeyring,
+            authorization: authorization,
+            studies: studies,
+            limits: collectionCapacity.admission,
+            validator: validator
+        )
+    }
     await app.grove.configure {
         reconciliation
         providers

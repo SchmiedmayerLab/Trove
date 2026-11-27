@@ -100,6 +100,15 @@ esac
         actual = {"recording_transfers", *re.findall(r"public\.([a-z_]+)", grants)}
         self.assertEqual(actual, expected)
 
+    def test_language_approvals_admit_only_insertion_and_revocation(self):
+        source = (SCRIPT.parent / "grant-runtime.sql").read_text()
+        privileges = set()
+        for statement in re.findall(r"^GRANT ([^;]+?)\s+TO\s+:\"runtime_name\";", source, re.MULTILINE | re.DOTALL):
+            granted, tables = re.split(r"\s+ON\s+", statement, maxsplit=1)
+            if re.search(r"public\.questionnaire_language_approvals\b", tables):
+                privileges.add(" ".join(granted.split()))
+        self.assertEqual(privileges, {"SELECT, INSERT", "UPDATE (revoked_at, revoked_by_issuer, revoked_by_subject)"})
+
     def test_provider_grants_cover_every_provider_table_without_deletion(self):
         sources = ROOT / "TroveServer/Sources/TroveServer"
         schemas = [*sources.glob("Migrations/Postgres/*Provider*.swift"), sources / "Modules/Provider/ProviderWorkerSchema.swift"]

@@ -3168,6 +3168,15 @@ components:
         detail:
           type: string
           description: A human-readable explanation specific to this occurrence
+        diagnostics:
+          type: array
+          maxItems: 512
+          description: >
+            Findings that explain a refusal in the form draft validation returns, for
+            example the collection routes that became unavailable between validation and
+            publication.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
 
     StudyDataVersions:
       type: string

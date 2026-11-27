@@ -598,25 +598,34 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ProblemDetails/detail`.
             public var detail: Swift.String?
+            /// Findings that explain a refusal in the form draft validation returns, for example the collection routes that became unavailable between validation and publication.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProblemDetails/diagnostics`.
+            public var diagnostics: [Components.Schemas.ValidationDiagnostic]?
             /// Creates a new `ProblemDetails`.
             ///
             /// - Parameters:
             ///   - title: A short, human-readable summary of the problem type
             ///   - status: The HTTP status code
             ///   - detail: A human-readable explanation specific to this occurrence
+            ///   - diagnostics: Findings that explain a refusal in the form draft validation returns, for example the collection routes that became unavailable between validation and publication.
             public init(
                 title: Swift.String,
                 status: Swift.Int,
-                detail: Swift.String? = nil
+                detail: Swift.String? = nil,
+                diagnostics: [Components.Schemas.ValidationDiagnostic]? = nil
             ) {
                 self.title = title
                 self.status = status
                 self.detail = detail
+                self.diagnostics = diagnostics
             }
             public enum CodingKeys: String, CodingKey {
                 case title
                 case status
                 case detail
+                case diagnostics
             }
         }
         /// - Remark: Generated from `#/components/schemas/StudyDataVersions`.
