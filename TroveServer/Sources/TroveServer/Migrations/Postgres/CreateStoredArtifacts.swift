@@ -31,7 +31,7 @@ struct CreateStoredArtifacts: AsyncMigration {
                 .field("cleanup_after", .datetime)
                 .field("last_deleted_at", .datetime)
                 .constraint(.custom(SQLConstraint(algorithm: SQLTableConstraintAlgorithm.check(SQLRaw("""
-                    (purpose IN ('consent', 'publication') AND study_id IS NOT NULL
+                    (purpose IN ('consent', 'publication', 'taskResponse') AND study_id IS NOT NULL
                         AND participant_id IS NULL AND source_binding_id IS NULL)
                     OR (purpose = 'recording' AND study_id IS NULL AND group_id IS NULL
                         AND participant_id IS NOT NULL AND source_binding_id IS NOT NULL AND owner_id = participant_id)

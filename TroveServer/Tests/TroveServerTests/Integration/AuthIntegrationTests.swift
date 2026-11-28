@@ -253,6 +253,9 @@ struct AuthIntegrationTests {
             if let ifMatch = endpoint.ifMatch {
                 req.headers.replaceOrAdd(name: "If-Match", value: ifMatch)
             }
+            if endpoint.method == .POST, endpoint.path.hasSuffix("/completion") || endpoint.path.hasSuffix("/failure") {
+                req.headers.replaceOrAdd(name: "Idempotency-Key", value: UUID().uuidString)
+            }
             if endpoint.method == .POST, endpoint.path.hasSuffix("/consents") {
                 req.headers.replaceOrAdd(name: "Idempotency-Key", value: UUID().uuidString)
                 req.headers.replaceOrAdd(name: "If-Match", value: EnrollmentStateTag.make(enrollmentID: dummyUUID, version: 1))

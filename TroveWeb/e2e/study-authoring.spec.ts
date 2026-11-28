@@ -471,10 +471,30 @@ test.describe("study authoring", () => {
       .getByRole("link", { name: informationName, exact: true })
       .click();
     await page.getByRole("button", { name: "Add schedule" }).click();
-    await page
-      .getByRole("dialog")
+    const scheduleDialog = page.getByRole("dialog", { name: "Schedule" });
+    await scheduleDialog.getByLabel("Enable notifications").check();
+    await scheduleDialog.getByLabel("Remind at a set time").check();
+    const reminderTime = scheduleDialog.getByRole("combobox", {
+      name: "Reminder time",
+    });
+    await reminderTime.click();
+    await page.getByRole("option", { name: /^08:00\b/ }).click();
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(reminderTime).toHaveText("08:00");
+    const scheduleResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/components\/[^/]+\/schedules$/.test(response.url()),
+    );
+    await scheduleDialog
       .getByRole("button", { name: "Add schedule" })
-      .click();
+      .press("Enter");
+    const createdSchedule = await scheduleResponse;
+    expect(createdSchedule.status()).toBe(201);
+    expect(await createdSchedule.json()).toMatchObject({
+      notification: true,
+      reminderTime: { hour: 8 },
+    });
     await expect(
       page.getByText("Schedule created", { exact: true }),
     ).toBeVisible();

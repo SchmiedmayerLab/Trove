@@ -24,7 +24,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
     /// A validation ID is the publication identity; exact retries never create a second archive or revision.
     func publish(studyId: UUID, validationID: UUID, expectedRevision: UUID) async throws -> PublishedStudy {
         let access = try await authorizationService.prepareDraftAccess(operation: .publish)
-        return try await repository.database.transaction { transaction in
+        let (published, created) = try await repository.database.transaction { transaction -> (PublishedStudy, Bool) in
             let study = try await self.studyRepository.lockStudy(id: studyId, on: transaction)
             let context = try await self.authorizationService.authorizeDraft(access, study: study, on: transaction)
             guard let candidate = try await StudyPublicationCandidate.find(validationID, on: transaction),
@@ -45,7 +45,7 @@ final class PublishedStudyService: Module, @unchecked Sendable {
                     scope: .study(studyID: studyId, groupID: study.$group.id),
                     target: .init(id: validationID, version: String(accepted.revision))
                 ), on: transaction)
-                return accepted
+                return (accepted, false)
             }
 
             try study.requireDraftRevision(expectedRevision)
@@ -54,8 +54,12 @@ final class PublishedStudyService: Module, @unchecked Sendable {
             guard try await StudyValidationService.nextPublicationRevision(studyID: studyId, on: transaction) == candidate.publicationRevision else {
                 throw ServerError.conflict("A publication was accepted after validation; validate the draft again")
             }
-            return try await self.accept(candidate, draft: study, context: context, on: transaction)
+            return (try await self.accept(candidate, draft: study, context: context, on: transaction), true)
         }
+        if created {
+            await prefillQuestionnaires(of: published)
+        }
+        return published
     }
 
     private func accept(
@@ -111,13 +115,17 @@ final class PublishedStudyService: Module, @unchecked Sendable {
             target: .init(id: try published.requireId(), version: String(revision))
         )
         return try await AuditRepository.disclose(event, on: repository.database) { _ in
-            try await self.artifacts.download(
-                id: published.artifactID,
-                ownerID: studyId,
-                purpose: .publication,
-                expected: (published.bundleKey, published.bundleDigest)
-            )
+            try await self.publicationBytes(published)
         }
+    }
+
+    func publicationBytes(_ publication: PublishedStudy) async throws -> Data {
+        try await artifacts.download(
+            id: publication.artifactID,
+            ownerID: publication.$study.id,
+            purpose: .publication,
+            expected: (publication.bundleKey, publication.bundleDigest)
+        )
     }
 
     func listPublished(studyId: UUID) async throws -> [PublishedStudy] {

@@ -30,7 +30,7 @@ MAX_REPLY = 256 * 1024
 MAX_DIAGNOSTICS = 100
 TIMEOUT = 120
 ASSETS = Path(os.environ.get("VALIDATOR_ASSETS", "/opt/validator"))
-ROUTES = ("/validate", "/validate/questionnaire", "/validate/questionnaire-response")
+ROUTES = ("/validate", "/validate/questionnaire", "/validate/questionnaire-response", "/validate/questionnaire-response-structure")
 # The response route's exact framing; the server embeds both documents byte for byte.
 PAIR_PREFIX = '{"resourceType":"Bundle","type":"collection","entry":[{"resource":'
 PAIR_INFIX = '},{"resource":'
@@ -74,6 +74,9 @@ NOT_EVALUATED = frozenset({
     "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_CS",
     "UNABLE_TO_CHECK_IF_THE_PROVIDED_CODES_ARE_IN_THE_VALUE_SET_VS",
 })
+# The structure route validates a response without its Questionnaire, which the engine cannot resolve. The server
+# checks the response against the exact published Questionnaire bytes with Grove's pair rules.
+PAIR_ONLY = frozenset({"Questionnaire_QR_Q_NotFound"})
 
 
 def bound_child_output():
@@ -349,7 +352,8 @@ class Validator:
 
     def route(self, path):
         """The one validation each fixed route performs; routes never select each other's checks."""
-        return dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response)))[path]
+        return dict(zip(ROUTES, (self.validate, self.validate_questionnaire, self.validate_questionnaire_response,
+                                 self.validate_response_structure)))[path]
 
     def respond(self, path, raw, deliver, restore=True):
         """Validate, deliver the result, then start a stopped engine before any other request runs.
@@ -407,6 +411,32 @@ class Validator:
             return 200, self.response(raw, valid=True)
         except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
             return 503, self.response(raw, code="validator_unavailable")
+
+    def validate_response_structure(self, raw):
+        """Validate one Grove QuestionnaireResponse with the reusable engine, without its Questionnaire.
+
+        Admission of a participant's task response uses this route; its reply has the exchange route's shape and
+        no diagnostics.
+        """
+        purpose = "questionnaire-response-structure"
+        try:
+            resource = strict_json(raw)
+        except (ValueError, UnicodeError, RecursionError):
+            return 422, dict(self.response(raw, code="invalid_json"), purpose=purpose)
+        if not self.claims(resource, "QuestionnaireResponse", RESPONSE_PROFILE):
+            return 422, dict(self.response(raw, code="invalid_fhir"), purpose=purpose)
+        try:
+            outcome = self.engine.validate(raw)
+        except (OSError, ValueError, http.client.HTTPException, subprocess.SubprocessError):
+            return 503, dict(self.response(raw, code="validator_unavailable"), purpose=purpose)
+        errors = [item for item in (issue_diagnostic(issue, {}) for issue in outcome["issue"])
+                  if item["severity"] == "error" and item["rule"] not in PAIR_ONLY]
+        if any(item["rule"] in NOT_EVALUATED for item in errors):
+            # A check the engine could not run establishes neither validity nor a rejection of the answers.
+            return 503, dict(self.response(raw, code="validator_unavailable"), purpose=purpose)
+        if errors:
+            return 422, dict(self.response(raw, code="invalid_fhir"), purpose=purpose)
+        return 200, dict(self.response(raw, valid=True), purpose=purpose)
 
     def report(self, raw, purpose, status, diagnostics=()):
         """An authoring result with its findings, errors first, bounded in count and size."""
@@ -652,9 +682,12 @@ def main():
     purpose.add_argument("--questionnaire", action="store_true", help="validate a Questionnaire in stdin mode")
     purpose.add_argument("--questionnaire-response", action="store_true",
                          help="validate a Bundle of a Questionnaire and its QuestionnaireResponse in stdin mode")
+    purpose.add_argument("--questionnaire-response-structure", action="store_true",
+                         help="validate one QuestionnaireResponse without its Questionnaire in stdin mode")
     arguments = parser.parse_args()
-    if (arguments.questionnaire or arguments.questionnaire_response) and not arguments.stdin:
-        parser.error("--questionnaire and --questionnaire-response require --stdin")
+    if (arguments.questionnaire or arguments.questionnaire_response or arguments.questionnaire_response_structure) \
+            and not arguments.stdin:
+        parser.error("--questionnaire, --questionnaire-response and --questionnaire-response-structure require --stdin")
     # Applies to stdin mode as well as the HTTP handler.
     signal.signal(signal.SIGALRM, Handler.read_timeout)
     try:
@@ -664,7 +697,8 @@ def main():
         return 2
     try:
         if arguments.stdin:
-            route = ROUTES[2] if arguments.questionnaire_response else ROUTES[1] if arguments.questionnaire else ROUTES[0]
+            route = ROUTES[3] if arguments.questionnaire_response_structure else ROUTES[2] if arguments.questionnaire_response \
+                else ROUTES[1] if arguments.questionnaire else ROUTES[0]
             replies = []
             validator.respond(route, sys.stdin.buffer.read(MAX_BODY + 1), lambda *reply: replies.append(reply), restore=False)
             status, result = replies[0]

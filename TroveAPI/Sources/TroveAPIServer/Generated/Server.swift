@@ -729,6 +729,17 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.excuseStudyTask(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/tasks/{taskId}/excusal")
+        )
+        try transport.register(
+            {
                 try await server.getParticipantTasks(
                     request: $0,
                     body: $1,
@@ -737,6 +748,39 @@ extension APIProtocol {
             },
             method: .get,
             path: server.apiPathComponentsWithServerPrefix("/participant/enrollments/{enrollmentId}/tasks")
+        )
+        try transport.register(
+            {
+                try await server.startTaskSession(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/tasks/{taskId}/session")
+        )
+        try transport.register(
+            {
+                try await server.completeParticipantTask(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/tasks/{taskId}/completion")
+        )
+        try transport.register(
+            {
+                try await server.failParticipantTask(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/participant/tasks/{taskId}/failure")
         )
         try transport.register(
             {
@@ -10192,6 +10236,99 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
             }
         )
     }
+    /// Excuse an open or missed questionnaire assignment
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Cancels the occurrence with the status reason excused, so it cannot be completed afterwards, and keeps it in the participant's task stream. A completed, failed or already cancelled occurrence cannot be excused.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/tasks/{taskId}/excusal`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)`.
+    func excuseStudyTask(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.ExcuseStudyTask.id,
+            using: {
+                APIHandler.excuseStudyTask($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.ExcuseStudyTask.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    taskId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "taskId",
+                        as: Swift.String.self
+                    )
+                )
+                let headers: Operations.ExcuseStudyTask.Input.Headers = .init(
+                    ifMatch: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "If-Match",
+                        as: Swift.String.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                return Operations.ExcuseStudyTask.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
     /// Synchronize questionnaire assignments for an owned enrollment
     ///
     /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
@@ -10239,6 +10376,337 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     path: path,
                     query: query,
                     headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Confirm a session that the device started for an owned assignment
+    ///
+    /// The device starts a session, also while offline, with its own session ID, the chosen administration language and its start time, and sends it at the next sync. The server confirms the first session of an assigned occurrence and returns it again for the same ID, language and start time. The session fixes the language, the start time, the accepted consent, the performance window and the subject identifier. The start time must lie within the performance window and at most five minutes after server time; the confirmation may arrive after the window ended while the enrollment is active. Once a session is confirmed, any other session ID of the occurrence receives 409 with the title "Task Session Superseded": another device started the occurrence first, and this device keeps its response as not accepted. A session ID already used for another occurrence receives 409. The language must have a publication approval for the exact Questionnaire digest.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/session`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)`.
+    func startTaskSession(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.StartTaskSession.id,
+            using: {
+                APIHandler.startTaskSession($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.StartTaskSession.Input.Path = .init(taskId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "taskId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.StartTaskSession.Input.Headers = .init(
+                    ifMatch: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "If-Match",
+                        as: Swift.String.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.StartTaskSession.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Operations.StartTaskSession.Input.Body.JsonPayload.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.StartTaskSession.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Accept a completed QuestionnaireResponse for an owned session
+    ///
+    /// Send unchanged UTF-8 FHIR JSON bytes. The subject must be a Patient reference containing only type and the exact identifier returned at session start. Authored must be an instant from the start of the performance window, and not before the whole second of the session start, until its exclusive cutoff, and at most five minutes after server time. The upload may arrive after the cutoff: a response authored within the window is accepted while the enrollment and its consent remain active. A window without an end has no deadline. A completion for a session other than the occurrence's confirmed session receives 409 "Task Session Superseded". Responses are checked against the exact published Questionnaire bytes the occurrence pins. The first accepted completion of an occurrence wins. Retrying the same bytes, session tag and command key returns the original receipt while the enrollment is active; any other completion of the occurrence receives 409. The occurrence then appears as completed in the task stream.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/completion`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)`.
+    func completeParticipantTask(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.CompleteParticipantTask.id,
+            using: {
+                APIHandler.completeParticipantTask($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.CompleteParticipantTask.Input.Path = .init(taskId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "taskId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.CompleteParticipantTask.Input.Headers = .init(
+                    ifMatch: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "If-Match",
+                        as: Swift.String.self
+                    ),
+                    idempotencyKey: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Idempotency-Key",
+                        as: Swift.String.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.CompleteParticipantTask.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/octet-stream"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/octet-stream":
+                    body = try converter.getRequiredRequestBodyAsBinary(
+                        OpenAPIRuntime.HTTPBody.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .binary(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.CompleteParticipantTask.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Record that an owned session could not be completed
+    ///
+    /// Records the failed outcome of an occurrence whose session started: the participant attempted it, but no response can be completed. The device reports when the attempt failed. A failure is accepted under the same conditions as a completion: its time lies within the performance window, not before the whole second of the session start, and at most five minutes after server time, the session's consent and language approval are still current, and the enrollment is active; the report may arrive after the cutoff. It is final. The occurrence then appears as failed in the task stream and accepts no completion or excusal. Retrying with the same session tag and command key returns the original receipt while the enrollment is active; any other outcome of the occurrence receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/failure`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)`.
+    func failParticipantTask(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.FailParticipantTask.id,
+            using: {
+                APIHandler.failParticipantTask($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.FailParticipantTask.Input.Path = .init(taskId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "taskId",
+                    as: Swift.String.self
+                ))
+                let headers: Operations.FailParticipantTask.Input.Headers = .init(
+                    ifMatch: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "If-Match",
+                        as: Swift.String.self
+                    ),
+                    idempotencyKey: try converter.getRequiredHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Idempotency-Key",
+                        as: Swift.String.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.FailParticipantTask.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Operations.FailParticipantTask.Input.Body.JsonPayload.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.FailParticipantTask.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
                 )
             },
             serializer: { output, request in

@@ -133,6 +133,20 @@ writes the stored resource to standard output byte for byte, without a trailing
 newline, so an export of an imported file is identical to it. Full validation and
 supported questionnaire execution rules remain server-owned.
 
+## Schedules
+
+`trove study schedule list <study-id> --component <component-id>` prints a
+component's schedules.
+`trove study schedule add <study-id> --component <component-id> --revision <draft-revision> --file schedule.json`
+and `trove study schedule replace <study-id> --component <component-id> --schedule <schedule-id> --revision <draft-revision> --file schedule.json`
+accept a `ComponentScheduleInput`. With `"notification": true`, an optional
+`reminderTime` sets the time of day of each occurrence's reminder in the study's
+enrollment time zone, for example
+`{"scheduleDefinition":{"type":"repeated","pattern":{"type":"daily","hour":9}},"completionPolicy":"sameDay","notification":true,"reminderTime":{"hour":8,"minute":30}}`.
+Without it, the reminder fires at the occurrence's due time. The server refuses a
+reminder time without notifications. The CLI checks that the reply carries the
+notification setting and reminder time it sent.
+
 ## Validation
 
 `trove questionnaire validate --study <study-id> --component <component-id>`

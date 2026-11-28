@@ -457,7 +457,14 @@ export const ScheduleDialog = () => {
                       name={name}
                       disabled={disabled}
                       checked={value}
-                      onCheckedChange={onChange}
+                      onCheckedChange={(checked) => {
+                        onChange(checked);
+                        if (checked !== true) {
+                          form.setValue("reminderTime", undefined, {
+                            shouldDirty: true,
+                          });
+                        }
+                      }}
                     />
                     <Label htmlFor="notification" className="cursor-pointer">
                       Enable notifications
@@ -466,6 +473,49 @@ export const ScheduleDialog = () => {
                 )}
               />
             </div>
+
+            {formValues.notification && (
+              <div className="border-border-tertiary bg-layer flex flex-wrap items-center gap-3 border-b px-6 py-4">
+                <Checkbox
+                  id="reminderTime"
+                  checked={formValues.reminderTime !== undefined}
+                  onCheckedChange={(checked) => {
+                    form.setValue(
+                      "reminderTime",
+                      checked === true ?
+                        { hour, minute, second: 0 }
+                      : undefined,
+                      { shouldDirty: true },
+                    );
+                  }}
+                />
+                <Label htmlFor="reminderTime" className="cursor-pointer">
+                  Remind at a set time
+                </Label>
+                {formValues.reminderTime && (
+                  <TimeSelect
+                    aria-label="Reminder time"
+                    className="w-32"
+                    value={{
+                      hours: formValues.reminderTime.hour,
+                      minutes: (formValues.reminderTime.minute ?? 0) as 0 | 30,
+                    }}
+                    onChange={({ hours, minutes }) => {
+                      form.setValue(
+                        "reminderTime",
+                        { hour: hours, minute: minutes, second: 0 },
+                        { shouldDirty: true },
+                      );
+                    }}
+                  />
+                )}
+                <p className="text-text-tertiary w-full text-sm">
+                  {formValues.reminderTime ?
+                    "The reminder fires at this time on each occurrence's day, in the study's time zone."
+                  : "The reminder fires at the schedule time."}
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-4 px-6 pt-6">
               <p className="text-text-tertiary text-sm">

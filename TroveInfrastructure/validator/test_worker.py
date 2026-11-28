@@ -161,7 +161,7 @@ class QuestionnaireValidationTests(unittest.TestCase):
         self.assertTrue(all(len(item["message"]) <= 1000 for item in response["diagnostics"]))
 
     def test_routes_do_not_select_each_others_validation(self):
-        methods = ("validate", "validate_questionnaire", "validate_questionnaire_response")
+        methods = ("validate", "validate_questionnaire", "validate_questionnaire_response", "validate_response_structure")
         for path, selected in zip(worker.ROUTES, methods):
             with self.subTest(path=path):
                 handler = object.__new__(worker.Handler)
@@ -315,6 +315,69 @@ class QuestionnaireResponseValidationTests(unittest.TestCase):
             status, result = self.validator.validate_questionnaire_response(self.raw(questionnaire, response))
         self.assertEqual((status, result["status"], result["diagnostics"][0]["rule"]), (422, "invalid", "pair-input"))
         run.assert_not_called()
+
+
+class ResponseStructureValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.validator = object.__new__(worker.Validator)
+        self.validator.manifest = {"contractRevision": "pinned"}
+        self.validator.identity = "sha256:pinned"
+        self.validator.engine = Mock()
+        self.validator.engine.validate.return_value = outcome(
+            official_issue("error", "Questionnaire_QR_Q_NotFound", "QuestionnaireResponse.questionnaire"))
+        self.resource = {"resourceType": "QuestionnaireResponse", "meta": {"profile": [worker.RESPONSE_PROFILE]},
+                         "status": "completed", "questionnaire": "https://example.org/Questionnaire/q|1.0.0"}
+
+    def validate(self, raw=None):
+        raw = raw if raw is not None else json.dumps(self.resource).encode()
+        status, response = self.validator.validate_response_structure(raw)
+        self.assertEqual(response["purpose"], "questionnaire-response-structure")
+        self.assertEqual(response["sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual((response["contractRevision"], response["validatorIdentity"]), ("pinned", "sha256:pinned"))
+        self.assertNotIn("diagnostics", response)
+        self.assertLess(len(json.dumps(response)), 2048)
+        return status, response
+
+    def test_engine_validates_exact_bytes_and_ignores_only_the_unresolved_questionnaire(self):
+        status, response = self.validate()
+        self.assertEqual((status, response["valid"], response.get("code")), (200, True, None))
+        self.validator.engine.validate.assert_called_once_with(json.dumps(self.resource).encode())
+
+    def test_any_other_engine_error_is_invalid(self):
+        for severity in ("error", "fatal"):
+            with self.subTest(severity=severity):
+                self.validator.engine.validate.return_value = outcome(
+                    official_issue(severity, "Type_Specific_Checks_DT_DateTime_Valid", "QuestionnaireResponse.authored"))
+                status, response = self.validate()
+                self.assertEqual((status, response["valid"], response["code"]), (422, False, "invalid_fhir"))
+
+    def test_a_check_the_engine_could_not_run_is_unavailable(self):
+        self.validator.engine.validate.return_value = outcome(
+            official_issue("error", "Terminology_TX_ValueSet_NotFound", "QuestionnaireResponse.item[0].answer[0].valueCoding"))
+        status, response = self.validate()
+        self.assertEqual((status, response["valid"], response["code"]), (503, False, "validator_unavailable"))
+
+    def test_warnings_do_not_reject(self):
+        self.validator.engine.validate.return_value = outcome(official_issue("warning", "Some_Warning", "QuestionnaireResponse"))
+        self.assertEqual(self.validate()[0], 200)
+
+    def test_rejects_other_shapes_without_running_the_engine(self):
+        cases = [b'{"resourceType":"QuestionnaireResponse","resourceType":"QuestionnaireResponse"}', b'not json',
+                 json.dumps(dict(self.resource, resourceType="Questionnaire")).encode(),
+                 json.dumps(dict(self.resource, meta={})).encode()]
+        for raw in cases:
+            with self.subTest(raw=raw):
+                status, response = self.validate(raw)
+                self.assertEqual((status, response["valid"]), (422, False))
+                self.assertIn(response["code"], ("invalid_json", "invalid_fhir"))
+        self.validator.engine.validate.assert_not_called()
+
+    def test_engine_failure_is_unavailable(self):
+        for failure in (OSError(), ValueError(), subprocess.SubprocessError()):
+            with self.subTest(failure=failure):
+                self.validator.engine.validate.side_effect = failure
+                status, response = self.validate()
+                self.assertEqual((status, response["code"]), (503, "validator_unavailable"))
 
 
 class DiagnosticTests(unittest.TestCase):

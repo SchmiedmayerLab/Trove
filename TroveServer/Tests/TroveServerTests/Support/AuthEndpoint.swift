@@ -73,4 +73,10 @@ struct AuthEndpoint: Sendable {
         }
         return false
     }
+
+    func with(ifMatch: String) -> Self {
+        var endpoint = self
+        endpoint.ifMatch = ifMatch
+        return endpoint
+    }
 }

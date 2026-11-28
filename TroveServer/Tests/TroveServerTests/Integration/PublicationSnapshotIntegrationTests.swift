@@ -19,7 +19,7 @@ import VaporTesting
 import ZIPFoundation
 
 
-private actor PublicationStorage: BufferedTestObjectStorageProvider {
+actor PublicationStorage: BufferedTestObjectStorageProvider {
     private var objects: [String: Data] = [:]
     private var nextUpload: (@Sendable () async throws -> Void)?
     private(set) var uploads: [String] = []
@@ -45,11 +45,43 @@ private actor PublicationStorage: BufferedTestObjectStorageProvider {
 
     func ensureBucketExists() {}
     func delete(key: String) { objects.removeValue(forKey: key) }
+    func keys(prefix: String) async throws -> [String] { objects.keys.filter { $0.hasPrefix(prefix) } }
     func shutdown() {}
 }
 
 
 struct PublicationSnapshotIntegrationTests {
+    @Test
+    func mismatchedTaskPublicationOrArtifactCannotReadTheBundle() async throws {
+        let storage = PublicationStorage()
+        try await TestApp.withApp(storageProvider: storage) { app, _ in
+            let study = try await Self.study(on: app)
+            let studyID = try study.requireId()
+            let published = try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyID, revision: 1)
+            let language = try #require(LanguageTag(rawValue: "en-US"))
+            let service = app.grove[PublishedStudyService.self]
+            for (publicationID, artifactID) in [(UUID(), published.artifactID), (try published.requireId(), UUID())] {
+                let instrument = PublishedStudyService.TaskInstrument(
+                    studyID: studyID,
+                    publicationID: publicationID,
+                    revision: 1,
+                    artifactID: artifactID,
+                    componentID: UUID(),
+                    baseLanguage: language.rawValue,
+                    sha256: FHIRValidationClient.digest(Data())
+                )
+                await #expect {
+                    try await service.checkTaskResponse(instrument: instrument, sessionLanguage: language, response: Data())
+                } throws: { ($0 as? ServerError)?.status == .internalServerError }
+                let oversized = Data(repeating: 0, count: FHIRValidationClient.maximumBytes + 1)
+                await #expect {
+                    try await service.checkTaskResponse(instrument: instrument, sessionLanguage: language, response: oversized)
+                } throws: { ($0 as? ServerError)?.status == .contentTooLarge }
+            }
+            #expect(await storage.downloads.isEmpty)
+        }
+    }
+
     @Test
     func terminalRevisionCannotOverflowOrUploadAnotherArchive() async throws {
         let storage = PublicationStorage()

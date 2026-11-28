@@ -42,12 +42,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
     public.groups, public.studies, public.components, public.component_schedules,
     public.participants, public.invitation_codes, public.enrollments, public.stored_artifacts
 TO :"runtime_name";
+GRANT SELECT, INSERT ON public.task_sessions, public.task_completions, public.task_failures, public.task_excusals TO :"runtime_name";
 GRANT SELECT, INSERT ON public.published_studies, public.enrollment_consents TO :"runtime_name";
 -- Language approvals are written once; a trigger admits only their revocation afterwards.
 GRANT SELECT, INSERT ON public.questionnaire_language_approvals TO :"runtime_name";
 GRANT UPDATE (revoked_at, revoked_by_issuer, revoked_by_subject) ON public.questionnaire_language_approvals TO :"runtime_name";
 GRANT SELECT, INSERT ON public.task_occurrences TO :"runtime_name";
-GRANT UPDATE (invalidated_version, invalidated_at) ON public.task_occurrences TO :"runtime_name";
+GRANT UPDATE (invalidated_version, invalidated_at, assigned_version, projection) ON public.task_occurrences TO :"runtime_name";
 GRANT SELECT, INSERT, DELETE ON public.task_sync_cursors TO :"runtime_name";
 GRANT SELECT, INSERT ON public.native_collection_reconciliations TO :"runtime_name";
 GRANT UPDATE (instruction, completed_at) ON public.native_collection_reconciliations TO :"runtime_name";

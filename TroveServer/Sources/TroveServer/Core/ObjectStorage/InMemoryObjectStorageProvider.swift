@@ -28,6 +28,10 @@ final class InMemoryObjectStorageProvider: ObjectStorageProvider, @unchecked Sen
         return HTTPBody(value)
     }
 
+    func keys(prefix: String) async throws -> [String] {
+        lock.withLock { storage.keys.filter { $0.hasPrefix(prefix) } }
+    }
+
     func ensureBucketExists() async throws {}
 
     func delete(key: String) async throws {

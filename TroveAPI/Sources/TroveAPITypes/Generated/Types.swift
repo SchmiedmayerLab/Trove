@@ -414,6 +414,14 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /studies/{studyId}/tasks`.
     /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)`.
     func getStudyTasks(_ input: Operations.GetStudyTasks.Input) async throws -> Operations.GetStudyTasks.Output
+    /// Excuse an open or missed questionnaire assignment
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Cancels the occurrence with the status reason excused, so it cannot be completed afterwards, and keeps it in the participant's task stream. A completed, failed or already cancelled occurrence cannot be excused.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/tasks/{taskId}/excusal`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)`.
+    func excuseStudyTask(_ input: Operations.ExcuseStudyTask.Input) async throws -> Operations.ExcuseStudyTask.Output
     /// Synchronize questionnaire assignments for an owned enrollment
     ///
     /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
@@ -422,6 +430,30 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/tasks`.
     /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)`.
     func getParticipantTasks(_ input: Operations.GetParticipantTasks.Input) async throws -> Operations.GetParticipantTasks.Output
+    /// Confirm a session that the device started for an owned assignment
+    ///
+    /// The device starts a session, also while offline, with its own session ID, the chosen administration language and its start time, and sends it at the next sync. The server confirms the first session of an assigned occurrence and returns it again for the same ID, language and start time. The session fixes the language, the start time, the accepted consent, the performance window and the subject identifier. The start time must lie within the performance window and at most five minutes after server time; the confirmation may arrive after the window ended while the enrollment is active. Once a session is confirmed, any other session ID of the occurrence receives 409 with the title "Task Session Superseded": another device started the occurrence first, and this device keeps its response as not accepted. A session ID already used for another occurrence receives 409. The language must have a publication approval for the exact Questionnaire digest.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/session`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)`.
+    func startTaskSession(_ input: Operations.StartTaskSession.Input) async throws -> Operations.StartTaskSession.Output
+    /// Accept a completed QuestionnaireResponse for an owned session
+    ///
+    /// Send unchanged UTF-8 FHIR JSON bytes. The subject must be a Patient reference containing only type and the exact identifier returned at session start. Authored must be an instant from the start of the performance window, and not before the whole second of the session start, until its exclusive cutoff, and at most five minutes after server time. The upload may arrive after the cutoff: a response authored within the window is accepted while the enrollment and its consent remain active. A window without an end has no deadline. A completion for a session other than the occurrence's confirmed session receives 409 "Task Session Superseded". Responses are checked against the exact published Questionnaire bytes the occurrence pins. The first accepted completion of an occurrence wins. Retrying the same bytes, session tag and command key returns the original receipt while the enrollment is active; any other completion of the occurrence receives 409. The occurrence then appears as completed in the task stream.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/completion`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)`.
+    func completeParticipantTask(_ input: Operations.CompleteParticipantTask.Input) async throws -> Operations.CompleteParticipantTask.Output
+    /// Record that an owned session could not be completed
+    ///
+    /// Records the failed outcome of an occurrence whose session started: the participant attempted it, but no response can be completed. The device reports when the attempt failed. A failure is accepted under the same conditions as a completion: its time lies within the performance window, not before the whole second of the session start, and at most five minutes after server time, the session's consent and language approval are still current, and the enrollment is active; the report may arrive after the cutoff. It is final. The occurrence then appears as failed in the task stream and accepts no completion or excusal. Retrying with the same session tag and command key returns the original receipt while the enrollment is active; any other outcome of the occurrence receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/failure`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)`.
+    func failParticipantTask(_ input: Operations.FailParticipantTask.Input) async throws -> Operations.FailParticipantTask.Output
     /// Read exact consented collection windows for an owned enrollment
     ///
     /// Returns an audited, consistent snapshot of accepted consent windows and their published collection requirements. No consent responses, signatures, artifacts or samples are returned. Withdrawal or no accepted consent yields no windows. Publication alone does not change the timeline. Inconsistent history or unknown policy fails the whole read, never a partial plan. Retain a complete, account-bound set of accepted plans for offline collection until each enrollment ends. Observation time is not an expiration and no elapsed-time lease or per-page network authorization is required. Enforce local withdrawal, account changes, known source revocation and known enrollment end. Refresh on reconnect and enrollment or consent changes; initial consent and broader revision adoption require server authorization. A retained plan is not an upload capability: the receiver independently checks every submitted target against its original consent and revision.
@@ -1434,6 +1466,22 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Excuse an open or missed questionnaire assignment
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Cancels the occurrence with the status reason excused, so it cannot be completed afterwards, and keeps it in the participant's task stream. A completed, failed or already cancelled occurrence cannot be excused.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/tasks/{taskId}/excusal`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)`.
+    public func excuseStudyTask(
+        path: Operations.ExcuseStudyTask.Input.Path,
+        headers: Operations.ExcuseStudyTask.Input.Headers
+    ) async throws -> Operations.ExcuseStudyTask.Output {
+        try await excuseStudyTask(Operations.ExcuseStudyTask.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Synchronize questionnaire assignments for an owned enrollment
     ///
     /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
@@ -1450,6 +1498,60 @@ extension APIProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// Confirm a session that the device started for an owned assignment
+    ///
+    /// The device starts a session, also while offline, with its own session ID, the chosen administration language and its start time, and sends it at the next sync. The server confirms the first session of an assigned occurrence and returns it again for the same ID, language and start time. The session fixes the language, the start time, the accepted consent, the performance window and the subject identifier. The start time must lie within the performance window and at most five minutes after server time; the confirmation may arrive after the window ended while the enrollment is active. Once a session is confirmed, any other session ID of the occurrence receives 409 with the title "Task Session Superseded": another device started the occurrence first, and this device keeps its response as not accepted. A session ID already used for another occurrence receives 409. The language must have a publication approval for the exact Questionnaire digest.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/session`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)`.
+    public func startTaskSession(
+        path: Operations.StartTaskSession.Input.Path,
+        headers: Operations.StartTaskSession.Input.Headers,
+        body: Operations.StartTaskSession.Input.Body
+    ) async throws -> Operations.StartTaskSession.Output {
+        try await startTaskSession(Operations.StartTaskSession.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Accept a completed QuestionnaireResponse for an owned session
+    ///
+    /// Send unchanged UTF-8 FHIR JSON bytes. The subject must be a Patient reference containing only type and the exact identifier returned at session start. Authored must be an instant from the start of the performance window, and not before the whole second of the session start, until its exclusive cutoff, and at most five minutes after server time. The upload may arrive after the cutoff: a response authored within the window is accepted while the enrollment and its consent remain active. A window without an end has no deadline. A completion for a session other than the occurrence's confirmed session receives 409 "Task Session Superseded". Responses are checked against the exact published Questionnaire bytes the occurrence pins. The first accepted completion of an occurrence wins. Retrying the same bytes, session tag and command key returns the original receipt while the enrollment is active; any other completion of the occurrence receives 409. The occurrence then appears as completed in the task stream.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/completion`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)`.
+    public func completeParticipantTask(
+        path: Operations.CompleteParticipantTask.Input.Path,
+        headers: Operations.CompleteParticipantTask.Input.Headers,
+        body: Operations.CompleteParticipantTask.Input.Body
+    ) async throws -> Operations.CompleteParticipantTask.Output {
+        try await completeParticipantTask(Operations.CompleteParticipantTask.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Record that an owned session could not be completed
+    ///
+    /// Records the failed outcome of an occurrence whose session started: the participant attempted it, but no response can be completed. The device reports when the attempt failed. A failure is accepted under the same conditions as a completion: its time lies within the performance window, not before the whole second of the session start, and at most five minutes after server time, the session's consent and language approval are still current, and the enrollment is active; the report may arrive after the cutoff. It is final. The occurrence then appears as failed in the task stream and accepts no completion or excusal. Retrying with the same session tag and command key returns the original receipt while the enrollment is active; any other outcome of the occurrence receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/failure`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)`.
+    public func failParticipantTask(
+        path: Operations.FailParticipantTask.Input.Path,
+        headers: Operations.FailParticipantTask.Input.Headers,
+        body: Operations.FailParticipantTask.Input.Body
+    ) async throws -> Operations.FailParticipantTask.Output {
+        try await failParticipantTask(Operations.FailParticipantTask.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Read exact consented collection windows for an owned enrollment

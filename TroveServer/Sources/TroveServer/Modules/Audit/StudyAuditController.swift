@@ -53,6 +53,12 @@ extension Components.Schemas.StudyAuditAction {
     // An exhaustive disclosure allowlist; splitting the mapping would obscure its coverage.
     init(_ action: AuditEvent.Action) throws { // swiftlint:disable:this cyclomatic_complexity
         switch action {
+        case .taskSessionStarted: self = .task_session_started
+        case .taskCompletionAccepted: self = .task_completion_accepted
+        case .taskReceiptDisclosure: self = .task_receipt_disclosure
+        case .taskSessionDisclosure: self = .task_session_disclosure
+        case .taskExcused: self = .task_excused
+        case .taskFailed: self = .task_failed
         case .consentRecorded: self = .consent_recorded
         case .consentPDFDisclosure: self = .consent_pdf_disclosure
         case .consentRecordsDisclosure: self = .consent_records_disclosure

@@ -36,6 +36,12 @@ enum AuditError: Error, Equatable {
 struct AuditEvent: Sendable {
     enum Action: String, Codable, CaseIterable, Sendable {
         case consentRecorded = "consent.recorded"
+        case taskSessionStarted = "task.session.started"
+        case taskCompletionAccepted = "task.completion.accepted"
+        case taskReceiptDisclosure = "task.receipt.disclosure"
+        case taskSessionDisclosure = "task.session.disclosure"
+        case taskExcused = "task.excused"
+        case taskFailed = "task.failed"
         case consentPDFDisclosure = "consent.pdf.disclosure"
         case consentRecordsDisclosure = "consent.records.disclosure"
         case tasksAssigned = "tasks.assigned"
@@ -104,6 +110,7 @@ struct AuditEvent: Sendable {
                  .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .clinicalEventReceiptDisclosure:
                 .participantSource
             case .tasksAssigned, .tasksInvalidated, .tasksDisclosure,
+                 .taskSessionStarted, .taskCompletionAccepted, .taskReceiptDisclosure, .taskSessionDisclosure, .taskExcused, .taskFailed,
                  .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
@@ -120,11 +127,12 @@ struct AuditEvent: Sendable {
             case .providerRegistrationChanged, .providerLinkStarted, .providerLinkDispatched, .providerLinkCompleted, .providerConnectionDisconnected,
                  .providerRefreshDispatched, .providerCredentialRotated, .providerCredentialUncertain, .providerCredentialRetired,
                  .providerFetchDispatched, .providerPageStaged, .providerPageAccepted: false
-            case .tasksDisclosure, .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
+            case .tasksDisclosure, .taskReceiptDisclosure, .taskSessionDisclosure,
+                 .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
                  .collectionPlanDisclosure, .studyBundleDisclosure,
                  .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
                  .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
-            case .tasksAssigned, .tasksInvalidated,
+            case .tasksAssigned, .tasksInvalidated, .taskSessionStarted, .taskCompletionAccepted, .taskExcused, .taskFailed,
                  .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,

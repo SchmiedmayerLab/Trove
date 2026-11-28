@@ -28,9 +28,13 @@ struct StudyDataIdentifiers {
         )
     }
 
+    func subject(enrollmentID: UUID) throws -> BusinessIdentifier {
+        try BusinessIdentifier(system: IdentifierSystem(root + ":participants"), value: enrollmentID.uuidString.lowercased())
+    }
+
     func context(enrollmentID: UUID, endsAt: Date?, recordedAt: Date) throws -> StudyPointExport.Context {
         try .init(
-            subject: BusinessIdentifier(system: IdentifierSystem(root + ":participants"), value: enrollmentID.uuidString.lowercased()),
+            subject: subject(enrollmentID: enrollmentID),
             exportSystem: IdentifierSystem(root + ":exports"),
             grantSystem: IdentifierSystem(root + ":grants"),
             receiver: BusinessIdentifier(system: IdentifierSystem(root + ":services"), value: "study-export"),

@@ -27,7 +27,8 @@ enum DatabaseRuntimePrivileges {
                 SELECT c.oid, c.relname, n.nspname
                 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public'
-                    AND c.relname IN ('audit_events', '_fluent_migrations', 'published_studies', 'enrollment_consents', 'source_bindings',
+                    AND c.relname IN ('audit_events', '_fluent_migrations', 'published_studies', 'enrollment_consents',
+                        'task_sessions', 'task_completions', 'task_failures', 'task_excusals', 'source_bindings',
                         'source_installations', 'study_delegations', 'study_publication_candidates', 'questionnaire_language_approvals',
                         'source_identity_keys', 'source_identity_key_envelopes', 'task_occurrences',
                         'clinical_events',
@@ -39,7 +40,7 @@ enum DatabaseRuntimePrivileges {
                         'provider_global_scopes', 'provider_query_coverage', 'provider_conversion_instants')
             )
             SELECT
-                (SELECT count(*) FROM protected_relations) = 32
+                (SELECT count(*) FROM protected_relations) = 36
                 AND current_user = session_user
                 AND NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_auth_members membership
@@ -91,7 +92,8 @@ enum DatabaseRuntimePrivileges {
                             SELECT 1 FROM pg_catalog.pg_attribute column_info
                             WHERE column_info.attrelid = p.oid AND column_info.attnum > 0 AND NOT column_info.attisdropped
                                 AND column_info.attname <> ALL (CASE p.relname
-                                    WHEN 'task_occurrences' THEN ARRAY['invalidated_version', 'invalidated_at']::name[]
+                                    WHEN 'task_occurrences'
+                                    THEN ARRAY['invalidated_version', 'invalidated_at', 'assigned_version', 'projection']::name[]
                                     WHEN 'questionnaire_language_approvals'
                                     THEN ARRAY['revoked_at', 'revoked_by_issuer', 'revoked_by_subject']::name[]
                                     ELSE ARRAY['revoked_at']::name[] END)

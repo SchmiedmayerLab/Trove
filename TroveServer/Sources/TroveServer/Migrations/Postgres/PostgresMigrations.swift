@@ -39,4 +39,6 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateQuestionnaireLanguageApprovals())
     // Task occurrences, their synchronization cursors and the published task plan.
     app.migrations.add(CreateTaskOccurrences())
+    // Task sessions, accepted completions, failures and excusals.
+    app.migrations.add(CreateTaskCompletions())
 }

@@ -118,12 +118,25 @@ is ready unless the engine fails to start. The Compose healthcheck (5-second int
 3-second timeout, 12 retries) tolerates that measured interval of about 30 seconds,
 but a pair that runs into the 120-second process timeout followed by a slow engine
 start can mark the container unhealthy until the engine is back. Do
-not send each participant response to the worker that gates event admission. The
+not send participant responses to this pair route on the worker that gates event
+admission; task admission uses the structure route below. The
 official validator stops without a result on some responses whose answer type
 contradicts a condition; the route then reports `unavailable` for that input on every
 attempt, so callers bound their retries. The server runs Grove's pair rules itself.
 
-Both routes reply with `status`, the digest of the exact request bytes, the contract
+`POST /validate/questionnaire-response-structure` validates one Grove
+QuestionnaireResponse without its Questionnaire, with the reusable engine. The server
+uses it to admit a participant's task response after it has checked the response
+against the exact published Questionnaire with Grove's pair rules. The worker reads
+the bytes as strict JSON, requires the Grove QuestionnaireResponse profile claim and
+treats every error or fatal issue as invalid, except the engine's report that it
+cannot resolve the named Questionnaire. It replies with `valid`, the digest, the
+contract revision, the validator identity, an optional `code` (`invalid_json`,
+`invalid_fhir` or `validator_unavailable`) and the purpose
+`questionnaire-response-structure`, and returns no diagnostics. A check the engine
+reports as not run is `validator_unavailable`.
+
+The two authoring routes reply with `status`, the digest of the exact request bytes, the contract
 revision, the validator identity, a `purpose` (`questionnaire` or
 `questionnaire-response`) and `diagnostics`. Consumers must verify the purpose as
 well as the digest, contract revision and configured identity. Each finding has a
@@ -148,8 +161,9 @@ the engine is unavailable. A code from a code system outside the offline package
 is reported as information unless a value set check depends on it. Findings can quote submitted content; the worker never
 logs them, and only the server receives them.
 
-Both routes use the same bounds and unavailable semantics below. For offline
-synthetic checks, use `--stdin --questionnaire` or `--stdin --questionnaire-response`.
+These routes use the same bounds and unavailable semantics below. For offline
+synthetic checks, use `--stdin --questionnaire`, `--stdin --questionnaire-response` or
+`--stdin --questionnaire-response-structure`.
 IG validity does not establish that a study client can execute every retained
 feature: the server must separately check its supported execution capabilities
 before publication. Exact original bytes, not a rewritten or simplified resource,

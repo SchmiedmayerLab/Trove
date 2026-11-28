@@ -59,6 +59,7 @@ extension Components.Schemas.PublishedStudyListItem {
         self.init(
             studyId: model.$study.id.uuidString,
             revision: model.revision,
+            bundleSha256: model.bundleDigest,
             metadata: model.metadata,
             enrollmentConditions: model.enrollmentCondition
         )

@@ -103,7 +103,7 @@ final class AuthorizationService: Module, @unchecked Sendable {
         return enrollment
     }
 
-    private func currentParticipantId() async throws -> UUID {
+    func currentParticipantId() async throws -> UUID {
         let context = try AuthContext.checkIsParticipant()
         guard let participant = try await profileRepository.findByIdentity(issuer: context.issuer, subject: context.subject) else {
             throw ServerError.notFound(resource: "Participant", identifier: context.subject)

@@ -223,10 +223,10 @@ struct ParticipantTaskTests {
 
                 try await PublishedStudyFixtures.createPublishedStudy(on: app.db, studyId: studyID, revision: 3, taskSchedules: [daily])
                 _ = try await ClinicalEventStoreTests.acceptConsent(enrollmentID: id, on: app, revision: 3)
-                let delta = try await service.taskPage(enrollmentID: id, cursor: checkpoint, limit: 100)
+                let delta = try await TaskCompletionFixture.drain(service, enrollment: id, from: checkpoint)
                 #expect(Set(delta.invalidated) == future)
                 #expect(!delta.items.isEmpty && delta.items.allSatisfy { $0.revision == 3 })
-                let snapshot = try await service.taskPage(enrollmentID: id, cursor: nil, limit: 100)
+                let snapshot = try await TaskCompletionFixture.drain(service, enrollment: id, from: nil)
                 #expect(snapshot.items.filter { $0.revision == 2 } == [past])
                 #expect(Set(snapshot.items.map(\.id)) == Set(delta.items.map(\.id)).union([past.id]))
             }

@@ -76,6 +76,19 @@ Their storage rows cannot contain a study or group, and retention matches the ex
 participant and source as well as the bytes. Cleanup records a participant/source
 audit event. Consent and publication artifacts retain their study ownership.
 
+Artifacts that are expensive to derive from a stored artifact, such as one
+Questionnaire extracted from a publication archive, are kept in object storage under
+`derived/<source-sha256>/<kind>/<derivation-version>/<content-sha256>`, without a
+database table. Publication writes the entries of its scheduled Questionnaires. A read
+verifies the content digest; a missing or mismatching entry is derived once from the
+source and written back; when the write fails, the read still returns the verified bytes. Artifact cleanup deletes the `derived/<source-sha256>/`
+prefix with the last artifact that holds the source bytes, and the cleanup command
+then sweeps entries whose kind or derivation version the server no longer reads. A
+new kind is declared in `DerivedArtifactKind` and registered there; changing a
+derivation's output increases its version. The sweep lists every derived key on each
+run and compares against the kinds of its own build, so it runs from the same build
+as the servers.
+
 The recording staging operation requires an explicit byte budget and verifies the
 stored transport bytes before returning a ready reference. The 2 GiB minus one byte
 storage ceiling is a protocol limit, not a default upload allowance. Clinical
@@ -784,12 +797,12 @@ the client journal; the shared entry point checks this before compiling.
 The real-store job in `swift-package.yml` runs the full server suite with the
 checksum-pinned offline validator and the separately pinned receiver lifecycle
 corpus. `TROVE_REQUIRE_FULL_VALIDATOR=1` requires the nine named clinical test groups
-and the two Questionnaire groups to execute; missing or skipped groups fail
+and the three Questionnaire groups to execute; missing or skipped groups fail
 verification. The multilingual group validates the shared bilingual fixtures through
 the questionnaire route and checks that the validator reports `qg-translation-1` for
 translations that repeat the base language or a language. The response group checks a
 matching QuestionnaireResponse and four mismatches (questionnaire version, missing
-required answer, answer type, language not offered) through the response route. The parameterized
+required answer, answer type, language not offered) through the response route. The task response group checks that the structure route accepts the matching response and rejects a duplicated member and an invalid status. The parameterized
 receiver group covers all 43 declared sequences, and the retraction group covers
 both arrival orders. Deployment binding preserves recorded lexemes and writer
 evidence. The pinned IG generator supplies the expected states, including the

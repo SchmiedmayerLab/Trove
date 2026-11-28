@@ -17,7 +17,9 @@ struct CleanupArtifactsCommand: AsyncCommand {
 
     let auditConfiguration: AuditConfiguration
 
-    var help: String { "Remove expired, unaccepted artifacts while retaining durable recovery records." }
+    var help: String {
+        "Remove expired, unaccepted artifacts while retaining durable recovery records, and derived artifacts no kind reads."
+    }
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let limit = signature.limit ?? 100
@@ -31,8 +33,15 @@ struct CleanupArtifactsCommand: AsyncCommand {
             try? await storage.shutdown()
             throw error
         }
-        try await storage.shutdown()
         context.console.print("Artifact cleanup: \(report.deleted) delete requests completed; \(report.failed) failed.")
+        do {
+            let swept = try await DerivedArtifactCache(storage: storage).sweep()
+            context.console.print("Derived artifact sweep: \(swept) unreachable entries deleted.")
+        } catch {
+            try? await storage.shutdown()
+            throw error
+        }
+        try await storage.shutdown()
         guard report.failed == 0 else { throw ServerError.internalServerError("Artifact cleanup requires retry") }
     }
 }

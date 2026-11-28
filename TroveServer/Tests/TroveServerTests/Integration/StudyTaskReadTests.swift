@@ -40,6 +40,23 @@ struct StudyTaskReadTests {
         return schedule.schedule.id
     }
 
+    /// Follows every continuation after `after` and returns its items and page count.
+    private static func continuation(path: String, after: String, bearer: String?, on app: Application) async throws
+        -> (items: [Components.Schemas.ParticipantTaskOccurrence], pages: Int) {
+        var items: [Components.Schemas.ParticipantTaskOccurrence] = []
+        var cursor: String? = after
+        var pages = 0
+        while let current = cursor {
+            pages += 1
+            let continuation = try await app.sendRequest(.GET, path + "?after=\(current)", beforeRequest: { $0.bearerAuth(bearer) })
+            let page = try continuation.content.decode(Components.Schemas.StudyTaskPage.self)
+            #expect(!page.items.isEmpty && page.items.allSatisfy { $0.id > current })
+            items += page.items
+            cursor = page.nextAfter
+        }
+        return (items, pages)
+    }
+
     @Test
     func studyPagesExcludeOtherEnrollmentsAndBindTheContinuation() async throws {
         try await TestApp.withApp(token: StudyDataFixture.reader) { app, bearer in
@@ -54,10 +71,9 @@ struct StudyTaskReadTests {
             try #require(first.items.count == 1)
             let after = try #require(first.nextAfter)
             #expect(after == first.items[0].id)
-            let continuation = try await app.sendRequest(.GET, path + "?after=\(after)", beforeRequest: { $0.bearerAuth(bearer) })
-            let rest = try continuation.content.decode(Components.Schemas.StudyTaskPage.self)
-            #expect(!rest.items.isEmpty && rest.nextAfter == nil && rest.items.allSatisfy { $0.id > after })
-            for item in first.items + rest.items {
+            let (rest, continuations) = try await Self.continuation(path: path, after: after, bearer: bearer, on: app)
+            let pages = continuations + 1
+            for item in first.items + rest {
                 let enrollmentID = fixture.enrollmentIDs[0]
                 let publicationID = try #require(UUID(uuidString: item.publicationId))
                 #expect(UUID(uuidString: item.enrollmentId) == enrollmentID)
@@ -75,7 +91,7 @@ struct StudyTaskReadTests {
                 SELECT target_id FROM audit_events WHERE action = 'tasks.disclosure'
                 """)
                 .all()
-            #expect(try audits.map { try $0.decode(column: "target_id", as: UUID.self) } == [study, study])
+            #expect(try audits.map { try $0.decode(column: "target_id", as: UUID.self) } == Array(repeating: study, count: pages))
         }
     }
 

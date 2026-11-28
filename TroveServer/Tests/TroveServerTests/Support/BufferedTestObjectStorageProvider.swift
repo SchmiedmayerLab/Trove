@@ -26,4 +26,9 @@ extension BufferedTestObjectStorageProvider {
     func downloadBody(key: String) async throws -> HTTPBody {
         try await HTTPBody(downloadBuffered(key: key, maximumBytes: 50 * 1024 * 1024))
     }
+
+    /// Test stores that hold no derived artifacts list none.
+    func keys(prefix: String) async throws -> [String] {
+        []
+    }
 }

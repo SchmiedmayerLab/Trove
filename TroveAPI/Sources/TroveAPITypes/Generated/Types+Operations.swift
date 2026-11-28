@@ -15883,6 +15883,201 @@ public enum Operations {
             }
         }
     }
+    /// Excuse an open or missed questionnaire assignment
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Cancels the occurrence with the status reason excused, so it cannot be completed afterwards, and keeps it in the participant's task stream. A completed, failed or already cancelled occurrence cannot be excused.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/tasks/{taskId}/excusal`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)`.
+    public enum ExcuseStudyTask {
+        public static let id: Swift.String = "excuseStudyTask"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/path/taskId`.
+                public var taskId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - taskId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    taskId: Swift.String
+                ) {
+                    self.studyId = studyId
+                    self.taskId = taskId
+                }
+            }
+            public var path: Operations.ExcuseStudyTask.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Quoted decimal occurrence version.
+                ///
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/header/If-Match`.
+                public var ifMatch: Swift.String
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ExcuseStudyTask.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - ifMatch: Quoted decimal occurrence version.
+                ///   - accept:
+                public init(
+                    ifMatch: Swift.String,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ExcuseStudyTask.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.ifMatch = ifMatch
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ExcuseStudyTask.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ExcuseStudyTask.Input.Path,
+                headers: Operations.ExcuseStudyTask.Input.Headers
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.ExcuseStudyTask.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.ExcuseStudyTask.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ExcuseStudyTask.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/{taskId}/excusal/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ParticipantTaskOccurrence)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ParticipantTaskOccurrence {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ExcuseStudyTask.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ExcuseStudyTask.Output.Ok.Headers = .init(),
+                    body: Operations.ExcuseStudyTask.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The cancelled occurrence
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ExcuseStudyTask.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ExcuseStudyTask.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/{taskId}/excusal/post(excuseStudyTask)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Synchronize questionnaire assignments for an owned enrollment
     ///
     /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
@@ -16032,6 +16227,691 @@ public enum Operations {
             /// Operation denied or unavailable; no protected change or disclosure was accepted.
             ///
             /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Confirm a session that the device started for an owned assignment
+    ///
+    /// The device starts a session, also while offline, with its own session ID, the chosen administration language and its start time, and sends it at the next sync. The server confirms the first session of an assigned occurrence and returns it again for the same ID, language and start time. The session fixes the language, the start time, the accepted consent, the performance window and the subject identifier. The start time must lie within the performance window and at most five minutes after server time; the confirmation may arrive after the window ended while the enrollment is active. Once a session is confirmed, any other session ID of the occurrence receives 409 with the title "Task Session Superseded": another device started the occurrence first, and this device keeps its response as not accepted. A session ID already used for another occurrence receives 409. The language must have a publication approval for the exact Questionnaire digest.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/session`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)`.
+    public enum StartTaskSession {
+        public static let id: Swift.String = "startTaskSession"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/path/taskId`.
+                public var taskId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - taskId:
+                public init(taskId: Swift.String) {
+                    self.taskId = taskId
+                }
+            }
+            public var path: Operations.StartTaskSession.Input.Path
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Quoted decimal assignment version.
+                ///
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/header/If-Match`.
+                public var ifMatch: Swift.String
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartTaskSession.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - ifMatch: Quoted decimal assignment version.
+                ///   - accept:
+                public init(
+                    ifMatch: Swift.String,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartTaskSession.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.ifMatch = ifMatch
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StartTaskSession.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// Session ID chosen by the device.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody/json/id`.
+                    public var id: Swift.String
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody/json/language`.
+                    public var language: Components.Schemas.LanguageTag
+                    /// When the device started the session.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody/json/startedAt`.
+                    public var startedAt: Foundation.Date
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - id: Session ID chosen by the device.
+                    ///   - language:
+                    ///   - startedAt: When the device started the session.
+                    public init(
+                        id: Swift.String,
+                        language: Components.Schemas.LanguageTag,
+                        startedAt: Foundation.Date
+                    ) {
+                        self.id = id
+                        self.language = language
+                        self.startedAt = startedAt
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case id
+                        case language
+                        case startedAt
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.id = try container.decode(
+                            Swift.String.self,
+                            forKey: .id
+                        )
+                        self.language = try container.decode(
+                            Components.Schemas.LanguageTag.self,
+                            forKey: .language
+                        )
+                        self.startedAt = try container.decode(
+                            Foundation.Date.self,
+                            forKey: .startedAt
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "id",
+                            "language",
+                            "startedAt"
+                        ])
+                    }
+                }
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/requestBody/content/application\/json`.
+                case json(Operations.StartTaskSession.Input.Body.JsonPayload)
+            }
+            public var body: Operations.StartTaskSession.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.StartTaskSession.Input.Path,
+                headers: Operations.StartTaskSession.Input.Headers,
+                body: Operations.StartTaskSession.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.StartTaskSession.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.StartTaskSession.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.StartTaskSession.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/session/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.TaskSession)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TaskSession {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StartTaskSession.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.StartTaskSession.Output.Ok.Headers = .init(),
+                    body: Operations.StartTaskSession.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The session of the occurrence
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.StartTaskSession.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.StartTaskSession.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/session/post(startTaskSession)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Accept a completed QuestionnaireResponse for an owned session
+    ///
+    /// Send unchanged UTF-8 FHIR JSON bytes. The subject must be a Patient reference containing only type and the exact identifier returned at session start. Authored must be an instant from the start of the performance window, and not before the whole second of the session start, until its exclusive cutoff, and at most five minutes after server time. The upload may arrive after the cutoff: a response authored within the window is accepted while the enrollment and its consent remain active. A window without an end has no deadline. A completion for a session other than the occurrence's confirmed session receives 409 "Task Session Superseded". Responses are checked against the exact published Questionnaire bytes the occurrence pins. The first accepted completion of an occurrence wins. Retrying the same bytes, session tag and command key returns the original receipt while the enrollment is active; any other completion of the occurrence receives 409. The occurrence then appears as completed in the task stream.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/completion`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)`.
+    public enum CompleteParticipantTask {
+        public static let id: Swift.String = "completeParticipantTask"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/path/taskId`.
+                public var taskId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - taskId:
+                public init(taskId: Swift.String) {
+                    self.taskId = taskId
+                }
+            }
+            public var path: Operations.CompleteParticipantTask.Input.Path
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Exact quoted session ID returned at session start.
+                ///
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/header/If-Match`.
+                public var ifMatch: Swift.String
+                /// UUID scoped to this occurrence.
+                ///
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantTask.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - ifMatch: Exact quoted session ID returned at session start.
+                ///   - idempotencyKey: UUID scoped to this occurrence.
+                ///   - accept:
+                public init(
+                    ifMatch: Swift.String,
+                    idempotencyKey: Swift.String,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CompleteParticipantTask.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.ifMatch = ifMatch
+                    self.idempotencyKey = idempotencyKey
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CompleteParticipantTask.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/requestBody/content/application\/octet-stream`.
+                case binary(OpenAPIRuntime.HTTPBody)
+            }
+            public var body: Operations.CompleteParticipantTask.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.CompleteParticipantTask.Input.Path,
+                headers: Operations.CompleteParticipantTask.Input.Headers,
+                body: Operations.CompleteParticipantTask.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.CompleteParticipantTask.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.CompleteParticipantTask.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CompleteParticipantTask.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/completion/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.TaskCompletionReceipt)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TaskCompletionReceipt {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CompleteParticipantTask.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CompleteParticipantTask.Output.Ok.Headers = .init(),
+                    body: Operations.CompleteParticipantTask.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The accepted receipt, also for an exact retry
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.CompleteParticipantTask.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.CompleteParticipantTask.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/completion/post(completeParticipantTask)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Record that an owned session could not be completed
+    ///
+    /// Records the failed outcome of an occurrence whose session started: the participant attempted it, but no response can be completed. The device reports when the attempt failed. A failure is accepted under the same conditions as a completion: its time lies within the performance window, not before the whole second of the session start, and at most five minutes after server time, the session's consent and language approval are still current, and the enrollment is active; the report may arrive after the cutoff. It is final. The occurrence then appears as failed in the task stream and accepts no completion or excusal. Retrying with the same session tag and command key returns the original receipt while the enrollment is active; any other outcome of the occurrence receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /participant/tasks/{taskId}/failure`.
+    /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)`.
+    public enum FailParticipantTask {
+        public static let id: Swift.String = "failParticipantTask"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/path/taskId`.
+                public var taskId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - taskId:
+                public init(taskId: Swift.String) {
+                    self.taskId = taskId
+                }
+            }
+            public var path: Operations.FailParticipantTask.Input.Path
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Exact quoted session ID returned at session start.
+                ///
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/header/If-Match`.
+                public var ifMatch: Swift.String
+                /// UUID scoped to this occurrence.
+                ///
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.FailParticipantTask.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - ifMatch: Exact quoted session ID returned at session start.
+                ///   - idempotencyKey: UUID scoped to this occurrence.
+                ///   - accept:
+                public init(
+                    ifMatch: Swift.String,
+                    idempotencyKey: Swift.String,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.FailParticipantTask.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.ifMatch = ifMatch
+                    self.idempotencyKey = idempotencyKey
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.FailParticipantTask.Input.Headers
+            /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// When the attempt failed on the device.
+                    ///
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/requestBody/json/failedAt`.
+                    public var failedAt: Foundation.Date
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - failedAt: When the attempt failed on the device.
+                    public init(failedAt: Foundation.Date) {
+                        self.failedAt = failedAt
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case failedAt
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.failedAt = try container.decode(
+                            Foundation.Date.self,
+                            forKey: .failedAt
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "failedAt"
+                        ])
+                    }
+                }
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/requestBody/content/application\/json`.
+                case json(Operations.FailParticipantTask.Input.Body.JsonPayload)
+            }
+            public var body: Operations.FailParticipantTask.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.FailParticipantTask.Input.Path,
+                headers: Operations.FailParticipantTask.Input.Headers,
+                body: Operations.FailParticipantTask.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.FailParticipantTask.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.FailParticipantTask.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.FailParticipantTask.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/tasks/{taskId}/failure/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.TaskFailureReceipt)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TaskFailureReceipt {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.FailParticipantTask.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.FailParticipantTask.Output.Ok.Headers = .init(),
+                    body: Operations.FailParticipantTask.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The failure receipt, also for an exact retry
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.FailParticipantTask.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.FailParticipantTask.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/tasks/{taskId}/failure/post(failParticipantTask)/responses/default`.
             ///
             /// HTTP response code: `default`.
             case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
