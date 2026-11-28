@@ -598,25 +598,34 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ProblemDetails/detail`.
             public var detail: Swift.String?
+            /// Findings that explain a refusal in the form draft validation returns, for example the collection routes that became unavailable between validation and publication.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProblemDetails/diagnostics`.
+            public var diagnostics: [Components.Schemas.ValidationDiagnostic]?
             /// Creates a new `ProblemDetails`.
             ///
             /// - Parameters:
             ///   - title: A short, human-readable summary of the problem type
             ///   - status: The HTTP status code
             ///   - detail: A human-readable explanation specific to this occurrence
+            ///   - diagnostics: Findings that explain a refusal in the form draft validation returns, for example the collection routes that became unavailable between validation and publication.
             public init(
                 title: Swift.String,
                 status: Swift.Int,
-                detail: Swift.String? = nil
+                detail: Swift.String? = nil,
+                diagnostics: [Components.Schemas.ValidationDiagnostic]? = nil
             ) {
                 self.title = title
                 self.status = status
                 self.detail = detail
+                self.diagnostics = diagnostics
             }
             public enum CodingKeys: String, CodingKey {
                 case title
                 case status
                 case detail
+                case diagnostics
             }
         }
         /// - Remark: Generated from `#/components/schemas/StudyDataVersions`.
@@ -836,6 +845,8 @@ extension Components {
             case study_draft_edited = "study.draft.edited"
             case study_draft_validated = "study.draft.validated"
             case study_draft_disclosure = "study.draft.disclosure"
+            case study_language_approved = "study.language.approved"
+            case study_language_approval_revoked = "study.language.approval.revoked"
             case delegation_created = "delegation.created"
             case delegation_revoked = "delegation.revoked"
             case delegation_disclosure = "delegation.disclosure"
@@ -1181,6 +1192,10 @@ extension Components {
             public var questionnaires: [Components.Schemas.StudyQuestionnaireValidation]
             /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/candidate`.
             public var candidate: Components.Schemas.StudyPublicationCandidate?
+            /// The route of each collection requirement, in draft order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyDraftValidation/routes`.
+            public var routes: [Components.Schemas.StudyRouteValidation]
             /// Creates a new `StudyDraftValidation`.
             ///
             /// - Parameters:
@@ -1190,13 +1205,15 @@ extension Components {
             ///   - advisories: Warnings and information that do not prevent publication.
             ///   - questionnaires:
             ///   - candidate:
+            ///   - routes: The route of each collection requirement, in draft order.
             public init(
                 draftRevision: Swift.String,
                 status: Components.Schemas.ValidationStatus,
                 blockers: [Components.Schemas.ValidationDiagnostic],
                 advisories: [Components.Schemas.ValidationDiagnostic],
                 questionnaires: [Components.Schemas.StudyQuestionnaireValidation],
-                candidate: Components.Schemas.StudyPublicationCandidate? = nil
+                candidate: Components.Schemas.StudyPublicationCandidate? = nil,
+                routes: [Components.Schemas.StudyRouteValidation]
             ) {
                 self.draftRevision = draftRevision
                 self.status = status
@@ -1204,6 +1221,7 @@ extension Components {
                 self.advisories = advisories
                 self.questionnaires = questionnaires
                 self.candidate = candidate
+                self.routes = routes
             }
             public enum CodingKeys: String, CodingKey {
                 case draftRevision
@@ -1212,6 +1230,7 @@ extension Components {
                 case advisories
                 case questionnaires
                 case candidate
+                case routes
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1239,13 +1258,194 @@ extension Components {
                     Components.Schemas.StudyPublicationCandidate.self,
                     forKey: .candidate
                 )
+                self.routes = try container.decode(
+                    [Components.Schemas.StudyRouteValidation].self,
+                    forKey: .routes
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "draftRevision",
                     "status",
                     "blockers",
                     "advisories",
                     "questionnaires",
-                    "candidate"
+                    "candidate",
+                    "routes"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyRouteValidation`.
+        public struct StudyRouteValidation: Codable, Hashable, Sendable {
+            /// Position of the requirement in `collectionRequirements`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/index`.
+            public var index: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/profile`.
+            public var profile: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/sourceKind`.
+            @frozen public enum SourceKindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case participantApp = "participant-app"
+                case serverWorker = "server-worker"
+            }
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/sourceKind`.
+            public var sourceKind: Components.Schemas.StudyRouteValidation.SourceKindPayload
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/providerRegistrationId`.
+            public var providerRegistrationId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/sourceTypeIdentifier`.
+            public var sourceTypeIdentifier: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/requirement`.
+            public var requirement: Components.Schemas.CollectionRequirementLevel
+            /// `available`: this deployment implements the route; for a server worker, the provider registration is approved and qualifies the source and profile. `unavailable`: it does not.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/availability`.
+            @frozen public enum AvailabilityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case available = "available"
+                case unavailable = "unavailable"
+            }
+            /// `available`: this deployment implements the route; for a server worker, the provider registration is approved and qualifies the source and profile. `unavailable`: it does not.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyRouteValidation/availability`.
+            public var availability: Components.Schemas.StudyRouteValidation.AvailabilityPayload
+            /// Creates a new `StudyRouteValidation`.
+            ///
+            /// - Parameters:
+            ///   - index: Position of the requirement in `collectionRequirements`.
+            ///   - profile:
+            ///   - sourceKind:
+            ///   - providerRegistrationId:
+            ///   - sourceTypeIdentifier:
+            ///   - requirement:
+            ///   - availability: `available`: this deployment implements the route; for a server worker, the provider registration is approved and qualifies the source and profile. `unavailable`: it does not.
+            public init(
+                index: Swift.Int,
+                profile: Swift.String,
+                sourceKind: Components.Schemas.StudyRouteValidation.SourceKindPayload,
+                providerRegistrationId: Swift.String? = nil,
+                sourceTypeIdentifier: Swift.String? = nil,
+                requirement: Components.Schemas.CollectionRequirementLevel,
+                availability: Components.Schemas.StudyRouteValidation.AvailabilityPayload
+            ) {
+                self.index = index
+                self.profile = profile
+                self.sourceKind = sourceKind
+                self.providerRegistrationId = providerRegistrationId
+                self.sourceTypeIdentifier = sourceTypeIdentifier
+                self.requirement = requirement
+                self.availability = availability
+            }
+            public enum CodingKeys: String, CodingKey {
+                case index
+                case profile
+                case sourceKind
+                case providerRegistrationId
+                case sourceTypeIdentifier
+                case requirement
+                case availability
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.index = try container.decode(
+                    Swift.Int.self,
+                    forKey: .index
+                )
+                self.profile = try container.decode(
+                    Swift.String.self,
+                    forKey: .profile
+                )
+                self.sourceKind = try container.decode(
+                    Components.Schemas.StudyRouteValidation.SourceKindPayload.self,
+                    forKey: .sourceKind
+                )
+                self.providerRegistrationId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .providerRegistrationId
+                )
+                self.sourceTypeIdentifier = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceTypeIdentifier
+                )
+                self.requirement = try container.decode(
+                    Components.Schemas.CollectionRequirementLevel.self,
+                    forKey: .requirement
+                )
+                self.availability = try container.decode(
+                    Components.Schemas.StudyRouteValidation.AvailabilityPayload.self,
+                    forKey: .availability
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "index",
+                    "profile",
+                    "sourceKind",
+                    "providerRegistrationId",
+                    "sourceTypeIdentifier",
+                    "requirement",
+                    "availability"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyAdministrationLanguage`.
+        public struct StudyAdministrationLanguage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyAdministrationLanguage/language`.
+            public var language: Swift.String
+            /// Whether the resource can be administered in this language: it is the base language, or every displayed string carries a translation into it.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyAdministrationLanguage/translationComplete`.
+            public var translationComplete: Swift.Bool
+            /// Whether an approval for this exact resource and language is in force.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyAdministrationLanguage/approved`.
+            public var approved: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/StudyAdministrationLanguage/approvalId`.
+            public var approvalId: Swift.String?
+            /// Creates a new `StudyAdministrationLanguage`.
+            ///
+            /// - Parameters:
+            ///   - language:
+            ///   - translationComplete: Whether the resource can be administered in this language: it is the base language, or every displayed string carries a translation into it.
+            ///   - approved: Whether an approval for this exact resource and language is in force.
+            ///   - approvalId:
+            public init(
+                language: Swift.String,
+                translationComplete: Swift.Bool,
+                approved: Swift.Bool,
+                approvalId: Swift.String? = nil
+            ) {
+                self.language = language
+                self.translationComplete = translationComplete
+                self.approved = approved
+                self.approvalId = approvalId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case language
+                case translationComplete
+                case approved
+                case approvalId
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.translationComplete = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .translationComplete
+                )
+                self.approved = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .approved
+                )
+                self.approvalId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .approvalId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "language",
+                    "translationComplete",
+                    "approved",
+                    "approvalId"
                 ])
             }
         }
@@ -1373,6 +1573,10 @@ extension Components {
             public var translationLanguages: [Swift.String]
             /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/sha256`.
             public var sha256: Swift.String
+            /// The languages admitted for administration, with their translation and approval state.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyQuestionnaireValidation/administrationLanguages`.
+            public var administrationLanguages: [Components.Schemas.StudyAdministrationLanguage]
             /// Creates a new `StudyQuestionnaireValidation`.
             ///
             /// - Parameters:
@@ -1381,18 +1585,21 @@ extension Components {
             ///   - language: The validated resource's base language (`Questionnaire.language`). Omitted when it cannot be read.
             ///   - translationLanguages: Languages of the resource's translation extensions, sorted.
             ///   - sha256:
+            ///   - administrationLanguages: The languages admitted for administration, with their translation and approval state.
             public init(
                 componentId: Swift.String,
                 status: Components.Schemas.ValidationStatus,
                 language: Swift.String? = nil,
                 translationLanguages: [Swift.String],
-                sha256: Swift.String
+                sha256: Swift.String,
+                administrationLanguages: [Components.Schemas.StudyAdministrationLanguage]
             ) {
                 self.componentId = componentId
                 self.status = status
                 self.language = language
                 self.translationLanguages = translationLanguages
                 self.sha256 = sha256
+                self.administrationLanguages = administrationLanguages
             }
             public enum CodingKeys: String, CodingKey {
                 case componentId
@@ -1400,6 +1607,7 @@ extension Components {
                 case language
                 case translationLanguages
                 case sha256
+                case administrationLanguages
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1423,12 +1631,17 @@ extension Components {
                     Swift.String.self,
                     forKey: .sha256
                 )
+                self.administrationLanguages = try container.decode(
+                    [Components.Schemas.StudyAdministrationLanguage].self,
+                    forKey: .administrationLanguages
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "componentId",
                     "status",
                     "language",
                     "translationLanguages",
-                    "sha256"
+                    "sha256",
+                    "administrationLanguages"
                 ])
             }
         }
@@ -5012,6 +5225,8 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/sourceKind`.
             public var sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload
+            /// - Remark: Generated from `#/components/schemas/CollectionRequirement/requirement`.
+            public var requirement: Components.Schemas.CollectionRequirementLevel?
             /// - Remark: Generated from `#/components/schemas/CollectionRequirement/timeBasis`.
             public var timeBasis: Components.Schemas.CollectionTimeBasis?
             /// Creates a new `CollectionRequirement`.
@@ -5023,6 +5238,7 @@ extension Components {
             ///   - sourceTypeIdentifier: Exact catalog source token. Required for new native streams and all provider requirements; legacy unqualified heart-rate, body-weight, sleep-stage and workout scopes remain supported.
             ///   - providerRegistrationId: Deployment-approved provider integration registration. Required for server-worker and forbidden for participant-app; distinct from the participant connection or source ID.
             ///   - sourceKind:
+            ///   - requirement:
             ///   - timeBasis:
             public init(
                 includeWorkoutRoutes: Swift.Bool? = nil,
@@ -5031,6 +5247,7 @@ extension Components {
                 sourceTypeIdentifier: Swift.String? = nil,
                 providerRegistrationId: Swift.String? = nil,
                 sourceKind: Components.Schemas.CollectionRequirement.SourceKindPayload,
+                requirement: Components.Schemas.CollectionRequirementLevel? = nil,
                 timeBasis: Components.Schemas.CollectionTimeBasis? = nil
             ) {
                 self.includeWorkoutRoutes = includeWorkoutRoutes
@@ -5039,6 +5256,7 @@ extension Components {
                 self.sourceTypeIdentifier = sourceTypeIdentifier
                 self.providerRegistrationId = providerRegistrationId
                 self.sourceKind = sourceKind
+                self.requirement = requirement
                 self.timeBasis = timeBasis
             }
             public enum CodingKeys: String, CodingKey {
@@ -5048,6 +5266,7 @@ extension Components {
                 case sourceTypeIdentifier
                 case providerRegistrationId
                 case sourceKind
+                case requirement
                 case timeBasis
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -5076,6 +5295,10 @@ extension Components {
                     Components.Schemas.CollectionRequirement.SourceKindPayload.self,
                     forKey: .sourceKind
                 )
+                self.requirement = try container.decodeIfPresent(
+                    Components.Schemas.CollectionRequirementLevel.self,
+                    forKey: .requirement
+                )
                 self.timeBasis = try container.decodeIfPresent(
                     Components.Schemas.CollectionTimeBasis.self,
                     forKey: .timeBasis
@@ -5087,9 +5310,18 @@ extension Components {
                     "sourceTypeIdentifier",
                     "providerRegistrationId",
                     "sourceKind",
+                    "requirement",
                     "timeBasis"
                 ])
             }
+        }
+        /// `required`: publication requires the route to be available. `optional`: publication proceeds when the route is unavailable; the publication then lists the requirement as unavailable and grants no collection for it. Omission means `required`.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/CollectionRequirementLevel`.
+        @frozen public enum CollectionRequirementLevel: String, Codable, Hashable, Sendable, CaseIterable {
+            case required = "required"
+            case optional = "optional"
         }
         /// Native repository identity; assignment alone does not imply receiver support for every data type.
         ///
@@ -5590,6 +5822,263 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/StudyDetailData`.
         public typealias StudyDetailData = TroveAPITypes.StudyDetailData
+        /// The readiness facts written in one language.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StudyReadinessContent`.
+        public struct StudyReadinessContent: Codable, Hashable, Sendable {
+            /// What the study aims to find out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/aims`.
+            public var aims: Swift.String?
+            /// Who can take part.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/population`.
+            public var population: Swift.String?
+            /// What participants do and what data the study collects.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/procedures`.
+            public var procedures: Swift.String?
+            /// The time and effort participation takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/burden`.
+            public var burden: Swift.String?
+            /// How long the study keeps the data and what happens to it afterwards.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/retention`.
+            public var retention: Swift.String?
+            /// How participants withdraw and what happens to their data.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/withdrawal`.
+            public var withdrawal: Swift.String?
+            /// How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route, such as an institutional contact, suffices.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/concernRoute`.
+            public var concernRoute: Swift.String?
+            /// Who is responsible for answering concerns and incidental findings, and when.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/coverage`.
+            public var coverage: Swift.String?
+            /// The reviewed rule for participants who are enrolled in other studies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessContent/coEnrollment`.
+            public var coEnrollment: Swift.String?
+            /// Creates a new `StudyReadinessContent`.
+            ///
+            /// - Parameters:
+            ///   - aims: What the study aims to find out.
+            ///   - population: Who can take part.
+            ///   - procedures: What participants do and what data the study collects.
+            ///   - burden: The time and effort participation takes.
+            ///   - retention: How long the study keeps the data and what happens to it afterwards.
+            ///   - withdrawal: How participants withdraw and what happens to their data.
+            ///   - concernRoute: How participants reach a person about concerns, and how incidental findings reach a responsible person. A reference to an approved external route, such as an institutional contact, suffices.
+            ///   - coverage: Who is responsible for answering concerns and incidental findings, and when.
+            ///   - coEnrollment: The reviewed rule for participants who are enrolled in other studies.
+            public init(
+                aims: Swift.String? = nil,
+                population: Swift.String? = nil,
+                procedures: Swift.String? = nil,
+                burden: Swift.String? = nil,
+                retention: Swift.String? = nil,
+                withdrawal: Swift.String? = nil,
+                concernRoute: Swift.String? = nil,
+                coverage: Swift.String? = nil,
+                coEnrollment: Swift.String? = nil
+            ) {
+                self.aims = aims
+                self.population = population
+                self.procedures = procedures
+                self.burden = burden
+                self.retention = retention
+                self.withdrawal = withdrawal
+                self.concernRoute = concernRoute
+                self.coverage = coverage
+                self.coEnrollment = coEnrollment
+            }
+            public enum CodingKeys: String, CodingKey {
+                case aims
+                case population
+                case procedures
+                case burden
+                case retention
+                case withdrawal
+                case concernRoute
+                case coverage
+                case coEnrollment
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.aims = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .aims
+                )
+                self.population = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .population
+                )
+                self.procedures = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .procedures
+                )
+                self.burden = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .burden
+                )
+                self.retention = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .retention
+                )
+                self.withdrawal = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .withdrawal
+                )
+                self.concernRoute = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .concernRoute
+                )
+                self.coverage = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .coverage
+                )
+                self.coEnrollment = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .coEnrollment
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "aims",
+                    "population",
+                    "procedures",
+                    "burden",
+                    "retention",
+                    "withdrawal",
+                    "concernRoute",
+                    "coverage",
+                    "coEnrollment"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyContact`.
+        public struct StudyContact: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyContact/name`.
+            public var name: Swift.String
+            /// For example, principal investigator or study coordinator.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyContact/role`.
+            public var role: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyContact/email`.
+            public var email: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StudyContact/phone`.
+            public var phone: Swift.String?
+            /// Creates a new `StudyContact`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - role: For example, principal investigator or study coordinator.
+            ///   - email:
+            ///   - phone:
+            public init(
+                name: Swift.String,
+                role: Swift.String,
+                email: Swift.String? = nil,
+                phone: Swift.String? = nil
+            ) {
+                self.name = name
+                self.role = role
+                self.email = email
+                self.phone = phone
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case role
+                case email
+                case phone
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.role = try container.decode(
+                    Swift.String.self,
+                    forKey: .role
+                )
+                self.email = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .email
+                )
+                self.phone = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .phone
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "role",
+                    "email",
+                    "phone"
+                ])
+            }
+        }
+        /// Baseline facts that publication requires, including the concern route, responsible coverage and co-enrollment policy that a study needs before it opens for enrollment. Draft validation checks that each text fact is present in the source language of the study details and that at least one contact names a person, a role and an email address or phone number. A fact missing in another details language is an advisory. Publications record the facts they were validated with; the participant bundle does not contain them.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/StudyReadinessFacts`.
+        public struct StudyReadinessFacts: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessFacts/content`.
+            public struct ContentPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.StudyReadinessContent]
+                /// Creates a new `ContentPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.StudyReadinessContent] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessFacts/content`.
+            public var content: Components.Schemas.StudyReadinessFacts.ContentPayload
+            /// - Remark: Generated from `#/components/schemas/StudyReadinessFacts/contacts`.
+            public var contacts: [Components.Schemas.StudyContact]
+            /// Creates a new `StudyReadinessFacts`.
+            ///
+            /// - Parameters:
+            ///   - content:
+            ///   - contacts:
+            public init(
+                content: Components.Schemas.StudyReadinessFacts.ContentPayload,
+                contacts: [Components.Schemas.StudyContact]
+            ) {
+                self.content = content
+                self.contacts = contacts
+            }
+            public enum CodingKeys: String, CodingKey {
+                case content
+                case contacts
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.content = try container.decode(
+                    Components.Schemas.StudyReadinessFacts.ContentPayload.self,
+                    forKey: .content
+                )
+                self.contacts = try container.decode(
+                    [Components.Schemas.StudyContact].self,
+                    forKey: .contacts
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "content",
+                    "contacts"
+                ])
+            }
+        }
         /// A criterion which must be satisfied for a person to participate in a study. Uses a discriminated union on "type". Leaf criteria carry a single value. Logical operators (not, all, any) are recursive.
         ///
         ///
@@ -6017,6 +6506,8 @@ extension Components {
             public var visibility: Components.Schemas.StudyVisibility?
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/enrollmentConditions`.
             public var enrollmentConditions: Components.Schemas.EnrollmentConditions?
+            /// - Remark: Generated from `#/components/schemas/StudyPatchInput/readinessFacts`.
+            public var readinessFacts: Components.Schemas.StudyReadinessFacts?
             /// Creates a new `StudyPatchInput`.
             ///
             /// - Parameters:
@@ -6030,6 +6521,7 @@ extension Components {
             ///   - consent:
             ///   - visibility:
             ///   - enrollmentConditions:
+            ///   - readinessFacts:
             public init(
                 enrollmentPeriod: Components.Schemas.EnrollmentPeriod? = nil,
                 collectionRequirements: [Components.Schemas.CollectionRequirement]? = nil,
@@ -6040,7 +6532,8 @@ extension Components {
                 participationCriterion: Components.Schemas.ParticipationCriterion? = nil,
                 consent: Components.Schemas.StudyConsent? = nil,
                 visibility: Components.Schemas.StudyVisibility? = nil,
-                enrollmentConditions: Components.Schemas.EnrollmentConditions? = nil
+                enrollmentConditions: Components.Schemas.EnrollmentConditions? = nil,
+                readinessFacts: Components.Schemas.StudyReadinessFacts? = nil
             ) {
                 self.enrollmentPeriod = enrollmentPeriod
                 self.collectionRequirements = collectionRequirements
@@ -6052,6 +6545,7 @@ extension Components {
                 self.consent = consent
                 self.visibility = visibility
                 self.enrollmentConditions = enrollmentConditions
+                self.readinessFacts = readinessFacts
             }
             public enum CodingKeys: String, CodingKey {
                 case enrollmentPeriod
@@ -6064,6 +6558,7 @@ extension Components {
                 case consent
                 case visibility
                 case enrollmentConditions
+                case readinessFacts
             }
         }
         /// Full study response
@@ -6072,6 +6567,8 @@ extension Components {
         public struct StudyResponse: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/StudyResponse/enrollmentPeriod`.
             public var enrollmentPeriod: Components.Schemas.EnrollmentPeriod
+            /// - Remark: Generated from `#/components/schemas/StudyResponse/readinessFacts`.
+            public var readinessFacts: Components.Schemas.StudyReadinessFacts
             /// Opaque revision of the complete editable study draft.
             ///
             /// - Remark: Generated from `#/components/schemas/StudyResponse/draftRevision`.
@@ -6106,6 +6603,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - enrollmentPeriod:
+            ///   - readinessFacts:
             ///   - draftRevision: Opaque revision of the complete editable study draft.
             ///   - collectionRequirements:
             ///   - receivesDeviceUnitIdentifiers: Draft setting; see StudyPatchInput.receivesDeviceUnitIdentifiers.
@@ -6119,6 +6617,7 @@ extension Components {
             ///   - enrollmentConditions:
             public init(
                 enrollmentPeriod: Components.Schemas.EnrollmentPeriod,
+                readinessFacts: Components.Schemas.StudyReadinessFacts,
                 draftRevision: Swift.String,
                 collectionRequirements: [Components.Schemas.CollectionRequirement],
                 receivesDeviceUnitIdentifiers: Swift.Bool,
@@ -6132,6 +6631,7 @@ extension Components {
                 enrollmentConditions: Components.Schemas.EnrollmentConditions
             ) {
                 self.enrollmentPeriod = enrollmentPeriod
+                self.readinessFacts = readinessFacts
                 self.draftRevision = draftRevision
                 self.collectionRequirements = collectionRequirements
                 self.receivesDeviceUnitIdentifiers = receivesDeviceUnitIdentifiers
@@ -6146,6 +6646,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case enrollmentPeriod
+                case readinessFacts
                 case draftRevision
                 case collectionRequirements
                 case receivesDeviceUnitIdentifiers
@@ -6167,7 +6668,8 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/StudyVisibility`.
         public typealias StudyVisibility = TroveAPITypes.StudyVisibility
-        /// A published study revision
+        /// A published study revision. The study definition schema version, the pinned Grove FHIR IG contract and the publication revision are recorded separately, so a publication stays interpretable when a later release changes any of them.
+        ///
         ///
         /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse`.
         public struct PublishedStudyResponse: Codable, Hashable, Sendable {
@@ -6185,6 +6687,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/publishedAt`.
             public var publishedAt: Foundation.Date
+            /// Version of the Grove study definition schema of the participant bundle.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/definitionSchemaVersion`.
+            public var definitionSchemaVersion: Swift.String
+            /// Version of the pinned Grove FHIR IG package that validated the revision.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/contractVersion`.
+            public var contractVersion: Swift.String
+            /// Source revision of the pinned Grove FHIR IG package.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/contractRevision`.
+            public var contractRevision: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/validatorIdentity`.
+            public var validatorIdentity: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/executionCapability`.
+            public var executionCapability: Swift.String
+            /// Each published Questionnaire with its administration languages and their approvals.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/instruments`.
+            public var instruments: [Components.Schemas.PublishedInstrument]
+            /// Optional collection requirements whose route was unavailable; the revision grants no collection for them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedStudyResponse/unavailableCollectionRequirements`.
+            public var unavailableCollectionRequirements: [Components.Schemas.CollectionRequirement]
             /// Creates a new `PublishedStudyResponse`.
             ///
             /// - Parameters:
@@ -6193,18 +6719,39 @@ extension Components {
             ///   - revision: The revision number of this publication
             ///   - visibility:
             ///   - publishedAt: When this revision was published
+            ///   - definitionSchemaVersion: Version of the Grove study definition schema of the participant bundle.
+            ///   - contractVersion: Version of the pinned Grove FHIR IG package that validated the revision.
+            ///   - contractRevision: Source revision of the pinned Grove FHIR IG package.
+            ///   - validatorIdentity:
+            ///   - executionCapability:
+            ///   - instruments: Each published Questionnaire with its administration languages and their approvals.
+            ///   - unavailableCollectionRequirements: Optional collection requirements whose route was unavailable; the revision grants no collection for them.
             public init(
                 id: Swift.String,
                 studyId: Swift.String,
                 revision: Swift.Int,
                 visibility: Components.Schemas.StudyVisibility,
-                publishedAt: Foundation.Date
+                publishedAt: Foundation.Date,
+                definitionSchemaVersion: Swift.String,
+                contractVersion: Swift.String,
+                contractRevision: Swift.String,
+                validatorIdentity: Swift.String,
+                executionCapability: Swift.String,
+                instruments: [Components.Schemas.PublishedInstrument],
+                unavailableCollectionRequirements: [Components.Schemas.CollectionRequirement]
             ) {
                 self.id = id
                 self.studyId = studyId
                 self.revision = revision
                 self.visibility = visibility
                 self.publishedAt = publishedAt
+                self.definitionSchemaVersion = definitionSchemaVersion
+                self.contractVersion = contractVersion
+                self.contractRevision = contractRevision
+                self.validatorIdentity = validatorIdentity
+                self.executionCapability = executionCapability
+                self.instruments = instruments
+                self.unavailableCollectionRequirements = unavailableCollectionRequirements
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6212,6 +6759,137 @@ extension Components {
                 case revision
                 case visibility
                 case publishedAt
+                case definitionSchemaVersion
+                case contractVersion
+                case contractRevision
+                case validatorIdentity
+                case executionCapability
+                case instruments
+                case unavailableCollectionRequirements
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PublishedInstrument`.
+        public struct PublishedInstrument: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PublishedInstrument/componentId`.
+            public var componentId: Swift.String
+            /// SHA-256 of the exact archived Questionnaire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedInstrument/sha256`.
+            public var sha256: Swift.String
+            /// The base language.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PublishedInstrument/language`.
+            public var language: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PublishedInstrument/translationLanguages`.
+            public var translationLanguages: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/PublishedInstrument/administrationLanguages`.
+            public var administrationLanguages: [Components.Schemas.PublishedAdministrationLanguage]
+            /// Creates a new `PublishedInstrument`.
+            ///
+            /// - Parameters:
+            ///   - componentId:
+            ///   - sha256: SHA-256 of the exact archived Questionnaire.
+            ///   - language: The base language.
+            ///   - translationLanguages:
+            ///   - administrationLanguages:
+            public init(
+                componentId: Swift.String,
+                sha256: Swift.String,
+                language: Swift.String,
+                translationLanguages: [Swift.String],
+                administrationLanguages: [Components.Schemas.PublishedAdministrationLanguage]
+            ) {
+                self.componentId = componentId
+                self.sha256 = sha256
+                self.language = language
+                self.translationLanguages = translationLanguages
+                self.administrationLanguages = administrationLanguages
+            }
+            public enum CodingKeys: String, CodingKey {
+                case componentId
+                case sha256
+                case language
+                case translationLanguages
+                case administrationLanguages
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.componentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.translationLanguages = try container.decode(
+                    [Swift.String].self,
+                    forKey: .translationLanguages
+                )
+                self.administrationLanguages = try container.decode(
+                    [Components.Schemas.PublishedAdministrationLanguage].self,
+                    forKey: .administrationLanguages
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "componentId",
+                    "sha256",
+                    "language",
+                    "translationLanguages",
+                    "administrationLanguages"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PublishedAdministrationLanguage`.
+        public struct PublishedAdministrationLanguage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PublishedAdministrationLanguage/language`.
+            public var language: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PublishedAdministrationLanguage/approvalId`.
+            public var approvalId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PublishedAdministrationLanguage/approvedAt`.
+            public var approvedAt: Foundation.Date
+            /// Creates a new `PublishedAdministrationLanguage`.
+            ///
+            /// - Parameters:
+            ///   - language:
+            ///   - approvalId:
+            ///   - approvedAt:
+            public init(
+                language: Swift.String,
+                approvalId: Swift.String,
+                approvedAt: Foundation.Date
+            ) {
+                self.language = language
+                self.approvalId = approvalId
+                self.approvedAt = approvedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case language
+                case approvalId
+                case approvedAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.approvalId = try container.decode(
+                    Swift.String.self,
+                    forKey: .approvalId
+                )
+                self.approvedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .approvedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "language",
+                    "approvalId",
+                    "approvedAt"
+                ])
             }
         }
         /// A component summary with type, id, and name
@@ -7311,21 +7989,154 @@ extension Components {
             public var name: Swift.String
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentInput/data`.
             public var data: Components.Schemas.QuestionnaireContent
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentInput/administrationLanguages`.
+            public var administrationLanguages: Components.Schemas.AdministrationLanguages?
             /// Creates a new `QuestionnaireComponentInput`.
             ///
             /// - Parameters:
             ///   - name: Display name for the component
             ///   - data:
+            ///   - administrationLanguages:
             public init(
                 name: Swift.String,
-                data: Components.Schemas.QuestionnaireContent
+                data: Components.Schemas.QuestionnaireContent,
+                administrationLanguages: Components.Schemas.AdministrationLanguages? = nil
             ) {
                 self.name = name
                 self.data = data
+                self.administrationLanguages = administrationLanguages
             }
             public enum CodingKeys: String, CodingKey {
                 case name
                 case data
+                case administrationLanguages
+            }
+        }
+        /// Languages in which participants may answer the Questionnaire, each the base language or a translation language of the resource as written there. Omission admits the base language only. Publication requires each admitted language to have complete translations and an approval for the exact resource.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/AdministrationLanguages`.
+        public typealias AdministrationLanguages = [Swift.String]
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApprovalInput`.
+        public struct QuestionnaireLanguageApprovalInput: Codable, Hashable, Sendable {
+            /// SHA-256 of the stored resource that was reviewed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApprovalInput/sha256`.
+            public var sha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApprovalInput/language`.
+            public var language: Swift.String
+            /// Creates a new `QuestionnaireLanguageApprovalInput`.
+            ///
+            /// - Parameters:
+            ///   - sha256: SHA-256 of the stored resource that was reviewed.
+            ///   - language:
+            public init(
+                sha256: Swift.String,
+                language: Swift.String
+            ) {
+                self.sha256 = sha256
+                self.language = language
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sha256
+                case language
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sha256",
+                    "language"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval`.
+        public struct QuestionnaireLanguageApproval: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/componentId`.
+            public var componentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/sha256`.
+            public var sha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/language`.
+            public var language: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/approvedAt`.
+            public var approvedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireLanguageApproval/revokedAt`.
+            public var revokedAt: Foundation.Date?
+            /// Creates a new `QuestionnaireLanguageApproval`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - componentId:
+            ///   - sha256:
+            ///   - language:
+            ///   - approvedAt:
+            ///   - revokedAt:
+            public init(
+                id: Swift.String,
+                componentId: Swift.String,
+                sha256: Swift.String,
+                language: Swift.String,
+                approvedAt: Foundation.Date,
+                revokedAt: Foundation.Date? = nil
+            ) {
+                self.id = id
+                self.componentId = componentId
+                self.sha256 = sha256
+                self.language = language
+                self.approvedAt = approvedAt
+                self.revokedAt = revokedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case componentId
+                case sha256
+                case language
+                case approvedAt
+                case revokedAt
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.componentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.approvedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .approvedAt
+                )
+                self.revokedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .revokedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "componentId",
+                    "sha256",
+                    "language",
+                    "approvedAt",
+                    "revokedAt"
+                ])
             }
         }
         /// Questionnaire component with the languages found in its resource. A draft resource is not validated; publication validation checks it.
@@ -7349,6 +8160,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/translationLanguages`.
             public var translationLanguages: [Swift.String]
+            /// SHA-256 of the stored resource, which an approval names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/sha256`.
+            public var sha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/administrationLanguages`.
+            public var administrationLanguages: Components.Schemas.AdministrationLanguages
+            /// Approvals in force for the stored resource.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireComponentResponse/languageApprovals`.
+            public var languageApprovals: [Components.Schemas.QuestionnaireLanguageApproval]
             /// Creates a new `QuestionnaireComponentResponse`.
             ///
             /// - Parameters:
@@ -7357,18 +8178,27 @@ extension Components {
             ///   - data:
             ///   - language: The resource's base language (`Questionnaire.language`), as written. Omitted when the draft names none.
             ///   - translationLanguages: Languages of the resource's translation extensions, as written and sorted.
+            ///   - sha256: SHA-256 of the stored resource, which an approval names.
+            ///   - administrationLanguages:
+            ///   - languageApprovals: Approvals in force for the stored resource.
             public init(
                 id: Swift.String,
                 name: Swift.String,
                 data: Components.Schemas.QuestionnaireContent,
                 language: Swift.String? = nil,
-                translationLanguages: [Swift.String]
+                translationLanguages: [Swift.String],
+                sha256: Swift.String,
+                administrationLanguages: Components.Schemas.AdministrationLanguages,
+                languageApprovals: [Components.Schemas.QuestionnaireLanguageApproval]
             ) {
                 self.id = id
                 self.name = name
                 self.data = data
                 self.language = language
                 self.translationLanguages = translationLanguages
+                self.sha256 = sha256
+                self.administrationLanguages = administrationLanguages
+                self.languageApprovals = languageApprovals
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -7376,6 +8206,9 @@ extension Components {
                 case data
                 case language
                 case translationLanguages
+                case sha256
+                case administrationLanguages
+                case languageApprovals
             }
         }
         /// Defines how the start date of an export session is determined. This represents a strategy rather than a concrete date.

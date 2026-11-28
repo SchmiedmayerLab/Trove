@@ -67,6 +67,8 @@ extension Components.Schemas.StudyAuditAction {
         case .studyDraftEdited: self = .study_draft_edited
         case .studyDraftValidated: self = .study_draft_validated
         case .studyDraftDisclosure: self = .study_draft_disclosure
+        case .studyLanguageApproved: self = .study_language_approved
+        case .studyLanguageApprovalRevoked: self = .study_language_approval_revoked
         case .delegationCreated: self = .delegation_created
         case .delegationRevoked: self = .delegation_revoked
         case .delegationDisclosure: self = .delegation_disclosure

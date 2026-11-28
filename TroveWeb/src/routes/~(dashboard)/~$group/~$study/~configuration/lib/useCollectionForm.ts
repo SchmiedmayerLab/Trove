@@ -3,6 +3,7 @@
 
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   getCollectionCapabilitiesOptions,
   getStudyCollectionProviderCapabilitiesOptions,
@@ -26,8 +27,12 @@ export const useCollectionForm = (studyId: string) => {
     ...measurementsFromCapabilities(capabilities.data ?? []),
     ...measurementsFromProviderRegistrations(providers.data ?? []),
   ];
+  const [baseline, setBaseline] = useState(query.data);
   const form = useForm({
-    formSchema: makeCollectionFormSchema(measurements),
+    formSchema: makeCollectionFormSchema(
+      measurements,
+      baseline?.collectionRequirements,
+    ),
     defaultValues: {
       collectionRequirements: [],
       receivesDeviceUnitIdentifiers: false,
@@ -37,11 +42,13 @@ export const useCollectionForm = (studyId: string) => {
     query.data,
     studyId,
     form.formState.isDirty,
-    (loaded) =>
+    (loaded) => {
+      setBaseline(loaded);
       form.reset({
         collectionRequirements: loaded.collectionRequirements,
         receivesDeviceUnitIdentifiers: loaded.receivesDeviceUnitIdentifiers,
-      }),
+      });
+    },
   );
   return {
     form,
@@ -50,10 +57,15 @@ export const useCollectionForm = (studyId: string) => {
     providers,
     measurements,
     isSupported:
-      !!query.data &&
+      !!baseline &&
+      baseline.id === query.data?.id &&
       !!capabilities.data &&
       !!providers.data &&
-      canEditCollection(query.data.collectionRequirements, measurements),
+      canEditCollection(
+        baseline.collectionRequirements,
+        measurements,
+        baseline.collectionRequirements,
+      ),
     getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
   };
 };

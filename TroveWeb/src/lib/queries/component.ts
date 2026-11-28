@@ -23,6 +23,8 @@ import {
   putStudiesByStudyIdComponentsHealthDataByComponentIdMutation,
   putStudiesByStudyIdComponentsByComponentIdSchedulesByScheduleIdMutation,
   deleteStudiesByStudyIdComponentsByComponentIdSchedulesByScheduleIdMutation,
+  approveQuestionnaireLanguageMutation,
+  revokeQuestionnaireLanguageApprovalMutation,
   validateStudyComponentMutation,
 } from "../api/generated/@tanstack/react-query.gen";
 import {
@@ -260,4 +262,15 @@ export const useDeleteScheduleMutation = createMutationHook(
   "Error deleting schedule",
   "getStudiesByStudyId",
   "getStudiesByStudyIdComponentsByComponentIdSchedules",
+);
+
+export const useApproveLanguage = createMutationHook(
+  approveQuestionnaireLanguageMutation,
+  "Error approving language",
+  "getStudiesByStudyIdComponentsQuestionnaireByComponentId",
+);
+export const useRevokeLanguage = createMutationHook(
+  revokeQuestionnaireLanguageApprovalMutation,
+  "Error revoking approval",
+  "getStudiesByStudyIdComponentsQuestionnaireByComponentId",
 );

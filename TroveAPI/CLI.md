@@ -176,6 +176,21 @@ leaves the analysis incomplete; a failed request exits 1 and prints nothing on
 standard output. The [study model](../docs/Study-Model-and-Research-Workflows.md#branching-scenarios)
 describes the evaluation rules.
 
+## Language Approvals
+
+Publication requires an administrator's approval of each administration language
+of each questionnaire, for the exact stored resource.
+`trove study approve-language <study-id> --component <component-id> --sha256 <digest> --language <language>`
+approves one language. `--sha256` names the digest of the resource you reviewed,
+as `trove study validate` reports it for the questionnaire; the server refuses an
+approval when the stored resource has a different digest. The command prints the
+`QuestionnaireLanguageApproval`, also when the same approval is already in force.
+`trove study revoke-language-approval <study-id> --component <component-id> --approval <approval-id>`
+revokes one. Both use interactive administrator authority and do not change the
+draft revision; validate the draft again before publishing. `trove questionnaire import`
+admits the base language only; admit a translation language on the questionnaire
+form or through the component API before approving it.
+
 ## Exact Publication
 
 Run `trove study validate <study-id> --revision <draft-revision>`. Review the

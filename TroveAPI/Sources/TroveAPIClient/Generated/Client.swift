@@ -1941,7 +1941,7 @@ public struct Client: APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, checks the readiness facts, the administration languages of each Questionnaire and the route of each collection requirement, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Each administration language must be the base language or a translation language of the resource, every displayed string must carry a translation into it, and a study administrator must have approved it for the exact resource. A required collection requirement whose route is unavailable blocks publication; an optional one is reported as unavailable and published as unavailable. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -2077,7 +2077,7 @@ public struct Client: APIProtocol {
     }
     /// Publish a study
     ///
-    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
+    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities, the language approvals the candidate recorded and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/publish`.
@@ -3393,6 +3393,204 @@ public struct Client: APIProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.QuestionnaireScenarioReport.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Approve one administration language of a questionnaire's exact resource
+    ///
+    /// Records that a study administrator approved the stored Questionnaire with the given SHA-256 for administration in one language. Requires interactive administrator authority; delegated clients cannot approve. The digest must be the digest of the stored resource, and the language must be the resource's base language or one of its translation languages. An approval applies only to that exact resource: any edit changes the digest, and publication then requires a new approval for every administration language. Approving does not change the draft revision; validate the draft again before publishing. Repeating an approval that is in force returns it unchanged with status 200.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)`.
+    public func approveQuestionnaireLanguage(_ input: Operations.ApproveQuestionnaireLanguage.Input) async throws -> Operations.ApproveQuestionnaireLanguage.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ApproveQuestionnaireLanguage.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/components/{}/language-approvals",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.componentId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 201:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ApproveQuestionnaireLanguage.Output.Created.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.QuestionnaireLanguageApproval.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .created(.init(body: body))
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ApproveQuestionnaireLanguage.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.QuestionnaireLanguageApproval.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Revoke a questionnaire language approval
+    ///
+    /// Ends an approval that is in force. Requires interactive administrator authority. A revoked approval no longer permits publication; a candidate validated with it cannot be published. Publications already accepted keep the approval evidence they recorded. Revoking a revoked approval returns it unchanged.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/post(revokeQuestionnaireLanguageApproval)`.
+    public func revokeQuestionnaireLanguageApproval(_ input: Operations.RevokeQuestionnaireLanguageApproval.Input) async throws -> Operations.RevokeQuestionnaireLanguageApproval.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RevokeQuestionnaireLanguageApproval.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/components/{}/language-approvals/{}/revoke",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.componentId,
+                        input.path.approvalId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RevokeQuestionnaireLanguageApproval.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.QuestionnaireLanguageApproval.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)

@@ -136,21 +136,30 @@ final class ProviderRegistrationService: Module, Sendable {
     }
 
     /// Publication checks the actual receiver/acquisition intersection again under the acceptance transaction.
-    func validate(requirements: [CollectionRequirement], on transaction: any Database) async throws {
-        guard transaction.inTransaction else { throw AuditError.transactionRequired }
-        let required = requirements.filter { $0.sourceKind == .serverWorker }
-        let identifiers = Set(required.compactMap(\.providerRegistrationID)).sorted { $0.uuidString < $1.uuidString }
-        guard required.allSatisfy({ $0.providerRegistrationID != nil && $0.sourceTypeIdentifier != nil }) else {
-            throw ProviderFailure.scopeLost
-        }
-        for id in identifiers {
-            let registration = try await ProviderRegistrationStore.requireApproved(id, on: transaction, lock: true).configuration
-            let capabilities = capabilities(for: registration)
-            for requirement in required where requirement.providerRegistrationID == id {
-                guard capabilities.contains(where: {
-                    $0.sourceTypeIdentifier == requirement.sourceTypeIdentifier && $0.profiles.contains(requirement.profile)
-                }) else { throw ProviderFailure.scopeLost }
-            }
+    ///
+    /// A granted route that became unavailable after validation refuses publication with a 409 whose diagnostics
+    /// name each affected `collectionRequirements` entry of the draft, as draft validation does.
+    func validate(requirements: [CollectionRequirement], draft: [CollectionRequirement], on transaction: any Database) async throws {
+        let admitted = try await routes(for: requirements, lock: true, on: transaction)
+        let lost = admitted.filter { !$0.available }
+        guard lost.isEmpty else {
+            // Publication accepts only the draft revision the candidate was built from, whose requirements are unique,
+            // so each granted requirement has one draft index. Without one, the finding names the whole list.
+            throw ServerError(
+                status: .conflict,
+                title: "Collection Route Unavailable",
+                detail: "A collection route became unavailable after validation; validate the study draft again",
+                diagnostics: lost.map { route in
+                    let index = draft.firstIndex(of: route.requirement)
+                    var refusal = CollectionRouteAvailability(
+                        index: index ?? route.index, requirement: route.requirement, available: false
+                    ).publicationRefusal
+                    if index == nil {
+                        refusal.path = "collectionRequirements"
+                    }
+                    return refusal
+                }
+            )
         }
     }
 

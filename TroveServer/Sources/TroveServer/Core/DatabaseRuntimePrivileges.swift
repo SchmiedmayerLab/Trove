@@ -28,7 +28,7 @@ enum DatabaseRuntimePrivileges {
                 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public'
                     AND c.relname IN ('audit_events', '_fluent_migrations', 'published_studies', 'enrollment_consents', 'source_bindings',
-                        'source_installations', 'study_delegations', 'study_publication_candidates',
+                        'source_installations', 'study_delegations', 'study_publication_candidates', 'questionnaire_language_approvals',
                         'source_identity_keys', 'source_identity_key_envelopes',
                         'clinical_events',
                         'clinical_event_representations', 'clinical_source_records', 'clinical_record_events', 'clinical_output_bindings',
@@ -39,7 +39,7 @@ enum DatabaseRuntimePrivileges {
                         'provider_global_scopes', 'provider_query_coverage', 'provider_conversion_instants')
             )
             SELECT
-                (SELECT count(*) FROM protected_relations) = 30
+                (SELECT count(*) FROM protected_relations) = 31
                 AND current_user = session_user
                 AND NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_auth_members membership
@@ -82,13 +82,17 @@ enum DatabaseRuntimePrivileges {
                             ELSE 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION' END)
                         OR pg_catalog.has_any_column_privilege(r.oid, p.oid,
                             CASE WHEN p.relname = '_fluent_migrations' THEN 'SELECT,INSERT,UPDATE,REFERENCES'
-                                WHEN p.relname IN ('source_bindings', 'source_installations', 'study_delegations')
+                                WHEN p.relname IN ('source_bindings', 'source_installations', 'study_delegations',
+                                    'questionnaire_language_approvals')
                                 THEN 'REFERENCES,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION,UPDATE WITH GRANT OPTION'
                                 ELSE 'UPDATE,REFERENCES,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION' END)
-                        OR (p.relname IN ('source_bindings', 'source_installations', 'study_delegations') AND EXISTS (
+                        OR (p.relname IN ('source_bindings', 'source_installations', 'study_delegations',
+                            'questionnaire_language_approvals') AND EXISTS (
                             SELECT 1 FROM pg_catalog.pg_attribute column_info
                             WHERE column_info.attrelid = p.oid AND column_info.attnum > 0 AND NOT column_info.attisdropped
                                 AND column_info.attname <> 'revoked_at'
+                                AND NOT (p.relname = 'questionnaire_language_approvals'
+                                    AND column_info.attname IN ('revoked_by_issuer', 'revoked_by_subject'))
                                 AND pg_catalog.has_column_privilege(r.oid, p.oid, column_info.attnum, 'UPDATE')
                         ))
                 ) AS allowed

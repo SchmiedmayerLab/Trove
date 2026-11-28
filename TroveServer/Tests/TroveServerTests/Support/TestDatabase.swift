@@ -50,7 +50,9 @@ enum TestDatabase {
             CreateAuditEvents().name,
             CreateClinicalEvents().name,
             CreateRecordingTransfers().name,
-            CreateProviderConnections().name
+            CreateProviderConnections().name,
+            AddPublicationReadiness().name,
+            CreateQuestionnaireLanguageApprovals().name
         ].sorted()
     }
 

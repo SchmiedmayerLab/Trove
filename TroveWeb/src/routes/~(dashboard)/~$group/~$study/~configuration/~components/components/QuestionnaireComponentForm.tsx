@@ -22,6 +22,7 @@ import { ValidationDiagnostics } from "@/components/interfaces/ValidationDiagnos
 import { CardHeader } from "@/components/ui/Card";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import type {
+  QuestionnaireComponentResponse,
   QuestionnaireValidation,
   ValidationDiagnostic,
 } from "@/lib/api/generated/types.gen";
@@ -34,6 +35,7 @@ import {
   shownValidation,
 } from "../../lib/questionnaireForm";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
+import { LanguageApprovals } from "./LanguageApprovals";
 
 // Reformatting rewrites the resource, so it only happens on request.
 const formatJson = (json: string): string =>
@@ -131,6 +133,8 @@ interface QuestionnaireComponentFormProps {
     studyId: string;
     componentId: string;
     revision: string | undefined;
+    component?: QuestionnaireComponentResponse;
+    groupId: string;
   };
 }
 
@@ -211,6 +215,16 @@ export const QuestionnaireComponentForm = ({
 
   const languages = questionnaireLanguages(questionnaireJson);
 
+  const admitted =
+    form.watch("administrationLanguages") ??
+    (languages?.base ? [languages.base] : []);
+  const choices = [
+    ...new Set([
+      ...(languages?.base ? [languages.base] : []),
+      ...(languages?.translations ?? []),
+      ...admitted,
+    ]),
+  ];
   return (
     <>
       <CardHeader
@@ -241,7 +255,7 @@ export const QuestionnaireComponentForm = ({
           }
           className="px-6 pt-6"
           render={({ field }) => (
-            <div ref={editorRef}>
+            <div ref={editorRef} id="questionnaire-resource" tabIndex={-1}>
               <Textarea {...field} rows={10} className="w-full font-mono" />
               {languages ?
                 <dl className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm">
@@ -292,7 +306,44 @@ export const QuestionnaireComponentForm = ({
             </div>
           )}
         />
+        <fieldset
+          className="grid gap-2 px-6 pt-4"
+          id="administrationLanguages"
+          tabIndex={-1}
+        >
+          <legend>Administration languages</legend>
+          {choices.map((language) => (
+            <label key={language}>
+              <input
+                type="checkbox"
+                checked={admitted.includes(language)}
+                disabled={!admitted.includes(language) && admitted.length >= 64}
+                onChange={(event) =>
+                  form.setValue(
+                    "administrationLanguages",
+                    event.target.checked ?
+                      [...admitted, language]
+                    : admitted.filter((value) => value !== language),
+                    { shouldDirty: true, shouldValidate: true },
+                  )
+                }
+              />{" "}
+              {language}
+            </label>
+          ))}
+        </fieldset>
       </form>
+      {saved?.component && (
+        <LanguageApprovals
+          studyId={saved.studyId}
+          groupId={saved.groupId}
+          component={saved.component}
+          dirty={
+            form.formState.isDirty ||
+            questionnaireJson !== saved.component.data.questionnaire
+          }
+        />
+      )}
       {saved && (
         <QuestionnaireValidationSection
           studyId={saved.studyId}

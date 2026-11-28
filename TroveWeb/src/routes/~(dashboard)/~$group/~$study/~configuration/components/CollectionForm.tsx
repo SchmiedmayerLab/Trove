@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import {
+  Button,
   Checkbox,
   Field,
   Input,
@@ -15,10 +16,11 @@ import type {
 } from "@/lib/api/generated/types.gen";
 import {
   collectionSummary,
+  collectionRouteKey,
   foodSourceTypeIdentifier,
   matchesCollectionMeasurement,
+  routeAvailable,
   type CollectionMeasurement,
-  setCollectionRequirement,
   sleepStageProfile,
   workoutProfile,
 } from "../lib/collectionForm";
@@ -29,6 +31,31 @@ interface CollectionControlsProps {
   requirements: CollectionRequirement[];
   onChange: (value: CollectionRequirement[]) => void;
 }
+
+const RequirementLevel = ({
+  item,
+  onChange,
+}: {
+  item: CollectionRequirement;
+  onChange: (updated: CollectionRequirement) => void;
+}) => (
+  <label className="grid gap-1">
+    Publication requirement
+    <select
+      value={item.requirement ?? "required"}
+      onChange={(event) =>
+        onChange({
+          ...item,
+          requirement:
+            event.target.value === "optional" ? "optional" : "required",
+        })
+      }
+    >
+      <option value="required">Required</option>
+      <option value="optional">Optional</option>
+    </select>
+  </label>
+);
 
 const MeasurementControls = ({
   requirement,
@@ -50,6 +77,7 @@ const MeasurementControls = ({
   };
   return (
     <div className="flex flex-col gap-6">
+      <RequirementLevel item={requirement} onChange={onChange} />
       {supportsWorkoutRoutes && (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
@@ -214,6 +242,83 @@ const MeasurementControls = ({
   );
 };
 
+const UnavailableRoute = ({
+  item,
+  measurements,
+  requirements,
+  replace,
+  remove,
+}: {
+  item: CollectionRequirement;
+  measurements: readonly CollectionMeasurement[];
+  requirements: CollectionRequirement[];
+  replace: (updated: CollectionRequirement) => void;
+  remove: () => void;
+}) => {
+  const replacements = measurements.filter(
+    (measurement) =>
+      measurement.profile === item.profile &&
+      (measurement.timeBasis ?? "measurement-time") ===
+        (item.timeBasis ?? "measurement-time") &&
+      (!item.includeWorkoutRoutes || measurement.supportsWorkoutRoutes) &&
+      !requirements.some((other) =>
+        matchesCollectionMeasurement(other, measurement),
+      ),
+  );
+  return (
+    <fieldset className="space-y-3 rounded-lg border p-4">
+      <legend>Unavailable collection route</legend>
+      <p className="break-all">
+        {item.profile} ({item.sourceKind})
+      </p>
+      {item.providerRegistrationId && (
+        <p>Registration: {item.providerRegistrationId}</p>
+      )}
+      {item.sourceTypeIdentifier && <p>Source: {item.sourceTypeIdentifier}</p>}
+      <RequirementLevel item={item} onChange={replace} />
+      {replacements.length > 0 && (
+        <label>
+          Replace with an available route
+          <select
+            value=""
+            onChange={(event) => {
+              const choice = replacements.find(
+                (route) => collectionRouteKey(route) === event.target.value,
+              );
+              if (!choice) return;
+              replace({
+                ...item,
+                sourceKind: choice.sourceKind ?? "participant-app",
+                sourceTypeIdentifier: choice.sourceTypeIdentifier,
+                providerRegistrationId: choice.providerRegistrationId,
+              });
+            }}
+          >
+            <option value="">Choose a route</option>
+            {replacements.map((choice) => (
+              <option
+                key={collectionRouteKey(choice)}
+                value={collectionRouteKey(choice)}
+              >
+                {[
+                  choice.label,
+                  choice.sourceTypeIdentifier,
+                  choice.providerRegistrationId,
+                ]
+                  .filter(Boolean)
+                  .join(" / ")}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <Button type="button" variant="outline" onClick={remove}>
+        Remove unavailable route
+      </Button>
+    </fieldset>
+  );
+};
+
 const CollectionControls = ({
   measurements,
   requirements,
@@ -242,6 +347,24 @@ const CollectionControls = ({
           Showing {visible.length} of {measurements.length} measurements.
         </p>
       </div>
+      {requirements
+        .filter((item) => !routeAvailable(item, measurements))
+        .map((item) => (
+          <UnavailableRoute
+            key={collectionRouteKey(item)}
+            item={item}
+            measurements={measurements}
+            requirements={requirements}
+            replace={(updated) =>
+              onChange(
+                requirements.map((other) => (other === item ? updated : other)),
+              )
+            }
+            remove={() =>
+              onChange(requirements.filter((other) => other !== item))
+            }
+          />
+        ))}
       {visible.map((measurement, index) => {
         const {
           profile,
@@ -255,12 +378,7 @@ const CollectionControls = ({
         );
         return (
           <fieldset
-            key={JSON.stringify([
-              profile,
-              sourceKind,
-              providerRegistrationId,
-              sourceTypeIdentifier,
-            ])}
+            key={collectionRouteKey(measurement)}
             className="space-y-4 rounded-lg border p-4"
           >
             <legend className="px-2 font-medium">{label}</legend>
@@ -270,21 +388,18 @@ const CollectionControls = ({
                 checked={!!requirement}
                 onCheckedChange={(checked) =>
                   onChange(
-                    setCollectionRequirement(
-                      requirements,
-                      profile,
-                      checked === true ?
+                    checked === true ?
+                      [
+                        ...requirements,
                         {
                           profile,
                           sourceKind,
                           providerRegistrationId,
                           sourceTypeIdentifier,
                           timeBasis: measurement.timeBasis,
-                        }
-                      : undefined,
-                      sourceTypeIdentifier,
-                      measurement,
-                    ),
+                        },
+                      ]
+                    : requirements.filter((item) => item !== requirement),
                   )
                 }
               />
@@ -363,12 +478,8 @@ const CollectionControls = ({
                 }
                 onChange={(updated) =>
                   onChange(
-                    setCollectionRequirement(
-                      requirements,
-                      profile,
-                      { ...updated, sourceTypeIdentifier },
-                      sourceTypeIdentifier,
-                      measurement,
+                    requirements.map((item) =>
+                      item === requirement ? updated : item,
                     ),
                   )
                 }

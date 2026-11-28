@@ -311,6 +311,28 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.approveQuestionnaireLanguage(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/components/{componentId}/language-approvals")
+        )
+        try transport.register(
+            {
+                try await server.revokeQuestionnaireLanguageApproval(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke")
+        )
+        try transport.register(
+            {
                 try await server.postStudiesStudyIdComponentsInformational(
                     request: $0,
                     body: $1,
@@ -2555,7 +2577,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Validate an exact study draft for publication
     ///
-    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
+    /// Captures the complete draft, validates every multilingual Questionnaire against the pinned Grove FHIR IG and execution capabilities, checks the readiness facts, the administration languages of each Questionnaire and the route of each collection requirement, and stages the exact publication archive. Findings that prevent publication are returned as blockers, other findings as advisories. Each administration language must be the base language or a translation language of the resource, every displayed string must carry a translation into it, and a study administrator must have approved it for the exact resource. A required collection requirement whose route is unavailable blocks publication; an optional one is reported as unavailable and published as unavailable. Only a `valid` result creates a candidate: its ID identifies a single immutable candidate and is also its future publication ID. An `invalid`, `incomplete` or `unavailable` result has no candidate and cannot be published. Candidates expire within one hour, or earlier when Questionnaire eligibility ends. This operation does not publish. Changes during validation reject the result without accepting a candidate. Provider registration and publication preparation failures, such as invalid consent response controls, remain problem responses.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/draft/validations`.
@@ -2677,7 +2699,7 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
     }
     /// Publish a study
     ///
-    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
+    /// Accepts only the immutable candidate selected by validationId and its original If-Match draft revision. Requires fresh interactive administrator authority; delegated clients cannot publish. First acceptance checks current draft, candidate lifetime, validator identity, capabilities, the language approvals the candidate recorded and next publication revision. It retains the previously validated archive without rebuilding it. An exact authorized retry returns the same publication even if the draft later changes or the candidate expires. A different If-Match never aliases an accepted request. An unavailable validator blocks new validation; an unexpired proof with unchanged pins remains usable without a second validator request. All candidates, including studies without Questionnaires, require a configured pinned validator identity.
     ///
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/publish`.
@@ -3881,6 +3903,212 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                     path: path,
                     headers: headers,
                     body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Approve one administration language of a questionnaire's exact resource
+    ///
+    /// Records that a study administrator approved the stored Questionnaire with the given SHA-256 for administration in one language. Requires interactive administrator authority; delegated clients cannot approve. The digest must be the digest of the stored resource, and the language must be the resource's base language or one of its translation languages. An approval applies only to that exact resource: any edit changes the digest, and publication then requires a new approval for every administration language. Approving does not change the draft revision; validate the draft again before publishing. Repeating an approval that is in force returns it unchanged with status 200.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/post(approveQuestionnaireLanguage)`.
+    func approveQuestionnaireLanguage(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.ApproveQuestionnaireLanguage.id,
+            using: {
+                APIHandler.approveQuestionnaireLanguage($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.ApproveQuestionnaireLanguage.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    componentId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "componentId",
+                        as: Components.Parameters.ComponentId.self
+                    )
+                )
+                let headers: Operations.ApproveQuestionnaireLanguage.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.ApproveQuestionnaireLanguage.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.QuestionnaireLanguageApprovalInput.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.ApproveQuestionnaireLanguage.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .created(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 201)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Revoke a questionnaire language approval
+    ///
+    /// Ends an approval that is in force. Requires interactive administrator authority. A revoked approval no longer permits publication; a candidate validated with it cannot be published. Publications already accepted keep the approval evidence they recorded. Revoking a revoked approval returns it unchanged.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke/post(revokeQuestionnaireLanguageApproval)`.
+    func revokeQuestionnaireLanguageApproval(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.RevokeQuestionnaireLanguageApproval.id,
+            using: {
+                APIHandler.revokeQuestionnaireLanguageApproval($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.RevokeQuestionnaireLanguageApproval.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    componentId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "componentId",
+                        as: Components.Parameters.ComponentId.self
+                    ),
+                    approvalId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "approvalId",
+                        as: Swift.String.self
+                    )
+                )
+                let headers: Operations.RevokeQuestionnaireLanguageApproval.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.RevokeQuestionnaireLanguageApproval.Input(
+                    path: path,
+                    headers: headers
                 )
             },
             serializer: { output, request in

@@ -9,6 +9,7 @@ import type {
 import { zQuestionnaireContent } from "@/lib/api/generated/zod.gen";
 
 export const questionnaireFormSchema = zQuestionnaireContent.extend({
+  administrationLanguages: z.array(z.string()).max(64).optional(),
   name: z.string().min(1, "Name is required"),
   questionnaire: z
     .string()
@@ -34,6 +35,7 @@ export const emptyQuestionnaireForm: QuestionnaireFormValues = {
 export const questionnaireFormValues = (
   response: QuestionnaireComponentResponse,
 ): QuestionnaireFormValues => ({
+  administrationLanguages: response.administrationLanguages,
   name: response.name,
   questionnaire: response.data.questionnaire,
 });
@@ -41,6 +43,7 @@ export const questionnaireFormValues = (
 export const questionnaireInput = (
   values: QuestionnaireFormValues,
 ): QuestionnaireComponentInput => ({
+  administrationLanguages: values.administrationLanguages,
   name: values.name,
   data: { questionnaire: values.questionnaire },
 });

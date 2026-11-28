@@ -563,3 +563,45 @@ describe("document source dates", () => {
     },
   );
 });
+
+describe("saved unavailable collection routes", () => {
+  const withdrawn = {
+    profile: bodyWeightProfile,
+    sourceKind: "server-worker" as const,
+    providerRegistrationId: "10000000-0000-4000-8000-000000000099",
+    sourceTypeIdentifier: "getmeas:1",
+    requirement: "required" as const,
+    measurementWindow: { calendar: "gregorian" as const, timeZone: "UTC" },
+  };
+  const other = newHeartRateRequirement();
+  const saved = [withdrawn, other];
+  const form = makeCollectionFormSchema(collectionMeasurements, saved);
+  it("keeps the saved scope intact on a level change or removal", () => {
+    expect(canEditCollection(saved, collectionMeasurements, saved)).toBe(true);
+    for (const rows of [
+      saved,
+      [{ ...withdrawn, requirement: "optional" as const }, other],
+      [other],
+    ]) {
+      expect(
+        form.parse({ collectionRequirements: rows }).collectionRequirements,
+      ).toEqual(rows);
+    }
+  });
+  it("rejects new unavailable routes and changes to their scope", () => {
+    for (const row of [
+      {
+        ...withdrawn,
+        providerRegistrationId: "10000000-0000-4000-8000-000000000098",
+      },
+      { ...withdrawn, measurementWindow: undefined },
+      { ...withdrawn, futureSetting: true },
+    ]) {
+      expect(
+        form.safeParse({ collectionRequirements: [row, other] }).success,
+      ).toBe(false);
+    }
+    const malformed = { ...withdrawn, sourceTypeIdentifier: undefined };
+    expect(canEditCollection([malformed], [], [malformed])).toBe(false);
+  });
+});

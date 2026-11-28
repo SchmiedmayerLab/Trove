@@ -38,7 +38,8 @@ extension StudyPatch {
             enrollmentCondition: schema.enrollmentConditions,
             enrollmentPeriod: schema.enrollmentPeriod,
             collectionRequirements: requirements,
-            receivesDeviceUnitIdentifiers: schema.receivesDeviceUnitIdentifiers
+            receivesDeviceUnitIdentifiers: schema.receivesDeviceUnitIdentifiers,
+            readinessFacts: schema.readinessFacts
         )
     }
 }
@@ -56,6 +57,7 @@ extension Components.Schemas.StudyResponse {
     init(_ model: Study) throws {
         self.init(
             enrollmentPeriod: model.enrollmentPeriod,
+            readinessFacts: model.readinessFacts,
             draftRevision: model.draftRevision.uuidString,
             collectionRequirements: model.collectionRequirements.map(Components.Schemas.CollectionRequirement.init),
             receivesDeviceUnitIdentifiers: model.receivesDeviceUnitIdentifiers,
@@ -86,7 +88,8 @@ extension CollectionRequirement {
             includeWorkoutRoutes: schema.includeWorkoutRoutes ?? false,
             providerRegistrationID: registration,
             sourceTypeIdentifier: schema.sourceTypeIdentifier,
-            timeBasis: schema.timeBasis
+            timeBasis: schema.timeBasis,
+            requirement: schema.requirement == .optional ? .optional : .required
         )
     }
 }
@@ -100,6 +103,7 @@ extension Components.Schemas.CollectionRequirement {
             sourceTypeIdentifier: model.sourceTypeIdentifier,
             providerRegistrationId: model.providerRegistrationID?.uuidString.lowercased(),
             sourceKind: model.sourceKind == .participantApp ? .participantApp : .serverWorker,
+            requirement: model.requirement == .optional ? .optional : .required,
             timeBasis: model.timeBasis
         )
     }

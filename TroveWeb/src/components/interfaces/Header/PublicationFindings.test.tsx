@@ -28,6 +28,7 @@ const report = (
   status,
   blockers: status === "valid" ? [] : [finding("error")],
   advisories: [finding("warning")],
+  routes: [],
   questionnaires: [],
   candidate:
     candidate ?
@@ -59,6 +60,43 @@ describe("PublicationFindings", () => {
       );
     expect(heading).not.toBeNull();
     expect(markup).toContain(`<p id="${heading?.[2]}">Invalid.`);
+  });
+
+  it("identifies unavailable routes with the same profile from the validation report alone", () => {
+    const value = report("valid", true);
+    value.advisories = [];
+    value.routes = ["one", "two"].map((id, index) => ({
+      index,
+      profile: "weight",
+      sourceKind: "server-worker",
+      providerRegistrationId: "registration-" + id,
+      sourceTypeIdentifier: "measurement-" + id,
+      availability: "unavailable",
+      requirement: "optional",
+    }));
+    const markup = render(value);
+    for (const id of ["one", "two"]) {
+      expect(markup).toMatch(
+        new RegExp(
+          `<p[^>]*>Unavailable optional collection route:[^<]*weight[^<]*<code>registration-${id}</code>[^<]*<code>measurement-${id}</code></p>`,
+        ),
+      );
+    }
+  });
+
+  it("does not list available routes", () => {
+    const value = report("valid", true);
+    value.advisories = [];
+    value.routes = [
+      {
+        index: 0,
+        profile: "heart-rate",
+        sourceKind: "participant-app",
+        availability: "available",
+        requirement: "required",
+      },
+    ];
+    expect(render(value)).not.toContain("heart-rate");
   });
 
   it("does not repeat the overall result under advisories", () => {

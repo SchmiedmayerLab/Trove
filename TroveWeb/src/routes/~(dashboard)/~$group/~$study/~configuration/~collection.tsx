@@ -22,7 +22,8 @@ const CollectionRoute = () => {
     getDraftHeaders,
   } = useCollectionForm(study);
   const updateStudy = useUpdateStudyMutation();
-  const disabled = !isSupported || updateStudy.isPending;
+  const loadFailed = query.isError || capabilities.isError || providers.isError;
+  const disabled = loadFailed || !isSupported || updateStudy.isPending;
   const handleSubmit = form.handleSubmit((data) => {
     if (disabled) return;
     updateStudy.mutate(
@@ -53,7 +54,7 @@ const CollectionRoute = () => {
   );
   if (query.isPending || capabilities.isPending || providers.isPending)
     content = <p role="status">Loading collection settings…</p>;
-  else if (query.isError || capabilities.isError || providers.isError)
+  else if (loadFailed)
     content = (
       <p role="alert">
         Collection settings could not be loaded. Reload to try again.
@@ -83,7 +84,13 @@ const CollectionRoute = () => {
           />
         }
       />
-      <div className="flex max-w-7xl flex-col gap-8 p-6">{content}</div>
+      <div
+        id="collection-edit"
+        tabIndex={-1}
+        className="flex max-w-7xl flex-col gap-8 p-6"
+      >
+        {content}
+      </div>
       <NavigationBlocker shouldBlock={form.formState.isDirty} />
     </div>
   );

@@ -54,6 +54,7 @@ enum TestApp {
         grantorAuthority: GrantorAuthorityProvider = .unavailable,
         recordingDownloadByteLimit: String? = nil,
         collectionCapacity: CollectionCapacityConfiguration = .standard,
+        providerRuntime: (@Sendable (Application, AuthorizationService, StudyRepository) -> ProviderRuntime)? = nil,
         _ test: @escaping @Sendable (Application, String?) async throws -> Void
     ) async throws {
         let app = try await makeApplication()
@@ -65,7 +66,8 @@ enum TestApp {
                 validator: validator,
                 grantorAuthority: grantorAuthority,
                 recordingDownloadByteLimit: recordingDownloadByteLimit,
-                collectionCapacity: collectionCapacity
+                collectionCapacity: collectionCapacity,
+                providerRuntime: providerRuntime
             )
             let token: String? = switch tokenConfig {
             case .none:
@@ -123,11 +125,15 @@ enum TestApp {
         validator: FHIRValidationClient? = nil,
         grantorAuthority: GrantorAuthorityProvider = .unavailable,
         recordingDownloadByteLimit: String? = nil,
-        collectionCapacity: CollectionCapacityConfiguration = .standard
+        collectionCapacity: CollectionCapacityConfiguration = .standard,
+        providerRuntime: (@Sendable (Application, AuthorizationService, StudyRepository) -> ProviderRuntime)? = nil
     ) async throws -> JWTKeyCollection {
         try await TestDatabase.configure(for: app)
         configureMigrations(for: app)
         try await app.autoMigrate()
+        let runtime: (@Sendable (AuthorizationService, StudyRepository) -> ProviderRuntime)? = providerRuntime.map { make in
+            { @Sendable authorization, studies in make(app, authorization, studies) }
+        }
         try await configureServices(
             for: app,
             storageProvider: storageProvider,
@@ -135,7 +141,8 @@ enum TestApp {
             sourceKeyring: TestApp.sourceKeyring(),
             grantorAuthority: grantorAuthority,
             recordingDownloadByteLimit: recordingDownloadByteLimit,
-            collectionCapacity: collectionCapacity
+            collectionCapacity: collectionCapacity,
+            providerRuntime: runtime
         )
 
         return try await configureTransport(for: app)

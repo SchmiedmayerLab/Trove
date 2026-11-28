@@ -486,9 +486,15 @@ paths:
       summary: Validate an exact study draft for publication
       description: >
         Captures the complete draft, validates every multilingual Questionnaire against
-        the pinned Grove FHIR IG and execution capabilities, and stages the exact
-        publication archive. Findings that prevent publication are returned as
-        blockers, other findings as advisories. Only a `valid` result creates a
+        the pinned Grove FHIR IG and execution capabilities, checks the readiness facts,
+        the administration languages of each Questionnaire and the route of each
+        collection requirement, and stages the exact publication archive. Findings that
+        prevent publication are returned as blockers, other findings as advisories.
+        Each administration language must be the base language or a translation language
+        of the resource, every displayed string must carry a translation into it, and a
+        study administrator must have approved it for the exact resource. A required
+        collection requirement whose route is unavailable blocks publication; an optional
+        one is reported as unavailable and published as unavailable. Only a `valid` result creates a
         candidate: its ID identifies a single immutable candidate and is also its future
         publication ID. An `invalid`, `incomplete` or `unavailable` result has no
         candidate and cannot be published. Candidates expire within one hour, or earlier
@@ -527,7 +533,8 @@ paths:
         Accepts only the immutable candidate selected by validationId and its original
         If-Match draft revision. Requires fresh interactive administrator authority;
         delegated clients cannot publish. First acceptance checks current draft,
-        candidate lifetime, validator identity, capabilities and next publication revision.
+        candidate lifetime, validator identity, capabilities, the language approvals the
+        candidate recorded and next publication revision.
         It retains the previously validated archive without rebuilding it. An exact
         authorized retry returns the same publication even if the draft later changes
         or the candidate expires. A different If-Match never aliases an accepted request.
@@ -795,6 +802,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/QuestionnaireScenarioReport'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/components/{componentId}/language-approvals:
+    post:
+      operationId: approveQuestionnaireLanguage
+      tags:
+        - Components
+      summary: Approve one administration language of a questionnaire's exact resource
+      description: >
+        Records that a study administrator approved the stored Questionnaire with the
+        given SHA-256 for administration in one language. Requires interactive
+        administrator authority; delegated clients cannot approve. The digest must be
+        the digest of the stored resource, and the language must be the resource's base
+        language or one of its translation languages. An approval applies only to that
+        exact resource: any edit changes the digest, and publication then requires a new
+        approval for every administration language. Approving does not change the draft
+        revision; validate the draft again before publishing. Repeating an approval that
+        is in force returns it unchanged with status 200.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireLanguageApprovalInput'
+      responses:
+        '201':
+          description: Approval recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireLanguageApproval'
+        '200':
+          description: The same approval is already in force
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireLanguageApproval'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/components/{componentId}/language-approvals/{approvalId}/revoke:
+    post:
+      operationId: revokeQuestionnaireLanguageApproval
+      tags:
+        - Components
+      summary: Revoke a questionnaire language approval
+      description: >
+        Ends an approval that is in force. Requires interactive administrator authority.
+        A revoked approval no longer permits publication; a candidate validated with it
+        cannot be published. Publications already accepted keep the approval evidence
+        they recorded. Revoking a revoked approval returns it unchanged.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The revoked approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireLanguageApproval'
         default:
           $ref: '#/components/responses/OperationFailure'
 
@@ -3090,6 +3168,15 @@ components:
         detail:
           type: string
           description: A human-readable explanation specific to this occurrence
+        diagnostics:
+          type: array
+          maxItems: 512
+          description: >
+            Findings that explain a refusal in the form draft validation returns, for
+            example the collection routes that became unavailable between validation and
+            publication.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
 
     StudyDataVersions:
       type: string
@@ -3176,6 +3263,8 @@ components:
         - study.draft.edited
         - study.draft.validated
         - study.draft.disclosure
+        - study.language.approved
+        - study.language.approval.revoked
         - delegation.created
         - delegation.revoked
         - delegation.disclosure
@@ -3296,7 +3385,7 @@ components:
     StudyDraftValidation:
       type: object
       additionalProperties: false
-      required: [draftRevision, status, blockers, advisories, questionnaires]
+      required: [draftRevision, status, blockers, advisories, questionnaires, routes]
       properties:
         draftRevision:
           type: string
@@ -3319,6 +3408,60 @@ components:
             $ref: '#/components/schemas/StudyQuestionnaireValidation'
         candidate:
           $ref: '#/components/schemas/StudyPublicationCandidate'
+        routes:
+          type: array
+          description: The route of each collection requirement, in draft order.
+          items:
+            $ref: '#/components/schemas/StudyRouteValidation'
+
+    StudyRouteValidation:
+      type: object
+      additionalProperties: false
+      required: [index, profile, sourceKind, requirement, availability]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          description: Position of the requirement in `collectionRequirements`.
+        profile:
+          type: string
+          format: uri
+        sourceKind:
+          type: string
+          enum: [participant-app, server-worker]
+        providerRegistrationId:
+          type: string
+          format: uuid
+        sourceTypeIdentifier:
+          type: string
+        requirement:
+          $ref: '#/components/schemas/CollectionRequirementLevel'
+        availability:
+          type: string
+          description: >
+            `available`: this deployment implements the route; for a server worker, the
+            provider registration is approved and qualifies the source and profile.
+            `unavailable`: it does not.
+          enum: [available, unavailable]
+
+    StudyAdministrationLanguage:
+      type: object
+      additionalProperties: false
+      required: [language, translationComplete, approved]
+      properties:
+        language:
+          type: string
+        translationComplete:
+          type: boolean
+          description: >
+            Whether the resource can be administered in this language: it is the base
+            language, or every displayed string carries a translation into it.
+        approved:
+          type: boolean
+          description: Whether an approval for this exact resource and language is in force.
+        approvalId:
+          type: string
+          format: uuid
 
     StudyPublicationCandidate:
       type: object
@@ -3352,7 +3495,7 @@ components:
     StudyQuestionnaireValidation:
       type: object
       additionalProperties: false
-      required: [componentId, status, sha256, translationLanguages]
+      required: [componentId, status, sha256, translationLanguages, administrationLanguages]
       properties:
         componentId:
           type: string
@@ -3371,6 +3514,11 @@ components:
         sha256:
           type: string
           pattern: '^[0-9a-f]{64}$'
+        administrationLanguages:
+          type: array
+          description: The languages admitted for administration, with their translation and approval state.
+          items:
+            $ref: '#/components/schemas/StudyAdministrationLanguage'
 
     QuestionnaireScenarioInput:
       type: object
@@ -4637,9 +4785,21 @@ components:
           enum:
             - participant-app
             - server-worker
+        requirement:
+          $ref: '#/components/schemas/CollectionRequirementLevel'
 
         timeBasis:
           $ref: '#/components/schemas/CollectionTimeBasis'
+
+    CollectionRequirementLevel:
+      type: string
+      default: required
+      description: >
+        `required`: publication requires the route to be available. `optional`:
+        publication proceeds when the route is unavailable; the publication then lists
+        the requirement as unavailable and grants no collection for it. Omission means
+        `required`.
+      enum: [required, optional]
 
     NativeSourceRepository:
       type: string
@@ -4894,6 +5054,96 @@ components:
               title: 'My Heart Counts'
               shortExplanationText: 'Eine Studie zur Herzgesundheit'
 
+    StudyReadinessContent:
+      type: object
+      additionalProperties: false
+      description: The readiness facts written in one language.
+      properties:
+        aims:
+          type: string
+          maxLength: 10000
+          description: What the study aims to find out.
+        population:
+          type: string
+          maxLength: 10000
+          description: Who can take part.
+        procedures:
+          type: string
+          maxLength: 10000
+          description: What participants do and what data the study collects.
+        burden:
+          type: string
+          maxLength: 10000
+          description: The time and effort participation takes.
+        retention:
+          type: string
+          maxLength: 10000
+          description: How long the study keeps the data and what happens to it afterwards.
+        withdrawal:
+          type: string
+          maxLength: 10000
+          description: How participants withdraw and what happens to their data.
+        concernRoute:
+          type: string
+          maxLength: 10000
+          description: >
+            How participants reach a person about concerns, and how incidental findings
+            reach a responsible person. A reference to an approved external route, such as
+            an institutional contact, suffices.
+        coverage:
+          type: string
+          maxLength: 10000
+          description: Who is responsible for answering concerns and incidental findings, and when.
+        coEnrollment:
+          type: string
+          maxLength: 10000
+          description: The reviewed rule for participants who are enrolled in other studies.
+
+    StudyContact:
+      type: object
+      additionalProperties: false
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        role:
+          type: string
+          maxLength: 200
+          description: For example, principal investigator or study coordinator.
+        email:
+          type: string
+          maxLength: 320
+        phone:
+          type: string
+          maxLength: 64
+
+    StudyReadinessFacts:
+      type: object
+      additionalProperties: false
+      description: >
+        Baseline facts that publication requires, including the concern route, responsible
+        coverage and co-enrollment policy that a study needs before it opens for enrollment.
+        Draft validation checks that each text fact is present in the source language of
+        the study details and that at least
+        one contact names a person, a role and an email address or phone number. A fact
+        missing in another details language is an advisory. Publications record the
+        facts they were validated with; the participant bundle does not contain them.
+      required: [content, contacts]
+      properties:
+        content:
+          type: object
+          maxProperties: 64
+          propertyNames:
+            $ref: '#/components/schemas/LanguageTag'
+          additionalProperties:
+            $ref: '#/components/schemas/StudyReadinessContent'
+        contacts:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/StudyContact'
+
     ParticipationCriterion:
       description: >
         A criterion which must be satisfied for a person to participate in a study.
@@ -5106,6 +5356,8 @@ components:
           $ref: '#/components/schemas/StudyVisibility'
         enrollmentConditions:
           $ref: '#/components/schemas/EnrollmentConditions'
+        readinessFacts:
+          $ref: '#/components/schemas/StudyReadinessFacts'
 
     StudyResponse:
       type: object
@@ -5123,9 +5375,12 @@ components:
         - consent
         - visibility
         - enrollmentConditions
+        - readinessFacts
       properties:
         enrollmentPeriod:
           $ref: '#/components/schemas/EnrollmentPeriod'
+        readinessFacts:
+          $ref: '#/components/schemas/StudyReadinessFacts'
         draftRevision:
           type: string
           format: uuid
@@ -5186,13 +5441,23 @@ components:
 
     PublishedStudyResponse:
       type: object
-      description: A published study revision
+      description: >
+        A published study revision. The study definition schema version, the pinned Grove
+        FHIR IG contract and the publication revision are recorded separately, so a
+        publication stays interpretable when a later release changes any of them.
       required:
         - id
         - studyId
         - revision
         - visibility
         - publishedAt
+        - definitionSchemaVersion
+        - contractVersion
+        - contractRevision
+        - validatorIdentity
+        - executionCapability
+        - instruments
+        - unavailableCollectionRequirements
       properties:
         id:
           type: string
@@ -5211,6 +5476,67 @@ components:
           type: string
           format: date-time
           description: When this revision was published
+        definitionSchemaVersion:
+          type: string
+          description: Version of the Grove study definition schema of the participant bundle.
+        contractVersion:
+          type: string
+          description: Version of the pinned Grove FHIR IG package that validated the revision.
+        contractRevision:
+          type: string
+          description: Source revision of the pinned Grove FHIR IG package.
+        validatorIdentity:
+          type: string
+        executionCapability:
+          type: string
+        instruments:
+          type: array
+          description: Each published Questionnaire with its administration languages and their approvals.
+          items:
+            $ref: '#/components/schemas/PublishedInstrument'
+        unavailableCollectionRequirements:
+          type: array
+          description: Optional collection requirements whose route was unavailable; the revision grants no collection for them.
+          items:
+            $ref: '#/components/schemas/CollectionRequirement'
+
+    PublishedInstrument:
+      type: object
+      additionalProperties: false
+      required: [componentId, sha256, language, translationLanguages, administrationLanguages]
+      properties:
+        componentId:
+          type: string
+          format: uuid
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the exact archived Questionnaire.
+        language:
+          type: string
+          description: The base language.
+        translationLanguages:
+          type: array
+          items:
+            type: string
+        administrationLanguages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublishedAdministrationLanguage'
+
+    PublishedAdministrationLanguage:
+      type: object
+      additionalProperties: false
+      required: [language, approvalId, approvedAt]
+      properties:
+        language:
+          type: string
+        approvalId:
+          type: string
+          format: uuid
+        approvedAt:
+          type: string
+          format: date-time
 
     # ── Components — Shared ───────────────────────────────────────────────
 
@@ -5687,6 +6013,61 @@ components:
           description: Display name for the component
         data:
           $ref: '#/components/schemas/QuestionnaireContent'
+        administrationLanguages:
+          $ref: '#/components/schemas/AdministrationLanguages'
+
+    AdministrationLanguages:
+      type: array
+      uniqueItems: true
+      maxItems: 64
+      description: >
+        Languages in which participants may answer the Questionnaire, each the base
+        language or a translation language of the resource as written there. Omission
+        admits the base language only. Publication requires each admitted language to
+        have complete translations and an approval for the exact resource.
+      items:
+        type: string
+        minLength: 1
+        maxLength: 35
+        pattern: '^\S+$'
+
+    QuestionnaireLanguageApprovalInput:
+      type: object
+      additionalProperties: false
+      required: [sha256, language]
+      properties:
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the stored resource that was reviewed.
+        language:
+          type: string
+          minLength: 1
+          maxLength: 35
+          pattern: '^\S+$'
+
+    QuestionnaireLanguageApproval:
+      type: object
+      additionalProperties: false
+      required: [id, componentId, sha256, language, approvedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        componentId:
+          type: string
+          format: uuid
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        language:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
 
     QuestionnaireComponentResponse:
       type: object
@@ -5698,6 +6079,9 @@ components:
         - name
         - data
         - translationLanguages
+        - sha256
+        - administrationLanguages
+        - languageApprovals
       properties:
         id:
           type: string
@@ -5716,6 +6100,17 @@ components:
           description: Languages of the resource's translation extensions, as written and sorted.
           items:
             type: string
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the stored resource, which an approval names.
+        administrationLanguages:
+          $ref: '#/components/schemas/AdministrationLanguages'
+        languageApprovals:
+          type: array
+          description: Approvals in force for the stored resource.
+          items:
+            $ref: '#/components/schemas/QuestionnaireLanguageApproval'
 
     # ── Components — Health Data ──────────────────────────────────────────
 

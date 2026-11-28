@@ -55,7 +55,8 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
     /// The caller captures and authorizes the entire draft before invoking this builder.
     /// No database, authorization or external resource lookup occurs while building.
-    func preparePublication(from study: Study, revision: Int) throws -> Publication {
+    /// `unavailable` names the optional requirements whose route is unavailable; the policy grants none of them.
+    func preparePublication(from study: Study, revision: Int, unavailable: [CollectionRequirement] = []) throws -> Publication {
         guard revision > 0 else { throw ServerError.badRequest("Study revision must be positive") }
         let studyId = try study.requireId()
         guard let capturedComponents = study.$components.value,
@@ -66,23 +67,13 @@ final class StudyBundleService: Module, @unchecked Sendable {
         let collectionPolicy = try PublishedCollectionPolicy.compile(
             studyID: studyId,
             revision: revision,
-            requirements: study.collectionRequirements,
+            requirements: study.collectionRequirements.filter { !unavailable.contains($0) },
             receivesDeviceUnitIdentifiers: study.receivesDeviceUnitIdentifiers,
-            enrollmentPeriod: study.enrollmentPeriod
+            enrollmentPeriod: study.enrollmentPeriod,
+            unavailableRequirements: unavailable
         )
 
-        var consentMarkdown = LocalizationsDictionary<String>()
-        for (locale, content) in study.consent {
-            let markdown = ConsentPresentation.markdown(content: content)
-                + (try CollectionScopePresentation.markdown(requirements: collectionPolicy.requirements, locale: locale.description))
-                + (try EnrollmentPeriodPresentation.markdown(collectionPolicy.enrollmentPeriod, locale: locale.description))
-            do {
-                _ = try ConsentResponseRequirements(markdown: markdown)
-            } catch {
-                throw ServerError.badRequest("Consent contains invalid or unsupported response controls")
-            }
-            consentMarkdown[locale] = markdown
-        }
+        let consentMarkdown = try Self.consentMarkdown(for: study, collectionPolicy: collectionPolicy)
         try checkResources(consent: consentMarkdown, components: capturedComponents)
 
         let (metadata, consentFiles) = try buildMetadata(from: study, consentMarkdown: consentMarkdown)
@@ -137,6 +128,26 @@ extension StudyBundleService {
             guard content == input.bytes else { throw ServerError.internalServerError("The study bundle changed a Questionnaire") }
             return input
         }
+    }
+
+    /// The consent of each locale with the collection scope and enrollment period the policy grants.
+    private static func consentMarkdown(
+        for study: Study,
+        collectionPolicy: PublishedCollectionPolicy
+    ) throws -> LocalizationsDictionary<String> {
+        var consentMarkdown = LocalizationsDictionary<String>()
+        for (locale, content) in study.consent {
+            let markdown = ConsentPresentation.markdown(content: content)
+                + (try CollectionScopePresentation.markdown(requirements: collectionPolicy.requirements, locale: locale.description))
+                + (try EnrollmentPeriodPresentation.markdown(collectionPolicy.enrollmentPeriod, locale: locale.description))
+            do {
+                _ = try ConsentResponseRequirements(markdown: markdown)
+            } catch {
+                throw ServerError.badRequest("Consent contains invalid or unsupported response controls")
+            }
+            consentMarkdown[locale] = markdown
+        }
+        return consentMarkdown
     }
 }
 

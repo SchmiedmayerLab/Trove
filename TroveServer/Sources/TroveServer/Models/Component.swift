@@ -41,6 +41,9 @@ final class Component: Model, @unchecked Sendable {
 
     @Field(key: "type") var type: ComponentType
 
+    /// The administration languages of a questionnaire component; empty for other components.
+    @Field(key: "administration") var administration: QuestionnaireAdministration
+
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     @Timestamp(key: "updated_at", on: .update) var updatedAt: Date?
@@ -53,6 +56,7 @@ final class Component: Model, @unchecked Sendable {
         studyId: UUID,
         data: ComponentData,
         name: String,
+        administration: QuestionnaireAdministration? = nil,
         id: UUID? = nil
     ) {
         self.id = id
@@ -60,5 +64,11 @@ final class Component: Model, @unchecked Sendable {
         self.data = data
         self.type = data.type
         self.name = name
+        if case .questionnaire(let content) = data {
+            // Without a choice, the base language is the one administration language, as in the API.
+            self.administration = administration ?? QuestionnaireAdministration.base(of: content)
+        } else {
+            self.administration = .init(languages: [])
+        }
     }
 }

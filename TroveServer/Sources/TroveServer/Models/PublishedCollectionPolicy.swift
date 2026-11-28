@@ -11,11 +11,21 @@ import TroveAPITypes
 
 
 struct CollectionRequirement: Codable, Sendable, Hashable {
+    /// Whether publication requires the route to be available; see ``CollectionRouteAvailability``.
+    enum Level: String, Codable, Sendable {
+        case required
+        case optional
+    }
+
     struct Identity: Hashable {
         let profile: String
         let sourceKind: SourceKind
         let providerRegistrationID: UUID?
         let sourceTypeIdentifier: String?
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case profile, sourceKind, providerRegistrationID, sourceTypeIdentifier, timeBasis, measurementWindow, includeWorkoutRoutes, requirement
     }
 
 
@@ -29,9 +39,15 @@ struct CollectionRequirement: Codable, Sendable, Hashable {
     let timeBasis: CollectionTimeBasis?
     let measurementWindow: CollectionMeasurementWindow?
     let includeWorkoutRoutes: Bool
+    let requirement: Level
 
     var identity: Identity {
         .init(profile: profile, sourceKind: sourceKind, providerRegistrationID: providerRegistrationID, sourceTypeIdentifier: sourceTypeIdentifier)
+    }
+
+    /// Whether the participant app implements this requirement's native source.
+    var hasSupportedNativeSource: Bool {
+        sourceKind == .participantApp && Self.validSource(self)
     }
 
     init(
@@ -41,8 +57,10 @@ struct CollectionRequirement: Codable, Sendable, Hashable {
         includeWorkoutRoutes: Bool = false,
         providerRegistrationID: UUID? = nil,
         sourceTypeIdentifier: String? = nil,
-        timeBasis: CollectionTimeBasis? = nil
+        timeBasis: CollectionTimeBasis? = nil,
+        requirement: Level = .required
     ) {
+        self.requirement = requirement
         self.profile = profile
         self.sourceKind = sourceKind
         self.providerRegistrationID = providerRegistrationID
@@ -52,12 +70,30 @@ struct CollectionRequirement: Codable, Sendable, Hashable {
         self.includeWorkoutRoutes = includeWorkoutRoutes
     }
 
-    private static func validSource(_ requirement: Self) -> Bool {
+    /// Requirements retained before the level existed are required.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        profile = try container.decode(String.self, forKey: .profile)
+        sourceKind = try container.decode(SourceKind.self, forKey: .sourceKind)
+        providerRegistrationID = try container.decodeIfPresent(UUID.self, forKey: .providerRegistrationID)
+        sourceTypeIdentifier = try container.decodeIfPresent(String.self, forKey: .sourceTypeIdentifier)
+        timeBasis = try container.decodeIfPresent(CollectionTimeBasis.self, forKey: .timeBasis)
+        measurementWindow = try container.decodeIfPresent(CollectionMeasurementWindow.self, forKey: .measurementWindow)
+        includeWorkoutRoutes = try container.decode(Bool.self, forKey: .includeWorkoutRoutes)
+        requirement = try container.decodeIfPresent(Level.self, forKey: .requirement) ?? .required
+    }
+
+    private static func validSource(_ requirement: Self, requiringSupportedSources: Bool = true) -> Bool {
         guard let profile = CollectionObservationProfile(rawValue: requirement.profile) else {
             return false
         }
         if requirement.sourceKind == .participantApp {
-            return profile.permitsNativeSource(requirement.sourceTypeIdentifier)
+            if profile.permitsNativeSource(requirement.sourceTypeIdentifier) {
+                return true
+            }
+            if requiringSupportedSources {
+                return false
+            }
         }
         guard let identifier = requirement.sourceTypeIdentifier else {
             return false
@@ -65,10 +101,12 @@ struct CollectionRequirement: Codable, Sendable, Hashable {
         return !identifier.isEmpty && identifier.utf8.count <= 256
     }
 
-    static func validate(_ requirements: [Self]) throws {
+    /// Draft requirements may name a native source the participant app does not implement; draft validation reports
+    /// that route as unavailable. Published requirements must name implemented sources.
+    static func validate(_ requirements: [Self], requiringSupportedSources: Bool = true) throws {
         guard requirements.count <= CollectionObservationProfile.maximumRequirements,
               Set(requirements.map(\.identity)).count == requirements.count,
-              requirements.allSatisfy({ validSource($0)
+              requirements.allSatisfy({ validSource($0, requiringSupportedSources: requiringSupportedSources)
                   && CollectionTimeBasis.accepts($0.timeBasis, profile: $0.profile, sourceTypeIdentifier: $0.sourceTypeIdentifier)
                   && ($0.sourceKind == .serverWorker) == ($0.providerRegistrationID != nil)
                   && ($0.sourceKind == .participantApp || !$0.includeWorkoutRoutes)
@@ -102,6 +140,10 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
     private static var missingScope: ServerError { .internalServerError("Exact accepted collection scope is unavailable") }
 
     static let filename = "collection-policy.json"
+    /// Version 7 adds requirement levels and the unavailable optional requirements. Version 6 policies, which have
+    /// neither, remain readable: each of their requirements is required, and none is unavailable.
+    static let currentSchemaVersion = 7
+    static let readableSchemaVersions: Set<Int> = [6, 7]
 
     let enrollmentPeriod: EnrollmentPeriod
     let schemaVersion: Int
@@ -114,20 +156,27 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
     let requirements: [CollectionRequirement]
     /// Whether study data released under this revision includes device unit identifiers; see ``StudyDeviceUnitDisclosure``.
     let receivesDeviceUnitIdentifiers: Bool
+    /// Optional requirements whose route was unavailable at validation. They grant no collection.
+    let unavailableRequirements: [CollectionRequirement]
 
     static func compile(
         studyID: UUID,
         revision: Int,
         requirements: [CollectionRequirement],
         receivesDeviceUnitIdentifiers: Bool,
-        enrollmentPeriod: EnrollmentPeriod = .ongoing
+        enrollmentPeriod: EnrollmentPeriod = .ongoing,
+        unavailableRequirements: [CollectionRequirement] = []
     ) throws -> Self {
         guard revision > 0 else { throw ServerError.badRequest("Collection policy revision must be positive") }
         try enrollmentPeriod.validate()
         try CollectionRequirement.validate(requirements)
+        try CollectionRequirement.validate(requirements + unavailableRequirements, requiringSupportedSources: false)
+        guard unavailableRequirements.allSatisfy({ $0.requirement == .optional }) else {
+            throw ServerError.conflict("A required collection route is unavailable")
+        }
         return Self(
             enrollmentPeriod: enrollmentPeriod,
-            schemaVersion: 6,
+            schemaVersion: currentSchemaVersion,
             contractVersion: FHIRValidationClient.contractVersion,
             contractRevision: FHIRValidationClient.contractRevision,
             studyID: studyID,
@@ -135,7 +184,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
             valueShape: "profiled-observation",
             collectionWindow: "retained-measurement-window",
             requirements: requirements,
-            receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers
+            receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
+            unavailableRequirements: unavailableRequirements
         )
     }
 
@@ -166,7 +216,8 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
 
     /// Unknown policy fails; an empty array explicitly means no collection.
     func validatedRequirements(studyID: UUID, revision: Int) throws -> [CollectionRequirement] {
-        guard schemaVersion == 6, contractVersion == FHIRValidationClient.contractVersion,
+        guard Self.readableSchemaVersions.contains(schemaVersion), schemaVersion == 7 || unavailableRequirements.isEmpty,
+              contractVersion == FHIRValidationClient.contractVersion,
               contractRevision == FHIRValidationClient.contractRevision,
               self.studyID == studyID, self.revision == revision,
               revision > 0, valueShape == "profiled-observation", collectionWindow == "retained-measurement-window" else {
@@ -273,5 +324,31 @@ struct PublishedCollectionPolicy: Codable, Sendable, Hashable {
                 && (rowExtent.map { (try? $0.isSelected(windowStart: requirement.start, windowEnd: requirement.end)) == true } ?? true)
                 && (!requiresWorkoutRoute || requirement.includeWorkoutRoutes)
         }
+    }
+}
+
+
+extension PublishedCollectionPolicy {
+    private enum CodingKeys: String, CodingKey {
+        case enrollmentPeriod, schemaVersion, contractVersion, contractRevision, studyID, revision, valueShape, collectionWindow
+        case requirements, receivesDeviceUnitIdentifiers, unavailableRequirements
+    }
+
+    /// Reads version 6 policies, which have no unavailable requirements, as well as the current version.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            enrollmentPeriod: try container.decode(EnrollmentPeriod.self, forKey: .enrollmentPeriod),
+            schemaVersion: try container.decode(Int.self, forKey: .schemaVersion),
+            contractVersion: try container.decode(String.self, forKey: .contractVersion),
+            contractRevision: try container.decode(String.self, forKey: .contractRevision),
+            studyID: try container.decode(UUID.self, forKey: .studyID),
+            revision: try container.decode(Int.self, forKey: .revision),
+            valueShape: try container.decode(String.self, forKey: .valueShape),
+            collectionWindow: try container.decode(String.self, forKey: .collectionWindow),
+            requirements: try container.decode([CollectionRequirement].self, forKey: .requirements),
+            receivesDeviceUnitIdentifiers: try container.decode(Bool.self, forKey: .receivesDeviceUnitIdentifiers),
+            unavailableRequirements: try container.decodeIfPresent([CollectionRequirement].self, forKey: .unavailableRequirements) ?? []
+        )
     }
 }

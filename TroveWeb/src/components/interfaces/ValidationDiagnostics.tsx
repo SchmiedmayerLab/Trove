@@ -34,7 +34,7 @@ interface ValidationDiagnosticsProps {
   /** Shows the element a finding concerns, when that element can be found, naming it in the action. */
   locate?: (
     diagnostic: ValidationDiagnostic,
-  ) => { target: string; show: () => void } | undefined;
+  ) => { label?: string; target: string; show: () => void } | undefined;
   /** Whether to state the overall result; a second list of the same result omits it. */
   showStatus?: boolean;
   /** Moves focus to the heading when a new result appears, instead of announcing it. */
@@ -131,7 +131,7 @@ export const ValidationDiagnostics = ({
                       variant="outlineBg"
                       onClick={location.show}
                     >
-                      Show item {location.target} in JSON
+                      {location.label ?? `Show item ${location.target} in JSON`}
                     </Button>
                   </div>
                 )}

@@ -89,7 +89,7 @@ class IOSSeedTests(unittest.TestCase):
             self.assertEqual(calls[index][2]["If-Match"], f'"{revision}"')
         self.assertEqual(json.loads(calls[12][3]), {"validationId": CANDIDATE})
         patch = json.loads(calls[10][3])
-        self.assertEqual(set(patch), {"consent", "collectionRequirements"})
+        self.assertEqual(set(patch), {"consent", "collectionRequirements", "readinessFacts"})
         self.assertFalse(any("questionnaire" in call[1] for call in calls))
 
     def test_stale_patch_stops_without_refresh_or_publication(self):

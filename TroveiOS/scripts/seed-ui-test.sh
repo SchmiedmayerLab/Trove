@@ -118,7 +118,17 @@ jq --null-input '{collectionRequirements: [{
 }], consent: {"en-US": {
     title: "Study Consent",
     content: "Please review this synthetic study consent.\n\n<toggle id=\"agree\" expected-value=\"true\">I agree to participate.</toggle>\n\n<signature id=\"participant\"/>"
-}}}' \
+}}, readinessFacts: {content: {en: {
+    aims: "Exercise the participant app with a synthetic study.",
+    population: "Synthetic test participants.",
+    procedures: "Consent and heart rate collection.",
+    burden: "A few minutes.",
+    retention: "Synthetic data is removed with the test stack.",
+    withdrawal: "Participants withdraw in the app.",
+    concernRoute: "Participants contact the synthetic coordinator.",
+    coverage: "The synthetic coordinator answers on working days.",
+    coEnrollment: "Synthetic participants may enroll in other studies."
+}}, contacts: [{name: "Synthetic Coordinator", role: "Coordinator", email: "coordinator@example.org"}]}}' \
     | curl --fail-with-body --silent --show-error \
         --request PATCH "$SERVER_URL/studies/$study_id" \
         --header "Authorization: Bearer $researcher_token" \

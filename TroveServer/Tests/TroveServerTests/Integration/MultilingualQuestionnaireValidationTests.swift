@@ -94,6 +94,7 @@ struct MultilingualQuestionnaireValidationTests {
                 try await component.create(on: app.db)
                 components[try component.requireId()] = fixture
             }
+            try await StudyFixtures.approveAdministrationLanguages(studyID: study.requireId(), on: app.db)
 
             let response = try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(study.requireId())/draft/validations", beforeRequest: { request in
                 request.bearerAuth(token)

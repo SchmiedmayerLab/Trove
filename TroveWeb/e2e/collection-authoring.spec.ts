@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 import { zStudyResponse } from "../src/lib/api/generated/zod.gen";
-import { heartRateProfile } from "../src/routes/~(dashboard)/~$group/~$study/~configuration/lib/collectionForm";
+import {
+  bodyWeightProfile,
+  heartRateProfile,
+} from "../src/routes/~(dashboard)/~$group/~$study/~configuration/lib/collectionForm";
 import { expect, openNewStudyDialog, test } from "./fixtures";
 
 const heartRate = (page: Page) =>
@@ -70,6 +73,7 @@ test("authors, reloads and preserves exact historical collection windows", async
   expect(saved.collectionRequirements).toEqual([
     {
       profile: heartRateProfile,
+      requirement: "required",
       sourceKind: "participant-app",
       sourceTypeIdentifier: "HKQuantityTypeIdentifierHeartRate",
       timeBasis: "measurement-time",
@@ -207,5 +211,155 @@ test("keeps an unsaved collection scope and refuses a stale revision", async ({
     ).toBeChecked();
   } finally {
     await other.close();
+  }
+});
+
+test("blocks button and keyboard saves after a provider catalog refetch fails", async ({
+  researcherPage: page,
+}) => {
+  const initial = await openCollection(page);
+  await heartRate(page).check();
+  const catalog = "**/studies/*/collection-provider-capabilities";
+  await page.route(catalog, (route) =>
+    route.fulfill({ status: 503, body: "{}" }),
+  );
+  const patches: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "PATCH" &&
+      request.url().endsWith(`/studies/${initial.id}`)
+    )
+      patches.push(request.url());
+  });
+  const refetch = () =>
+    page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+  await refetch();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Collection settings could not be loaded" }),
+  ).toBeVisible({ timeout: 20_000 });
+  const save = page.getByRole("button", { name: "Save", exact: true });
+  await expect(save).toBeDisabled();
+  await save.evaluate((button: HTMLButtonElement) => button.click());
+  await page.keyboard.press("Meta+Enter");
+  await page.unroute(catalog);
+  await refetch();
+  await expect(heartRate(page)).toBeChecked();
+  expect(patches).toHaveLength(0);
+  await saveCollection(page, initial.draftRevision);
+  expect(patches).toHaveLength(1);
+});
+
+test("repairs a withdrawn provider route without changing the other saved scope", async ({
+  researcherPage: page,
+}) => {
+  test.slow();
+  const initial = await openCollection(page);
+  const other = {
+    profile: heartRateProfile,
+    sourceKind: "participant-app",
+    sourceTypeIdentifier: "HKQuantityTypeIdentifierHeartRate",
+    includeWorkoutRoutes: false,
+    requirement: "required",
+    timeBasis: "measurement-time",
+    measurementWindow: {
+      calendar: "gregorian",
+      timeZone: "UTC",
+      start: { type: "last", components: { month: 6 } },
+    },
+  };
+  const unavailable = {
+    profile: bodyWeightProfile,
+    sourceKind: "server-worker",
+    providerRegistrationId: "10000000-0000-4000-8000-000000000099",
+    sourceTypeIdentifier: "getmeas:1",
+    includeWorkoutRoutes: false,
+    requirement: "required",
+    measurementWindow: {
+      calendar: "gregorian",
+      timeZone: "UTC",
+      start: { type: "oldestSample" },
+    },
+  };
+  const removed = {
+    ...unavailable,
+    providerRegistrationId: "10000000-0000-4000-8000-000000000098",
+  };
+  // Seed the draft through its normal versioned PATCH, with a registration absent from the live catalog.
+  const seed = async (route: Route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    await route.continue({
+      postData: JSON.stringify({
+        collectionRequirements: [unavailable, other, removed],
+      }),
+    });
+  };
+  await page.route(`**/studies/${initial.id}`, seed);
+  await heartRate(page).check();
+  const seeded = zStudyResponse.parse(
+    await (await saveCollection(page, initial.draftRevision)).json(),
+  );
+  await page.unroute(`**/studies/${initial.id}`, seed);
+  await page.reload();
+  const rows = page.getByRole("group", {
+    name: "Unavailable collection route",
+  });
+  const row = rows.filter({ hasText: unavailable.providerRegistrationId });
+  await rows
+    .filter({ hasText: removed.providerRegistrationId })
+    .getByRole("button", { name: "Remove unavailable route" })
+    .click();
+  await expect(row).toContainText(unavailable.providerRegistrationId);
+  await row.getByLabel("Publication requirement").selectOption("optional");
+  const optional = zStudyResponse.parse(
+    await (await saveCollection(page, seeded.draftRevision)).json(),
+  );
+  expect(optional.collectionRequirements).toEqual([
+    { ...unavailable, requirement: "optional" },
+    other,
+  ]);
+  await page.reload();
+  await expect(row.getByLabel("Publication requirement")).toHaveValue(
+    "optional",
+  );
+  const editing = await page.context().newPage();
+  try {
+    await editing.goto(page.url());
+    const level = editing
+      .getByRole("group", { name: "Unavailable collection route" })
+      .getByLabel("Publication requirement");
+    await level.selectOption("required");
+    await row
+      .getByLabel("Replace with an available route")
+      .selectOption({ index: 1 });
+    const replaced = zStudyResponse.parse(
+      await (await saveCollection(page, optional.draftRevision)).json(),
+    );
+    expect(replaced.collectionRequirements).toHaveLength(2);
+    expect(replaced.collectionRequirements[0]).toMatchObject({
+      profile: bodyWeightProfile,
+      sourceKind: "participant-app",
+      requirement: "optional",
+      measurementWindow: unavailable.measurementWindow,
+    });
+    expect(replaced.collectionRequirements[1]).toEqual(other);
+    await expect(row).toHaveCount(0);
+
+    const refetched = editing.waitForResponse(`**/studies/${initial.id}`);
+    await editing.bringToFront();
+    await editing.evaluate(() =>
+      window.dispatchEvent(new Event("visibilitychange")),
+    );
+    expect(
+      zStudyResponse.parse(await (await refetched).json()).draftRevision,
+    ).toBe(replaced.draftRevision);
+    await expect(level).toHaveValue("required");
+    const stale = await saveCollection(editing, optional.draftRevision, 412);
+    expect(stale.request().postDataJSON()).toMatchObject({
+      collectionRequirements: [unavailable, other],
+    });
+  } finally {
+    await editing.close();
   }
 });

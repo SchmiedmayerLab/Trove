@@ -288,7 +288,7 @@ extension DatabaseRuntimePrivilegesTests {
         "public.enrollment_consents", "public.source_bindings", "public.source_installations",
         "public.source_identity_keys", "public.source_identity_key_envelopes",
         "public.clinical_events", "public.clinical_event_representations",
-        "public.study_delegations", "public.study_publication_candidates",
+        "public.study_delegations", "public.study_publication_candidates", "public.questionnaire_language_approvals",
         "public.clinical_event_nodes", "public.clinical_point_facts", "public.study_data_grants",
         "public.clinical_source_records", "public.clinical_record_events", "public.clinical_output_bindings", "public.clinical_record_retractions",
         "public.clinical_retraction_reversals", "public.clinical_questionnaire_contexts", "public.clinical_point_derivations",
@@ -315,7 +315,7 @@ extension DatabaseRuntimePrivilegesTests {
         let databaseName: String
     }
 
-    private static func expectRejected(on database: any Database) async {
+    static func expectRejected(on database: any Database) async {
         await #expect {
             try await DatabaseRuntimePrivileges.validate(on: database)
         } throws: { error in
@@ -381,6 +381,7 @@ extension DatabaseRuntimePrivilegesTests {
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_bindings TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.source_installations TO \(ident: role)").run()
         try await sql.raw("GRANT UPDATE (revoked_at) ON public.study_delegations TO \(ident: role)").run()
+        try await grantLanguageApprovals(role: role, on: sql)
         try await ProviderCollectionPrivilegesTests.grantRuntime(role: role, on: sql)
     }
 
@@ -475,7 +476,7 @@ extension DatabaseRuntimePrivilegesTests {
         }
     }
 
-    private static func removeRole(_ role: String, databaseName: String, on sql: any SQLDatabase) async throws {
+    static func removeRole(_ role: String, databaseName: String, on sql: any SQLDatabase) async throws {
         // Exact generated role, in its disposable database only. Ownership tests restore their
         // table owner first. DROP OWNED also removes column ACLs that table-level REVOKE misses.
         let result = try await sql.raw("SELECT current_database() AS name").first()
@@ -484,17 +485,5 @@ extension DatabaseRuntimePrivilegesTests {
         try #require(role.hasPrefix("trove_runtime_test_"))
         try await sql.raw("DROP OWNED BY \(ident: role)").run()
         try await sql.raw("DROP ROLE \(ident: role)").run()
-    }
-
-    private static func withGroup(on fixture: RuntimeFixture, _ body: (String) async throws -> Void) async throws {
-        let group = "trove_runtime_test_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        try await fixture.admin.raw("CREATE ROLE \(ident: group) NOLOGIN").run()
-        do {
-            try await body(group)
-        } catch {
-            try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
-            throw error
-        }
-        try await removeRole(group, databaseName: fixture.databaseName, on: fixture.admin)
     }
 }

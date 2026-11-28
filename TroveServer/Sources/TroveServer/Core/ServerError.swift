@@ -20,11 +20,27 @@ struct ServerError: Error, Sendable {
     static let invalidToken = unauthorized("Invalid or expired token")
     static let forbidden = Self(status: .forbidden, title: "Forbidden", detail: "Insufficient permissions")
     static let unexpectedError = internalServerError("An unexpected error occurred")
+    /// A stored provider registration violates its invariants and needs an operator to configure it again.
+    static let providerRegistrationUnreadable = internalServerError(
+        "A stored provider registration cannot be read; an operator must configure it again",
+        title: "Provider Registration Unreadable"
+    )
     static let endpointNotImplemented = Self(status: .notImplemented, title: "Not Implemented", detail: "Endpoint not implemented")
 
     let status: HTTPResponse.Status
+    /// A static name of the problem type, never built from request or stored data: server error responses and their
+    /// log entries include it while they withhold the detail.
     let title: String
     let detail: String
+    /// Findings in the form draft validation reports them; empty for most problems.
+    let diagnostics: [ValidationDiagnostic]
+
+    init(status: HTTPResponse.Status, title: String, detail: String, diagnostics: [ValidationDiagnostic] = []) {
+        self.status = status
+        self.title = title
+        self.detail = detail
+        self.diagnostics = diagnostics
+    }
 
     static func badRequest(_ detail: String) -> Self {
         Self(status: .badRequest, title: "Bad Request", detail: detail)
@@ -58,14 +74,16 @@ struct ServerError: Error, Sendable {
         .conflict("\(resource) with identifier '\(identifier)' already exists")
     }
 
-    static func internalServerError(_ detail: String) -> Self {
-        Self(status: .internalServerError, title: "Internal Server Error", detail: detail)
+    static func internalServerError(_ detail: String, title: String = "Internal Server Error") -> Self {
+        Self(status: .internalServerError, title: title, detail: detail)
     }
 }
 
 extension ServerError {
     var httpResponse: (HTTPResponse, HTTPBody?) {
-        let problemDetails = Components.Schemas.ProblemDetails(title: title, status: status.code, detail: detail)
+        let problemDetails = Components.Schemas.ProblemDetails(
+            title: title, status: status.code, detail: detail, diagnostics: diagnostics.isEmpty ? nil : diagnostics
+        )
 
         var headerFields = HTTPFields()
         headerFields[.contentType] = "application/problem+json; charset=utf-8"

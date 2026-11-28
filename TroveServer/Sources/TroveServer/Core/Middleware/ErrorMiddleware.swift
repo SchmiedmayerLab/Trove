@@ -35,10 +35,11 @@ struct ErrorMiddleware: ServerMiddleware {
 
             if let serverError = underlying as? ServerError {
                 if serverError.status.code >= 500 {
-                    logger.error("Server operation failed", metadata: diagnostics)
+                    // Titles are static and name the problem type; details and diagnostics stay in the server.
+                    logger.error("Server operation failed", metadata: diagnostics.merging(["title": .string(serverError.title)]) { $1 })
                     return ServerError(
                         status: serverError.status,
-                        title: "Server Error",
+                        title: serverError.title,
                         detail: "An unexpected error occurred"
                     ).httpResponse
                 }

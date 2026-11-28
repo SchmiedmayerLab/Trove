@@ -49,17 +49,36 @@ extension Components.Schemas.InformationalComponentResponse {
 
 
 extension Components.Schemas.QuestionnaireComponentResponse {
-    init(_ model: Component) throws {
+    init(_ entry: ComponentService.QuestionnaireComponent) throws {
+        let model = entry.component
         guard case .questionnaire(let content) = model.data else {
             throw ServerError.internalServerError("Expected questionnaire component data")
         }
-        let languages = QuestionnaireLanguages(Data(content.questionnaire.utf8))
+        let bytes = Data(content.questionnaire.utf8)
+        let languages = QuestionnaireLanguages(bytes)
         self.init(
             id: try model.requireId().uuidString,
             name: model.name,
             data: content,
             language: languages.base,
-            translationLanguages: languages.translations
+            translationLanguages: languages.translations,
+            sha256: FHIRValidationClient.digest(bytes),
+            administrationLanguages: model.administration.languages,
+            languageApprovals: try entry.approvals.map(Components.Schemas.QuestionnaireLanguageApproval.init)
+        )
+    }
+}
+
+
+extension Components.Schemas.QuestionnaireLanguageApproval {
+    init(_ model: QuestionnaireLanguageApproval) throws {
+        self.init(
+            id: try model.requireId().uuidString,
+            componentId: model.componentID.uuidString,
+            sha256: model.sha256,
+            language: model.language,
+            approvedAt: model.approvedAt,
+            revokedAt: model.revokedAt
         )
     }
 }

@@ -62,6 +62,8 @@ struct DelegationAuthorizationTests {
                 (.GET, "/studies/\(studyID)/invitation-codes"), (.POST, "/studies/\(studyID)/publish"),
                 (.GET, "/studies/\(studyID)/delegations"), (.POST, "/studies/\(studyID)/delegations"),
                 (.POST, "/studies/\(studyID)/delegations/\(UUID())/revoke"),
+                (.POST, "/studies/\(studyID)/components/\(UUID())/language-approvals"),
+                (.POST, "/studies/\(studyID)/components/\(UUID())/language-approvals/\(UUID())/revoke"),
                 (.DELETE, "/studies/\(studyID)")
             ]
             for (method, path) in paths {

@@ -150,6 +150,20 @@ extension AuthIntegrationTests {
                 successStatus: .created
             ),
             researcher(.POST, "\(base)/studies/\(studyId)/draft/validations", draftRevision: ids.draftRevision, successStatus: .created),
+            // Language approvals need administrator authority; the synthetic digest names no stored resource.
+            researcher(
+                .POST,
+                "\(base)/studies/\(studyId)/components/\(questionnaireId)/language-approvals",
+                body: jsonData(Components.Schemas.QuestionnaireLanguageApprovalInput(sha256: String(repeating: "0", count: 64), language: "en-US")),
+                minRole: .admin,
+                successStatus: .conflict
+            ),
+            researcher(
+                .POST,
+                "\(base)/studies/\(studyId)/components/\(questionnaireId)/language-approvals/\(dummyId)/revoke",
+                minRole: .admin,
+                successStatus: .notFound
+            ),
             researcher(.GET, "\(base)/studies/\(studyId)/delegations", successStatus: .ok),
             researcher(
                 .POST,

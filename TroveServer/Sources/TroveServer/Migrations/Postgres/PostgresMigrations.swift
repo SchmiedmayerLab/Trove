@@ -34,4 +34,7 @@ func configurePostgresMigrations(for app: Application) {
     app.migrations.add(CreateClinicalEvents())
     app.migrations.add(CreateRecordingTransfers())
     app.migrations.add(CreateProviderConnections())
+    // Readiness facts, administration languages, publication evidence and language approvals.
+    app.migrations.add(AddPublicationReadiness())
+    app.migrations.add(CreateQuestionnaireLanguageApprovals())
 }

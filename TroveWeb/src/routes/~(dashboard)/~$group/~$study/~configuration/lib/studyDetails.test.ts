@@ -3,9 +3,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { StudyDetailData } from "@/lib/api/generated/types.gen";
-import { compareCodeUnits } from "@/lib/questionnaireLanguages";
+import { readinessFactKeys } from "@/lib/readinessFacts";
 import {
   detailLanguages,
+  generalFormValues,
+  withReadinessContent,
   withDetailContent,
   withSourceLanguage,
   withoutLanguage,
@@ -36,13 +38,77 @@ describe("study details languages", () => {
     expect(withSourceLanguage(details, "ar").sourceLanguage).toBe("ar");
     expect(() => withSourceLanguage(details, "de")).toThrow();
   });
+});
 
-  it("removes translations but keeps the source language", () => {
+describe("readiness form values", () => {
+  const study = {
+    icon: "heart",
+    details,
+    readinessFacts: {
+      content: { en: { aims: "English aims", procedures: "Survey" } },
+      contacts: [
+        { name: "Example", role: "Coordinator", email: "contact@example.org" },
+      ],
+    },
+  };
+  it("removes only the selected language from details and readiness together", () => {
+    const translated = {
+      ...study,
+      readinessFacts: {
+        ...study.readinessFacts,
+        content: { ...study.readinessFacts.content, ar: { aims: "هدف" } },
+      },
+    };
+    const patch = withoutLanguage(translated, "ar");
+    expect(patch.details.content).toEqual({
+      en: details.content.en,
+      "zh-Hant": details.content["zh-Hant"],
+    });
+    expect(patch.readinessFacts).toEqual(study.readinessFacts);
     expect(
-      Object.keys(withoutLanguage(details, "ar").content).sort(
-        compareCodeUnits,
-      ),
-    ).toEqual(["en", "zh-Hant"]);
-    expect(() => withoutLanguage(details, "en")).toThrow();
+      Object.values(generalFormValues({ ...study, ...patch }, "ar").facts),
+    ).toEqual(readinessFactKeys.map(() => ""));
+    expect(translated.readinessFacts.content.ar.aims).toBe("هدف");
+    expect(() => withoutLanguage(translated, "en")).toThrow();
+  });
+
+  it("loads shared contacts and never borrows source facts for a translation", () => {
+    expect(generalFormValues(study, "en").facts).toEqual({
+      aims: "English aims",
+      population: "",
+      procedures: "Survey",
+      burden: "",
+      retention: "",
+      withdrawal: "",
+      concernRoute: "",
+      coverage: "",
+      coEnrollment: "",
+    });
+    expect(generalFormValues(study, "ar")).toMatchObject({
+      contacts: study.readinessFacts.contacts,
+    });
+  });
+
+  it("gives every readiness field an empty value in a language without stored facts", () => {
+    const facts: Record<string, unknown> = generalFormValues(study, "ar").facts;
+    for (const key of readinessFactKeys) expect(facts[key]).toBe("");
+    expect(Object.keys(facts)).toEqual(readinessFactKeys);
+  });
+  it("updates the edited language and contacts without mutating the loaded snapshot", () => {
+    const updated = withReadinessContent(
+      study.readinessFacts,
+      "ar",
+      { aims: "هدف الدراسة" },
+      [],
+    );
+    expect(updated).toEqual({
+      content: {
+        en: study.readinessFacts.content.en,
+        ar: { aims: "هدف الدراسة" },
+      },
+      contacts: [],
+    });
+    expect(study.readinessFacts.contacts).toHaveLength(1);
+    expect(Object.keys(study.readinessFacts.content)).toEqual(["en"]);
   });
 });

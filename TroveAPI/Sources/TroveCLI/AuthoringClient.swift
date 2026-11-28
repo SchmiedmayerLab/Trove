@@ -227,7 +227,7 @@ struct AuthoringClient: Sendable {
         }
     }
 
-    private func request<Value>(revision: UUID?, operation: (Client) async throws -> Value) async throws -> Value {
+    func request<Value>(revision: UUID?, operation: (Client) async throws -> Value) async throws -> Value {
         do {
             let client = Client(
                 serverURL: serverURL,
