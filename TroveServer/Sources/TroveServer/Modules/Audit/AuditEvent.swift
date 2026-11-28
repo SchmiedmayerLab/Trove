@@ -78,6 +78,9 @@ struct AuditEvent: Sendable {
         case clinicalEventAttributed = "clinical.event.attributed"
         case clinicalRetractionReversed = "clinical.retraction.reversed"
         case clinicalEventReceiptDisclosure = "clinical.event.receipt.disclosure"
+        case exportCreated = "study.export.created"
+        case exportExecuted = "study.export.executed"
+        case exportDisclosure = "study.export.disclosure"
         case studyDataGranted = "study.data.granted"
         case studyAuditDisclosure = "study.audit.disclosure"
         case studyDataDisclosure = "study.data.disclosure"
@@ -114,6 +117,7 @@ struct AuditEvent: Sendable {
                  .consentRecorded, .consentPDFDisclosure, .consentRecordsDisclosure, .collectionPlanDisclosure, .enrollmentWithdrawn,
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .studyPublished, .studyPublicationDisclosure, .studyDraftDeleted, .studyBundleDisclosure, .artifactDiscardScheduled,
+                 .exportCreated, .exportExecuted, .exportDisclosure,
                  .studyDataGranted, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated,
                  .studyDraftDisclosure, .delegationCreated, .delegationRevoked, .delegationDisclosure,
@@ -130,14 +134,15 @@ struct AuditEvent: Sendable {
             case .tasksDisclosure, .taskReceiptDisclosure, .taskSessionDisclosure,
                  .recordingTransferReceiptDisclosure, .consentPDFDisclosure, .consentRecordsDisclosure,
                  .collectionPlanDisclosure, .studyBundleDisclosure,
-                 .clinicalEventReceiptDisclosure, .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
+                 .exportDisclosure, .clinicalEventReceiptDisclosure,
+                 .studyAuditDisclosure, .studyDataDisclosure, .studyRecordingDisclosure, .studyDraftDisclosure,
                  .delegationDisclosure, .studyPublicationDisclosure, .sourceIdentityDisclosure: true
             case .tasksAssigned, .tasksInvalidated, .taskSessionStarted, .taskCompletionAccepted, .taskExcused, .taskFailed,
                  .consentRecorded, .enrollmentWithdrawn, .studyPublished, .studyDraftDeleted, .artifactDiscardScheduled,
                  .collectionReconciliationIssued, .collectionReconciliationCompleted,
                  .recordingTransferDeclared, .recordingTransferStored, .recordingArtifactDiscardScheduled,
                  .sourceRegistered, .sourceRevoked, .sourceInstallationRegistered, .sourceInstallationRevoked,
-                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .studyDataGranted,
+                 .clinicalEventAccepted, .clinicalEventAttributed, .clinicalRetractionReversed, .exportCreated, .exportExecuted, .studyDataGranted,
                  .studyDraftCreated, .studyDraftEdited, .studyDraftValidated, .delegationCreated, .delegationRevoked,
                  .studyLanguageApproved, .studyLanguageApprovalRevoked: false
             }

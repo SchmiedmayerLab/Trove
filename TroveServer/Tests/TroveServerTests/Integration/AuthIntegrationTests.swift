@@ -94,7 +94,7 @@ struct AuthIntegrationTests {
         let endpoints = Self.allEndpoints(.dummy)
         for index in endpoints.indices where endpoints[index].requiresAuthenticationOnly
             || endpoints[index].requiresGroupAccess && endpoints[index].minRole <= .researcher {
-            guard !endpoints[index].requiresDataReader else { continue }
+            guard !endpoints[index].requiresDataReader, !endpoints[index].requiresInvestigator else { continue }
             try await withFixtures(token: .researcher(groups: ["/Test Group/researcher"])) { app, token, endpoints in
                 let endpoint = endpoints[index]
                 try await self.expectStatus(endpoint.successStatus, for: endpoint, token: token, on: app)
@@ -140,6 +140,20 @@ struct AuthIntegrationTests {
     func dataReadersRequireExplicitCapability(groups: [String], expected: HTTPStatus) async throws {
         try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
             for endpoint in endpoints where endpoint.requiresDataReader {
+                try await self.expectStatus(expected == .ok ? endpoint.successStatus : expected, for: endpoint, token: token, on: app)
+            }
+        }
+    }
+
+    @Test(arguments: [
+        (["/Test Group/researcher", "/Test Group/data-reader"], HTTPStatus.forbidden),
+        (["/Test Group/researcher", "/Test Group/principal-investigator"], HTTPStatus.forbidden),
+        (["/Test Group/data-reader", "/Test Group/principal-investigator"], HTTPStatus.forbidden),
+        (["/Test Group/researcher", "/Test Group/data-reader", "/Test Group/principal-investigator"], HTTPStatus.ok)
+    ])
+    func investigatorsRequireBothCapabilities(groups: [String], expected: HTTPStatus) async throws {
+        try await withFixtures(token: .researcher(groups: groups)) { app, token, endpoints in
+            for endpoint in endpoints where endpoint.requiresInvestigator {
                 try await self.expectStatus(expected == .ok ? endpoint.successStatus : expected, for: endpoint, token: token, on: app)
             }
         }

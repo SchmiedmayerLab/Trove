@@ -45,6 +45,8 @@ struct AuthContext: Sendable {
     let groupMemberships: [String: GroupRole]
     /// Independent governed-data capability; administration alone does not imply it.
     let auditReaderGroups: Set<String>
+    /// Study export approval is separately granted and applies together with clinical data access.
+    let principalInvestigatorGroups: Set<String>
     /// Clinical disclosure is separately granted; neither administration nor audit access implies it.
     let dataReaderGroups: Set<String>
 
@@ -81,6 +83,7 @@ struct AuthContext: Sendable {
 
         var memberships: [String: GroupRole] = [:]
         var auditReaders: Set<String> = []
+        var investigators: Set<String> = []
         var dataReaders: Set<String> = []
         for path in groups {
             guard path.hasPrefix("/") else { continue }
@@ -92,6 +95,10 @@ struct AuthContext: Sendable {
                 auditReaders.insert(groupName)
                 continue
             }
+            if parts[1] == "principal-investigator" {
+                investigators.insert(groupName)
+                continue
+            }
             if parts[1] == "data-reader" {
                 dataReaders.insert(groupName)
                 continue
@@ -101,6 +108,7 @@ struct AuthContext: Sendable {
         }
         self.groupMemberships = memberships
         self.auditReaderGroups = auditReaders
+        self.principalInvestigatorGroups = investigators
         self.dataReaderGroups = dataReaders
     }
 

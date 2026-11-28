@@ -26,4 +26,5 @@ data:
   KEYCLOAK_RESEARCHER_ROLE: trove-researcher
   KEYCLOAK_PARTICIPANT_ROLE: trove-participant
   APP_ENVIRONMENT: production
+  TROVE_STUDY_CANONICAL_BASE: https://DOMAIN_PLACEHOLDER/fhir
   PGSSLMODE: verify-full

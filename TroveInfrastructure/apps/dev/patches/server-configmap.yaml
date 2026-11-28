@@ -16,6 +16,7 @@ data:
   PGSSLMODE: disable
   KEYCLOAK_ISSUER: https://localhost/auth/realms/trove
   APP_ENVIRONMENT: development
+  TROVE_STUDY_CANONICAL_BASE: https://localhost/fhir
   S3_ENDPOINT: http://seaweedfs.trove.svc.cluster.local:8333
   S3_ACCESS_KEY: admin
   S3_SECRET_KEY: admin

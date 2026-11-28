@@ -43,6 +43,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
     public.participants, public.invitation_codes, public.enrollments, public.stored_artifacts
 TO :"runtime_name";
 GRANT SELECT, INSERT ON public.task_sessions, public.task_completions, public.task_failures, public.task_excusals TO :"runtime_name";
+GRANT SELECT, INSERT ON public.study_export_jobs, public.study_export_files TO :"runtime_name";
 GRANT SELECT, INSERT ON public.published_studies, public.enrollment_consents TO :"runtime_name";
 -- Language approvals are written once; a trigger admits only their revocation afterwards.
 GRANT SELECT, INSERT ON public.questionnaire_language_approvals TO :"runtime_name";

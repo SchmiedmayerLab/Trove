@@ -35,14 +35,19 @@ struct StudyDataExportStore {
         }
     }
 
-    func page(studyID: UUID, versions: StudyDataQuery.Versions, evidence: StudyDataFence) async throws -> Components.Schemas.StudyDataPage {
+    func page(
+        studyID: UUID,
+        versions: StudyDataQuery.Versions,
+        evidence: StudyDataFence,
+        recordedAt: Date = Date(),
+        frozen: ExportMembership? = nil
+    ) async throws -> Components.Schemas.StudyDataPage {
         guard database.inTransaction else { throw AuditError.transactionRequired }
         let grouped = Dictionary(grouping: evidence.page.outputs, by: \.eventID)
         var visited: Set<UUID> = []
         var records: [Components.Schemas.StudyDataRecord] = []
         // Reserve the bounded page envelope and record-array punctuation before retaining records.
         var encodedBytes = 1024
-        let recordedAt = Date()
         let receiving = try await StudyDeviceUnitDisclosure.receivingEvents(
             Set(evidence.page.outputs.map(\.eventID)), studyID: studyID, on: database
         )
@@ -55,7 +60,7 @@ struct StudyDataExportStore {
                 outputs: outputs,
                 evidence: evidence,
                 recordedAt: recordedAt,
-                receivesDeviceUnitIdentifiers: receiving.contains(output.eventID)
+                receivesDeviceUnitIdentifiers: receiving.contains(output.eventID) && (frozen?.receiving.contains(output.eventID) ?? true)
             )
             let size = try JSONEncoder().encode(record).count
             guard size <= limits.pageBytes - encodedBytes else { throw StudyProjectionJSON.Failure.outputTooLarge }

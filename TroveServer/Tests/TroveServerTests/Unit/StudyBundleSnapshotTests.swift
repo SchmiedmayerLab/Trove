@@ -214,7 +214,7 @@ struct StudyBundleSnapshotTests {
         component.$schedules.value = [schedule]
         study.$components.value = [component]
 
-        let publication = try StudyBundleService().preparePublication(from: study, revision: 1)
+        let publication = try StudyBundleService(canonicalBase: "https://example.org/archive").preparePublication(from: study, revision: 1)
         let archive = try Archive(data: publication.bundle, accessMode: .read)
         let entry = try #require(archive.first { $0.path.hasSuffix("/definition.json") })
         var bytes = Data()
@@ -295,6 +295,7 @@ extension StudyBundleSnapshotTests {
         let content = QuestionnaireContent(questionnaire: """
             {
               "resourceType": "Questionnaire", "id": "\(id)", "status": "active",
+              "url": "https://example.org/Questionnaire/\(id)", "version": "1.0.0",
               "language": "\(language)", "title": "Synthetic",
               "item": [{"linkId": "answer", "type": "integer", "text": "Synthetic"}]
             }
@@ -314,6 +315,53 @@ extension StudyBundleSnapshotTests {
             var bytes = Data()
             _ = try archive.extract(entry) { bytes.append($0) }
             #expect(bytes == resource.bytes)
+        }
+    }
+}
+
+
+extension StudyBundleSnapshotTests {
+    private static func scheduledStudy() throws -> (Study, UUID) {
+        let study = try Self.study()
+        let studyID = try study.requireId()
+        let componentID = UUID()
+        let component = Self.questionnaire(studyID: studyID, id: componentID)
+        let fixture = try #require(try MultilingualQuestionnaireFixture.all().first)
+        component.data = .questionnaire(try fixture.content())
+        let schedule = ComponentSchedule(componentId: componentID, scheduleData: .init(
+            id: UUID(),
+            componentId: componentID,
+            scheduleDefinition: .repeated(.daily(interval: 1, hour: 9, minute: 0, second: 0), offset: DateComponents()),
+            completionPolicy: .anytime,
+            notifications: .disabled
+        ))
+        component.$schedules.value = [schedule]
+        study.$components.value = [component]
+        return (study, componentID)
+    }
+
+    @Test
+    func scheduledQuestionnairesRequireTheDefinitionNamespace() throws {
+        let (study, _) = try Self.scheduledStudy()
+        #expect(throws: ServerError.self) { try StudyBundleService().preparePublication(from: study, revision: 3) }
+        #expect(throws: ServerError.self) { try StudyBundleService(canonicalBase: "https://example.org/archive?x=1") }
+        #expect(throws: ServerError.self) { try StudyBundleService(canonicalBase: "urn:trove:archive") }
+    }
+
+    @Test
+    func scheduledTaskDefinitionsResolveFromTheRetainedArchive() throws {
+        let (study, componentID) = try Self.scheduledStudy()
+        let studyID = try study.requireId()
+        let publication = try StudyBundleService(canonicalBase: "https://example.org/archive").preparePublication(from: study, revision: 3)
+        let graph = try #require(try StudyBundleService.taskDefinitions(in: publication.bundle, study: studyID))
+        let archived = try #require(publication.questionnaires.first)
+        let questionnaire = try StudyProjectionJSON.readResult(archived.bytes)
+        let canonical = try #require(questionnaire["url"]?.string) + "|" + #require(questionnaire["version"]?.string)
+        let pins = try StudyTaskDefinitions.resolve(graph, study: studyID, revision: 3, component: componentID, questionnaire: canonical)
+        #expect(pins.activity.hasSuffix("/ActivityDefinition/" + componentID.uuidString.lowercased() + "|3"))
+        #expect(pins.plan.hasSuffix("/PlanDefinition/" + studyID.uuidString.lowercased() + "|3"))
+        #expect(throws: ServerError.self) {
+            try StudyTaskDefinitions.resolve(graph, study: studyID, revision: 3, component: componentID, questionnaire: canonical + "0")
         }
     }
 }

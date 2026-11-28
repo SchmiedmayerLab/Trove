@@ -157,6 +157,61 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.createStudyExport(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/exports")
+        )
+        try transport.register(
+            {
+                try await server.getStudyExport(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/exports/{exportId}")
+        )
+        try transport.register(
+            {
+                try await server.executeStudyExport(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/exports/{exportId}/execution")
+        )
+        try transport.register(
+            {
+                try await server.getStudyExportPage(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/exports/{exportId}/records")
+        )
+        try transport.register(
+            {
+                try await server.downloadStudyExport(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .get,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/exports/{exportId}/download")
+        )
+        try transport.register(
+            {
                 try await server.getStudyData(
                     request: $0,
                     body: $1,
@@ -2239,6 +2294,467 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                             value,
                             headerFields: &response.headerFields,
                             contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Capture the membership of a frozen study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A repeated requestId returns the same export; the same requestId with other versions receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/post(createStudyExport)`.
+    func createStudyExport(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.CreateStudyExport.id,
+            using: {
+                APIHandler.createStudyExport($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.CreateStudyExport.Input.Path = .init(studyId: try converter.getPathParameterAsURI(
+                    in: metadata.pathParameters,
+                    name: "studyId",
+                    as: Components.Parameters.StudyId.self
+                ))
+                let headers: Operations.CreateStudyExport.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.CreateStudyExport.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.FrozenExportRequest.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.CreateStudyExport.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Read the manifest of a study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/get(getStudyExport)`.
+    func getStudyExport(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetStudyExport.id,
+            using: {
+                APIHandler.getStudyExport($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetStudyExport.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    exportId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "exportId",
+                        as: Swift.String.self
+                    )
+                )
+                let headers: Operations.GetStudyExport.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetStudyExport.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Write the NDJSON file of a captured study export once
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. Executing a ready export returns its manifest without writing again.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/exports/{exportId}/execution`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/execution/post(executeStudyExport)`.
+    func executeStudyExport(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.ExecuteStudyExport.id,
+            using: {
+                APIHandler.executeStudyExport($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.ExecuteStudyExport.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    exportId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "exportId",
+                        as: Swift.String.self
+                    )
+                )
+                let headers: Operations.ExecuteStudyExport.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.ExecuteStudyExport.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Page the line index of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/records`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/records/get(getStudyExportPage)`.
+    func getStudyExportPage(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.GetStudyExportPage.id,
+            using: {
+                APIHandler.getStudyExportPage($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.GetStudyExportPage.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    exportId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "exportId",
+                        as: Swift.String.self
+                    )
+                )
+                let query: Operations.GetStudyExportPage.Input.Query = .init(
+                    offset: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "offset",
+                        as: Swift.Int.self
+                    ),
+                    limit: try converter.getOptionalQueryItemAsURI(
+                        in: request.soar_query,
+                        style: .form,
+                        explode: true,
+                        name: "limit",
+                        as: Swift.Int.self
+                    )
+                )
+                let headers: Operations.GetStudyExportPage.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.GetStudyExportPage.Input(
+                    path: path,
+                    query: query,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Download the NDJSON file of a ready study export
+    ///
+    /// Requires interactive researcher membership with the data-reader and principal-investigator subgroups of the study group. Every member is rechecked under the participant and enrollment locks, and a withdrawn enrollment, a retracted record, a changed accepted result or a revoked role denies the whole export. A queued export receives 409. The bytes are the stored file after its SHA-256 check.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/exports/{exportId}/download`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/exports/{exportId}/download/get(downloadStudyExport)`.
+    func downloadStudyExport(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.DownloadStudyExport.id,
+            using: {
+                APIHandler.downloadStudyExport($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.DownloadStudyExport.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    exportId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "exportId",
+                        as: Swift.String.self
+                    )
+                )
+                let headers: Operations.DownloadStudyExport.Input.Headers = .init(accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields))
+                return Operations.DownloadStudyExport.Input(
+                    path: path,
+                    headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    try converter.setHeaderFieldAsURI(
+                        in: &response.headerFields,
+                        name: "Cache-Control",
+                        value: value.headers.cacheControl
+                    )
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .binary(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/octet-stream",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsBinary(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/octet-stream"
                         )
                     }
                     return (response, body)

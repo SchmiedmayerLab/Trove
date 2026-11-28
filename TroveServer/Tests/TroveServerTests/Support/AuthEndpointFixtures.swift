@@ -83,6 +83,12 @@ extension AuthIntegrationTests {
         )
     }
 
+    static func investigator(_ method: HTTPMethod, _ path: String, successStatus: HTTPStatus, body: Data? = nil) -> AuthEndpoint {
+        AuthEndpoint(
+            method: method, path: path, body: body, contentType: body != nil ? .json : nil, role: .investigator, successStatus: successStatus
+        )
+    }
+
     static func participant(
         _ method: HTTPMethod,
         _ path: String,
@@ -210,6 +216,13 @@ extension AuthIntegrationTests {
                 role: .dataReader,
                 successStatus: .ok
             ),
+            investigator(
+                .POST, "\(base)/studies/\(studyId)/exports", successStatus: .ok, body: jsonData(["requestId": UUID().uuidString, "versions": "current"])
+            ),
+            investigator(.GET, "\(base)/studies/\(studyId)/exports/\(dummyId)", successStatus: .notFound),
+            investigator(.POST, "\(base)/studies/\(studyId)/exports/\(dummyId)/execution", successStatus: .notFound),
+            investigator(.GET, "\(base)/studies/\(studyId)/exports/\(dummyId)/records", successStatus: .notFound),
+            investigator(.GET, "\(base)/studies/\(studyId)/exports/\(dummyId)/download", successStatus: .notFound),
             AuthEndpoint(
                 method: .GET,
                 path: "\(base)/studies/\(studyId)/data/recordings/\(dummyId)",

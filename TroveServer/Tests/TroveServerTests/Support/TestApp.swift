@@ -34,6 +34,8 @@ enum TestApp {
     static let apiAudience = "trove-api"
     static let researcherRole = "trove-researcher"
     static let participantRole = "trove-participant"
+    /// The definition namespace of test publications.
+    @TaskLocal static var studyCanonicalBase: String? = "https://studies.trove.test/fhir"
 
     static func sourceKeyring() throws -> SourceIdentityKeyring {
         try .init(currentKeyID: "synthetic-fixture", keys: ["synthetic-fixture": SymmetricKey(data: Data(repeating: 0x71, count: 32))])
@@ -142,6 +144,7 @@ enum TestApp {
             grantorAuthority: grantorAuthority,
             recordingDownloadByteLimit: recordingDownloadByteLimit,
             collectionCapacity: collectionCapacity,
+            studyCanonicalBase: studyCanonicalBase,
             providerRuntime: runtime
         )
 

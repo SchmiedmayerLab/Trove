@@ -300,6 +300,48 @@ frozen dataset snapshot. The default response budget is 24 MiB, configurable up 
 and JSON overhead. Capacity failure returns HTTP 503 without a partial page or
 audit intent; request fewer outputs to reduce page size.
 
+### Frozen study exports
+
+`POST /studies/{studyId}/exports` captures one export: the eligible clinical outputs
+and every task occurrence of the study's enrolled, not withdrawn participants, with
+the state each had at capture. Creation, execution, every manifest and index read,
+and every download require a researcher in the study group's `data-reader` and
+`principal-investigator` subgroups, recheck every member under the participant and
+enrollment locks, and record audit intent before returning anything. The development
+realm templates include an empty `principal-investigator` subgroup; existing realms
+need the same explicit identity-administrator setup, and no user is assigned to it
+automatically. A withdrawn enrollment, a retracted record or a changed accepted
+result denies the whole export. Execution writes one NDJSON file once; later
+downloads return the same bytes. The executed file, at most the configured page byte
+limit, stays stored with its export job.
+
+Task occurrences are exported in the experimental Grove Study Exchange
+(`org.grovealliance.fhir.study`): one `grove-study-questionnaire-task` Task per
+occurrence and, for a completed one, its accepted `grove-questionnaire-response`
+version. An occurrence the participant attempted but could not complete is
+`failed` at the failure time its device reported. A completed Task changes at the
+time the server accepted the response, which can follow the window end when the
+response was authored within it and can precede the authored time by up to five
+minutes when the device clock runs ahead; a `ready` Task whose window ended counts as missed
+at capture and can still become `completed` or `failed` while the enrollment is
+open. The study package profile binds only `ready`,
+`completed` and `cancelled`, so a `failed` Task does not conform to it.
+An occurrence the study excused is `cancelled` with the status reason
+`excused`, and one a later revision adoption removed is `cancelled` at that
+adoption; when either happened after the performance window ended, the Task stays
+`ready` and counts as missed.
+`authoredOn` is the time the server recorded the occurrence's assignment.
+The response keeps its answers, status, language, authored time and
+extensions and contained resources; its identity, subject and version come from the
+completion receipt, and `author` and `source` are not exported. Each published revision that
+schedules a questionnaire retains `task-definitions.json`, the protocol
+PlanDefinition and the questionnaire ActivityDefinitions its Tasks instantiate; the
+export repeats them with the exact Questionnaires. Set `TROVE_STUDY_CANONICAL_BASE`
+to the deployment's stable HTTP(S) namespace for these definitions. Validating or
+publishing a draft that schedules a questionnaire fails without it, and a changed
+value never changes an earlier revision's definitions. A performance window without
+an end has no deadline.
+
 ### Device unit identifiers
 
 Each published revision states whether its study receives facts that identify one

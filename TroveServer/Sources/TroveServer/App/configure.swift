@@ -199,9 +199,11 @@ func configureServices(
     recordingDownloadByteLimit: String? = nil,
     collectionCapacity: CollectionCapacityConfiguration = .standard,
     providerConfiguration: ProviderRuntimeConfiguration? = nil,
+    studyCanonicalBase: String? = Environment.get("TROVE_STUDY_CANONICAL_BASE"),
     nativeReconciliationSettings: NativeReconciliationSettings? = nil,
     providerRuntime: (@Sendable (AuthorizationService, StudyRepository) -> ProviderRuntime)? = nil
 ) async throws {
+    let bundles = try StudyBundleService(canonicalBase: studyCanonicalBase)
     let reconciliation = try nativeReconciliationSettings ?? NativeReconciliationSettings()
     let storage = ObjectStorageService(provider: storageProvider)
     let recordings = RecordingTransferService(database: app.db(.psql), storage: storage, limits: recordingLimits)
@@ -231,7 +233,7 @@ func configureServices(
         StudyService(exportLimits: collectionCapacity.export)
         ComponentService()
         ComponentScheduleService()
-        StudyBundleService()
+        bundles
         StudyValidationService(validator: validator)
         InvitationCodeService()
         ProfileService()

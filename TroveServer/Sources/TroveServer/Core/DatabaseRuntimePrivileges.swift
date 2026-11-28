@@ -31,7 +31,7 @@ enum DatabaseRuntimePrivileges {
                         'task_sessions', 'task_completions', 'task_failures', 'task_excusals', 'source_bindings',
                         'source_installations', 'study_delegations', 'study_publication_candidates', 'questionnaire_language_approvals',
                         'source_identity_keys', 'source_identity_key_envelopes', 'task_occurrences',
-                        'clinical_events',
+                        'clinical_events', 'study_export_jobs', 'study_export_files',
                         'clinical_event_representations', 'clinical_source_records', 'clinical_record_events', 'clinical_output_bindings',
                         'clinical_record_retractions', 'clinical_retraction_reversals',
                         'clinical_questionnaire_contexts', 'clinical_point_derivations',
@@ -40,7 +40,7 @@ enum DatabaseRuntimePrivileges {
                         'provider_global_scopes', 'provider_query_coverage', 'provider_conversion_instants')
             )
             SELECT
-                (SELECT count(*) FROM protected_relations) = 36
+                (SELECT count(*) FROM protected_relations) = 38
                 AND current_user = session_user
                 AND NOT EXISTS (
                     SELECT 1 FROM pg_catalog.pg_auth_members membership
