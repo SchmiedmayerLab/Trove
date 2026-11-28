@@ -60,8 +60,7 @@ const EditInformationPage = () => {
 
 const EditQuestionnairePage = () => {
   const params = Route.useParams();
-  const { locale } = useLocale();
-  const { form, toInput, getDraftHeaders } = useQuestionnaireForm(locale);
+  const { form, toInput, getDraftHeaders } = useQuestionnaireForm();
   const mutation = useUpdateQuestionnaireMutation();
 
   const handleSubmit = form.handleSubmit((data) => {

@@ -66,7 +66,10 @@ describe("revision-bound form snapshots", () => {
           collectionRequirements: [],
           locales: ["en-US"],
           icon: "",
-          details: {},
+          details: {
+            sourceLanguage: "en",
+            content: { en: { title: "Original" } },
+          },
           consent: {},
           visibility: "unlisted" as const,
           enrollmentConditions: "none" as const,

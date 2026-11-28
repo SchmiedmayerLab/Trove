@@ -10,7 +10,6 @@ import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { z } from "zod";
-import type { StudyDetailContent } from "@/lib/api/generated/types.gen";
 import { zStudyDetailContent } from "@/lib/api/generated/zod.gen";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
 import { studyResponseQueryOptions } from "@/lib/queries/study";
@@ -34,10 +33,10 @@ const defaultValues: z.infer<typeof generalFormSchema> = {
 };
 
 /**
- * Creates the general study form for a specific locale.
- * Uses the raw StudyResponse so callers can access `details` for locale preservation on save.
+ * Creates the general study form for one language of the study details.
+ * Uses the raw StudyResponse so callers can keep the other languages on save.
  */
-export const useGeneralForm = (locale: string) => {
+export const useGeneralForm = (language: string) => {
   const params = useParams({
     from: "/(dashboard)/$group/$study/configuration/general",
   });
@@ -45,16 +44,16 @@ export const useGeneralForm = (locale: string) => {
     studyResponseQueryOptions({ studyId: params.study }),
   );
 
-  const localeDetails = studyResponse?.details[locale];
+  const languageDetails = studyResponse?.details.content[language];
 
   const formValues =
     studyResponse ?
       {
-        title: localeDetails?.title ?? "",
-        shortTitle: localeDetails?.shortTitle ?? null,
+        title: languageDetails?.title ?? "",
+        shortTitle: languageDetails?.shortTitle ?? null,
         icon: studyResponse.icon,
-        explanationText: localeDetails?.explanationText ?? null,
-        shortExplanationText: localeDetails?.shortExplanationText ?? null,
+        explanationText: languageDetails?.explanationText ?? null,
+        shortExplanationText: languageDetails?.shortExplanationText ?? null,
       }
     : undefined;
 
@@ -65,10 +64,10 @@ export const useGeneralForm = (locale: string) => {
 
   const getStudySnapshot = useDraftFormSnapshot(
     studyResponse,
-    `${params.study}:${locale}`,
+    `${params.study}:${language}`,
     form.formState.isDirty,
     (loaded) => {
-      const details = loaded.details[locale] as StudyDetailContent | undefined;
+      const details = loaded.details.content[language];
       form.reset({
         title: details?.title ?? "",
         shortTitle: details?.shortTitle ?? null,

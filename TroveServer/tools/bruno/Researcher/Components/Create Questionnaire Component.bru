@@ -23,9 +23,7 @@ body:json {
   {
     "name": "Daily Survey",
     "data": {
-      "en-US": {
-        "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey\",\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}],\"meta\":{\"profile\":[\"https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire\"]},\"url\":\"https://example.org/fhir/Questionnaire/daily-survey\",\"version\":\"1.0.0\",\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm\",\"valueCoding\":{\"system\":\"http://hl7.org/fhir/version-algorithm\",\"code\":\"semver\"}}],\"subjectType\":[\"Patient\"]}"
-      }
+      "questionnaire": "{\"resourceType\":\"Questionnaire\",\"id\":\"daily-survey\",\"status\":\"active\",\"language\":\"en-US\",\"title\":\"Daily Survey\",\"_title\":{\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/translation\",\"extension\":[{\"url\":\"lang\",\"valueCode\":\"de\"},{\"url\":\"content\",\"valueString\":\"Tägliche Umfrage\"}]}]},\"item\":[{\"linkId\":\"q1\",\"text\":\"How are you feeling today?\",\"type\":\"string\"}],\"meta\":{\"profile\":[\"https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire\"]},\"url\":\"https://example.org/fhir/Questionnaire/daily-survey\",\"version\":\"1.0.0\",\"extension\":[{\"url\":\"http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm\",\"valueCoding\":{\"system\":\"http://hl7.org/fhir/version-algorithm\",\"code\":\"semver\"}}],\"subjectType\":[\"Patient\"]}"
     }
   }
 }

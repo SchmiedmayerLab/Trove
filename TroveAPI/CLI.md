@@ -9,8 +9,9 @@ SPDX-License-Identifier: MIT
 # Study CLI
 
 The `trove` executable uses the generated Swift API client. It supports reading a
-draft, creating and editing a study, importing a localized questionnaire component,
-validating a publication candidate, and explicitly publishing that candidate.
+draft, creating and editing a study, importing and exporting a multilingual
+questionnaire component, validating a publication candidate, and explicitly
+publishing that candidate.
 Researchers with clinical data access can also retrieve study measurement pages
 and download authorized recordings.
 It does not provide browser login, refresh-token storage, delegation management
@@ -19,7 +20,8 @@ or participant access.
 Build with `swift build --package-path TroveAPI --product trove`. Use `trove --help`
 and each command's `--help` for arguments. The server URL must include the API
 version path. Except for recording downloads, output is one typed JSON document
-on standard output; errors go to
+on standard output; `trove questionnaire export` writes the stored FHIR resource
+itself. Errors go to
 standard error and exit nonzero without printing credentials or server response
 bodies.
 
@@ -112,13 +114,24 @@ output. Save recordings only in an approved study-data location.
    replaying the same edit.
 
 `trove study create --group <group-id> --file create.json` accepts
-`StudyCreateInput`, for example `{"title":"Example Study","icon":"heart"}`.
-`trove questionnaire import --study <study-id> --revision <draft-revision> --file questionnaire.json --name "Wellbeing" --locale en-US`
-accepts a raw UTF-8 FHIR Questionnaire JSON file. The CLI checks the resource type
-and wraps its original text in the typed localized component input; it does not
-rewrite resource IDs, profiles or whitespace. The server assigns the separate
-component ID. Full validation and supported questionnaire execution rules remain
-server-owned.
+`StudyCreateInput`, for example
+`{"title":"Example Study","sourceLanguage":"en","icon":"heart"}`. Study details
+in a `StudyPatchInput` name their source language and are keyed by BCP 47
+language tag, for example
+`{"details":{"sourceLanguage":"en","content":{"en":{"title":"Example Study"},"de":{"title":"Beispielstudie"}}}}`.
+
+A questionnaire is one FHIR Questionnaire JSON file holding every language:
+`Questionnaire.language` names the base language, and standard `translation`
+extensions carry the others.
+`trove questionnaire import --study <study-id> --revision <draft-revision> --file questionnaire.json --name "Wellbeing"`
+accepts that raw UTF-8 file without a byte order mark. The CLI checks the resource type and wraps its
+original text in the typed component input; it does not rewrite resource IDs,
+profiles, translations or whitespace. The server assigns the separate component
+ID and returns it with the base and translation languages it finds.
+`trove questionnaire export --study <study-id> --component <component-id> > questionnaire.json`
+writes the stored resource to standard output byte for byte, without a trailing
+newline, so an export of an imported file is identical to it. Full validation and
+supported questionnaire execution rules remain server-owned.
 
 ## Exact Publication
 

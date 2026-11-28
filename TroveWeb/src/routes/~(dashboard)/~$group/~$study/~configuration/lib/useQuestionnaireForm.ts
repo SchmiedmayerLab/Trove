@@ -9,63 +9,18 @@
 import { useForm } from "@schmiedmayerlab/grove-design-system";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { z } from "zod";
-import type {
-  QuestionnaireComponentData,
-  QuestionnaireComponentInput,
-  QuestionnaireComponentResponse,
-  QuestionnaireContent,
-} from "@/lib/api/generated/types.gen";
-import { zQuestionnaireContent } from "@/lib/api/generated/zod.gen";
 import { questionnaireRetrieveQueryOptions } from "@/lib/queries/component";
 import { draftHeaders, useDraftFormSnapshot } from "@/lib/queries/draft";
+import {
+  emptyQuestionnaireForm,
+  questionnaireFormSchema,
+  questionnaireFormValues,
+  questionnaireInput,
+  type QuestionnaireFormValues,
+} from "./questionnaireForm";
 
-const questionnaireSchema = zQuestionnaireContent.extend({
-  name: z.string().min(1, "Name is required"),
-  questionnaire: z
-    .string()
-    .min(1, "Questionnaire JSON is required")
-    .refine((value) => {
-      try {
-        JSON.parse(value);
-        return true;
-      } catch {
-        return false;
-      }
-    }, "Invalid FHIR Questionnaire JSON"),
-});
-
-const defaultValues: z.infer<typeof questionnaireSchema> = {
-  name: "",
-  questionnaire: "",
-};
-
-const transformResponseToForm = (
-  response: QuestionnaireComponentResponse,
-  locale: string,
-) => {
-  const localeData = response.data[locale] as QuestionnaireContent | undefined;
-  return {
-    name: response.name,
-    questionnaire: localeData?.questionnaire ?? "",
-  };
-};
-
-const transformQuestionnaireFormToInput = (
-  formData: z.infer<typeof questionnaireSchema>,
-  locale: string,
-  existingData?: QuestionnaireComponentData,
-): QuestionnaireComponentInput => ({
-  name: formData.name,
-  data: {
-    ...existingData,
-    [locale]: {
-      questionnaire: formData.questionnaire,
-    },
-  },
-});
-
-export const useQuestionnaireForm = (locale: string) => {
+/** Edits the component's one multilingual FHIR Questionnaire as JSON text. */
+export const useQuestionnaireForm = () => {
   const params = useParams({ strict: false });
 
   const { data: snapshot } = useQuery({
@@ -77,39 +32,31 @@ export const useQuestionnaireForm = (locale: string) => {
   });
   const componentResponse = snapshot?.value;
 
-  const formValues =
-    componentResponse ?
-      transformResponseToForm(componentResponse, locale)
-    : undefined;
-
   const form = useForm({
-    formSchema: questionnaireSchema,
-    defaultValues: formValues ?? defaultValues,
+    formSchema: questionnaireFormSchema,
+    defaultValues:
+      componentResponse ?
+        questionnaireFormValues(componentResponse)
+      : emptyQuestionnaireForm,
   });
 
   const getSnapshot = useDraftFormSnapshot(
     snapshot,
-    `${params.study}:${params.component}:${locale}`,
+    `${params.study}:${params.component}`,
     form.formState.isDirty,
     (loaded) =>
       form.reset(
         loaded.value ?
-          transformResponseToForm(loaded.value, locale)
-        : defaultValues,
+          questionnaireFormValues(loaded.value)
+        : emptyQuestionnaireForm,
       ),
   );
-
-  const toInput = (formData: z.infer<typeof questionnaireSchema>) =>
-    transformQuestionnaireFormToInput(
-      formData,
-      locale,
-      getSnapshot().value?.data,
-    );
 
   return {
     form,
     componentData: componentResponse,
-    toInput,
+    toInput: (formData: QuestionnaireFormValues) =>
+      questionnaireInput(formData),
     getDraftHeaders: () => draftHeaders(getSnapshot().draftRevision),
   };
 };

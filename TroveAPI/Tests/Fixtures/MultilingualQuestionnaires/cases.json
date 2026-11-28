@@ -1,0 +1,90 @@
+[
+  {
+    "file": "bilingual-de.json",
+    "tag": "language only",
+    "language": "en-US",
+    "translationLanguages": [
+      "de"
+    ],
+    "title": {
+      "en-US": "Weekly café check-in",
+      "de": "Wöchentliche Café-Abfrage"
+    },
+    "answerDisplays": {
+      "en-US": [
+        "Coffee",
+        "Tea"
+      ],
+      "de": [
+        "Kaffee",
+        "Tee"
+      ]
+    }
+  },
+  {
+    "file": "bilingual-zh-Hant.json",
+    "tag": "language and script",
+    "language": "en-US",
+    "translationLanguages": [
+      "zh-Hant"
+    ],
+    "title": {
+      "en-US": "Weekly café check-in",
+      "zh-Hant": "每週咖啡館問卷"
+    },
+    "answerDisplays": {
+      "en-US": [
+        "Coffee",
+        "Tea"
+      ],
+      "zh-Hant": [
+        "咖啡",
+        "茶"
+      ]
+    }
+  },
+  {
+    "file": "bilingual-pt-BR.json",
+    "tag": "language and region",
+    "language": "en-US",
+    "translationLanguages": [
+      "pt-BR"
+    ],
+    "title": {
+      "en-US": "Weekly café check-in",
+      "pt-BR": "Questionário semanal do café"
+    },
+    "answerDisplays": {
+      "en-US": [
+        "Coffee",
+        "Tea"
+      ],
+      "pt-BR": [
+        "Café",
+        "Chá"
+      ]
+    }
+  },
+  {
+    "file": "bilingual-ar.json",
+    "tag": "right-to-left script",
+    "language": "en-US",
+    "translationLanguages": [
+      "ar"
+    ],
+    "title": {
+      "en-US": "Weekly café check-in",
+      "ar": "استبيان المقهى الأسبوعي"
+    },
+    "answerDisplays": {
+      "en-US": [
+        "Coffee",
+        "Tea"
+      ],
+      "ar": [
+        "قهوة",
+        "شاي"
+      ]
+    }
+  }
+]

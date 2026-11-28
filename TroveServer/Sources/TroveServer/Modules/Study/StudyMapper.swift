@@ -16,9 +16,10 @@ extension Study {
     convenience init(_ schema: Components.Schemas.StudyCreateInput, groupId: UUID) {
         self.init(
             groupId: groupId,
-            locales: [.enUS],
+            // Document locales start from the source language where the participant bundle can represent it.
+            locales: Set([StudyBundleService.bundleLocalization(for: schema.sourceLanguage)].compactMap(\.self)),
             icon: schema.icon,
-            details: .init([.enUS: StudyDetailContent(title: schema.title)]),
+            details: StudyDetailData(sourceLanguage: schema.sourceLanguage, source: StudyDetailContent(title: schema.title)),
             id: UUID()
         )
     }
@@ -43,10 +44,9 @@ extension StudyPatch {
 
 extension Components.Schemas.StudyListItem {
     init(_ model: Study) throws {
-        let title = model.details[.enUS]?.title ?? model.details.first?.value.title ?? ""
         self.init(
             id: try model.requireId().uuidString,
-            title: title
+            title: model.details.source.title
         )
     }
 }

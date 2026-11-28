@@ -73,8 +73,7 @@ const NewInformationPage = () => {
 const NewQuestionnairePage = () => {
   const params = Route.useParams();
   const navigateToList = useNavigateToComponentList();
-  const { locale } = useLocale();
-  const { form, toInput, getDraftHeaders } = useQuestionnaireForm(locale);
+  const { form, toInput, getDraftHeaders } = useQuestionnaireForm();
   const mutation = useCreateQuestionnaireMutation();
 
   const handleSubmit = form.handleSubmit((data) => {

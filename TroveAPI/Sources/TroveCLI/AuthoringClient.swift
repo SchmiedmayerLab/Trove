@@ -108,6 +108,23 @@ struct AuthoringClient: Sendable {
         }
     }
 
+    func getQuestionnaire(
+        _ study: UUID,
+        component: UUID,
+        delegation: UUID?
+    ) async throws -> Components.Schemas.QuestionnaireComponentResponse {
+        try await request(revision: nil) { client in
+            let response = try await client.getStudiesStudyIdComponentsQuestionnaireComponentId(.init(
+                path: .init(studyId: study.uuidString, componentId: component.uuidString),
+                headers: .init(troveDelegationID: delegation?.uuidString)
+            )).ok.body.json
+            guard UUID(uuidString: response.id) == component else {
+                throw CLIError.requestFailed
+            }
+            return response
+        }
+    }
+
     func validateStudy(_ study: UUID, revision: UUID, delegation: UUID?) async throws -> Components.Schemas.StudyDraftValidation {
         try await request(revision: revision) { client in
             try await client.validateStudyDraft(.init(

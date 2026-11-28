@@ -129,13 +129,69 @@ struct QuestionnaireComponentIntegrationTests {
         }
     }
 
+    @Test
+    func multilingualResourceRoundTripsWithItsExactBytesAndLanguages() async throws {
+        try await TestApp.withApp { app, token in
+            let group = try await GroupFixtures.createGroup(on: app.db)
+            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
+            let studyId = try study.requireId()
+            for fixture in try MultilingualQuestionnaireFixture.all() {
+                let revision = try #require(try await Study.find(studyId, on: app.db)).draftRevision
+                let created = try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(studyId)/components/questionnaire", beforeRequest: { req in
+                    req.bearerAuth(token)
+                    req.headers.replaceOrAdd(name: "If-Match", value: "\"\(revision)\"")
+                    try req.encodeJSONBody(Components.Schemas.QuestionnaireComponentInput(name: fixture.file, data: try fixture.content()))
+                })
+                #expect(created.status == .created)
+                let component = try created.content.decode(Components.Schemas.QuestionnaireComponentResponse.self)
+                let componentId = try #require(UUID(uuidString: component.id))
+                #expect(Data(component.data.questionnaire.utf8) == (try fixture.bytes()))
+                #expect(component.language == fixture.language)
+                #expect(component.translationLanguages == fixture.translationLanguages)
+
+                let stored = try #require(try await Component.find(componentId, on: app.db))
+                guard case .questionnaire(let content) = stored.data else {
+                    Issue.record("Expected one stored questionnaire resource")
+                    continue
+                }
+                #expect(Data(content.questionnaire.utf8) == (try fixture.bytes()))
+
+                let read = try await app.sendRequest(.GET, "\(apiBasePath)/studies/\(studyId)/components/questionnaire/\(componentId)", beforeRequest: { req in
+                    req.bearerAuth(token)
+                })
+                #expect(try read.content.decode(Components.Schemas.QuestionnaireComponentResponse.self) == component)
+            }
+        }
+    }
+
+    @Test
+    func draftLanguagesAreReportedWithoutValidatingTheResource() async throws {
+        try await TestApp.withApp { app, token in
+            let group = try await GroupFixtures.createGroup(on: app.db)
+            let study = try await StudyFixtures.createStudy(on: app.db, groupId: try group.requireId())
+            try await app.test(
+                .POST,
+                "\(apiBasePath)/studies/\(study.requireId())/components/questionnaire",
+                beforeRequest: { req in
+                    req.bearerAuth(token)
+                    req.headers.replaceOrAdd(name: "If-Match", value: "\"\(study.draftRevision)\"")
+                    try req.encodeJSONBody(createRequestBody(name: "Unfinished"))
+                }
+            ) { response in
+                #expect(response.status == .created)
+                let component = try response.content.decode(Components.Schemas.QuestionnaireComponentResponse.self)
+                #expect(component.data.questionnaire == "{}")
+                #expect(component.language == nil)
+                #expect(component.translationLanguages.isEmpty)
+            }
+        }
+    }
+
     private func createRequestBody(name: String) -> [String: Any] {
         [
             "name": name,
             "data": [
-                "en-US": [
-                    "questionnaire": "{}"
-                ]
+                "questionnaire": "{}"
             ]
         ]
     }

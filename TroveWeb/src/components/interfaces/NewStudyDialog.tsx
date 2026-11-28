@@ -23,12 +23,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { ListPlus } from "lucide-react";
 import { type ReactNode } from "react";
 import { z } from "zod";
+import { isLanguageTag, languageTagHint } from "@/lib/languageTags";
 import { useCreateStudyMutation } from "@/lib/queries/study";
 import { FeaturedIconContainer } from "../ui/FeaturedIconContainer";
 import { FieldLabel } from "../ui/FieldLabel";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  sourceLanguage: z.string().refine(isLanguageTag, languageTagHint),
 });
 
 interface NewStudyDialogContentProps {
@@ -44,13 +46,13 @@ export const NewStudyDialogContent = ({
   const createStudy = useCreateStudyMutation();
   const form = useForm({
     formSchema,
-    defaultValues: { title: "" },
+    defaultValues: { title: "", sourceLanguage: "en" },
   });
 
-  const handleSubmit = form.handleSubmit(async ({ title }) => {
+  const handleSubmit = form.handleSubmit(async ({ title, sourceLanguage }) => {
     const study = await createStudy.mutateAsync({
       path: { groupId },
-      body: { title, icon: "heart" },
+      body: { title, sourceLanguage, icon: "heart" },
     });
     await navigate({
       to: "/$group/$study",
@@ -80,6 +82,18 @@ export const NewStudyDialogContent = ({
             render={({ field }) => (
               <Input placeholder="Enter study title" {...field} />
             )}
+          />
+          <Field
+            control={form.control}
+            name="sourceLanguage"
+            className="pt-4"
+            label={
+              <FieldLabel
+                title="Source language"
+                description={`The language you write the study in. ${languageTagHint}`}
+              />
+            }
+            render={({ field }) => <Input {...field} />}
           />
         </div>
         <DialogFooter>

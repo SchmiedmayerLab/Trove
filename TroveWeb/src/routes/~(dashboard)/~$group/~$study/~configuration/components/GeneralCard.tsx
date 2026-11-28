@@ -11,7 +11,7 @@ import { DynamicIcon, type IconName } from "lucide-react/dynamic";
 import { KeyValueCard } from "@/components/interfaces/KeyValueCard";
 import { EditButtonLink } from "@/components/ui/EditButton";
 import type { StudyResponse } from "@/lib/api/generated/types.gen";
-import { useLocale } from "@/lib/locale";
+import { detailLanguages } from "../lib/studyDetails";
 
 interface GeneralCardProps {
   study?: StudyResponse;
@@ -22,8 +22,7 @@ export const GeneralCard = ({ study, isLoading }: GeneralCardProps) => {
   const params = useParams({
     from: "/(dashboard)/$group/$study/configuration/",
   });
-  const { locale } = useLocale();
-  const details = study?.details[locale];
+  const details = study?.details.content[study.details.sourceLanguage];
 
   return (
     <KeyValueCard
@@ -46,6 +45,12 @@ export const GeneralCard = ({ study, isLoading }: GeneralCardProps) => {
           tooltip:
             "The title of your study, which will be displayed to participants.",
           value: details?.title,
+        },
+        {
+          key: "Languages",
+          tooltip:
+            "The languages of the title and descriptions, starting with the language they were written in.",
+          value: study ? detailLanguages(study.details).join(", ") : undefined,
         },
         {
           key: "Short title",

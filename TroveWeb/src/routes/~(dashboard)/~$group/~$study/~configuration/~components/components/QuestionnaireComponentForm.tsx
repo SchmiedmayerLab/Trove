@@ -15,11 +15,11 @@ import {
 import { useRef, type BaseSyntheticEvent, type ChangeEvent } from "react";
 import { CardHeader } from "@/components/ui/Card";
 import { FieldLabel } from "@/components/ui/FieldLabel";
-import { useLocale } from "@/lib/locale";
+import { questionnaireLanguages } from "@/lib/questionnaireLanguages";
 import { enhanceField } from "@/utils/enhanceField";
-import { LocaleSuffix } from "../../components/LocaleSuffix";
 import type { QuestionnaireForm } from "../../lib/useQuestionnaireForm";
 
+// Reformatting rewrites the resource, so it only happens on request.
 const formatJson = (json: string): string =>
   JSON.stringify(JSON.parse(json), null, 2);
 
@@ -66,7 +66,8 @@ export const QuestionnaireComponentForm = ({
 
     try {
       const text = await file.text();
-      setQuestionnaireJson(formatJson(text));
+      JSON.parse(text);
+      setQuestionnaireJson(text);
     } catch {
       setQuestionnaireError(
         "Invalid JSON file. Please upload a valid JSON document.",
@@ -82,14 +83,8 @@ export const QuestionnaireComponentForm = ({
       return;
     }
 
-    try {
-      downloadFile(formatJson(questionnaireJson), "questionnaire.json");
-      form.clearErrors("questionnaire");
-    } catch {
-      setQuestionnaireError(
-        "JSON is invalid. Please fix it before downloading.",
-      );
-    }
+    downloadFile(questionnaireJson, "questionnaire.json");
+    form.clearErrors("questionnaire");
   };
 
   const handleFormat = () => {
@@ -104,7 +99,7 @@ export const QuestionnaireComponentForm = ({
     }
   };
 
-  const { locale } = useLocale();
+  const languages = questionnaireLanguages(questionnaireJson);
 
   return (
     <>
@@ -130,19 +125,27 @@ export const QuestionnaireComponentForm = ({
           name="questionnaire"
           label={
             <FieldLabel
-              title={
-                <>
-                  FHIR questionnaire JSON
-                  <LocaleSuffix locale={locale} />
-                </>
-              }
-              description="The FHIR Questionnaire JSON to collect responses from participants."
+              title="FHIR questionnaire JSON"
+              description="One FHIR Questionnaire for every language: Questionnaire.language names the base language, and translation extensions carry the others. Upload and download keep the text without reformatting."
             />
           }
           className="px-6 pt-6"
           render={({ field }) => (
             <div>
               <Textarea {...field} rows={10} className="w-full font-mono" />
+              {languages ?
+                <dl className="text-text-secondary grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pt-3 text-sm">
+                  <dt className="font-medium">Base language</dt>
+                  <dd>{languages.base ?? "Not named"}</dd>
+                  <dt className="font-medium">Translations</dt>
+                  <dd>
+                    {languages.translations.length > 0 ?
+                      languages.translations.join(", ")
+                    : "None"}
+                  </dd>
+                </dl>
+              : <p className="text-text-secondary pt-3 text-sm">Invalid JSON</p>
+              }
               <div className="flex flex-wrap justify-end gap-2 pt-4">
                 <input
                   ref={fileInputRef}

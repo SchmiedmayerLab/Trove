@@ -140,7 +140,7 @@ client.interceptors.request.use((request, options) => {
   });
 });
 
-// Error interceptor — wraps RFC 7807 Problem Details responses into ApiError
+// Error interceptor: wraps RFC 7807 Problem Details responses into ApiError
 client.interceptors.error.use(
   (error: unknown, response: Response | undefined, request) => {
     // The generated client also invokes this interceptor when fetch rejects.

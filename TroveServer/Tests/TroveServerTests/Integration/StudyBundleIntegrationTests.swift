@@ -38,6 +38,10 @@ struct StudyBundleIntegrationTests {
         })
     }
 
+    private static func bilingualQuestionnaire() throws -> MultilingualQuestionnaireFixture {
+        try #require(try MultilingualQuestionnaireFixture.all().first { $0.translationLanguage == "de" })
+    }
+
     // MARK: - Comprehensive Component Types Test
 
     @Test("Enrolled participant downloads a published bundle containing all component types")
@@ -168,6 +172,13 @@ extension StudyBundleIntegrationTests {
         let study = try await StudyFixtures.createStudy(on: database, groupId: groupId, title: "Bundle Test Study")
         let studyId = try study.requireId()
 
+        let english = try #require(LanguageTag(rawValue: "en"))
+        let german = try #require(LanguageTag(rawValue: "de"))
+        study.details = try #require(StudyDetailData(sourceLanguage: english, content: [
+            english: StudyDetailContent(title: "Bundle Test Study"),
+            german: StudyDetailContent(title: "Bundle-Teststudie")
+        ]))
+
         // Consent
         study.consent = LocalizationsDictionary([
             .enUS: ConsentContent(title: "Informed Consent", content: "# Informed Consent\n\nPlease read carefully.")
@@ -197,27 +208,7 @@ extension StudyBundleIntegrationTests {
             name: "Daily Survey"
         )
         let questionnaireId = try questionnaireComponent.requireId()
-        let questionnaireJSON = """
-            {
-              "resourceType": "Questionnaire",
-              "id": "\(questionnaireId.uuidString)",
-              "status": "active",
-              "meta": {"profile": ["https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire"]},
-              "url": "https://example.org/fhir/Questionnaire/daily-survey",
-              "version": "1.0.0",
-              "subjectType": ["Patient"],
-              "extension": [{
-                "url": "http://hl7.org/fhir/StructureDefinition/artifact-versionAlgorithm",
-                "valueCoding": {"system": "http://hl7.org/fhir/version-algorithm", "code": "semver"}
-              }],
-              "language": "en-US",
-              "title": "Daily Survey",
-              "item": [{"linkId": "mood", "text": "Rate your mood", "type": "integer"}]
-            }
-            """
-        questionnaireComponent.data = .questionnaire(LocalizationsDictionary([
-            .enUS: QuestionnaireContent(questionnaire: questionnaireJSON)
-        ]))
+        questionnaireComponent.data = .questionnaire(try Self.bilingualQuestionnaire().content())
         try await questionnaireComponent.update(on: database)
 
         // Health data component
@@ -271,6 +262,7 @@ extension StudyBundleIntegrationTests {
         // Study metadata
         #expect(definition.id == studyId)
         #expect(definition.metadata.title[.enUS] == "Bundle Test Study")
+        #expect(definition.metadata.title[try #require(LocalizationKey("de-DE"))] == "Bundle-Teststudie")
         #expect(definition.metadata.consentFileRef != nil)
         #expect(definition.studyRevision == 1)
 
@@ -300,7 +292,16 @@ extension StudyBundleIntegrationTests {
             }
             return false
         }))
-        #expect(bundle.displayTitle(for: questionnaireDef, in: enUS) == "Daily Survey")
+        // One multilingual resource in its stored bytes; Grove selects the language when rendering.
+        let fixture = try Self.bilingualQuestionnaire()
+        let questionnaireFiles = try FileManager.default.contentsOfDirectory(
+            at: bundle.bundleUrl.appending(path: "questionnaire"),
+            includingPropertiesForKeys: nil
+        )
+        #expect(questionnaireFiles.map(\.lastPathComponent) == ["\(questionnaireDef.id.uuidString.lowercased())+en-US.json"])
+        #expect(try Data(contentsOf: try #require(questionnaireFiles.first)) == fixture.bytes())
+        #expect(bundle.displayTitle(for: questionnaireDef, in: enUS) == fixture.title["en-US"])
+        #expect(bundle.displayTitle(for: questionnaireDef, in: Locale(identifier: "de-AT")) == fixture.title["de"])
 
         // Health data component
         let healthData = try #require(definition.components.lazy.compactMap {

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "not JSON",
+    "text": "{\"resourceType\": ",
+    "isJSON": false,
+    "translationLanguages": []
+  },
+  {
+    "name": "JSON array",
+    "text": "[]",
+    "isJSON": true,
+    "translationLanguages": []
+  },
+  {
+    "name": "tags as written, deduplicated and sorted",
+    "text": "{\"language\": \"en-us\", \"_name\": {\"extension\": [{\"url\": \"http://hl7.org/fhir/StructureDefinition/translation\", \"extension\": [{\"url\": \"lang\", \"valueCode\": \"en-us\"}, {\"url\": \"content\", \"valueString\": \"Text\"}]}, {\"url\": \"http://hl7.org/fhir/StructureDefinition/translation\", \"extension\": [{\"url\": \"lang\", \"valueCode\": \"de\"}, {\"url\": \"content\", \"valueString\": \"Text\"}]}, {\"url\": \"http://hl7.org/fhir/StructureDefinition/translation\", \"extension\": [{\"url\": \"lang\", \"valueCode\": \"de\"}, {\"url\": \"content\", \"valueString\": \"Text\"}]}]}, \"item\": [{\"_text\": {\"extension\": [{\"url\": \"http://hl7.org/fhir/StructureDefinition/translation\", \"extension\": [{\"url\": \"lang\", \"valueCode\": \"ar\"}, {\"url\": \"content\", \"valueString\": \"Text\"}]}]}}]}",
+    "isJSON": true,
+    "language": "en-us",
+    "translationLanguages": [
+      "ar",
+      "de",
+      "en-us"
+    ]
+  },
+  {
+    "name": "other extensions ignored",
+    "text": "{\"language\": \"en-US\", \"_title\": {\"extension\": [{\"url\": \"https://example.org/other\", \"extension\": [{\"url\": \"lang\", \"valueCode\": \"fr\"}]}]}}",
+    "isJSON": true,
+    "language": "en-US",
+    "translationLanguages": []
+  }
+]

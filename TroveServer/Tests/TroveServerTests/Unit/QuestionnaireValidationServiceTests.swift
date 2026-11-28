@@ -71,7 +71,7 @@ struct QuestionnaireValidationServiceTests {
         let evidence = try await Self.service().validate(bytes: Self.fixture, evaluationInstant: Self.instant)
         #expect(evidence.sha256 == SHA256.hash(data: Self.fixture).map { String(format: "%02x", $0) }.joined())
         #expect(evidence.contractRevision == FHIRValidationClient.contractRevision)
-        #expect(evidence.executionCapability == "grove-questionnaire-core-v1")
+        #expect(evidence.executionCapability == "grove-questionnaire-core-v2")
         let restored = try JSONDecoder().decode(QuestionnaireValidationService.Evidence.self, from: JSONEncoder().encode(evidence))
         #expect(restored == evidence)
         let compact = try JSONEncoder().encode(JSONDecoder().decode(ModelsR4.Questionnaire.self, from: Self.fixture))

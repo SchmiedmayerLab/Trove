@@ -156,7 +156,7 @@ extension StudyPublicationCandidateTests {
         """
         let component = Component(
             studyId: try study.requireId(),
-            data: .questionnaire(.init([.enUS: .init(questionnaire: questionnaire)])),
+            data: .questionnaire(.init(questionnaire: questionnaire)),
             name: "Synthetic Questionnaire",
             id: componentID
         )

@@ -15,6 +15,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   Field,
   Input,
@@ -24,7 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Languages, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { FeaturedIconContainer } from "@/components/ui/FeaturedIconContainer";
 import { FieldLabel } from "@/components/ui/FieldLabel";
@@ -94,8 +97,9 @@ const AddLocaleDialogContent = ({
           />
           <DialogTitle>Add a locale</DialogTitle>
           <DialogDescription>
-            Add a new language to your study. You can then switch to it and
-            start editing content.
+            Add a language-region locale for the study's consent and
+            informational documents. Study details and questionnaires keep their
+            languages in their own content.
           </DialogDescription>
         </DialogHeader>
         <div className="pt-4">
@@ -132,6 +136,17 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
     study: StudyResponse;
   }>();
   const [pendingAddStudy, setPendingAddStudy] = useState<StudyResponse>();
+  // The locale dialogs have no trigger of their own, so focus returns to the
+  // selector when one closes. A dialog chosen in the menu opens once the menu
+  // content has unmounted, so no closing menu can take focus from the selector.
+  const dialogAfterMenuRef = useRef<() => void>(undefined);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const isDialogOpen = addLocaleDialog.isOpen || deleteDialog.isOpen;
+  const wasDialogOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasDialogOpenRef.current && !isDialogOpen) triggerRef.current?.focus();
+    wasDialogOpenRef.current = isDialogOpen;
+  }, [isDialogOpen]);
   const updateStudy = useUpdateStudyMutation();
 
   const { data: study } = useQuery({
@@ -170,38 +185,69 @@ const LocaleSelectorContent = ({ studyId }: { studyId: string }) => {
 
   return (
     <>
-      <HeaderSelector selectedItem={{ title: activeLocale }}>
-        <HeaderSelectorMenuLabel>Locales</HeaderSelectorMenuLabel>
-        {locales.map((locale) => (
-          <HeaderSelectorMenuItem
-            key={locale}
-            onSelect={() => setLocale(locale)}
-          >
-            <span className="flex-1">{locale}</span>
-            {locales.length > 1 && (
-              <button
-                type="button"
-                className="text-text-tertiary hover:text-text -mr-1 rounded p-0.5"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!study) return;
-                  setPendingDeleteLocale({ locale, study });
-                  deleteDialog.open();
-                }}
+      <HeaderSelector
+        triggerRef={triggerRef}
+        onOpenChange={(open) => {
+          // A dialog chosen before the menu reopened no longer applies.
+          if (open) dialogAfterMenuRef.current = undefined;
+        }}
+        onMenuUnmount={() => {
+          dialogAfterMenuRef.current?.();
+          dialogAfterMenuRef.current = undefined;
+        }}
+        selectedItem={{
+          title: (
+            <>
+              <span className="text-text-secondary">Documents</span>{" "}
+              {activeLocale}
+            </>
+          ),
+        }}
+      >
+        <HeaderSelectorMenuLabel>
+          Consent and informational document locales
+        </HeaderSelectorMenuLabel>
+        <DropdownMenuRadioGroup
+          aria-label="Document locales"
+          value={activeLocale}
+          onValueChange={setLocale}
+        >
+          {locales.map((locale) => (
+            <div key={locale} className="flex items-center gap-1">
+              <DropdownMenuRadioItem
+                value={locale}
+                className="flex-1 py-2! pl-10! [&>span:first-child]:left-3.5"
               >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </HeaderSelectorMenuItem>
-        ))}
+                {locale}
+              </DropdownMenuRadioItem>
+              {locales.length > 1 && (
+                <DropdownMenuItem
+                  aria-label={`Remove ${locale}`}
+                  className="text-text-tertiary p-2!"
+                  onSelect={() => {
+                    if (!study) return;
+                    dialogAfterMenuRef.current = () => {
+                      setPendingDeleteLocale({ locale, study });
+                      deleteDialog.open();
+                    };
+                  }}
+                >
+                  <X />
+                </DropdownMenuItem>
+              )}
+            </div>
+          ))}
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <HeaderSelectorMenuItem
           icon="plus"
           className="text-text-tertiary"
           onSelect={() => {
             if (!study) return;
-            setPendingAddStudy(study);
-            addLocaleDialog.open();
+            dialogAfterMenuRef.current = () => {
+              setPendingAddStudy(study);
+              addLocaleDialog.open();
+            };
           }}
         >
           Add locale

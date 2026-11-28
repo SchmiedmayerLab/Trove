@@ -15,7 +15,7 @@ import TroveAPIServer
 
 enum ComponentData: Codable, Sendable, Hashable {
     case informational(LocalizationsDictionary<InformationalContent>)
-    case questionnaire(LocalizationsDictionary<QuestionnaireContent>)
+    case questionnaire(QuestionnaireContent)
     case healthDataCollection(StudyDefinition.HealthDataCollectionComponent)
 
     var type: ComponentType {

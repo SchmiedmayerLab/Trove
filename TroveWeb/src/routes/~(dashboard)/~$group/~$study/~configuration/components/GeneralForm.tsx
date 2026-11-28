@@ -23,7 +23,7 @@ import { LocaleSuffix } from "./LocaleSuffix";
 
 interface GeneralFormProps {
   form: GeneralFormType;
-  locale: string;
+  language: string;
   onSubmit: () => void;
   onFieldFocus?: (fieldName: string) => void;
   onFieldBlur?: () => void;
@@ -31,7 +31,7 @@ interface GeneralFormProps {
 
 export const GeneralForm = ({
   form,
-  locale,
+  language,
   onSubmit,
   onFieldFocus,
   onFieldBlur,
@@ -46,7 +46,7 @@ export const GeneralForm = ({
             title={
               <>
                 Title
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="Be descriptive but keep it under 100 characters."
@@ -55,6 +55,8 @@ export const GeneralForm = ({
         className="border-border-tertiary border-b px-6"
         render={({ field }) => (
           <Input
+            lang={language}
+            dir="auto"
             className="focus:ring-border-info"
             onFocus={() => onFieldFocus?.("title")}
             {...enhanceField(field, { onBlur: onFieldBlur })}
@@ -66,7 +68,7 @@ export const GeneralForm = ({
           title={
             <>
               Study icon & name
-              <LocaleSuffix locale={locale} />
+              <LocaleSuffix locale={language} />
             </>
           }
           description="Used in tight spaces where the full title won't fit."
@@ -102,7 +104,9 @@ export const GeneralForm = ({
           control={form.control}
           name="shortTitle"
           className="flex-1"
-          render={({ field }) => <Input {...enhanceField(field)} />}
+          render={({ field }) => (
+            <Input lang={language} dir="auto" {...enhanceField(field)} />
+          )}
         />
       </div>
       <Field
@@ -113,7 +117,7 @@ export const GeneralForm = ({
             title={
               <>
                 Explanation
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="This helps participants decide if they want to join."
@@ -122,6 +126,8 @@ export const GeneralForm = ({
         className="border-border-tertiary border-b px-6 pt-6"
         render={({ field }) => (
           <Textarea
+            lang={language}
+            dir="auto"
             className="focus:ring-border-info"
             onFocus={() => onFieldFocus?.("explanationText")}
             {...enhanceField(field, { onBlur: onFieldBlur })}
@@ -136,14 +142,16 @@ export const GeneralForm = ({
             title={
               <>
                 Short explanation
-                <LocaleSuffix locale={locale} />
+                <LocaleSuffix locale={language} />
               </>
             }
             description="A short summary for preview cards and search results."
           />
         }
         className="px-6 pt-6"
-        render={({ field }) => <Textarea {...enhanceField(field)} />}
+        render={({ field }) => (
+          <Textarea lang={language} dir="auto" {...enhanceField(field)} />
+        )}
       />
     </form>
   );
