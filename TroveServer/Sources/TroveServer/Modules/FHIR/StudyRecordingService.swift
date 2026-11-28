@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+import Fluent
 import Foundation
 import OpenAPIRuntime
 
@@ -32,6 +33,7 @@ extension StudyService {
                 throw ServerError.notFound("Study recording not found")
             }
             let media = try StudyRecordingMedia(event: event, outputFullURL: output.fullURL)
+            try await self.requireDeviceUnitRelease(eventID: output.eventID, media: media, studyID: studyID, on: transaction)
             return (candidate, attachment, media)
         }
         // Do not hold participant/enrollment locks during object reads and complete byte verification.
@@ -41,6 +43,9 @@ extension StudyService {
             let study = try await self.repository.lockStudy(id: studyID, on: transaction)
             try await self.authorizationService.checkResearcherHasStudyDataAccess(study, actor: actor, on: transaction)
             guard fence.grants.contains(where: { $0.id == grantID }) else { throw ServerError.notFound("Study recording not found") }
+            // A grant under a revision that withholds unit facts can be attributed while the file is prepared.
+            guard let eventID = candidate.outputs.first?.eventID else { throw ServerError.notFound("Study recording not found") }
+            try await self.requireDeviceUnitRelease(eventID: eventID, media: media, studyID: studyID, on: transaction)
             guard actor.tokenExpiresAt.map({ $0 > Date() }) ?? true else { throw ServerError.invalidToken }
             try Task.checkCancellation()
             try await AuditRepository.recordDisclosureIntent(.init(
@@ -51,5 +56,15 @@ extension StudyService {
             ), on: transaction)
         }
         return .init(body: RecordingDownloadBody(file: file).body, media: media)
+    }
+
+    /// The same decision as the record's data page: every one of this study's grants for the event counts.
+    private func requireDeviceUnitRelease(
+        eventID: UUID, media: StudyRecordingMedia, studyID: UUID, on transaction: any Database
+    ) async throws {
+        let receiving = try await StudyDeviceUnitDisclosure.receivingEvents([eventID], studyID: studyID, on: transaction)
+        guard receiving.contains(eventID) || StudyDeviceUnitDisclosure.releasesUnchanged(media.format) else {
+            throw ServerError.forbidden("This study does not receive device unit identifiers, which this recording format can carry")
+        }
     }
 }

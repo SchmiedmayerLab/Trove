@@ -518,7 +518,8 @@ does not count toward coverage: a version 7 query replays authorized history wit
 own cursor, while shared native-record and conversion identities deduplicate unchanged
 samples. Pending delivery bytes are never reinterpreted or rewritten.
 
-Published collection-policy schema 4 includes the explicit enrollment period: an
+Published collection-policy schema 6 records whether the revision's study receives
+device unit identifiers and includes the explicit enrollment period: an
 optional Gregorian calendar duration from enrollment, a fixed closing date, or
 both (earliest wins). Neither means ongoing enrollment. Creation resolves the
 rule from the database's stored enrollment timestamp and retains `endsAt` in the

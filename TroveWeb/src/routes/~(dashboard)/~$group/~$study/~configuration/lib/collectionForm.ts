@@ -219,6 +219,7 @@ export const makeCollectionFormSchema = (
   measurements: readonly CollectionMeasurement[],
 ) =>
   z.object({
+    receivesDeviceUnitIdentifiers: z.boolean().optional(),
     collectionRequirements: z
       .custom<CollectionRequirement[]>()
       .superRefine((value, context) => {

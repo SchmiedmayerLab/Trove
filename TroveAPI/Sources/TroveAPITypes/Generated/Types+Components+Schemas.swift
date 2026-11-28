@@ -4766,6 +4766,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/collectionRequirements`.
             public var collectionRequirements: [Components.Schemas.CollectionRequirement]?
+            /// Whether study data released under the next publication includes facts that identify one physical device unit. When false, recording and host Devices keep only status, type, manufacturer, model number, versions, parent, patient, UDI device identifier, issuer and jurisdiction, and model, manufacturer and UDI label names, and application Devices also keep their user-friendly name and the bundle identifier; references to Devices keep only their address and type; HealthKit source names, bundle identifiers and readable sync identifiers of a device-assigned source, and the metadata entries HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed; native, provider and FHIR collection recordings are not released. Retained custody is unchanged.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyPatchInput/receivesDeviceUnitIdentifiers`.
+            public var receivesDeviceUnitIdentifiers: Swift.Bool?
             /// Language-region locales of the study's consent and informational documents
             ///
             /// - Remark: Generated from `#/components/schemas/StudyPatchInput/locales`.
@@ -4789,6 +4794,7 @@ extension Components {
             /// - Parameters:
             ///   - enrollmentPeriod:
             ///   - collectionRequirements: Empty disables backend collection in the next publication; existing publications are unchanged.
+            ///   - receivesDeviceUnitIdentifiers: Whether study data released under the next publication includes facts that identify one physical device unit. When false, recording and host Devices keep only status, type, manufacturer, model number, versions, parent, patient, UDI device identifier, issuer and jurisdiction, and model, manufacturer and UDI label names, and application Devices also keep their user-friendly name and the bundle identifier; references to Devices keep only their address and type; HealthKit source names, bundle identifiers and readable sync identifiers of a device-assigned source, and the metadata entries HKDeviceSerialNumber, HKDeviceName and HKUDIProductionIdentifier are removed; native, provider and FHIR collection recordings are not released. Retained custody is unchanged.
             ///   - locales: Language-region locales of the study's consent and informational documents
             ///   - icon: Icon identifier (e.g. SF Symbol name)
             ///   - details:
@@ -4799,6 +4805,7 @@ extension Components {
             public init(
                 enrollmentPeriod: Components.Schemas.EnrollmentPeriod? = nil,
                 collectionRequirements: [Components.Schemas.CollectionRequirement]? = nil,
+                receivesDeviceUnitIdentifiers: Swift.Bool? = nil,
                 locales: [Components.Schemas.LocalizationKey]? = nil,
                 icon: Swift.String? = nil,
                 details: Components.Schemas.StudyDetailData? = nil,
@@ -4809,6 +4816,7 @@ extension Components {
             ) {
                 self.enrollmentPeriod = enrollmentPeriod
                 self.collectionRequirements = collectionRequirements
+                self.receivesDeviceUnitIdentifiers = receivesDeviceUnitIdentifiers
                 self.locales = locales
                 self.icon = icon
                 self.details = details
@@ -4820,6 +4828,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case enrollmentPeriod
                 case collectionRequirements
+                case receivesDeviceUnitIdentifiers
                 case locales
                 case icon
                 case details
@@ -4841,6 +4850,10 @@ extension Components {
             public var draftRevision: Swift.String
             /// - Remark: Generated from `#/components/schemas/StudyResponse/collectionRequirements`.
             public var collectionRequirements: [Components.Schemas.CollectionRequirement]
+            /// Draft setting; see StudyPatchInput.receivesDeviceUnitIdentifiers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StudyResponse/receivesDeviceUnitIdentifiers`.
+            public var receivesDeviceUnitIdentifiers: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/StudyResponse/id`.
             public var id: Swift.String
             /// Language-region locales of the study's consent and informational documents
@@ -4867,6 +4880,7 @@ extension Components {
             ///   - enrollmentPeriod:
             ///   - draftRevision: Opaque revision of the complete editable study draft.
             ///   - collectionRequirements:
+            ///   - receivesDeviceUnitIdentifiers: Draft setting; see StudyPatchInput.receivesDeviceUnitIdentifiers.
             ///   - id:
             ///   - locales: Language-region locales of the study's consent and informational documents
             ///   - icon: Icon identifier (e.g. SF Symbol name)
@@ -4879,6 +4893,7 @@ extension Components {
                 enrollmentPeriod: Components.Schemas.EnrollmentPeriod,
                 draftRevision: Swift.String,
                 collectionRequirements: [Components.Schemas.CollectionRequirement],
+                receivesDeviceUnitIdentifiers: Swift.Bool,
                 id: Swift.String,
                 locales: [Components.Schemas.LocalizationKey],
                 icon: Swift.String,
@@ -4891,6 +4906,7 @@ extension Components {
                 self.enrollmentPeriod = enrollmentPeriod
                 self.draftRevision = draftRevision
                 self.collectionRequirements = collectionRequirements
+                self.receivesDeviceUnitIdentifiers = receivesDeviceUnitIdentifiers
                 self.id = id
                 self.locales = locales
                 self.icon = icon
@@ -4904,6 +4920,7 @@ extension Components {
                 case enrollmentPeriod
                 case draftRevision
                 case collectionRequirements
+                case receivesDeviceUnitIdentifiers
                 case id
                 case locales
                 case icon

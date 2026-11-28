@@ -35,6 +35,7 @@ enum StudyPointProjection {
         _ event: ValidatedExchangeEvent,
         outputs: Set<String>,
         subject: BusinessIdentifier,
+        receivesDeviceUnitIdentifiers: Bool,
         id: UUID = UUID(),
         recordingURLs: [String: String] = [:],
         maximumBytes: Int = StudyExportLimits.standard.bundleBytes
@@ -51,7 +52,13 @@ enum StudyPointProjection {
             try FHIRWorkoutProjection.requireCompleteSelection(outputs, outputs: point.collectionOutputs)
             try FHIRHealthKitECGBoundary.requireCompleteSelection(outputs, outputs: point.collectionOutputs)
             let resources = try index(StudyProjectionJSON.read(record))
-            let transform = StudyPointResourceProjection(resources: resources, subject: subject, outputs: outputs, recordingURLs: recordingURLs)
+            let transform = StudyPointResourceProjection(
+                resources: resources,
+                subject: subject,
+                outputs: outputs,
+                recordingURLs: recordingURLs,
+                receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers
+            )
             let selected = try closure(outputs: outputs, provenance: record.version.fullURL, transform: transform)
             let addresses = selected.keys.sorted().map { ($0, "urn:uuid:" + UUID().uuidString.lowercased()) }
             let mapping = Dictionary(uniqueKeysWithValues: addresses)

@@ -41,7 +41,8 @@ struct StudyCompanionProjectionTests {
             resources: [measurement: .object(observation), recording: .object(document)],
             subject: BusinessIdentifier(system: "https://study.example.org/participant", value: "one"),
             outputs: grantRecording ? [measurement, recording] : [measurement],
-            recordingURLs: [:]
+            recordingURLs: [:],
+            receivesDeviceUnitIdentifiers: false
         )
     }
 

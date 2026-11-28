@@ -66,6 +66,22 @@ describe("collection authoring", () => {
     );
   });
 
+  it("submits the device unit identifier choice unchanged and accepts only a Boolean", () => {
+    for (const receivesDeviceUnitIdentifiers of [true, false])
+      expect(
+        collectionFormSchema.parse({
+          collectionRequirements: [],
+          receivesDeviceUnitIdentifiers,
+        }),
+      ).toEqual({ collectionRequirements: [], receivesDeviceUnitIdentifiers });
+    expect(
+      collectionFormSchema.safeParse({
+        collectionRequirements: [],
+        receivesDeviceUnitIdentifiers: "yes",
+      }).success,
+    ).toBe(false);
+  });
+
   it.each<CollectionMeasurementWindow>([
     { calendar: "gregorian", timeZone: "UTC" },
     {

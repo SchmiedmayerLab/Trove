@@ -22,6 +22,7 @@ struct StudyRecordingDownload: Sendable {
 struct StudyRecordingMedia: Sendable {
     typealias ContentType = Operations.GetStudyRecording.Output.Ok.Headers.XRecordingContentTypePayload
 
+    let format: RegisteredRecordingFormat
     let contentType: ContentType
 
     var contentDisposition: String {
@@ -39,6 +40,7 @@ struct StudyRecordingMedia: Sendable {
         guard format.registeredContentTypes.contains(mediaType), let contentType = ContentType(rawValue: mediaType) else {
             throw ServerError.internalServerError("Recording media is unavailable")
         }
+        self.format = format
         self.contentType = contentType
     }
 

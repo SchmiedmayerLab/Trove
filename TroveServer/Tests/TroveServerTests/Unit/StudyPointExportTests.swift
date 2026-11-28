@@ -29,7 +29,7 @@ struct StudyPointExportTests {
         let provenance = try Self.resources(result, type: "Provenance")
         #expect(provenance.count == 2, "Keep conversion facts and record the receiver's derivation separately.")
         let derived = try #require(provenance.first { $0["policy"] != nil })
-        #expect(derived["policy"] as? [String] == ["urn:trove:study-point-view-v1"])
+        #expect(derived["policy"] as? [String] == ["urn:trove:study-point-view-v1", StudyDeviceUnitDisclosure.withheldPolicy])
         let source = try #require((derived["entity"] as? [[String: Any]])?.first?["what"] as? [String: Any])
         #expect(source["identifier"] as? [String: String] == ["system": "https://trove.example/study-grants", "value": grant.id.uuidString.lowercased()])
         #expect(!String(decoding: result.json, as: UTF8.self).contains("participant-001"))
