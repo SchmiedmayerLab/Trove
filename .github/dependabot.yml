@@ -92,22 +92,15 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    ignore:
+      # The Wolfi Runtime Refresh workflow moves this base together with the validator runtime.
+      - dependency-name: "chainguard/wolfi-base"
     groups:
       compatible-updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
   - package-ecosystem: "docker"
     directory: "/TroveWeb"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 7
-    groups:
-      compatible-updates:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
-  - package-ecosystem: "docker"
-    directory: "/TroveInfrastructure/validator/runtime"
     schedule:
       interval: "weekly"
     cooldown:

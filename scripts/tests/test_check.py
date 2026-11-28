@@ -123,14 +123,15 @@ class VerificationInputTests(unittest.TestCase):
     def test_dependency_updates_point_at_manifests(self):
         source = (ROOT / ".github/dependabot.yml").read_text()
         updates = re.findall(r'package-ecosystem: "([^"]+)"\s+directory: "([^"]+)"', source)
-        self.assertEqual(len(updates), 17)
+        self.assertEqual(len(updates), 16)
         self.assertIn(("docker-compose", "/TroveServer/Benchmarks"), updates)
         for directory in ("infrastructure/base/keycloak", "infrastructure/dev", "database-operator", "argocd-apps/dev"):
             self.assertIn(("docker", "/TroveInfrastructure/" + directory), updates)
         self.assertIn(("pip", "/documentation"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/tools"), updates)
         self.assertIn(("pip", "/TroveInfrastructure/validator"), updates)
-        self.assertIn(("docker", "/TroveInfrastructure/validator/runtime"), updates)
+        # The Wolfi Runtime Refresh workflow owns the validator runtime base and packages.
+        self.assertNotIn(("docker", "/TroveInfrastructure/validator/runtime"), updates)
         manifests = {
             "github-actions": ".github/workflows/*.yml",
             "swift": "Package.swift",
