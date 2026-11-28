@@ -1,0 +1,166 @@
+# This source file is part of the Trove open-source project
+# SPDX-FileCopyrightText: 2026 Schmiedmayer Lab and the project authors (see CONTRIBUTORS.md)
+# SPDX-License-Identifier: MIT
+
+# Moves the server and validator runtimes to the current Wolfi base and validator packages
+# and keeps one maintenance pull request open with the result. Its checks, including the
+# Dev Stack image builds and scans, are dispatched on the pull request branch, because
+# events from the workflow token do not start pull request workflows.
+name: Wolfi Runtime Refresh
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * 1"
+concurrency:
+  group: wolfi-runtime-refresh
+  cancel-in-progress: false
+permissions:
+  contents: read
+env:
+  BRANCH: automation/wolfi-runtime
+jobs:
+  base:
+    name: Resolve the Wolfi Base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      digest: ${{ steps.resolve.outputs.digest }}
+    steps:
+      - id: resolve
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect cgr.dev/chainguard/wolfi-base:latest --format '{{json .Manifest.Digest}}' | jq -r .)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+  packages:
+    name: List Validator Packages (${{ matrix.architecture }})
+    needs: base
+    strategy:
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: List the available package versions
+        env:
+          DIGEST: ${{ needs.base.outputs.digest }}
+        run: |
+          python3 -B scripts/refresh-wolfi-runtime.py versions --image "cgr.dev/chainguard/wolfi-base:latest@$DIGEST" \
+            > "$RUNNER_TEMP/${{ matrix.architecture }}.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Wolfi-Packages-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/${{ matrix.architecture }}.json
+          if-no-files-found: error
+  refresh:
+    name: Update the Maintenance Pull Request
+    needs: [base, packages]
+    # Only the default branch may update the maintenance pull request.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: Wolfi-Packages-*
+          path: ${{ runner.temp }}/packages
+          merge-multiple: true
+      - name: Rewrite the runtime pins
+        env:
+          DIGEST: ${{ needs.base.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python3 -B scripts/refresh-wolfi-runtime.py apply --digest "$DIGEST" \
+            "$RUNNER_TEMP/packages/amd64.json" "$RUNNER_TEMP/packages/arm64.json" > "$RUNNER_TEMP/changes.md"
+          cat "$RUNNER_TEMP/changes.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit, open or update the pull request, and dispatch its checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ ! -s "$RUNNER_TEMP/changes.md" ]; then
+            echo "The runtimes already use the current Wolfi base and packages." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Build the commit on the current default branch without moving the branch, so an open
+          # pull request stays open. A commit created through the API without an author is signed
+          # by GitHub. Each value is assigned on its own so that a failed call stops the step.
+          base="$(gh api "repos/$REPOSITORY/git/commits/$BASE_SHA" --jq .tree.sha)"
+          server="$(gh api "repos/$REPOSITORY/git/blobs" -f encoding=base64 -f content="$(base64 -w0 TroveServer/Dockerfile)" --jq .sha)"
+          runtime="$(gh api "repos/$REPOSITORY/git/blobs" -f encoding=base64 -f content="$(base64 -w0 TroveInfrastructure/validator/runtime/Dockerfile)" --jq .sha)"
+          manifest="$(gh api "repos/$REPOSITORY/git/blobs" -f encoding=base64 -f content="$(base64 -w0 TroveInfrastructure/validator/manifest.json)" --jq .sha)"
+          for value in "$base" "$server" "$runtime" "$manifest"; do [[ "$value" =~ ^[0-9a-f]{40}$ ]]; done
+          tree="$(jq -n --arg base "$base" --arg server "$server" --arg runtime "$runtime" --arg manifest "$manifest" '{
+              base_tree: $base, tree: [
+                { path: "TroveServer/Dockerfile", mode: "100644", type: "blob", sha: $server },
+                { path: "TroveInfrastructure/validator/runtime/Dockerfile", mode: "100644", type: "blob", sha: $runtime },
+                { path: "TroveInfrastructure/validator/manifest.json", mode: "100644", type: "blob", sha: $manifest }
+              ] }' | gh api "repos/$REPOSITORY/git/trees" --input - --jq .sha)"
+          [[ "$tree" =~ ^[0-9a-f]{40}$ ]]
+          number="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if current="$(gh api "repos/$REPOSITORY/commits/$BRANCH" --jq '[.commit.tree.sha, (.parents | map(.sha) | join(" "))] | join(" ")' 2>/dev/null)" \
+            && [ "$current" = "$tree $BASE_SHA" ] && [ -n "$number" ]; then
+            echo "The open maintenance pull request already holds this change on the current default branch." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "${current:-}" != "$tree $BASE_SHA" ]; then
+            commit="$(jq -n --arg tree "$tree" --arg parent "$BASE_SHA" --rawfile changes "$RUNNER_TEMP/changes.md" \
+              '{ message: ("Update the Wolfi runtime base and validator packages\n\n" + $changes), tree: $tree, parents: [$parent] }' \
+              | gh api "repos/$REPOSITORY/git/commits" --input - --jq .sha)"
+            [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+            # The branch belongs to this workflow and is replaced by each new change.
+            if gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" > /dev/null 2>&1; then
+              gh api -X PATCH "repos/$REPOSITORY/git/refs/heads/$BRANCH" -f sha="$commit" -F force=true > /dev/null
+            else
+              gh api "repos/$REPOSITORY/git/refs" -f ref="refs/heads/$BRANCH" -f sha="$commit" > /dev/null
+            fi
+          fi
+          {
+            echo "### :recycle: Current situation & Problem"
+            echo
+            echo "Security fixes in the Wolfi base image and the validator runtime packages reach the images only when their pins move. This pull request moves them to the current builds:"
+            echo
+            cat "$RUNNER_TEMP/changes.md"
+            echo
+            echo "### :gear: Release Notes"
+            echo
+            echo "The validator identity is the SHA-256 of \`TroveInfrastructure/validator/manifest.json\` and changes with these pins. A deployment sets \`FHIR_VALIDATOR_IDENTITY\` to the new value together with the rebuilt image, and a study draft validated under the old identity is validated again before it is published."
+            echo
+            echo "### :books: Documentation"
+            echo
+            echo "No documentation changes."
+            echo
+            echo "### :white_check_mark: Testing"
+            echo
+            echo "No tests are added or changed. The Dev Stack checks build the server, web and validator images from this branch and scan them."
+            echo
+            echo "### Code of Conduct & Contributing Guidelines"
+            echo "By creating and submitting this pull request, you agree to follow our [Code of Conduct](https://github.com/SchmiedmayerLab/.github/blob/main/CODE_OF_CONDUCT.md) and [Contributing Guidelines](https://github.com/SchmiedmayerLab/.github/blob/main/CONTRIBUTING.md):"
+            echo "- [x] I agree to follow the [Code of Conduct](https://github.com/SchmiedmayerLab/.github/blob/main/CODE_OF_CONDUCT.md) and [Contributing Guidelines](https://github.com/SchmiedmayerLab/.github/blob/main/CONTRIBUTING.md)."
+          } > "$RUNNER_TEMP/body.md"
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --repo "$REPOSITORY" --head "$BRANCH" --base "$DEFAULT_BRANCH" \
+              --title "Update the Wolfi runtime base and validator packages" --body-file "$RUNNER_TEMP/body.md"
+          fi
+          for workflow in build-and-test.yml repository-standards.yml codeql.yml static-analysis.yml; do
+            gh workflow run "$workflow" --repo "$REPOSITORY" --ref "$BRANCH"
+          done
