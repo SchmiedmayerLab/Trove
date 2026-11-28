@@ -68,7 +68,7 @@ RUN if [ -d /build/TroveServer/Resources ]; then mv /build/TroveServer/Resources
 # ================================
 # Run image
 # ================================
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:833c48f1faf32c90e6f9501a2410a9aa28ceb2c594102edd4470053c30efa089
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:5172a213d2bba8b1c9ca11957db65562b52b0f9844583a0347318ea5fd8e3aa5
 
 # Keep the Swift toolchain in the build stage. The serving image needs only the
 # binary's dynamic libraries, certificate roots and time-zone data.
