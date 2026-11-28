@@ -87,7 +87,7 @@ Use `compose.yaml` as an overlay for `../docker/docker-compose.yml`. Set `FHIR_V
 
 Only the server joins both the normal application network and the internal validation network. The worker has no published port, external network, database credentials, storage credentials or Docker socket. Keep those restrictions when deploying outside Compose. The image runs as an unprivileged user with a read-only filesystem, dropped capabilities, bounded CPU, memory, processes and temporary storage. A writable private copy of the verified package cache prevents cache changes from surviving a container restart.
 
-The worker processes one request at a time, with a two-connection backlog and one reusable official validator engine. It loads the pinned packages before accepting requests. The engine listens only on loopback inside the container; the worker forwards only raw FHIR bytes to its fixed validation route, without query parameters. Engine administration, package loading and transformation routes are not exposed. No validation results are cached: every event, including a retry, passes both validation layers.
+The worker processes one request at a time, with a two-connection backlog and one reusable official validator engine; the questionnaire-response route replaces the engine with one short-lived validator process for that request. It loads the pinned packages before accepting requests. The engine listens only on loopback inside the container; the worker forwards only raw FHIR bytes to its fixed validation route, without query parameters. Engine administration, package loading and transformation routes are not exposed. No validation results are cached: every event, including a retry, passes both validation layers.
 
 A timeout, dead process or malformed engine response is never an admission result. An interrupted validation returns unavailable and discards its engine; a later request can start a replacement within the same deadline. The worker does not add a process pool, durable queue or general execution API. Measure throughput before increasing concurrency.
 
@@ -97,25 +97,74 @@ A timeout, dead process or malformed engine response is never an admission resul
 package closure. It requires the Grove Questionnaire profile claim, runs the IG's
 `validate_questionnaire` companion rules, then the official validator. It accepts
 no caller-selected packages, profiles, terminology servers or executable code.
-Its response adds `"purpose": "questionnaire"`; consumers must verify this field
-as well as the exact input digest, contract revision and configured identity.
 The existing `/validate` route remains restricted to exchange/retraction Bundles.
 
+`POST /validate/questionnaire-response` validates one QuestionnaireResponse against
+its exact Questionnaire with the official validator. The body is a collection Bundle
+framed exactly as
+`{"resourceType":"Bundle","type":"collection","entry":[{"resource":<Questionnaire>},{"resource":<QuestionnaireResponse>}]}`,
+with the Grove Questionnaire and the Grove QuestionnaireResponse embedded byte for
+byte. The engine's single-resource route cannot resolve a study's Questionnaire, so
+the worker writes both documents to a private temporary directory and runs one offline
+validator process over them, which resolves the response's canonical against that
+Questionnaire only. Before it starts, the reusable engine is stopped so that the two
+Java processes never share the memory limit. The result is sent first; the engine is
+then started again, also after the process failed or timed out, before the worker
+takes the next request. With the 0.8.2 image on a 2-CPU, 4 GB container, a
+bilingual pair replied after 13 to 17 seconds and the engine restart took another 13
+to 19 seconds (a cold first start took 28 seconds). Validations are serialized: while
+a pair runs, the worker answers no other request, including `/health`; afterwards it
+is ready unless the engine fails to start. The Compose healthcheck (5-second interval,
+3-second timeout, 12 retries) tolerates that measured interval of about 30 seconds,
+but a pair that runs into the 120-second process timeout followed by a slow engine
+start can mark the container unhealthy until the engine is back. Do
+not send each participant response to the worker that gates event admission. The
+official validator stops without a result on some responses whose answer type
+contradicts a condition; the route then reports `unavailable` for that input on every
+attempt, so callers bound their retries. The server runs Grove's pair rules itself.
+
+Both routes reply with `status`, the digest of the exact request bytes, the contract
+revision, the validator identity, a `purpose` (`questionnaire` or
+`questionnaire-response`) and `diagnostics`. Consumers must verify the purpose as
+well as the digest, contract revision and configured identity. Each finding has a
+`severity` (`error`, `warning` or `information`), a `source` (`fhir` for the official
+validator, `grove` for the companion rules, `trove` for the worker's own input
+checks), a `rule` (the validator's message identifier, or the issue code when it
+has none), the FHIRPath `path` of the element, a `message` and, when the path points
+into one standard translation extension, that translation's `language`. Paths inside
+the response route's Bundle are reported relative to each resource. Findings are
+ordered errors first; at most 100 are returned within 256 KiB, and
+`omittedDiagnostics` counts the rest.
+
+The status is `valid` (HTTP 200) when no finding is an error and no official finding
+states that a check was skipped, `invalid` (HTTP 422) when any finding is an error,
+`incomplete` (HTTP 422) when the official validator reports that it could not resolve
+the Questionnaire a response names, an enableWhen condition or a profile the resource
+declares or depends on, or could not check slicing cardinality or a code against a
+value set binding or answer options (the identifiers are listed as `NOT_EVALUATED` in
+`worker.py`), and `unavailable` (HTTP 503) when the official
+validator gave no trustworthy result. A companion-rule error stays `invalid` even when
+the engine is unavailable. A code from a code system outside the offline package set
+is reported as information unless a value set check depends on it. Findings can quote submitted content; the worker never
+logs them, and only the server receives them.
+
 Both routes use the same bounds and unavailable semantics below. For offline
-synthetic checks, use `--stdin --questionnaire`. IG validity does not establish
-that a study client can execute every retained feature: the server must separately
-check its supported execution capabilities before publication. Exact original
-Questionnaire bytes, not a rewritten or simplified resource, are validated.
-Run `smoke.py` with `--questionnaire` and a synthetic IG-conformant Questionnaire
-fixture to exercise this route, including official rejection, timeout recovery,
-CLI framing and private-network HTTP. Run the existing exchange smoke separately;
-a Questionnaire result does not replace exchange-admission evidence.
+synthetic checks, use `--stdin --questionnaire` or `--stdin --questionnaire-response`.
+IG validity does not establish that a study client can execute every retained
+feature: the server must separately check its supported execution capabilities
+before publication. Exact original bytes, not a rewritten or simplified resource,
+are validated. Run `smoke.py` with `--questionnaire` and a synthetic IG-conformant
+Questionnaire fixture to exercise these routes, including official rejection with
+findings, timeout recovery, CLI framing and private-network HTTP. Add `--response`
+with a synthetic QuestionnaireResponse that answers the fixture to check a matching
+pair and an unresolved questionnaire version. Run the existing exchange smoke separately; a Questionnaire
+result does not replace exchange-admission evidence.
 
 ## Request and Result
 
-`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 16 MiB. The application enforces its independently configured event-admission budget before calling the validator. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content, FHIR diagnostics or process output is logged or returned.
+`POST /validate` accepts `application/fhir+json` with one exact `Content-Length`, at most 16 MiB. The application enforces its independently configured event-admission budget before calling the validator. Chunked or ambiguous framing is rejected. UTF-8, JSON member uniqueness, nesting depth (64), Unicode and finite numeric representations are checked before any FHIR decoding. Header/body reading has a ten-second deadline. The official validator has a 120-second deadline, bounded heap and output, `-tx n/a`, and `-no-http-access`. No request content or process output is logged or returned, and the exchange route returns no FHIR diagnostics.
 
-The response is smaller than 2 KiB:
+The exchange route's response is smaller than 2 KiB:
 
 ```json
 {

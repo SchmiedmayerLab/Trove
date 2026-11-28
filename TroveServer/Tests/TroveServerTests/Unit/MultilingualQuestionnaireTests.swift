@@ -15,15 +15,23 @@ import Testing
 @testable import TroveServer
 
 
-struct MultilingualQuestionnaireTests {
-    private struct Reply: Encodable {
-        let valid = true
-        let sha256: String
-        let contractRevision = FHIRValidationClient.contractRevision
-        let validatorIdentity = "sha256:" + String(repeating: "a", count: 64)
-        let purpose = "questionnaire"
+private struct AnyCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
     }
 
+    init(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
+    }
+}
+
+
+struct MultilingualQuestionnaireTests {
     private static let instant = Date(timeIntervalSince1970: 1_790_035_200)
     private static let translation = #"""
         {"url": "http://hl7.org/fhir/StructureDefinition/translation",
@@ -31,12 +39,7 @@ struct MultilingualQuestionnaireTests {
         """#
 
     private static var service: QuestionnaireValidationService {
-        .init(validator: FHIRValidationClient(
-            expectedIdentity: "sha256:" + String(repeating: "a", count: 64),
-            sendForPurpose: { _, bytes in
-                (200, try JSONEncoder().encode(Reply(sha256: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())))
-            }
-        ))
+        .init(validator: QuestionnaireWorkerReply.validator())
     }
 
     /// The bilingual fixture, with `extensions` placed as the primitive extensions of the element at `path`.
@@ -102,7 +105,7 @@ struct MultilingualQuestionnaireTests {
     func validationAdmitsTranslationsAndBindsTheExactBytes() async throws {
         for fixture in try MultilingualQuestionnaireFixture.all() {
             let bytes = try fixture.bytes()
-            let evidence = try await Self.service.validate(bytes: bytes, evaluationInstant: Self.instant)
+            let evidence = try #require(try await Self.service.validate(bytes: bytes, evaluationInstant: Self.instant).evidence)
             #expect(evidence.sha256 == SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
             #expect(evidence.executionCapability == QuestionnaireValidationService.executionCapability)
             #expect(evidence.language == fixture.language)
@@ -133,9 +136,30 @@ struct MultilingualQuestionnaireTests {
         #expect(throws: (any Error).self) {
             try JSONDecoder().decode(QuestionnaireExtensionBoundary.self, from: bytes)
         }
-        await #expect {
-            try await Self.service.validate(bytes: bytes, evaluationInstant: Self.instant)
-        } throws: { ($0 as? ServerError)?.title == "Unsupported Questionnaire" }
+        let result = try await Self.service.validate(bytes: bytes, evaluationInstant: Self.instant)
+        #expect(result.status == .invalid)
+        #expect(result.evidence == nil)
+        let element = QuestionnaireExtensionBoundary.path(path.map { step in
+            (step as? Int).map { AnyCodingKey(intValue: $0) } ?? AnyCodingKey(stringValue: "\(step)")
+        })
+        #expect(result.diagnostics.contains { $0.rule == "extension-location" && $0.path == element + ".extension" }, "\(result.diagnostics)")
+    }
+
+    @Test
+    func boundaryReportsEveryMisplacedExtensionWithItsPath() throws {
+        let unsupported = #"{"url": "https://example.org/unsupported", "valueString": "Not a translation"}"#
+        let placed = try Self.resource(placing: unsupported, at: ["item", 0, "_text"])
+        var resource = try #require(try JSONSerialization.jsonObject(with: placed) as? [String: Any])
+        resource["_name"] = ["extension": [["url": "https://example.org/unsupported", "valueBoolean": true]]]
+        resource["modifierExtension"] = [["url": "https://example.org/modifier", "valueBoolean": true]]
+        let diagnostics = QuestionnaireExtensionBoundary.violations(in: try JSONSerialization.data(withJSONObject: resource))
+        #expect(Set(diagnostics.map { "\($0.rule) \($0.path)" }) == [
+            "translation-only Questionnaire.item[0].text.extension[0]",
+            "extension-location Questionnaire.name.extension",
+            "modifier-extension Questionnaire.modifierExtension"
+        ])
+        #expect(diagnostics.allSatisfy { $0.severity == .error && $0.source == .trove })
+        #expect(QuestionnaireExtensionBoundary.violations(in: Data("not json".utf8)).isEmpty)
     }
 
     @Test(arguments: [

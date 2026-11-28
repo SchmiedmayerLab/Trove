@@ -55,7 +55,11 @@ struct EditStudy: AsyncParsableCommand {
 
 
 struct ValidateStudy: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "validate", abstract: "Validate and capture an immutable publication candidate.")
+    static let configuration = CommandConfiguration(
+        commandName: "validate",
+        abstract: "Validate a draft revision and, when it is valid, capture an immutable publication candidate.",
+        discussion: ValidationExit.discussion
+    )
     @OptionGroup var connection: ConnectionOptions
     @OptionGroup var draft: DraftAccessOptions
     @Argument(transform: CLIInput.uuid) var study: UUID
@@ -63,7 +67,9 @@ struct ValidateStudy: AsyncParsableCommand {
 
     mutating func run() async throws {
         let client = try connection.client()
-        try CLIInput.write(try await client.validateStudy(study, revision: revision, delegation: draft.delegation))
+        let report = try await client.validateStudy(study, revision: revision, delegation: draft.delegation)
+        try CLIInput.write(report)
+        try ValidationExit.require(report.status)
     }
 }
 
@@ -102,6 +108,51 @@ struct ImportQuestionnaire: AsyncParsableCommand {
         let input = try CLIInput.questionnaire(file: file, name: name)
         let client = try connection.client()
         try CLIInput.write(try await client.importQuestionnaire(study, revision: revision, delegation: draft.delegation, input: input))
+    }
+}
+
+
+struct ValidateQuestionnaire: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "validate",
+        abstract: "Validate a draft questionnaire component's stored FHIR Questionnaire and list every finding.",
+        discussion: "The result is not publication evidence; `trove study validate` creates that. " + ValidationExit.discussion
+    )
+    @OptionGroup var connection: ConnectionOptions
+    @OptionGroup var draft: DraftAccessOptions
+    @Option(transform: CLIInput.uuid) var study: UUID
+    @Option(help: "The questionnaire component ID.", transform: CLIInput.uuid) var component: UUID
+
+    mutating func run() async throws {
+        let client = try connection.client()
+        let result = try await client.validateQuestionnaire(study, component: component, delegation: draft.delegation)
+        try CLIInput.write(result)
+        try ValidationExit.require(result.status)
+    }
+}
+
+
+/// Exit codes of validation commands, after the result is written to standard output.
+enum ValidationExit {
+    static let discussion = """
+        Exit codes: 0 valid, 2 invalid, 3 incomplete (a check could not be evaluated), 4 unavailable (the validator \
+        could not be reached). Other failures exit 1 without a result.
+        """
+
+    static func code(for status: Components.Schemas.ValidationStatus) -> Int32 {
+        switch status {
+        case .valid: 0
+        case .invalid: 2
+        case .incomplete: 3
+        case .unavailable: 4
+        }
+    }
+
+    static func require(_ status: Components.Schemas.ValidationStatus) throws {
+        let code = code(for: status)
+        if code != 0 {
+            throw ExitCode(code)
+        }
     }
 }
 

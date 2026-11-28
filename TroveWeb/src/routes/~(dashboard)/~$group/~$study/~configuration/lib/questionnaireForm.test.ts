@@ -8,6 +8,8 @@ import {
   questionnaireFormSchema,
   questionnaireFormValues,
   questionnaireInput,
+  isStaleValidation,
+  shownValidation,
 } from "./questionnaireForm";
 
 const fixtures = resolve(
@@ -47,5 +49,28 @@ describe("questionnaire form", () => {
       questionnaireFormSchema.safeParse({ name: "Draft", questionnaire: "{" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("shownValidation", () => {
+  const result = { draftRevision: "revision-1", status: "valid" };
+
+  it("shows a result only for its saved revision without unsaved changes", () => {
+    expect(shownValidation(result, "revision-1", false)).toBe(result);
+    expect(shownValidation(result, "revision-1", true)).toBeUndefined();
+    expect(shownValidation(result, "revision-2", false)).toBeUndefined();
+    expect(shownValidation(result, undefined, false)).toBeUndefined();
+    expect(shownValidation(undefined, "revision-1", false)).toBeUndefined();
+  });
+});
+
+describe("isStaleValidation", () => {
+  const result = { draftRevision: "revision-1" };
+
+  it("reports a hidden result only when the saved draft changed", () => {
+    expect(isStaleValidation(result, "revision-2", false)).toBe(true);
+    expect(isStaleValidation(result, "revision-1", false)).toBe(false);
+    expect(isStaleValidation(result, "revision-2", true)).toBe(false);
+    expect(isStaleValidation(undefined, "revision-2", false)).toBe(false);
   });
 });

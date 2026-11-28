@@ -44,21 +44,10 @@ struct FixtureIDs: Sendable {
 // MARK: - Static Helpers
 
 extension AuthIntegrationTests {
-    private struct ValidatorReply: Encodable {
-        let valid = true
-        let sha256: String
-        let contractRevision = FHIRValidationClient.contractRevision
-        let validatorIdentity = AuthIntegrationTests.validatorIdentity
-        let purpose = "questionnaire"
-    }
-
-    static let validatorIdentity = "sha256:" + String(repeating: "a", count: 64)
+    static let validatorIdentity = QuestionnaireWorkerReply.identity
 
     static var validator: FHIRValidationClient {
-        .init(expectedIdentity: validatorIdentity, sendForPurpose: { purpose, bytes in
-            #expect(purpose == .questionnaire)
-            return (200, try JSONEncoder().encode(ValidatorReply(sha256: ArtifactStore.digest(bytes))))
-        })
+        QuestionnaireWorkerReply.validator()
     }
 
     static var authority: GrantorAuthorityProvider {
@@ -213,6 +202,7 @@ extension AuthIntegrationTests {
             researcher(.PUT, "\(base)/studies/\(studyId)/components/questionnaire/\(questionnaireId)", body: questionnaire, draftRevision: ids.draftRevision, successStatus: .ok),
             researcher(.PUT, "\(base)/studies/\(studyId)/components/health-data/\(healthDataId)", body: healthData, draftRevision: ids.draftRevision, successStatus: .ok),
             // Component Schedules (use questionnaire — health-data doesn't support schedules)
+            researcher(.POST, "\(base)/studies/\(studyId)/components/\(questionnaireId)/validations", successStatus: .ok),
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", body: scheduleBody, draftRevision: ids.draftRevision, successStatus: .created),
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules/\(scheduleId)", successStatus: .ok),

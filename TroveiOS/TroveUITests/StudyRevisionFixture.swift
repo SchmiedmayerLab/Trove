@@ -27,9 +27,14 @@ enum StudyRevisionFixture {
     }
 
     private struct Validation: Decodable {
-        let id: UUID
+        struct Candidate: Decodable {
+            let id: UUID
+            let publicationRevision: Int
+        }
+
+        let status: String
         let draftRevision: UUID
-        let publicationRevision: Int
+        let candidate: Candidate?
     }
 
     private struct PublicationInput: Encodable {
@@ -85,7 +90,8 @@ enum StudyRevisionFixture {
         let validation = try JSONDecoder().decode(Validation.self, from: await request(
             "studies/\(studyID)/draft/validations", token: token, method: "POST", revision: revision, expectedStatus: 201
         ))
-        guard validation.draftRevision == revision, validation.publicationRevision == 2 else {
+        guard validation.status == "valid", validation.draftRevision == revision, let candidate = validation.candidate,
+              candidate.publicationRevision == 2 else {
             XCTFail("Expected the captured draft's second publication candidate.")
             throw URLError(.badServerResponse)
         }
@@ -95,7 +101,7 @@ enum StudyRevisionFixture {
                 "studies/\(studyID)/publish",
                 token: token,
                 method: "POST",
-                body: JSONEncoder().encode(PublicationInput(validationId: validation.id)),
+                body: JSONEncoder().encode(PublicationInput(validationId: candidate.id)),
                 revision: validation.draftRevision,
                 expectedStatus: 201
             )

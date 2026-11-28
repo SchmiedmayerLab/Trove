@@ -9,9 +9,9 @@ SPDX-License-Identifier: MIT
 # Study CLI
 
 The `trove` executable uses the generated Swift API client. It supports reading a
-draft, creating and editing a study, importing and exporting a multilingual
-questionnaire component, validating a publication candidate, and explicitly
-publishing that candidate.
+draft, creating and editing a study, importing, exporting and validating a
+multilingual questionnaire component, validating a draft into a publication
+candidate, and explicitly publishing that candidate.
 Researchers with clinical data access can also retrieve study measurement pages
 and download authorized recordings.
 It does not provide browser login, refresh-token storage, delegation management
@@ -133,12 +133,41 @@ writes the stored resource to standard output byte for byte, without a trailing
 newline, so an export of an imported file is identical to it. Full validation and
 supported questionnaire execution rules remain server-owned.
 
+## Validation
+
+`trove questionnaire validate --study <study-id> --component <component-id>`
+validates the stored resource and prints one `QuestionnaireValidation` document: the
+`status`, the SHA-256 digest of the validated bytes, the draft revision it was read
+at, the validator identity and contract, and every finding in `diagnostics`. Each
+finding has a `severity`, a `source` (`fhir`, `grove` or `trove`), a `rule`, the
+FHIRPath `path` of the element, the `language` of a translation it concerns and,
+for Trove's rules, a `nextAction`. The command changes nothing and its result is
+not publication evidence. It requires a grant that permits validation when used
+with `--delegation`.
+
+`trove study validate <study-id> --revision <draft-revision>` validates the exact
+draft revision and prints one `StudyDraftValidation` document. `blockers` lists the
+findings that prevent publication, each naming its `componentId` where it concerns
+a component; `advisories` lists warnings and information. A `candidate` is present
+only when the status is `valid`.
+
+Both commands print their result before exiting with a status-specific code:
+
+| Exit code | Status | Meaning |
+|---|---|---|
+| 0 | `valid` | No finding is an error and no check was reported as skipped. |
+| 2 | `invalid` | At least one finding is an error. |
+| 3 | `incomplete` | A check could not be evaluated, so validity is not established. |
+| 4 | `unavailable` | The validator could not be reached; validate again later. |
+| 1 | none | The request failed; nothing is printed on standard output. |
+
 ## Exact Publication
 
 Run `trove study validate <study-id> --revision <draft-revision>`. Review the
 returned candidate ID, revision, archive digest, questionnaire evidence, validator
-identity, execution capability and expiry. Then an authorized administrator can
-run `trove study publish <study-id> --validation <candidate-id> --revision <draft-revision>`.
+identity, execution capability, expiry and any advisories. Then an authorized
+administrator can run
+`trove study publish <study-id> --validation <candidate-id> --revision <draft-revision>`.
 
 Publication never implicitly validates or selects the latest draft. Retain the
 candidate ID and revision: the server uses that pair for an exact authorized

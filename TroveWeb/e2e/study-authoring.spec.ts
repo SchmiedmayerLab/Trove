@@ -46,12 +46,19 @@ const openNewComponentDialog = async (page: Page) => {
   const firstComponentButton = page.getByRole("button", {
     name: "Create component",
   });
+  const listedComponent = page.getByRole("table").getByRole("link");
+  // The configuration overview has its own empty-state button, so first wait for the
+  // components route, then until its list has loaded into the empty state or a list.
+  await expect(page).toHaveURL(/\/configuration\/components\/?$/);
+  await expect(firstComponentButton.or(listedComponent).first()).toBeVisible();
   if (await firstComponentButton.isVisible()) {
     await firstComponentButton.click();
-    return;
+  } else {
+    await page.getByRole("button", { name: "Add component" }).click();
   }
-
-  await page.getByRole("button", { name: "Add component" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Choose a component type" }),
+  ).toBeVisible();
 };
 
 const chooseComponentType = async (page: Page, name: string) => {
@@ -73,7 +80,10 @@ const reviewPublicationCandidate = async (page: Page) => {
     .click();
   const validated = await validationResponse;
   expect(validated.status()).toBe(201);
-  const candidate = zStudyDraftValidation.parse(await validated.json());
+  const report = zStudyDraftValidation.parse(await validated.json());
+  expect(report.status).toBe("valid");
+  const candidate = report.candidate;
+  if (!candidate) throw new Error("A valid draft must return a candidate");
   await expect(
     page.getByRole("heading", { name: "Review publication candidate" }),
   ).toBeVisible();
@@ -82,9 +92,9 @@ const reviewPublicationCandidate = async (page: Page) => {
     page.getByText(candidate.bundleSha256, { exact: true }),
   ).toBeVisible();
   expect((await validated.request().allHeaders())["if-match"]).toBe(
-    `"${candidate.draftRevision}"`,
+    `"${report.draftRevision}"`,
   );
-  return candidate;
+  return { ...candidate, draftRevision: report.draftRevision };
 };
 
 test.describe("study authoring", () => {
@@ -315,6 +325,63 @@ test.describe("study authoring", () => {
       page.getByRole("button", { name: "Validate draft", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Publish v2" })).toHaveCount(
+      0,
+    );
+  });
+
+  test("lists the blockers of a draft that cannot be published and focuses them", async ({
+    researcherPage: page,
+  }, testInfo) => {
+    const suffix = `${Date.now()}-${testInfo.project.name}`;
+    const studyTitle = `Blocked E2E ${suffix}`;
+    const questionnaireName = `Draft questionnaire ${suffix}`;
+
+    await openNewStudyDialog(page);
+    await page.getByLabel("Study title").fill(studyTitle);
+    await page.getByRole("button", { name: "Create study" }).click();
+    await expect(
+      page.getByRole("button", { name: studyTitle, exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Components", exact: true }).click();
+
+    // Only an active Questionnaire can be published; a draft one is a blocker
+    // whether or not the FHIR validator is reachable.
+    await chooseComponentType(page, "Questionnaire");
+    await page
+      .getByRole("textbox", { name: /^Name\b/ })
+      .fill(questionnaireName);
+    await page
+      .getByRole("textbox", { name: /^FHIR questionnaire JSON\b/ })
+      .fill(questionnaire.replace('"status":"active"', '"status":"draft"'));
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(
+      page.getByRole("link", { name: questionnaireName, exact: true }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const validationResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/v0\/studies\/[^/]+\/draft\/validations$/.test(response.url()),
+    );
+    await page
+      .getByRole("button", { name: "Validate draft", exact: true })
+      .click();
+    const validated = await validationResponse;
+    expect(validated.status()).toBe(200);
+    const report = zStudyDraftValidation.parse(await validated.json());
+    expect(report.candidate).toBeUndefined();
+    expect(report.blockers.map((blocker) => blocker.rule)).toContain(
+      "status-active",
+    );
+
+    const blockers = page.getByRole("heading", { name: "Blockers" });
+    await expect(blockers).toHaveCount(1);
+    await expect(blockers).toBeFocused();
+    await expect(
+      page.getByText("Only an active Questionnaire can be published."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Publish v/ })).toHaveCount(
       0,
     );
   });

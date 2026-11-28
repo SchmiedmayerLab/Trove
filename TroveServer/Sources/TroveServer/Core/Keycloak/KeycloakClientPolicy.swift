@@ -41,7 +41,7 @@ struct KeycloakClientPolicy: Sendable {
              Operations.PutStudiesStudyIdComponentsComponentIdSchedulesScheduleId.id,
              Operations.DeleteStudiesStudyIdComponentsComponentIdSchedulesScheduleId.id:
             .edit
-        case "validateStudyDraft": .validate
+        case Operations.ValidateStudyDraft.id, Operations.ValidateStudyComponent.id: .validate
         default: nil
         }
     }

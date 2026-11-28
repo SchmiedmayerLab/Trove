@@ -481,17 +481,28 @@ paths:
       description: >
         Captures the complete draft, validates every multilingual Questionnaire against
         the pinned Grove FHIR IG and execution capabilities, and stages the exact
-        publication archive. The returned validation ID identifies a single immutable
-        candidate and is also its future publication ID. Candidates expire within one
-        hour, or earlier when Questionnaire eligibility ends. This operation does not
-        publish. Changes during validation reject the result without accepting a candidate.
+        publication archive. Findings that prevent publication are returned as
+        blockers, other findings as advisories. Only a `valid` result creates a
+        candidate: its ID identifies a single immutable candidate and is also its future
+        publication ID. An `invalid`, `incomplete` or `unavailable` result has no
+        candidate and cannot be published. Candidates expire within one hour, or earlier
+        when Questionnaire eligibility ends. This operation does not publish. Changes
+        during validation reject the result without accepting a candidate. Provider
+        registration and publication preparation failures, such as invalid consent
+        response controls, remain problem responses.
       parameters:
         - $ref: '#/components/parameters/StudyId'
         - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/DelegationId'
       responses:
         '201':
-          description: Exact draft validated and staged for explicit review and publication
+          description: Exact draft validated and staged as a candidate for explicit review and publication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDraftValidation'
+        '200':
+          description: No candidate was created; the blockers state why
           content:
             application/json:
               schema:
@@ -712,6 +723,36 @@ paths:
           $ref: '#/components/responses/NotFound'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        default:
+          $ref: '#/components/responses/OperationFailure'
+
+  /studies/{studyId}/components/{componentId}/validations:
+    parameters:
+      - $ref: '#/components/parameters/DelegationId'
+    post:
+      operationId: validateStudyComponent
+      tags:
+        - Components
+      summary: Validate a questionnaire component's stored resource
+      description: >
+        Validates the exact stored Questionnaire against the pinned Grove FHIR IG with the
+        official FHIR Validator, the IG's Questionnaire rules, and the execution
+        capabilities of the supported study client. Returns every finding with its
+        severity, rule, element path and, for a translation, its language. Only `valid`
+        means that no finding is an error and no check was reported as skipped. The
+        result is not stored, does not change the draft and is not publication evidence;
+        publication requires draft validation.
+        Other component types return 422.
+      parameters:
+        - $ref: '#/components/parameters/StudyId'
+        - $ref: '#/components/parameters/ComponentId'
+      responses:
+        '200':
+          description: Validation result for the stored resource at the returned draft revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireValidation'
         default:
           $ref: '#/components/responses/OperationFailure'
 
@@ -3113,17 +3154,140 @@ components:
           format: uuid
           description: Server-issued immutable candidate ID and natural publication retry identity.
 
-    StudyDraftValidation:
+    ValidationStatus:
+      type: string
+      description: >
+        `valid`: no finding is an error and no official finding states that a check was
+        skipped. `invalid`: at least one finding is an error.
+        `incomplete`: the official validator reported that it could not resolve the
+        Questionnaire a response names, an enableWhen condition or a profile the resource
+        declares or depends on, or could not check slicing cardinality or a code against a
+        value set binding or answer options, so validity is not established. A code from a
+        code system outside the offline package set is reported as information unless a
+        value set check depends on it. `unavailable`: the validator
+        could not be reached or returned no trustworthy result; for some inputs this
+        repeats on every attempt. Only `valid` permits publication.
+      enum: [valid, invalid, incomplete, unavailable]
+
+    ValidationDiagnostic:
       type: object
       additionalProperties: false
-      required: [id, draftRevision, publicationRevision, bundleSha256, validatorIdentity, contractRevision, executionCapability, createdAt, expiresAt, questionnaires]
+      required: [severity, source, rule, path, message]
       properties:
-        id:
+        severity:
+          type: string
+          enum: [error, warning, information]
+        source:
+          type: string
+          description: >
+            `fhir`: the official FHIR Validator. `grove`: the Grove FHIR IG or Grove
+            questionnaire rules. `trove`: Trove's own publication and execution rules.
+          enum: [fhir, grove, trove]
+        rule:
+          type: string
+          maxLength: 200
+          description: Stable rule or message identifier within its source.
+        path:
+          type: string
+          maxLength: 500
+          description: >
+            FHIRPath of the element within the resource, for example
+            `Questionnaire.item[1].answerOption[0]`, or the draft field. Empty when the
+            finding concerns the whole input.
+        language:
+          type: string
+          description: Language of the translation the finding concerns.
+        componentId:
+          type: string
+          format: uuid
+          description: Component the finding concerns, in draft validation results.
+        message:
+          type: string
+          maxLength: 1000
+        nextAction:
+          type: string
+          maxLength: 500
+          description: What to change or do next, where the rule defines it.
+
+    QuestionnaireValidation:
+      type: object
+      additionalProperties: false
+      required: [componentId, draftRevision, status, sha256, translationLanguages, contractVersion, contractRevision, executionCapability, diagnostics]
+      properties:
+        componentId:
           type: string
           format: uuid
         draftRevision:
           type: string
           format: uuid
+          description: Draft revision at which the stored resource was read.
+        status:
+          $ref: '#/components/schemas/ValidationStatus'
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the exact validated bytes.
+        language:
+          type: string
+          description: The resource's base language as the Grove model reads it. Omitted when it cannot be read.
+        translationLanguages:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        validatorIdentity:
+          type: string
+          description: The configured validator identity. Omitted when no validator is configured.
+        contractVersion:
+          type: string
+        contractRevision:
+          type: string
+        executionCapability:
+          type: string
+        diagnostics:
+          type: array
+          maxItems: 201
+          description: Findings ordered by severity, errors first.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
+
+    StudyDraftValidation:
+      type: object
+      additionalProperties: false
+      required: [draftRevision, status, blockers, advisories, questionnaires]
+      properties:
+        draftRevision:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ValidationStatus'
+        blockers:
+          type: array
+          description: Findings that prevent publication, including an unavailable or incomplete check.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
+        advisories:
+          type: array
+          description: Warnings and information that do not prevent publication.
+          items:
+            $ref: '#/components/schemas/ValidationDiagnostic'
+        questionnaires:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyQuestionnaireValidation'
+        candidate:
+          $ref: '#/components/schemas/StudyPublicationCandidate'
+
+    StudyPublicationCandidate:
+      type: object
+      additionalProperties: false
+      description: Present only when the status is `valid`.
+      required: [id, publicationRevision, bundleSha256, validatorIdentity, contractRevision, executionCapability, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Immutable candidate ID and future publication ID.
         publicationRevision:
           type: integer
           minimum: 1
@@ -3142,22 +3306,20 @@ components:
         expiresAt:
           type: string
           format: date-time
-        questionnaires:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyQuestionnaireValidation'
 
     StudyQuestionnaireValidation:
       type: object
       additionalProperties: false
-      required: [componentId, language, translationLanguages, sha256]
+      required: [componentId, status, sha256, translationLanguages]
       properties:
         componentId:
           type: string
           format: uuid
+        status:
+          $ref: '#/components/schemas/ValidationStatus'
         language:
           type: string
-          description: The validated resource's base language (`Questionnaire.language`).
+          description: The validated resource's base language (`Questionnaire.language`). Omitted when it cannot be read.
         translationLanguages:
           type: array
           uniqueItems: true

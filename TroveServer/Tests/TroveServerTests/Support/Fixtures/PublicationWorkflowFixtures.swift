@@ -51,10 +51,11 @@ enum PublicationWorkflowFixtures {
     static func publish(_ studyID: UUID, app: Application, token: String?) async throws -> TestingHTTPResponse {
         let validation = try await validate(studyID, app: app, token: token)
         try #require(validation.status == .created)
-        let candidate = try validation.content.decode(Components.Schemas.StudyDraftValidation.self)
+        let report = try validation.content.decode(Components.Schemas.StudyDraftValidation.self)
+        let candidate = try #require(report.candidate)
         return try await app.sendRequest(.POST, "\(apiBasePath)/studies/\(studyID)/publish", beforeRequest: { request in
             request.bearerAuth(token)
-            request.headers.replaceOrAdd(name: "If-Match", value: "\"\(candidate.draftRevision)\"")
+            request.headers.replaceOrAdd(name: "If-Match", value: "\"\(report.draftRevision)\"")
             try request.encodeJSONBody(Components.Schemas.StudyPublicationInput(validationId: candidate.id))
         })
     }

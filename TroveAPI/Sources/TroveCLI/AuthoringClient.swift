@@ -127,10 +127,35 @@ struct AuthoringClient: Sendable {
 
     func validateStudy(_ study: UUID, revision: UUID, delegation: UUID?) async throws -> Components.Schemas.StudyDraftValidation {
         try await request(revision: revision) { client in
-            try await client.validateStudyDraft(.init(
+            let output = try await client.validateStudyDraft(.init(
                 path: .init(studyId: study.uuidString),
                 headers: .init(ifMatch: CLIInput.revisionHeader(revision), troveDelegationID: delegation?.uuidString)
-            )).created.body.json
+            ))
+            let report = switch output {
+            case .created(let created): try created.body.json
+            case .ok(let ok): try ok.body.json
+            default: throw CLIError.requestFailed
+            }
+            // A candidate exists exactly for a valid result of the reviewed revision.
+            guard UUID(uuidString: report.draftRevision) == revision,
+                  (report.status == .valid) == (report.candidate != nil),
+                  (report.status == .valid) == (output.createdIfPresent != nil) else {
+                throw CLIError.requestFailed
+            }
+            return report
+        }
+    }
+
+    func validateQuestionnaire(_ study: UUID, component: UUID, delegation: UUID?) async throws -> Components.Schemas.QuestionnaireValidation {
+        try await request(revision: nil) { client in
+            let result = try await client.validateStudyComponent(.init(
+                path: .init(studyId: study.uuidString, componentId: component.uuidString),
+                headers: .init(troveDelegationID: delegation?.uuidString)
+            )).ok.body.json
+            guard UUID(uuidString: result.componentId) == component else {
+                throw CLIError.requestFailed
+            }
+            return result
         }
     }
 
@@ -194,5 +219,12 @@ struct AuthoringClient: Sendable {
             // Generated ClientError can retain request headers and response bodies; never print it.
             throw CLIError.sanitized(error)
         }
+    }
+}
+
+
+extension Operations.ValidateStudyDraft.Output {
+    fileprivate var createdIfPresent: Operations.ValidateStudyDraft.Output.Created? {
+        if case .created(let created) = self { created } else { nil }
     }
 }
