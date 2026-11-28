@@ -59,6 +59,7 @@ enum PublishedStudyFixtures {
         enrollmentPeriod: EnrollmentPeriod = .ongoing,
         receivesDeviceUnitIdentifiers: Bool = false,
         instruments: [PublishedInstrument] = [],
+        taskSchedules: [PublishedTaskSchedule] = [],
         save: Bool = true
     ) async throws -> PublishedStudy {
         let metadata = StudyDefinition.Metadata(
@@ -92,6 +93,7 @@ enum PublishedStudyFixtures {
                 receivesDeviceUnitIdentifiers: receivesDeviceUnitIdentifiers,
                 enrollmentPeriod: enrollmentPeriod
             ),
+            taskPlan: .init(schedules: taskSchedules),
             evidence: evidence(instruments: instruments)
         )
         if save {

@@ -15681,6 +15681,410 @@ public enum Operations {
             }
         }
     }
+    /// Read current materialized questionnaire assignments for a study
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Returns assignments for active enrollments, ordered by occurrence ID. Each page reflects current assignments. Pass nextAfter as after on the same study.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/tasks`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)`.
+    public enum GetStudyTasks {
+        public static let id: Swift.String = "getStudyTasks"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                public init(studyId: Components.Parameters.StudyId) {
+                    self.studyId = studyId
+                }
+            }
+            public var path: Operations.GetStudyTasks.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/query/after`.
+                public var after: Swift.String?
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - after:
+                ///   - limit:
+                public init(
+                    after: Swift.String? = nil,
+                    limit: Swift.Int? = nil
+                ) {
+                    self.after = after
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.GetStudyTasks.Input.Query
+            /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyTasks.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetStudyTasks.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetStudyTasks.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetStudyTasks.Input.Path,
+                query: Operations.GetStudyTasks.Input.Query = .init(),
+                headers: Operations.GetStudyTasks.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetStudyTasks.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.GetStudyTasks.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetStudyTasks.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/tasks/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.StudyTaskPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.StudyTaskPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetStudyTasks.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetStudyTasks.Output.Ok.Headers = .init(),
+                    body: Operations.GetStudyTasks.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Authorized page of assignments
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetStudyTasks.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetStudyTasks.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Synchronize questionnaire assignments for an owned enrollment
+    ///
+    /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/tasks`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)`.
+    public enum GetParticipantTasks {
+        public static let id: Swift.String = "getParticipantTasks"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/path/enrollmentId`.
+                public var enrollmentId: Components.Parameters.EnrollmentId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - enrollmentId:
+                public init(enrollmentId: Components.Parameters.EnrollmentId) {
+                    self.enrollmentId = enrollmentId
+                }
+            }
+            public var path: Operations.GetParticipantTasks.Input.Path
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/query/cursor`.
+                public var cursor: Swift.String?
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - cursor:
+                ///   - limit:
+                public init(
+                    cursor: Swift.String? = nil,
+                    limit: Swift.Int? = nil
+                ) {
+                    self.cursor = cursor
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.GetParticipantTasks.Input.Query
+            /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantTasks.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetParticipantTasks.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetParticipantTasks.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetParticipantTasks.Input.Path,
+                query: Operations.GetParticipantTasks.Input.Query = .init(),
+                headers: Operations.GetParticipantTasks.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/responses/200/headers/Cache-Control`.
+                    @frozen public enum CacheControlPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case noStore = "no-store"
+                    }
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Operations.GetParticipantTasks.Output.Ok.Headers.CacheControlPayload?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Operations.GetParticipantTasks.Output.Ok.Headers.CacheControlPayload? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetParticipantTasks.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/participant/enrollments/{enrollmentId}/tasks/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ParticipantTaskPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ParticipantTaskPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetParticipantTasks.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetParticipantTasks.Output.Ok.Headers = .init(),
+                    body: Operations.GetParticipantTasks.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// A page from the authorized task stream
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetParticipantTasks.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetParticipantTasks.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Read exact consented collection windows for an owned enrollment
     ///
     /// Returns an audited, consistent snapshot of accepted consent windows and their published collection requirements. No consent responses, signatures, artifacts or samples are returned. Withdrawal or no accepted consent yields no windows. Publication alone does not change the timeline. Inconsistent history or unknown policy fails the whole read, never a partial plan. Retain a complete, account-bound set of accepted plans for offline collection until each enrollment ends. Observation time is not an expiration and no elapsed-time lease or per-page network authorization is required. Enforce local withdrawal, account changes, known source revocation and known enrollment end. Refresh on reconnect and enrollment or consent changes; initial consent and broader revision adoption require server authorization. A retained plan is not an upload capability: the receiver independently checks every submitted target against its original consent and revision.

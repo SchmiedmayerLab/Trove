@@ -834,6 +834,9 @@ extension Components {
             case consent_recorded = "consent.recorded"
             case consent_pdf_disclosure = "consent.pdf.disclosure"
             case consent_records_disclosure = "consent.records.disclosure"
+            case tasks_assigned = "tasks.assigned"
+            case tasks_invalidated = "tasks.invalidated"
+            case tasks_disclosure = "tasks.disclosure"
             case collection_plan_disclosure = "collection.plan.disclosure"
             case collection_reconciliation_issued = "collection.reconciliation.issued"
             case collection_reconciliation_completed = "collection.reconciliation.completed"
@@ -4337,6 +4340,370 @@ extension Components {
                     "targetIntentSHA256",
                     "receivedAt",
                     "nodeCount"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StudyTaskPage`.
+        public struct StudyTaskPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StudyTaskPage/studyId`.
+            public var studyId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StudyTaskPage/items`.
+            public var items: [Components.Schemas.ParticipantTaskOccurrence]
+            /// - Remark: Generated from `#/components/schemas/StudyTaskPage/nextAfter`.
+            public var nextAfter: Swift.String?
+            /// Creates a new `StudyTaskPage`.
+            ///
+            /// - Parameters:
+            ///   - studyId:
+            ///   - items:
+            ///   - nextAfter:
+            public init(
+                studyId: Swift.String,
+                items: [Components.Schemas.ParticipantTaskOccurrence],
+                nextAfter: Swift.String? = nil
+            ) {
+                self.studyId = studyId
+                self.items = items
+                self.nextAfter = nextAfter
+            }
+            public enum CodingKeys: String, CodingKey {
+                case studyId
+                case items
+                case nextAfter
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.studyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .studyId
+                )
+                self.items = try container.decode(
+                    [Components.Schemas.ParticipantTaskOccurrence].self,
+                    forKey: .items
+                )
+                self.nextAfter = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextAfter
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "studyId",
+                    "items",
+                    "nextAfter"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage`.
+        public struct ParticipantTaskPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage/snapshotVersion`.
+            public var snapshotVersion: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage/items`.
+            public var items: [Components.Schemas.ParticipantTaskOccurrence]
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage/invalidated`.
+            public var invalidated: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage/nextCursor`.
+            public var nextCursor: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskPage/checkpoint`.
+            public var checkpoint: Swift.String?
+            /// Creates a new `ParticipantTaskPage`.
+            ///
+            /// - Parameters:
+            ///   - snapshotVersion:
+            ///   - items:
+            ///   - invalidated:
+            ///   - nextCursor:
+            ///   - checkpoint:
+            public init(
+                snapshotVersion: Swift.Int64,
+                items: [Components.Schemas.ParticipantTaskOccurrence],
+                invalidated: [Swift.String],
+                nextCursor: Swift.String? = nil,
+                checkpoint: Swift.String? = nil
+            ) {
+                self.snapshotVersion = snapshotVersion
+                self.items = items
+                self.invalidated = invalidated
+                self.nextCursor = nextCursor
+                self.checkpoint = checkpoint
+            }
+            public enum CodingKeys: String, CodingKey {
+                case snapshotVersion
+                case items
+                case invalidated
+                case nextCursor
+                case checkpoint
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.snapshotVersion = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .snapshotVersion
+                )
+                self.items = try container.decode(
+                    [Components.Schemas.ParticipantTaskOccurrence].self,
+                    forKey: .items
+                )
+                self.invalidated = try container.decode(
+                    [Swift.String].self,
+                    forKey: .invalidated
+                )
+                self.nextCursor = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextCursor
+                )
+                self.checkpoint = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .checkpoint
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "snapshotVersion",
+                    "items",
+                    "invalidated",
+                    "nextCursor",
+                    "checkpoint"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence`.
+        public struct ParticipantTaskOccurrence: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/enrollmentId`.
+            public var enrollmentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/publicationId`.
+            public var publicationId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/revision`.
+            public var revision: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/artifactId`.
+            public var artifactId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/componentId`.
+            public var componentId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/scheduleId`.
+            public var scheduleId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/sha256`.
+            public var sha256: Swift.String
+            /// The published Questionnaire's url and version, joined by a vertical bar.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/questionnaireCanonical`.
+            public var questionnaireCanonical: Swift.String
+            /// The base language of the Questionnaire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/language`.
+            public var language: Swift.String
+            /// The languages the publication approved for administering this Questionnaire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/administrationLanguages`.
+            public var administrationLanguages: [Swift.String]
+            /// Start of the performance window.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/opensAt`.
+            public var opensAt: Foundation.Date
+            /// The scheduled time of the occurrence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/dueAt`.
+            public var dueAt: Foundation.Date
+            /// End of the performance window, exclusive. Omitted when the occurrence has no deadline: it is never missed, and every time from opensAt on lies within its window.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/cutoffAt`.
+            public var cutoffAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/timeZone`.
+            public var timeZone: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case assigned = "assigned"
+            }
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/state`.
+            public var state: Components.Schemas.ParticipantTaskOccurrence.StatePayload
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/version`.
+            public var version: Swift.Int64
+            /// When the server recorded the assignment.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/assignedAt`.
+            public var assignedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/ParticipantTaskOccurrence/resultReferences`.
+            public var resultReferences: [Swift.String]
+            /// Creates a new `ParticipantTaskOccurrence`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - enrollmentId:
+            ///   - publicationId:
+            ///   - revision:
+            ///   - artifactId:
+            ///   - componentId:
+            ///   - scheduleId:
+            ///   - sha256:
+            ///   - questionnaireCanonical: The published Questionnaire's url and version, joined by a vertical bar.
+            ///   - language: The base language of the Questionnaire.
+            ///   - administrationLanguages: The languages the publication approved for administering this Questionnaire.
+            ///   - opensAt: Start of the performance window.
+            ///   - dueAt: The scheduled time of the occurrence.
+            ///   - cutoffAt: End of the performance window, exclusive. Omitted when the occurrence has no deadline: it is never missed, and every time from opensAt on lies within its window.
+            ///   - timeZone:
+            ///   - state:
+            ///   - version:
+            ///   - assignedAt: When the server recorded the assignment.
+            ///   - resultReferences:
+            public init(
+                id: Swift.String,
+                enrollmentId: Swift.String,
+                publicationId: Swift.String,
+                revision: Swift.Int,
+                artifactId: Swift.String,
+                componentId: Swift.String,
+                scheduleId: Swift.String,
+                sha256: Swift.String,
+                questionnaireCanonical: Swift.String,
+                language: Swift.String,
+                administrationLanguages: [Swift.String],
+                opensAt: Foundation.Date,
+                dueAt: Foundation.Date,
+                cutoffAt: Foundation.Date? = nil,
+                timeZone: Swift.String,
+                state: Components.Schemas.ParticipantTaskOccurrence.StatePayload,
+                version: Swift.Int64,
+                assignedAt: Foundation.Date,
+                resultReferences: [Swift.String]
+            ) {
+                self.id = id
+                self.enrollmentId = enrollmentId
+                self.publicationId = publicationId
+                self.revision = revision
+                self.artifactId = artifactId
+                self.componentId = componentId
+                self.scheduleId = scheduleId
+                self.sha256 = sha256
+                self.questionnaireCanonical = questionnaireCanonical
+                self.language = language
+                self.administrationLanguages = administrationLanguages
+                self.opensAt = opensAt
+                self.dueAt = dueAt
+                self.cutoffAt = cutoffAt
+                self.timeZone = timeZone
+                self.state = state
+                self.version = version
+                self.assignedAt = assignedAt
+                self.resultReferences = resultReferences
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case enrollmentId
+                case publicationId
+                case revision
+                case artifactId
+                case componentId
+                case scheduleId
+                case sha256
+                case questionnaireCanonical
+                case language
+                case administrationLanguages
+                case opensAt
+                case dueAt
+                case cutoffAt
+                case timeZone
+                case state
+                case version
+                case assignedAt
+                case resultReferences
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.enrollmentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .enrollmentId
+                )
+                self.publicationId = try container.decode(
+                    Swift.String.self,
+                    forKey: .publicationId
+                )
+                self.revision = try container.decode(
+                    Swift.Int.self,
+                    forKey: .revision
+                )
+                self.artifactId = try container.decode(
+                    Swift.String.self,
+                    forKey: .artifactId
+                )
+                self.componentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.scheduleId = try container.decode(
+                    Swift.String.self,
+                    forKey: .scheduleId
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.questionnaireCanonical = try container.decode(
+                    Swift.String.self,
+                    forKey: .questionnaireCanonical
+                )
+                self.language = try container.decode(
+                    Swift.String.self,
+                    forKey: .language
+                )
+                self.administrationLanguages = try container.decode(
+                    [Swift.String].self,
+                    forKey: .administrationLanguages
+                )
+                self.opensAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .opensAt
+                )
+                self.dueAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .dueAt
+                )
+                self.cutoffAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .cutoffAt
+                )
+                self.timeZone = try container.decode(
+                    Swift.String.self,
+                    forKey: .timeZone
+                )
+                self.state = try container.decode(
+                    Components.Schemas.ParticipantTaskOccurrence.StatePayload.self,
+                    forKey: .state
+                )
+                self.version = try container.decode(
+                    Swift.Int64.self,
+                    forKey: .version
+                )
+                self.assignedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .assignedAt
+                )
+                self.resultReferences = try container.decode(
+                    [Swift.String].self,
+                    forKey: .resultReferences
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "enrollmentId",
+                    "publicationId",
+                    "revision",
+                    "artifactId",
+                    "componentId",
+                    "scheduleId",
+                    "sha256",
+                    "questionnaireCanonical",
+                    "language",
+                    "administrationLanguages",
+                    "opensAt",
+                    "dueAt",
+                    "cutoffAt",
+                    "timeZone",
+                    "state",
+                    "version",
+                    "assignedAt",
+                    "resultReferences"
                 ])
             }
         }

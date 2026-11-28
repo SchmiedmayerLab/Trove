@@ -53,7 +53,8 @@ extension Components.Schemas.ScheduleDefinition {
         case .once(let schedule):
             self = .once(.init(_type: .once, pattern: .init(schedule)))
         case let .repeated(pattern, offset):
-            self = .repeated(.init(_type: .repeated, pattern: try .init(pattern), offset: .init(offset)))
+            let hasOffset = offset.year != nil || offset.month != nil || offset.day != nil
+            self = .repeated(.init(_type: .repeated, pattern: try .init(pattern), offset: hasOffset ? .init(offset) : nil))
         }
     }
 }
@@ -64,6 +65,10 @@ extension StudyDefinition.ComponentSchedule.ScheduleDefinition {
         case .once(let value):
             self = .once(try .init(value.pattern))
         case .repeated(let value):
+            if let offset = value.offset {
+                let parts = [offset.year, offset.month, offset.day].compactMap { $0 }
+                guard !parts.isEmpty, !parts.contains(Int.max) else { throw ServerError.badRequest("Invalid recurrence offset") }
+            }
             self = .repeated(.init(value.pattern), offset: value.offset.map { Foundation.DateComponents($0) } ?? Foundation.DateComponents())
         }
     }
@@ -97,7 +102,7 @@ extension StudyDefinition.ComponentSchedule.ScheduleDefinition.OneTimeSchedule {
             self = .event(
                 try StudyLifecycleEvent(value.event),
                 offsetInDays: value.offsetInDays ?? 0,
-                time: value.time.map { StudyDefinition.ComponentSchedule.Time($0) }
+                time: try value.time.map { try StudyDefinition.ComponentSchedule.Time($0) }
             )
         }
     }
@@ -250,7 +255,10 @@ extension Components.Schemas.ScheduleTime {
 }
 
 extension StudyDefinition.ComponentSchedule.Time {
-    init(_ schema: Components.Schemas.ScheduleTime) {
+    init(_ schema: Components.Schemas.ScheduleTime) throws {
+        guard TaskRecurrence.validTime(hour: schema.hour, minute: schema.minute ?? 0, second: schema.second ?? 0) else {
+            throw ServerError.badRequest("Invalid schedule time")
+        }
         self.init(
             hour: schema.hour,
             minute: schema.minute ?? 0,

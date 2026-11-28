@@ -31,6 +31,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
         let collectionPolicy: PublishedCollectionPolicy
         let groupID: UUID
         let bundle: Data
+        let taskSchedules: [StudyDefinition.ComponentSchedule]
         let questionnaires: [QuestionnaireResource]
     }
 
@@ -63,7 +64,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
               capturedComponents.allSatisfy({ $0.$schedules.value != nil }) else {
             throw ServerError.internalServerError("Study draft snapshot is incomplete")
         }
-        guard capturedComponents.count <= 256 else { throw Self.resourceLimitExceeded }
+
         let collectionPolicy = try PublishedCollectionPolicy.compile(
             studyID: studyId,
             revision: revision,
@@ -78,7 +79,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
         let (metadata, consentFiles) = try buildMetadata(from: study, consentMarkdown: consentMarkdown)
         let components = try buildComponents(from: capturedComponents)
-        let schedules = capturedComponents.flatMap { $0.schedules.map(\.scheduleData) }
+        let schedules = try Self.validatedSchedules(capturedComponents, timeZone: collectionPolicy.enrollmentPeriod.timeZone)
 
         let definition = StudyDefinition(
             studyRevision: UInt(revision),
@@ -99,6 +100,7 @@ final class StudyBundleService: Module, @unchecked Sendable {
             collectionPolicy: collectionPolicy,
             groupID: study.$group.id,
             bundle: archive,
+            taskSchedules: schedules,
             questionnaires: questionnaires
         )
     }
@@ -106,6 +108,19 @@ final class StudyBundleService: Module, @unchecked Sendable {
 
 
 extension StudyBundleService {
+    private static func validatedSchedules(_ components: [Component], timeZone: String) throws -> [StudyDefinition.ComponentSchedule] {
+        let calendar = try PublishedTaskPlan.calendar(timeZone: timeZone)
+        return try components.flatMap { component in
+            try component.schedules.map { schedule in
+                // Older drafts stored a separate UUID in the serialized schedule.
+                var data = schedule.scheduleData
+                data.id = try schedule.requireId()
+                try PublishedTaskSchedule.validate(data.scheduleDefinition, scheduleID: data.id, calendar: calendar)
+                return data
+            }
+        }
+    }
+
     /// Only archive bytes may receive validation evidence. Each component's one resource
     /// must be archived exactly as stored; a rewritten resource would attest different content.
     static func archivedQuestionnaires(in bytes: Data, inputs: [QuestionnaireResource]) throws -> [QuestionnaireResource] {
@@ -358,6 +373,7 @@ extension StudyBundleService {
 
     /// Bound uncompressed inputs before writing an archive or contacting the validator.
     private func checkResources(consent: LocalizationsDictionary<String>, components: [Component]) throws {
+        guard components.count <= 256 else { throw Self.resourceLimitExceeded }
         var paths: Set<String> = []
         var identifiers: Set<UUID> = []
         var remainingBytes = ArtifactReference.Purpose.publication.maximumBytes
@@ -479,7 +495,6 @@ extension StudyBundleService {
         guard let data = archive.data else {
             throw ServerError.internalServerError("Failed to create ZIP archive")
         }
-
         return data
     }
 }

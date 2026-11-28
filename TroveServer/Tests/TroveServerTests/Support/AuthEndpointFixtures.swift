@@ -194,6 +194,14 @@ extension AuthIntegrationTests {
             ),
             AuthEndpoint(
                 method: .GET,
+                path: "\(base)/studies/\(studyId)/tasks",
+                body: nil,
+                contentType: nil,
+                role: .dataReader,
+                successStatus: .ok
+            ),
+            AuthEndpoint(
+                method: .GET,
                 path: "\(base)/studies/\(studyId)/data/recordings/\(dummyId)",
                 body: nil,
                 contentType: nil,
@@ -332,6 +340,7 @@ extension AuthIntegrationTests {
             participant(.POST, "\(base)/participant/studies/\(studyId)/enrollments", successStatus: .notFound, body: jsonData([String: String]())),
             participant(.GET, "\(base)/participant/enrollments", successStatus: .ok),
             participant(.GET, "\(base)/participant/enrollments/\(dummyId)/collection-plan", successStatus: .notFound),
+            participant(.GET, "\(base)/participant/enrollments/\(dummyId)/tasks", successStatus: .notFound),
             participant(
                 .POST,
                 "\(base)/participant/enrollments/\(dummyId)/collection-reconciliations",

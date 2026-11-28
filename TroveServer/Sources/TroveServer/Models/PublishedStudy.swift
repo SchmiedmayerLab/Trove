@@ -32,6 +32,8 @@ final class PublishedStudy: Model, @unchecked Sendable {
 
     @Field(key: "bundle_digest") var bundleDigest: String
 
+    @Field(key: "task_plan") var taskPlan: PublishedTaskPlan
+
     @Field(key: "artifact_id") var artifactID: UUID
 
     /// Exact localized Markdown included in the archive, never regenerated from an editable draft.
@@ -75,6 +77,7 @@ final class PublishedStudy: Model, @unchecked Sendable {
         artifactID: UUID,
         consentSnapshot: LocalizationsDictionary<String>,
         collectionPolicy: PublishedCollectionPolicy,
+        taskPlan: PublishedTaskPlan,
         evidence: PublicationEvidence,
         id: UUID? = nil
     ) {
@@ -88,6 +91,7 @@ final class PublishedStudy: Model, @unchecked Sendable {
         self.bundleDigest = bundleDigest
         self.artifactID = artifactID
         self.consentSnapshot = consentSnapshot
+        self.taskPlan = taskPlan
         self.collectionPolicy = collectionPolicy
         self.definitionSchemaVersion = evidence.definitionSchemaVersion
         self.contractVersion = evidence.contractVersion

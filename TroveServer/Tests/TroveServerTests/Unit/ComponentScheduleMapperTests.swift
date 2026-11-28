@@ -49,12 +49,19 @@ struct ComponentScheduleMapperTests {
     }
 
     @Test
-    func scheduleTimeSchemaToModel() {
+    func scheduleTimeSchemaToModel() throws {
         let schema = Components.Schemas.ScheduleTime(hour: 9, minute: nil, second: nil)
-        let model = CSTime(schema)
+        let model = try CSTime(schema)
         #expect(model.hour == 9)
         #expect(model.minute == 0)
         #expect(model.second == 0)
+    }
+
+    @Test(arguments: [
+        Components.Schemas.ScheduleTime(hour: -1), .init(hour: 24), .init(hour: 8, minute: 60), .init(hour: 8, second: -1)
+    ])
+    func invalidEventTimeIsRejected(time: Components.Schemas.ScheduleTime) {
+        #expect(throws: ServerError.self) { try CSTime(time) }
     }
 
     @Test

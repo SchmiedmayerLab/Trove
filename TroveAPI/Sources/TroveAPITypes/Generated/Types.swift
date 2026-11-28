@@ -406,6 +406,22 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /participant/enrollments/{enrollmentId}/withdraw`.
     /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/withdraw/post`.
     func postParticipantEnrollmentsEnrollmentIdWithdraw(_ input: Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Input) async throws -> Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Output
+    /// Read current materialized questionnaire assignments for a study
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Returns assignments for active enrollments, ordered by occurrence ID. Each page reflects current assignments. Pass nextAfter as after on the same study.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/tasks`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)`.
+    func getStudyTasks(_ input: Operations.GetStudyTasks.Input) async throws -> Operations.GetStudyTasks.Output
+    /// Synchronize questionnaire assignments for an owned enrollment
+    ///
+    /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/tasks`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)`.
+    func getParticipantTasks(_ input: Operations.GetParticipantTasks.Input) async throws -> Operations.GetParticipantTasks.Output
     /// Read exact consented collection windows for an owned enrollment
     ///
     /// Returns an audited, consistent snapshot of accepted consent windows and their published collection requirements. No consent responses, signatures, artifacts or samples are returned. Withdrawal or no accepted consent yields no windows. Publication alone does not change the timeline. Inconsistent history or unknown policy fails the whole read, never a partial plan. Retain a complete, account-bound set of accepted plans for offline collection until each enrollment ends. Observation time is not an expiration and no elapsed-time lease or per-page network authorization is required. Enforce local withdrawal, account changes, known source revocation and known enrollment end. Refresh on reconnect and enrollment or consent changes; initial consent and broader revision adoption require server authorization. A retained plan is not an upload capability: the receiver independently checks every submitted target against its original consent and revision.
@@ -1397,6 +1413,42 @@ extension APIProtocol {
     ) async throws -> Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Output {
         try await postParticipantEnrollmentsEnrollmentIdWithdraw(Operations.PostParticipantEnrollmentsEnrollmentIdWithdraw.Input(
             path: path,
+            headers: headers
+        ))
+    }
+    /// Read current materialized questionnaire assignments for a study
+    ///
+    /// Requires interactive researcher membership and data-reader access in the study group. Returns assignments for active enrollments, ordered by occurrence ID. Each page reflects current assignments. Pass nextAfter as after on the same study.
+    ///
+    ///
+    /// - Remark: HTTP `GET /studies/{studyId}/tasks`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/tasks/get(getStudyTasks)`.
+    public func getStudyTasks(
+        path: Operations.GetStudyTasks.Input.Path,
+        query: Operations.GetStudyTasks.Input.Query = .init(),
+        headers: Operations.GetStudyTasks.Input.Headers = .init()
+    ) async throws -> Operations.GetStudyTasks.Output {
+        try await getStudyTasks(Operations.GetStudyTasks.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Synchronize questionnaire assignments for an owned enrollment
+    ///
+    /// Start without a cursor for a snapshot. Apply each page in change-version order. Continue with nextCursor until checkpoint is returned. Use checkpoint as cursor for the next delta. Invalidated identifiers remove obsolete assignments. Each series ends at a fixed committed watermark. A 410 requires a new snapshot.
+    ///
+    ///
+    /// - Remark: HTTP `GET /participant/enrollments/{enrollmentId}/tasks`.
+    /// - Remark: Generated from `#/paths//participant/enrollments/{enrollmentId}/tasks/get(getParticipantTasks)`.
+    public func getParticipantTasks(
+        path: Operations.GetParticipantTasks.Input.Path,
+        query: Operations.GetParticipantTasks.Input.Query = .init(),
+        headers: Operations.GetParticipantTasks.Input.Headers = .init()
+    ) async throws -> Operations.GetParticipantTasks.Output {
+        try await getParticipantTasks(Operations.GetParticipantTasks.Input(
+            path: path,
+            query: query,
             headers: headers
         ))
     }

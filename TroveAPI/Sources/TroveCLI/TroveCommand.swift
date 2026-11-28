@@ -13,8 +13,8 @@ struct StudyCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "study",
         subcommands: [
-            CreateStudy.self, GetStudy.self, GetStudyData.self, GetStudyRecording.self, EditStudy.self, ValidateStudy.self, PublishStudy.self,
-            ApproveLanguage.self, RevokeLanguageApproval.self
+            CreateStudy.self, GetStudy.self, GetStudyTasks.self, GetStudyData.self, GetStudyRecording.self,
+            EditStudy.self, ValidateStudy.self, PublishStudy.self, ApproveLanguage.self, RevokeLanguageApproval.self
         ]
     )
 }

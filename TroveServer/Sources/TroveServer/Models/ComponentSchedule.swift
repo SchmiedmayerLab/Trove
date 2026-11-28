@@ -28,10 +28,9 @@ final class ComponentSchedule: Model, @unchecked Sendable {
 
     init(
         componentId: UUID,
-        scheduleData: StudyDefinition.ComponentSchedule,
-        id: UUID? = nil
+        scheduleData: StudyDefinition.ComponentSchedule
     ) {
-        self.id = id
+        self.id = scheduleData.id
         self.$component.id = componentId
         self.scheduleData = scheduleData
     }

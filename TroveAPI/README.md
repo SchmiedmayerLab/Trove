@@ -24,6 +24,13 @@ Individual targets can be regenerated on their own:
 swift run --package-path TroveAPI TroveAPIGenerator --package-path TroveAPI --types --client
 ```
 
+## Study Task Assignments
+
+`trove study tasks <study-id> --limit 50` reads one page of materialized questionnaire assignments
+for active enrollments. Pass the returned `nextAfter` to `--after` with the same study ID to continue.
+Each page reflects current assignments and requires interactive researcher membership and data-reader
+access in the study group. The server records a disclosure for every successful page, including empty pages.
+
 ## Study Data Retrieval
 
 The generated `getStudyData` operation reads authorized point data for a study.
