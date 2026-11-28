@@ -71,7 +71,7 @@ The secret scan and the dependency vulnerability scan run on every change, and t
 [Static Analysis](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/static-analysis.yml) runs SwiftLint and Swift
 CodeQL, and [CodeQL](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/codeql.yml) analyzes JavaScript,
 TypeScript, Python and the GitHub Actions workflows.
-[Wolfi Runtime Refresh](https://github.com/SchmiedmayerLab/Trove/blob/main/.github/workflows/wolfi-runtime-refresh.yml) runs
+Wolfi Runtime Refresh (`.github/workflows/wolfi-runtime-refresh.yml`) runs
 weekly. It moves the server and validator runtimes to the current Wolfi base and the
 validator packages to their newest builds on both architectures, without the Dependabot
 cooldown. It keeps one maintenance pull request open with the change and dispatches the
