@@ -98,7 +98,7 @@ Evaluation follows the FHIR enableWhen rules ([R4 definitions](https://hl7.org/f
 
 An item is `notEvaluated` when its state depends on something the evaluator does not decide: an SDC `enableWhenExpression` or `calculatedExpression`, a dependency cycle through conditions or enclosing items, a condition with a dangling or ambiguous reference, a type or operator mismatch, several conditions without `enableBehavior`, dates of different precision that agree as far as both go, or quantities in different units. Expressions are preserved and reported, and they add no edge. The graph is complete only when it reports no error or warning, so a broken reference, a cycle or an unevaluated expression is never shown as a verified branch. The result is bound to the SHA-256 digest of the evaluated bytes, the draft revision and the evaluator identity; it is not stored and creates no participant records. Inspecting the draft is enough to run scenarios.
 
-The shared fixtures in [`TroveAPI/Tests/Fixtures/questionnaire-scenarios`](https://github.com/SchmiedmayerLab/Trove/tree/main/TroveAPI/Tests/Fixtures/questionnaire-scenarios) hold a questionnaire, a request and the expected graph and results for each rule. Every member a fixture states must equal the evaluator's output; members it leaves out are not compared, and a stated array must have as many elements as the output.
+The shared fixtures in `TroveAPI/Tests/Fixtures/questionnaire-scenarios` hold a questionnaire, a request and the expected graph and results for each rule. Every member a fixture states must equal the evaluator's output; members it leaves out are not compared, and a stated array must have as many elements as the output.
 
 ## Localization
 
