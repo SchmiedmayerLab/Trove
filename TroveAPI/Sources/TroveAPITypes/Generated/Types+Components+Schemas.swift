@@ -1432,6 +1432,1234 @@ extension Components {
                 ])
             }
         }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioInput`.
+        public struct QuestionnaireScenarioInput: Codable, Hashable, Sendable {
+            /// Named synthetic answer sets. Names are unique within one request.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioInput/scenarios`.
+            public var scenarios: [Components.Schemas.QuestionnaireScenario]
+            /// Creates a new `QuestionnaireScenarioInput`.
+            ///
+            /// - Parameters:
+            ///   - scenarios: Named synthetic answer sets. Names are unique within one request.
+            public init(scenarios: [Components.Schemas.QuestionnaireScenario]) {
+                self.scenarios = scenarios
+            }
+            public enum CodingKeys: String, CodingKey {
+                case scenarios
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.scenarios = try container.decode(
+                    [Components.Schemas.QuestionnaireScenario].self,
+                    forKey: .scenarios
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "scenarios"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenario`.
+        public struct QuestionnaireScenario: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenario/name`.
+            public var name: Swift.String
+            /// Synthetic answers in the shape of `QuestionnaireResponse.item`. A repeating group appears once per instance, the answers of a question appear in `answer`, and the items nested under a question appear in that answer's `item`.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenario/item`.
+            public var item: [Components.Schemas.QuestionnaireScenarioItem]
+            /// Creates a new `QuestionnaireScenario`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - item: Synthetic answers in the shape of `QuestionnaireResponse.item`. A repeating group appears once per instance, the answers of a question appear in `answer`, and the items nested under a question appear in that answer's `item`.
+            public init(
+                name: Swift.String,
+                item: [Components.Schemas.QuestionnaireScenarioItem]
+            ) {
+                self.name = name
+                self.item = item
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case item
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.item = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioItem].self,
+                    forKey: .item
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "item"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItem`.
+        public struct QuestionnaireScenarioItem: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItem/linkId`.
+            public var linkId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItem/answer`.
+            public var answer: [Components.Schemas.QuestionnaireScenarioAnswer]?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItem/item`.
+            public var item: [Components.Schemas.QuestionnaireScenarioItem]?
+            /// Creates a new `QuestionnaireScenarioItem`.
+            ///
+            /// - Parameters:
+            ///   - linkId:
+            ///   - answer:
+            ///   - item:
+            public init(
+                linkId: Swift.String,
+                answer: [Components.Schemas.QuestionnaireScenarioAnswer]? = nil,
+                item: [Components.Schemas.QuestionnaireScenarioItem]? = nil
+            ) {
+                self.linkId = linkId
+                self.answer = answer
+                self.item = item
+            }
+            public enum CodingKeys: String, CodingKey {
+                case linkId
+                case answer
+                case item
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.linkId = try container.decode(
+                    Swift.String.self,
+                    forKey: .linkId
+                )
+                self.answer = try container.decodeIfPresent(
+                    [Components.Schemas.QuestionnaireScenarioAnswer].self,
+                    forKey: .answer
+                )
+                self.item = try container.decodeIfPresent(
+                    [Components.Schemas.QuestionnaireScenarioItem].self,
+                    forKey: .item
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "linkId",
+                    "answer",
+                    "item"
+                ])
+            }
+        }
+        /// One FHIR R4 answer value, named as in `QuestionnaireResponse.item.answer`. Exactly one value is set. The same shape states the expected answer of an `enableWhen` condition.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer`.
+        public struct QuestionnaireScenarioAnswer: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueBoolean`.
+            public var valueBoolean: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueDecimal`.
+            public var valueDecimal: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueInteger`.
+            public var valueInteger: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueDate`.
+            public var valueDate: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueDateTime`.
+            public var valueDateTime: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueTime`.
+            public var valueTime: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueString`.
+            public var valueString: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueUri`.
+            public var valueUri: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueCoding`.
+            public var valueCoding: Components.Schemas.QuestionnaireScenarioCoding?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueQuantity`.
+            public var valueQuantity: Components.Schemas.QuestionnaireScenarioQuantity?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueReference`.
+            public var valueReference: Components.Schemas.QuestionnaireScenarioReference?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/valueAttachment`.
+            public var valueAttachment: Components.Schemas.QuestionnaireScenarioAttachment?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAnswer/item`.
+            public var item: [Components.Schemas.QuestionnaireScenarioItem]?
+            /// Creates a new `QuestionnaireScenarioAnswer`.
+            ///
+            /// - Parameters:
+            ///   - valueBoolean:
+            ///   - valueDecimal:
+            ///   - valueInteger:
+            ///   - valueDate:
+            ///   - valueDateTime:
+            ///   - valueTime:
+            ///   - valueString:
+            ///   - valueUri:
+            ///   - valueCoding:
+            ///   - valueQuantity:
+            ///   - valueReference:
+            ///   - valueAttachment:
+            ///   - item:
+            public init(
+                valueBoolean: Swift.Bool? = nil,
+                valueDecimal: Swift.Double? = nil,
+                valueInteger: Swift.Int? = nil,
+                valueDate: Swift.String? = nil,
+                valueDateTime: Swift.String? = nil,
+                valueTime: Swift.String? = nil,
+                valueString: Swift.String? = nil,
+                valueUri: Swift.String? = nil,
+                valueCoding: Components.Schemas.QuestionnaireScenarioCoding? = nil,
+                valueQuantity: Components.Schemas.QuestionnaireScenarioQuantity? = nil,
+                valueReference: Components.Schemas.QuestionnaireScenarioReference? = nil,
+                valueAttachment: Components.Schemas.QuestionnaireScenarioAttachment? = nil,
+                item: [Components.Schemas.QuestionnaireScenarioItem]? = nil
+            ) {
+                self.valueBoolean = valueBoolean
+                self.valueDecimal = valueDecimal
+                self.valueInteger = valueInteger
+                self.valueDate = valueDate
+                self.valueDateTime = valueDateTime
+                self.valueTime = valueTime
+                self.valueString = valueString
+                self.valueUri = valueUri
+                self.valueCoding = valueCoding
+                self.valueQuantity = valueQuantity
+                self.valueReference = valueReference
+                self.valueAttachment = valueAttachment
+                self.item = item
+            }
+            public enum CodingKeys: String, CodingKey {
+                case valueBoolean
+                case valueDecimal
+                case valueInteger
+                case valueDate
+                case valueDateTime
+                case valueTime
+                case valueString
+                case valueUri
+                case valueCoding
+                case valueQuantity
+                case valueReference
+                case valueAttachment
+                case item
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.valueBoolean = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .valueBoolean
+                )
+                self.valueDecimal = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .valueDecimal
+                )
+                self.valueInteger = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .valueInteger
+                )
+                self.valueDate = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .valueDate
+                )
+                self.valueDateTime = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .valueDateTime
+                )
+                self.valueTime = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .valueTime
+                )
+                self.valueString = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .valueString
+                )
+                self.valueUri = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .valueUri
+                )
+                self.valueCoding = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioCoding.self,
+                    forKey: .valueCoding
+                )
+                self.valueQuantity = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioQuantity.self,
+                    forKey: .valueQuantity
+                )
+                self.valueReference = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioReference.self,
+                    forKey: .valueReference
+                )
+                self.valueAttachment = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioAttachment.self,
+                    forKey: .valueAttachment
+                )
+                self.item = try container.decodeIfPresent(
+                    [Components.Schemas.QuestionnaireScenarioItem].self,
+                    forKey: .item
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "valueBoolean",
+                    "valueDecimal",
+                    "valueInteger",
+                    "valueDate",
+                    "valueDateTime",
+                    "valueTime",
+                    "valueString",
+                    "valueUri",
+                    "valueCoding",
+                    "valueQuantity",
+                    "valueReference",
+                    "valueAttachment",
+                    "item"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioCoding`.
+        public struct QuestionnaireScenarioCoding: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioCoding/system`.
+            public var system: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioCoding/version`.
+            public var version: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioCoding/code`.
+            public var code: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioCoding/display`.
+            public var display: Swift.String?
+            /// Creates a new `QuestionnaireScenarioCoding`.
+            ///
+            /// - Parameters:
+            ///   - system:
+            ///   - version:
+            ///   - code:
+            ///   - display:
+            public init(
+                system: Swift.String? = nil,
+                version: Swift.String? = nil,
+                code: Swift.String? = nil,
+                display: Swift.String? = nil
+            ) {
+                self.system = system
+                self.version = version
+                self.code = code
+                self.display = display
+            }
+            public enum CodingKeys: String, CodingKey {
+                case system
+                case version
+                case code
+                case display
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.system = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .system
+                )
+                self.version = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .version
+                )
+                self.code = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                self.display = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .display
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "system",
+                    "version",
+                    "code",
+                    "display"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity`.
+        public struct QuestionnaireScenarioQuantity: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/value`.
+            public var value: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/comparator`.
+            @frozen public enum ComparatorPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _lt_ = "<"
+                case _lt__equals_ = "<="
+                case _gt__equals_ = ">="
+                case _gt_ = ">"
+            }
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/comparator`.
+            public var comparator: Components.Schemas.QuestionnaireScenarioQuantity.ComparatorPayload?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/unit`.
+            public var unit: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/system`.
+            public var system: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioQuantity/code`.
+            public var code: Swift.String?
+            /// Creates a new `QuestionnaireScenarioQuantity`.
+            ///
+            /// - Parameters:
+            ///   - value:
+            ///   - comparator:
+            ///   - unit:
+            ///   - system:
+            ///   - code:
+            public init(
+                value: Swift.Double? = nil,
+                comparator: Components.Schemas.QuestionnaireScenarioQuantity.ComparatorPayload? = nil,
+                unit: Swift.String? = nil,
+                system: Swift.String? = nil,
+                code: Swift.String? = nil
+            ) {
+                self.value = value
+                self.comparator = comparator
+                self.unit = unit
+                self.system = system
+                self.code = code
+            }
+            public enum CodingKeys: String, CodingKey {
+                case value
+                case comparator
+                case unit
+                case system
+                case code
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.value = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .value
+                )
+                self.comparator = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioQuantity.ComparatorPayload.self,
+                    forKey: .comparator
+                )
+                self.unit = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .unit
+                )
+                self.system = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .system
+                )
+                self.code = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "value",
+                    "comparator",
+                    "unit",
+                    "system",
+                    "code"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReference`.
+        public struct QuestionnaireScenarioReference: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReference/reference`.
+            public var reference: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReference/display`.
+            public var display: Swift.String?
+            /// Creates a new `QuestionnaireScenarioReference`.
+            ///
+            /// - Parameters:
+            ///   - reference:
+            ///   - display:
+            public init(
+                reference: Swift.String? = nil,
+                display: Swift.String? = nil
+            ) {
+                self.reference = reference
+                self.display = display
+            }
+            public enum CodingKeys: String, CodingKey {
+                case reference
+                case display
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.reference = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .reference
+                )
+                self.display = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .display
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "reference",
+                    "display"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAttachment`.
+        public struct QuestionnaireScenarioAttachment: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAttachment/contentType`.
+            public var contentType: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAttachment/url`.
+            public var url: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioAttachment/title`.
+            public var title: Swift.String?
+            /// Creates a new `QuestionnaireScenarioAttachment`.
+            ///
+            /// - Parameters:
+            ///   - contentType:
+            ///   - url:
+            ///   - title:
+            public init(
+                contentType: Swift.String? = nil,
+                url: Swift.String? = nil,
+                title: Swift.String? = nil
+            ) {
+                self.contentType = contentType
+                self.url = url
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case contentType
+                case url
+                case title
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.contentType = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .contentType
+                )
+                self.url = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .url
+                )
+                self.title = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "contentType",
+                    "url",
+                    "title"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport`.
+        public struct QuestionnaireScenarioReport: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/componentId`.
+            public var componentId: Swift.String
+            /// Draft revision at which the stored resource was read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/draftRevision`.
+            public var draftRevision: Swift.String
+            /// SHA-256 of the exact evaluated bytes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/sha256`.
+            public var sha256: Swift.String
+            /// Identity of the evaluation rules. The shared scenario fixtures name the identity they expect.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/evaluator`.
+            public var evaluator: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/graph`.
+            public var graph: Components.Schemas.QuestionnaireGraph
+            /// One result per requested scenario, in request order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioReport/scenarios`.
+            public var scenarios: [Components.Schemas.QuestionnaireScenarioResult]
+            /// Creates a new `QuestionnaireScenarioReport`.
+            ///
+            /// - Parameters:
+            ///   - componentId:
+            ///   - draftRevision: Draft revision at which the stored resource was read.
+            ///   - sha256: SHA-256 of the exact evaluated bytes.
+            ///   - evaluator: Identity of the evaluation rules. The shared scenario fixtures name the identity they expect.
+            ///   - graph:
+            ///   - scenarios: One result per requested scenario, in request order.
+            public init(
+                componentId: Swift.String,
+                draftRevision: Swift.String,
+                sha256: Swift.String,
+                evaluator: Swift.String,
+                graph: Components.Schemas.QuestionnaireGraph,
+                scenarios: [Components.Schemas.QuestionnaireScenarioResult]
+            ) {
+                self.componentId = componentId
+                self.draftRevision = draftRevision
+                self.sha256 = sha256
+                self.evaluator = evaluator
+                self.graph = graph
+                self.scenarios = scenarios
+            }
+            public enum CodingKeys: String, CodingKey {
+                case componentId
+                case draftRevision
+                case sha256
+                case evaluator
+                case graph
+                case scenarios
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.componentId = try container.decode(
+                    Swift.String.self,
+                    forKey: .componentId
+                )
+                self.draftRevision = try container.decode(
+                    Swift.String.self,
+                    forKey: .draftRevision
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.evaluator = try container.decode(
+                    Swift.String.self,
+                    forKey: .evaluator
+                )
+                self.graph = try container.decode(
+                    Components.Schemas.QuestionnaireGraph.self,
+                    forKey: .graph
+                )
+                self.scenarios = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioResult].self,
+                    forKey: .scenarios
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "componentId",
+                    "draftRevision",
+                    "sha256",
+                    "evaluator",
+                    "graph",
+                    "scenarios"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph`.
+        public struct QuestionnaireGraph: Codable, Hashable, Sendable {
+            /// True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles, expressions that are not evaluated, references that can read another repeat instance and codings without a system make the analysis incomplete.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph/complete`.
+            public var complete: Swift.Bool
+            /// Every item in document order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph/nodes`.
+            public var nodes: [Components.Schemas.QuestionnaireGraphNode]
+            /// `containment` connects a group or question to each nested item, `order` connects consecutive siblings, and `dependency` connects the question an `enableWhen` condition names to the item it gates. An expression adds no edge.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph/edges`.
+            public var edges: [Components.Schemas.QuestionnaireGraphEdge]
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraph/diagnostics`.
+            public var diagnostics: [Components.Schemas.ValidationDiagnostic]
+            /// Creates a new `QuestionnaireGraph`.
+            ///
+            /// - Parameters:
+            ///   - complete: True when no finding is an error or a warning. Broken references, unsupported or mismatched conditions, dependency cycles, expressions that are not evaluated, references that can read another repeat instance and codings without a system make the analysis incomplete.
+            ///   - nodes: Every item in document order.
+            ///   - edges: `containment` connects a group or question to each nested item, `order` connects consecutive siblings, and `dependency` connects the question an `enableWhen` condition names to the item it gates. An expression adds no edge.
+            ///   - diagnostics:
+            public init(
+                complete: Swift.Bool,
+                nodes: [Components.Schemas.QuestionnaireGraphNode],
+                edges: [Components.Schemas.QuestionnaireGraphEdge],
+                diagnostics: [Components.Schemas.ValidationDiagnostic]
+            ) {
+                self.complete = complete
+                self.nodes = nodes
+                self.edges = edges
+                self.diagnostics = diagnostics
+            }
+            public enum CodingKeys: String, CodingKey {
+                case complete
+                case nodes
+                case edges
+                case diagnostics
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.complete = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .complete
+                )
+                self.nodes = try container.decode(
+                    [Components.Schemas.QuestionnaireGraphNode].self,
+                    forKey: .nodes
+                )
+                self.edges = try container.decode(
+                    [Components.Schemas.QuestionnaireGraphEdge].self,
+                    forKey: .edges
+                )
+                self.diagnostics = try container.decode(
+                    [Components.Schemas.ValidationDiagnostic].self,
+                    forKey: .diagnostics
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "complete",
+                    "nodes",
+                    "edges",
+                    "diagnostics"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode`.
+        public struct QuestionnaireGraphNode: Codable, Hashable, Sendable {
+            /// FHIRPath of the item, for example `Questionnaire.item[0].item[1]`; the node's identity in edges.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/path`.
+            public var path: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/linkId`.
+            public var linkId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/type`.
+            public var _type: Swift.String?
+            /// Path of the enclosing item. Omitted at the top level.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/parent`.
+            public var parent: Swift.String?
+            /// The item's base-language text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/text`.
+            public var text: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/enableBehavior`.
+            public var enableBehavior: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/repeats`.
+            public var repeats: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphNode/required`.
+            public var required: Swift.Bool
+            /// Creates a new `QuestionnaireGraphNode`.
+            ///
+            /// - Parameters:
+            ///   - path: FHIRPath of the item, for example `Questionnaire.item[0].item[1]`; the node's identity in edges.
+            ///   - linkId:
+            ///   - _type:
+            ///   - parent: Path of the enclosing item. Omitted at the top level.
+            ///   - text: The item's base-language text.
+            ///   - enableBehavior:
+            ///   - repeats:
+            ///   - required:
+            public init(
+                path: Swift.String,
+                linkId: Swift.String? = nil,
+                _type: Swift.String? = nil,
+                parent: Swift.String? = nil,
+                text: Swift.String? = nil,
+                enableBehavior: Swift.String? = nil,
+                repeats: Swift.Bool,
+                required: Swift.Bool
+            ) {
+                self.path = path
+                self.linkId = linkId
+                self._type = _type
+                self.parent = parent
+                self.text = text
+                self.enableBehavior = enableBehavior
+                self.repeats = repeats
+                self.required = required
+            }
+            public enum CodingKeys: String, CodingKey {
+                case path
+                case linkId
+                case _type = "type"
+                case parent
+                case text
+                case enableBehavior
+                case repeats
+                case required
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.path = try container.decode(
+                    Swift.String.self,
+                    forKey: .path
+                )
+                self.linkId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .linkId
+                )
+                self._type = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.parent = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .parent
+                )
+                self.text = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .text
+                )
+                self.enableBehavior = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .enableBehavior
+                )
+                self.repeats = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .repeats
+                )
+                self.required = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "path",
+                    "linkId",
+                    "type",
+                    "parent",
+                    "text",
+                    "enableBehavior",
+                    "repeats",
+                    "required"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge`.
+        public struct QuestionnaireGraphEdge: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case containment = "containment"
+                case order = "order"
+                case dependency = "dependency"
+            }
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge/kind`.
+            public var kind: Components.Schemas.QuestionnaireGraphEdge.KindPayload
+            /// Path of the enclosing item, the preceding sibling or the question a condition names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge/from`.
+            public var from: Swift.String
+            /// Path of the nested item, the following sibling or the gated item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge/to`.
+            public var to: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireGraphEdge/condition`.
+            public var condition: Components.Schemas.QuestionnaireCondition?
+            /// Creates a new `QuestionnaireGraphEdge`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - from: Path of the enclosing item, the preceding sibling or the question a condition names.
+            ///   - to: Path of the nested item, the following sibling or the gated item.
+            ///   - condition:
+            public init(
+                kind: Components.Schemas.QuestionnaireGraphEdge.KindPayload,
+                from: Swift.String,
+                to: Swift.String,
+                condition: Components.Schemas.QuestionnaireCondition? = nil
+            ) {
+                self.kind = kind
+                self.from = from
+                self.to = to
+                self.condition = condition
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case from
+                case to
+                case condition
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.kind = try container.decode(
+                    Components.Schemas.QuestionnaireGraphEdge.KindPayload.self,
+                    forKey: .kind
+                )
+                self.from = try container.decode(
+                    Swift.String.self,
+                    forKey: .from
+                )
+                self.to = try container.decode(
+                    Swift.String.self,
+                    forKey: .to
+                )
+                self.condition = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireCondition.self,
+                    forKey: .condition
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "kind",
+                    "from",
+                    "to",
+                    "condition"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireCondition`.
+        public struct QuestionnaireCondition: Codable, Hashable, Sendable {
+            /// Position in the gated item's `enableWhen`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireCondition/index`.
+            public var index: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireCondition/question`.
+            public var question: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireCondition/operator`.
+            public var _operator: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireCondition/answer`.
+            public var answer: Components.Schemas.QuestionnaireScenarioAnswer?
+            /// Creates a new `QuestionnaireCondition`.
+            ///
+            /// - Parameters:
+            ///   - index: Position in the gated item's `enableWhen`.
+            ///   - question:
+            ///   - _operator:
+            ///   - answer:
+            public init(
+                index: Swift.Int,
+                question: Swift.String,
+                _operator: Swift.String? = nil,
+                answer: Components.Schemas.QuestionnaireScenarioAnswer? = nil
+            ) {
+                self.index = index
+                self.question = question
+                self._operator = _operator
+                self.answer = answer
+            }
+            public enum CodingKeys: String, CodingKey {
+                case index
+                case question
+                case _operator = "operator"
+                case answer
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.index = try container.decode(
+                    Swift.Int.self,
+                    forKey: .index
+                )
+                self.question = try container.decode(
+                    Swift.String.self,
+                    forKey: .question
+                )
+                self._operator = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: ._operator
+                )
+                self.answer = try container.decodeIfPresent(
+                    Components.Schemas.QuestionnaireScenarioAnswer.self,
+                    forKey: .answer
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "index",
+                    "question",
+                    "operator",
+                    "answer"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult`.
+        public struct QuestionnaireScenarioResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult/name`.
+            public var name: Swift.String
+            /// True when every item is `enabled` or `disabled` and no finding about the answers is an error.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult/complete`.
+            public var complete: Swift.Bool
+            /// The state of every item instance in document order. An item inside a repeating group or nested under a question has one state per instance; an instance without answers is evaluated as an unanswered instance with index 0.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult/items`.
+            public var items: [Components.Schemas.QuestionnaireScenarioItemState]
+            /// The answers a completed response keeps, in document order. Answers of disabled items and the answers the findings reject are removed; answers of `notEvaluated` items remain.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult/response`.
+            public var response: [Components.Schemas.QuestionnaireScenarioItem]
+            /// Findings about the synthetic answers, with paths into `QuestionnaireResponse.item`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioResult/diagnostics`.
+            public var diagnostics: [Components.Schemas.ValidationDiagnostic]
+            /// Creates a new `QuestionnaireScenarioResult`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - complete: True when every item is `enabled` or `disabled` and no finding about the answers is an error.
+            ///   - items: The state of every item instance in document order. An item inside a repeating group or nested under a question has one state per instance; an instance without answers is evaluated as an unanswered instance with index 0.
+            ///   - response: The answers a completed response keeps, in document order. Answers of disabled items and the answers the findings reject are removed; answers of `notEvaluated` items remain.
+            ///   - diagnostics: Findings about the synthetic answers, with paths into `QuestionnaireResponse.item`.
+            public init(
+                name: Swift.String,
+                complete: Swift.Bool,
+                items: [Components.Schemas.QuestionnaireScenarioItemState],
+                response: [Components.Schemas.QuestionnaireScenarioItem],
+                diagnostics: [Components.Schemas.ValidationDiagnostic]
+            ) {
+                self.name = name
+                self.complete = complete
+                self.items = items
+                self.response = response
+                self.diagnostics = diagnostics
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case complete
+                case items
+                case response
+                case diagnostics
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.complete = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .complete
+                )
+                self.items = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioItemState].self,
+                    forKey: .items
+                )
+                self.response = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioItem].self,
+                    forKey: .response
+                )
+                self.diagnostics = try container.decode(
+                    [Components.Schemas.ValidationDiagnostic].self,
+                    forKey: .diagnostics
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "complete",
+                    "items",
+                    "response",
+                    "diagnostics"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState`.
+        public struct QuestionnaireScenarioItemState: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/path`.
+            public var path: Swift.String
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/linkId`.
+            public var linkId: Swift.String?
+            /// The repeat context, one entry for each enclosing repeating group or question.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/instance`.
+            public var instance: [Components.Schemas.QuestionnaireScenarioInstance]
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case enabled = "enabled"
+                case disabled = "disabled"
+                case notEvaluated = "notEvaluated"
+            }
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/state`.
+            public var state: Components.Schemas.QuestionnaireScenarioItemState.StatePayload
+            /// `unconditional`: no condition and every enclosing item enabled. `conditionsMet` or `conditionsNotMet`: the item's own conditions decide. `ancestorDisabled` or `ancestorNotEvaluated`: an enclosing item decides. `conditionNotEvaluated`: a condition or the item's `enableBehavior` cannot be evaluated. `expressionNotEvaluated`: the item uses an `enableWhenExpression`. `dependencyCycle`: the item's conditions depend on its own state.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/reason`.
+            @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case unconditional = "unconditional"
+                case conditionsMet = "conditionsMet"
+                case conditionsNotMet = "conditionsNotMet"
+                case ancestorDisabled = "ancestorDisabled"
+                case ancestorNotEvaluated = "ancestorNotEvaluated"
+                case conditionNotEvaluated = "conditionNotEvaluated"
+                case expressionNotEvaluated = "expressionNotEvaluated"
+                case dependencyCycle = "dependencyCycle"
+            }
+            /// `unconditional`: no condition and every enclosing item enabled. `conditionsMet` or `conditionsNotMet`: the item's own conditions decide. `ancestorDisabled` or `ancestorNotEvaluated`: an enclosing item decides. `conditionNotEvaluated`: a condition or the item's `enableBehavior` cannot be evaluated. `expressionNotEvaluated`: the item uses an `enableWhenExpression`. `dependencyCycle`: the item's conditions depend on its own state.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/reason`.
+            public var reason: Components.Schemas.QuestionnaireScenarioItemState.ReasonPayload
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioItemState/conditions`.
+            public var conditions: [Components.Schemas.QuestionnaireScenarioConditionResult]
+            /// Creates a new `QuestionnaireScenarioItemState`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - linkId:
+            ///   - instance: The repeat context, one entry for each enclosing repeating group or question.
+            ///   - state:
+            ///   - reason: `unconditional`: no condition and every enclosing item enabled. `conditionsMet` or `conditionsNotMet`: the item's own conditions decide. `ancestorDisabled` or `ancestorNotEvaluated`: an enclosing item decides. `conditionNotEvaluated`: a condition or the item's `enableBehavior` cannot be evaluated. `expressionNotEvaluated`: the item uses an `enableWhenExpression`. `dependencyCycle`: the item's conditions depend on its own state.
+            ///   - conditions:
+            public init(
+                path: Swift.String,
+                linkId: Swift.String? = nil,
+                instance: [Components.Schemas.QuestionnaireScenarioInstance],
+                state: Components.Schemas.QuestionnaireScenarioItemState.StatePayload,
+                reason: Components.Schemas.QuestionnaireScenarioItemState.ReasonPayload,
+                conditions: [Components.Schemas.QuestionnaireScenarioConditionResult]
+            ) {
+                self.path = path
+                self.linkId = linkId
+                self.instance = instance
+                self.state = state
+                self.reason = reason
+                self.conditions = conditions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case path
+                case linkId
+                case instance
+                case state
+                case reason
+                case conditions
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.path = try container.decode(
+                    Swift.String.self,
+                    forKey: .path
+                )
+                self.linkId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .linkId
+                )
+                self.instance = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioInstance].self,
+                    forKey: .instance
+                )
+                self.state = try container.decode(
+                    Components.Schemas.QuestionnaireScenarioItemState.StatePayload.self,
+                    forKey: .state
+                )
+                self.reason = try container.decode(
+                    Components.Schemas.QuestionnaireScenarioItemState.ReasonPayload.self,
+                    forKey: .reason
+                )
+                self.conditions = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioConditionResult].self,
+                    forKey: .conditions
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "path",
+                    "linkId",
+                    "instance",
+                    "state",
+                    "reason",
+                    "conditions"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioInstance`.
+        public struct QuestionnaireScenarioInstance: Codable, Hashable, Sendable {
+            /// Path of the enclosing repeating group or question.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioInstance/path`.
+            public var path: Swift.String
+            /// Position of the group instance or of the question's answer among those the scenario keeps, as in `response`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioInstance/index`.
+            public var index: Swift.Int
+            /// Creates a new `QuestionnaireScenarioInstance`.
+            ///
+            /// - Parameters:
+            ///   - path: Path of the enclosing repeating group or question.
+            ///   - index: Position of the group instance or of the question's answer among those the scenario keeps, as in `response`.
+            public init(
+                path: Swift.String,
+                index: Swift.Int
+            ) {
+                self.path = path
+                self.index = index
+            }
+            public enum CodingKeys: String, CodingKey {
+                case path
+                case index
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.path = try container.decode(
+                    Swift.String.self,
+                    forKey: .path
+                )
+                self.index = try container.decode(
+                    Swift.Int.self,
+                    forKey: .index
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "path",
+                    "index"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult`.
+        public struct QuestionnaireScenarioConditionResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/index`.
+            public var index: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/question`.
+            public var question: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/operator`.
+            public var _operator: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case met = "met"
+                case notMet = "notMet"
+                case notEvaluated = "notEvaluated"
+            }
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/outcome`.
+            public var outcome: Components.Schemas.QuestionnaireScenarioConditionResult.OutcomePayload
+            /// The answers the condition compared. The answers of a disabled question count as absent and are not listed.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/answers`.
+            public var answers: [Components.Schemas.QuestionnaireScenarioAnswer]
+            /// The repeat context of the question instance the condition read, by the FHIR R4 rule: an enclosing instance on the ancestor axis, otherwise the nearest preceding instance, otherwise the nearest following one, in document order of the form's item instances. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
+            ///
+            ///
+            /// - Remark: Generated from `#/components/schemas/QuestionnaireScenarioConditionResult/questionInstance`.
+            public var questionInstance: [Components.Schemas.QuestionnaireScenarioInstance]?
+            /// Creates a new `QuestionnaireScenarioConditionResult`.
+            ///
+            /// - Parameters:
+            ///   - index:
+            ///   - question:
+            ///   - _operator:
+            ///   - outcome:
+            ///   - answers: The answers the condition compared. The answers of a disabled question count as absent and are not listed.
+            ///   - questionInstance: The repeat context of the question instance the condition read, by the FHIR R4 rule: an enclosing instance on the ancestor axis, otherwise the nearest preceding instance, otherwise the nearest following one, in document order of the form's item instances. Omitted when the condition names no question instance: an invalid condition or one on a dependency cycle.
+            public init(
+                index: Swift.Int,
+                question: Swift.String? = nil,
+                _operator: Swift.String? = nil,
+                outcome: Components.Schemas.QuestionnaireScenarioConditionResult.OutcomePayload,
+                answers: [Components.Schemas.QuestionnaireScenarioAnswer],
+                questionInstance: [Components.Schemas.QuestionnaireScenarioInstance]? = nil
+            ) {
+                self.index = index
+                self.question = question
+                self._operator = _operator
+                self.outcome = outcome
+                self.answers = answers
+                self.questionInstance = questionInstance
+            }
+            public enum CodingKeys: String, CodingKey {
+                case index
+                case question
+                case _operator = "operator"
+                case outcome
+                case answers
+                case questionInstance
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.index = try container.decode(
+                    Swift.Int.self,
+                    forKey: .index
+                )
+                self.question = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .question
+                )
+                self._operator = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: ._operator
+                )
+                self.outcome = try container.decode(
+                    Components.Schemas.QuestionnaireScenarioConditionResult.OutcomePayload.self,
+                    forKey: .outcome
+                )
+                self.answers = try container.decode(
+                    [Components.Schemas.QuestionnaireScenarioAnswer].self,
+                    forKey: .answers
+                )
+                self.questionInstance = try container.decodeIfPresent(
+                    [Components.Schemas.QuestionnaireScenarioInstance].self,
+                    forKey: .questionInstance
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "index",
+                    "question",
+                    "operator",
+                    "outcome",
+                    "answers",
+                    "questionInstance"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/StudyDelegationPreset`.
         @frozen public enum StudyDelegationPreset: String, Codable, Hashable, Sendable, CaseIterable {
             case inspectStudy = "inspectStudy"

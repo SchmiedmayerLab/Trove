@@ -1,0 +1,211 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Multiple answers (`!=` is not met when one of several answers is equal), nested groups gated with any and all, disabled descendants, and changed earlier answers that recompute later items.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-nested",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      {
+        "linkId": "symptoms", "type": "choice", "repeats": true, "text": "Symptoms",
+        "answerOption": [
+          { "valueCoding": { "system": "http://example.org/symptoms", "code": "cough" } },
+          { "valueCoding": { "system": "http://example.org/symptoms", "code": "fever" } },
+          { "valueCoding": { "system": "http://example.org/symptoms", "code": "rash" } }
+        ]
+      },
+      {
+        "linkId": "cough-detail", "type": "string", "text": "Describe the cough",
+        "enableWhen": [{ "question": "symptoms", "operator": "=", "answerCoding": { "system": "http://example.org/symptoms", "code": "cough" } }]
+      },
+      {
+        "linkId": "other-symptom", "type": "display", "text": "Another symptom than a cough",
+        "enableWhen": [{ "question": "symptoms", "operator": "!=", "answerCoding": { "system": "http://example.org/symptoms", "code": "cough" } }]
+      },
+      { "linkId": "severity", "type": "integer", "text": "Severity from 0 to 10" },
+      {
+        "linkId": "followup", "type": "group", "text": "Follow-up", "enableBehavior": "any",
+        "enableWhen": [
+          { "question": "symptoms", "operator": "=", "answerCoding": { "system": "http://example.org/symptoms", "code": "fever" } },
+          { "question": "severity", "operator": ">=", "answerInteger": 7 }
+        ],
+        "item": [
+          { "linkId": "days", "type": "integer", "text": "Days with symptoms" },
+          {
+            "linkId": "detail", "type": "group", "text": "Details", "enableBehavior": "all",
+            "enableWhen": [
+              { "question": "severity", "operator": ">=", "answerInteger": 5 },
+              { "question": "symptoms", "operator": "exists", "answerBoolean": true }
+            ],
+            "item": [
+              { "linkId": "notes", "type": "string", "text": "Notes" },
+              {
+                "linkId": "rash-photo", "type": "display", "text": "Please photograph the rash",
+                "enableWhen": [{ "question": "symptoms", "operator": "=", "answerCoding": { "system": "http://example.org/symptoms", "code": "rash" } }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "cough and rash, mild",
+        "item": [
+          {
+            "linkId": "symptoms",
+            "answer": [
+              { "valueCoding": { "system": "http://example.org/symptoms", "code": "cough" } },
+              { "valueCoding": { "system": "http://example.org/symptoms", "code": "rash" } }
+            ]
+          },
+          { "linkId": "severity", "answer": [{ "valueInteger": 3 }] },
+          {
+            "linkId": "followup",
+            "item": [
+              { "linkId": "days", "answer": [{ "valueInteger": 2 }] },
+              { "linkId": "detail", "item": [{ "linkId": "notes", "answer": [{ "valueString": "Started at night" }] }] }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "fever, severe",
+        "item": [
+          { "linkId": "symptoms", "answer": [{ "valueCoding": { "system": "http://example.org/symptoms", "code": "fever" } }] },
+          { "linkId": "severity", "answer": [{ "valueInteger": 8 }] },
+          {
+            "linkId": "followup",
+            "item": [
+              { "linkId": "days", "answer": [{ "valueInteger": 2 }] },
+              { "linkId": "detail", "item": [{ "linkId": "notes", "answer": [{ "valueString": "Started at night" }] }] }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "only cough, severe",
+        "item": [
+          { "linkId": "symptoms", "answer": [{ "valueCoding": { "system": "http://example.org/symptoms", "code": "cough" } }] },
+          { "linkId": "severity", "answer": [{ "valueInteger": 7 }] }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": true,
+      "edges": [
+        { "kind": "containment", "from": "Questionnaire.item[4]", "to": "Questionnaire.item[4].item[0]" },
+        { "kind": "containment", "from": "Questionnaire.item[4]", "to": "Questionnaire.item[4].item[1]" },
+        { "kind": "containment", "from": "Questionnaire.item[4].item[1]", "to": "Questionnaire.item[4].item[1].item[0]" },
+        { "kind": "containment", "from": "Questionnaire.item[4].item[1]", "to": "Questionnaire.item[4].item[1].item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[2]" },
+        { "kind": "order", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[3]" },
+        { "kind": "order", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]" },
+        { "kind": "order", "from": "Questionnaire.item[4].item[0]", "to": "Questionnaire.item[4].item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[4].item[1].item[0]", "to": "Questionnaire.item[4].item[1].item[1]" },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[2]" },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[4]", "condition": { "index": 0, "question": "symptoms" } },
+        { "kind": "dependency", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]", "condition": { "index": 1, "question": "severity", "operator": ">=", "answer": { "valueInteger": 7 } } },
+        { "kind": "dependency", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4].item[1]", "condition": { "index": 0 } },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[4].item[1]", "condition": { "index": 1, "operator": "exists" } },
+        { "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[4].item[1].item[1]" }
+      ],
+      "diagnostics": []
+    },
+    "scenarios": [
+      {
+        "name": "cough and rash, mild",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[1]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[2]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[3]", "state": "enabled", "reason": "unconditional" },
+          {
+            "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [
+              { "index": 0, "outcome": "notMet" },
+              { "index": 1, "outcome": "notMet", "answers": [{ "valueInteger": 3 }] }
+            ]
+          },
+          { "path": "Questionnaire.item[4].item[0]", "state": "disabled", "reason": "ancestorDisabled" },
+          {
+            "path": "Questionnaire.item[4].item[1]", "state": "disabled", "reason": "ancestorDisabled",
+            "conditions": [{ "index": 0, "outcome": "notMet" }, { "index": 1, "outcome": "met" }]
+          },
+          { "path": "Questionnaire.item[4].item[1].item[0]", "state": "disabled", "reason": "ancestorDisabled" },
+          { "path": "Questionnaire.item[4].item[1].item[1]", "state": "disabled", "reason": "ancestorDisabled" }
+        ],
+        "response": [
+          {
+            "linkId": "symptoms",
+            "answer": [
+              { "valueCoding": { "system": "http://example.org/symptoms", "code": "cough" } },
+              { "valueCoding": { "system": "http://example.org/symptoms", "code": "rash" } }
+            ]
+          },
+          { "linkId": "severity", "answer": [{ "valueInteger": 3 }] }
+        ],
+        "diagnostics": [
+          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[2].item[0].answer[0]" },
+          { "severity": "information", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[2].item[1].item[0].answer[0]" }
+        ]
+      },
+      {
+        "name": "fever, severe",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[3]", "state": "enabled" },
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4].item[0]", "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[4].item[1]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4].item[1].item[0]", "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[4].item[1].item[1]", "state": "disabled", "reason": "conditionsNotMet" }
+        ],
+        "response": [
+          { "linkId": "symptoms", "answer": [{ "valueCoding": { "system": "http://example.org/symptoms", "code": "fever" } }] },
+          { "linkId": "severity", "answer": [{ "valueInteger": 8 }] },
+          {
+            "linkId": "followup",
+            "item": [
+              { "linkId": "days", "answer": [{ "valueInteger": 2 }] },
+              { "linkId": "detail", "item": [{ "linkId": "notes", "answer": [{ "valueString": "Started at night" }] }] }
+            ]
+          }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "only cough, severe",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[1]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[2]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[3]", "state": "enabled" },
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4].item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[4].item[1]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[4].item[1].item[0]", "state": "enabled" },
+          { "path": "Questionnaire.item[4].item[1].item[1]", "state": "disabled", "reason": "conditionsNotMet" }
+        ],
+        "response": [
+          { "linkId": "symptoms", "answer": [{ "valueCoding": { "system": "http://example.org/symptoms", "code": "cough" } }] },
+          { "linkId": "severity", "answer": [{ "valueInteger": 7 }] }
+        ],
+        "diagnostics": []
+      }
+    ]
+  }
+}

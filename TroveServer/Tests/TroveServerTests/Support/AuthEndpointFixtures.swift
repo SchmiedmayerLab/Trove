@@ -203,6 +203,12 @@ extension AuthIntegrationTests {
             researcher(.PUT, "\(base)/studies/\(studyId)/components/health-data/\(healthDataId)", body: healthData, draftRevision: ids.draftRevision, successStatus: .ok),
             // Component Schedules (use questionnaire — health-data doesn't support schedules)
             researcher(.POST, "\(base)/studies/\(studyId)/components/\(questionnaireId)/validations", successStatus: .ok),
+            researcher(
+                .POST,
+                "\(base)/studies/\(studyId)/components/\(questionnaireId)/scenarios",
+                body: jsonData(Components.Schemas.QuestionnaireScenarioInput(scenarios: [.init(name: "Unanswered", item: [])])),
+                successStatus: .ok
+            ),
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", successStatus: .ok),
             researcher(.POST, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules", body: scheduleBody, draftRevision: ids.draftRevision, successStatus: .created),
             researcher(.GET, "\(base)/studies/\(studyId)/components/\(questionnaireId)/schedules/\(scheduleId)", successStatus: .ok),

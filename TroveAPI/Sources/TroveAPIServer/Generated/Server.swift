@@ -300,6 +300,17 @@ extension APIProtocol {
         )
         try transport.register(
             {
+                try await server.evaluateQuestionnaireScenarios(
+                    request: $0,
+                    body: $1,
+                    metadata: $2
+                )
+            },
+            method: .post,
+            path: server.apiPathComponentsWithServerPrefix("/studies/{studyId}/components/{componentId}/scenarios")
+        )
+        try transport.register(
+            {
                 try await server.postStudiesStudyIdComponentsInformational(
                     request: $0,
                     body: $1,
@@ -3761,6 +3772,115 @@ fileprivate extension UniversalServer where APIHandler: APIProtocol {
                 return Operations.ValidateStudyComponent.Input(
                     path: path,
                     headers: headers
+                )
+            },
+            serializer: { output, request in
+                switch output {
+                case let .ok(value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: 200)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .json(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                case let .`default`(statusCode, value):
+                    suppressUnusedWarning(value)
+                    var response = HTTPTypes.HTTPResponse(soar_statusCode: statusCode)
+                    suppressMutabilityWarning(&response)
+                    let body: OpenAPIRuntime.HTTPBody
+                    switch value.body {
+                    case let .applicationProblemJson(value):
+                        try converter.validateAcceptIfPresent(
+                            "application/problem+json",
+                            in: request.headerFields
+                        )
+                        body = try converter.setResponseBodyAsJSON(
+                            value,
+                            headerFields: &response.headerFields,
+                            contentType: "application/problem+json; charset=utf-8"
+                        )
+                    }
+                    return (response, body)
+                }
+            }
+        )
+    }
+    /// Evaluate named synthetic answer sets against a questionnaire component's stored resource
+    ///
+    /// Derives the branching graph of the exact stored Questionnaire and evaluates each named scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules, including `exists`, typed comparisons, multiple answers, ancestor gating and repeat instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is `notEvaluated` when its state depends on an expression, a dependency cycle or a condition that cannot be evaluated. The result is not stored, creates no participant records and does not change the draft. Other component types return 422, and a request whose evaluation exceeds its bounds returns 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/scenarios`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)`.
+    func evaluateQuestionnaireScenarios(
+        request: HTTPTypes.HTTPRequest,
+        body: OpenAPIRuntime.HTTPBody?,
+        metadata: OpenAPIRuntime.ServerRequestMetadata
+    ) async throws -> (HTTPTypes.HTTPResponse, OpenAPIRuntime.HTTPBody?) {
+        try await handle(
+            request: request,
+            requestBody: body,
+            metadata: metadata,
+            forOperation: Operations.EvaluateQuestionnaireScenarios.id,
+            using: {
+                APIHandler.evaluateQuestionnaireScenarios($0)
+            },
+            deserializer: { request, requestBody, metadata in
+                let path: Operations.EvaluateQuestionnaireScenarios.Input.Path = .init(
+                    studyId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "studyId",
+                        as: Components.Parameters.StudyId.self
+                    ),
+                    componentId: try converter.getPathParameterAsURI(
+                        in: metadata.pathParameters,
+                        name: "componentId",
+                        as: Components.Parameters.ComponentId.self
+                    )
+                )
+                let headers: Operations.EvaluateQuestionnaireScenarios.Input.Headers = .init(
+                    troveDelegationID: try converter.getOptionalHeaderFieldAsURI(
+                        in: request.headerFields,
+                        name: "Trove-Delegation-ID",
+                        as: Components.Parameters.DelegationId.self
+                    ),
+                    accept: try converter.extractAcceptHeaderIfPresent(in: request.headerFields)
+                )
+                let contentType = converter.extractContentTypeIfPresent(in: request.headerFields)
+                let body: Operations.EvaluateQuestionnaireScenarios.Input.Body
+                let chosenContentType = try converter.bestContentType(
+                    received: contentType,
+                    options: [
+                        "application/json"
+                    ]
+                )
+                switch chosenContentType {
+                case "application/json":
+                    body = try await converter.getRequiredRequestBodyAsJSON(
+                        Components.Schemas.QuestionnaireScenarioInput.self,
+                        from: requestBody,
+                        transforming: { value in
+                            .json(value)
+                        }
+                    )
+                default:
+                    preconditionFailure("bestContentType chose an invalid content type.")
+                }
+                return Operations.EvaluateQuestionnaireScenarios.Input(
+                    path: path,
+                    headers: headers,
+                    body: body
                 )
             },
             serializer: { output, request in

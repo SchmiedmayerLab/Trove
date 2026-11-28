@@ -1,0 +1,154 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Boolean equality, inequality and exists, where `!=` holds when no answer is equal and therefore without an answer or when its question is disabled, with answers of disabled items left out of the response.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-exists",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      { "linkId": "smoker", "type": "boolean", "text": "Do you smoke?" },
+      {
+        "linkId": "packs", "type": "integer", "text": "Packs per day",
+        "enableWhen": [{ "question": "smoker", "operator": "=", "answerBoolean": true }]
+      },
+      {
+        "linkId": "answered", "type": "display", "text": "Thank you for answering.",
+        "enableWhen": [{ "question": "smoker", "operator": "exists", "answerBoolean": true }]
+      },
+      {
+        "linkId": "unanswered", "type": "display", "text": "Please answer the first question.",
+        "enableWhen": [{ "question": "smoker", "operator": "exists", "answerBoolean": false }]
+      },
+      {
+        "linkId": "not-smoker", "type": "string", "text": "Why not?",
+        "enableWhen": [{ "question": "smoker", "operator": "!=", "answerBoolean": true }]
+      },
+      {
+        "linkId": "not-one-pack", "type": "display", "text": "Not one pack",
+        "enableWhen": [{ "question": "packs", "operator": "!=", "answerInteger": 1 }]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      { "name": "unanswered", "item": [] },
+      {
+        "name": "smokes",
+        "item": [
+          { "linkId": "smoker", "answer": [{ "valueBoolean": true }] },
+          { "linkId": "packs", "answer": [{ "valueInteger": 2 }] }
+        ]
+      },
+      {
+        "name": "does not smoke",
+        "item": [
+          { "linkId": "smoker", "answer": [{ "valueBoolean": false }] },
+          { "linkId": "packs", "answer": [{ "valueInteger": 1 }] }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": true,
+      "nodes": [
+        { "path": "Questionnaire.item[0]", "linkId": "smoker", "type": "boolean", "text": "Do you smoke?", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[1]", "linkId": "packs", "type": "integer", "text": "Packs per day", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[2]", "linkId": "answered", "type": "display", "text": "Thank you for answering.", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[3]", "linkId": "unanswered", "type": "display", "text": "Please answer the first question.", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[4]", "linkId": "not-smoker", "type": "string", "text": "Why not?", "repeats": false, "required": false },
+        { "path": "Questionnaire.item[5]", "linkId": "not-one-pack", "type": "display", "text": "Not one pack", "repeats": false, "required": false }
+      ],
+      "edges": [
+        { "kind": "order", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]" },
+        { "kind": "order", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[2]" },
+        { "kind": "order", "from": "Questionnaire.item[2]", "to": "Questionnaire.item[3]" },
+        { "kind": "order", "from": "Questionnaire.item[3]", "to": "Questionnaire.item[4]" },
+        { "kind": "order", "from": "Questionnaire.item[4]", "to": "Questionnaire.item[5]" },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[1]",
+          "condition": { "index": 0, "question": "smoker", "operator": "=", "answer": { "valueBoolean": true } }
+        },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[2]",
+          "condition": { "index": 0, "question": "smoker", "operator": "exists", "answer": { "valueBoolean": true } }
+        },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[3]",
+          "condition": { "index": 0, "question": "smoker", "operator": "exists", "answer": { "valueBoolean": false } }
+        },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[0]", "to": "Questionnaire.item[4]",
+          "condition": { "index": 0, "question": "smoker", "operator": "!=", "answer": { "valueBoolean": true } }
+        },
+        {
+          "kind": "dependency", "from": "Questionnaire.item[1]", "to": "Questionnaire.item[5]",
+          "condition": { "index": 0, "question": "packs", "operator": "!=", "answer": { "valueInteger": 1 } }
+        }
+      ],
+      "diagnostics": []
+    },
+    "scenarios": [
+      {
+        "name": "unanswered",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "linkId": "smoker", "instance": [], "state": "enabled", "reason": "unconditional", "conditions": [] },
+          {
+            "path": "Questionnaire.item[1]", "linkId": "packs", "instance": [], "state": "disabled", "reason": "conditionsNotMet",
+            "conditions": [{ "index": 0, "question": "smoker", "operator": "=", "outcome": "notMet", "answers": [], "questionInstance": [] }]
+          },
+          { "path": "Questionnaire.item[2]", "state": "disabled", "reason": "conditionsNotMet" },
+          {
+            "path": "Questionnaire.item[3]", "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "index": 0, "question": "smoker", "operator": "exists", "outcome": "met", "answers": [] }]
+          },
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [] }] }
+        ],
+        "response": [],
+        "diagnostics": []
+      },
+      {
+        "name": "smokes",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled", "reason": "unconditional" },
+          {
+            "path": "Questionnaire.item[1]", "state": "enabled", "reason": "conditionsMet",
+            "conditions": [{ "index": 0, "outcome": "met", "answers": [{ "valueBoolean": true }] }]
+          },
+          { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [{ "valueInteger": 2 }] }] }
+        ],
+        "response": [
+          { "linkId": "smoker", "answer": [{ "valueBoolean": true }] },
+          { "linkId": "packs", "answer": [{ "valueInteger": 2 }] }
+        ],
+        "diagnostics": []
+      },
+      {
+        "name": "does not smoke",
+        "complete": true,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "enabled", "reason": "unconditional" },
+          { "path": "Questionnaire.item[1]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[2]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[3]", "state": "disabled", "reason": "conditionsNotMet" },
+          { "path": "Questionnaire.item[4]", "state": "enabled", "reason": "conditionsMet" },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet", "conditions": [{ "outcome": "met", "answers": [] }] }
+        ],
+        "response": [
+          { "linkId": "smoker", "answer": [{ "valueBoolean": false }] }
+        ],
+        "diagnostics": [
+          { "severity": "information", "source": "trove", "rule": "answer-excluded", "path": "QuestionnaireResponse.item[1].answer[0]" }
+        ]
+      }
+    ]
+  }
+}

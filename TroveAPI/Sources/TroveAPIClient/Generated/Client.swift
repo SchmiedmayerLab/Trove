@@ -3334,6 +3334,103 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// Evaluate named synthetic answer sets against a questionnaire component's stored resource
+    ///
+    /// Derives the branching graph of the exact stored Questionnaire and evaluates each named scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules, including `exists`, typed comparisons, multiple answers, ancestor gating and repeat instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is `notEvaluated` when its state depends on an expression, a dependency cycle or a condition that cannot be evaluated. The result is not stored, creates no participant records and does not change the draft. Other component types return 422, and a request whose evaluation exceeds its bounds returns 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/scenarios`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)`.
+    public func evaluateQuestionnaireScenarios(_ input: Operations.EvaluateQuestionnaireScenarios.Input) async throws -> Operations.EvaluateQuestionnaireScenarios.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.EvaluateQuestionnaireScenarios.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/studies/{}/components/{}/scenarios",
+                    parameters: [
+                        input.path.studyId,
+                        input.path.componentId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "Trove-Delegation-ID",
+                    value: input.headers.troveDelegationID
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.EvaluateQuestionnaireScenarios.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.QuestionnaireScenarioReport.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.OperationFailure.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ProblemDetails.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
     /// Add an informational component to a study
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/components/informational`.

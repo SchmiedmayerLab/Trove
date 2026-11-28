@@ -1,0 +1,953 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "The R4 occurrence rule across three repeating-group instances: a question inside a repeating group that follows the gated item is read in the group's first instance (following axis), a question before the gated item in the same instance, a question after it in the previous instance, a nested repeating group reads the enclosing instance, and a disabled nearest preceding occurrence counts as absent instead of falling back to an earlier one.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-repeat-axes",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      {
+        "linkId": "preview",
+        "type": "display",
+        "text": "A high first score",
+        "enableWhen": [
+          {
+            "question": "score",
+            "operator": ">",
+            "answerInteger": 5
+          }
+        ]
+      },
+      {
+        "linkId": "round",
+        "type": "group",
+        "repeats": true,
+        "text": "Round",
+        "item": [
+          {
+            "linkId": "played",
+            "type": "boolean",
+            "text": "Played"
+          },
+          {
+            "linkId": "score",
+            "type": "integer",
+            "text": "Score",
+            "enableWhen": [
+              {
+                "question": "played",
+                "operator": "=",
+                "answerBoolean": true
+              }
+            ]
+          },
+          {
+            "linkId": "bonus",
+            "type": "display",
+            "text": "Bonus",
+            "enableWhen": [
+              {
+                "question": "next",
+                "operator": "=",
+                "answerBoolean": true
+              }
+            ]
+          },
+          {
+            "linkId": "next",
+            "type": "boolean",
+            "text": "Another round"
+          },
+          {
+            "linkId": "detail",
+            "type": "group",
+            "repeats": true,
+            "text": "Detail",
+            "item": [
+              {
+                "linkId": "inner-note",
+                "type": "display",
+                "text": "Played this round",
+                "enableWhen": [
+                  {
+                    "question": "played",
+                    "operator": "=",
+                    "answerBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "inner-late",
+                "type": "display",
+                "text": "Late",
+                "enableWhen": [
+                  {
+                    "question": "late",
+                    "operator": "=",
+                    "answerBoolean": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "linkId": "late",
+            "type": "boolean",
+            "text": "Late"
+          }
+        ]
+      },
+      {
+        "linkId": "summary",
+        "type": "display",
+        "text": "The last round has a score",
+        "enableWhen": [
+          {
+            "question": "score",
+            "operator": "exists",
+            "answerBoolean": true
+          }
+        ]
+      }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      {
+        "name": "three rounds",
+        "item": [
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "score",
+                "answer": [
+                  {
+                    "valueInteger": 8
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "score",
+                "answer": [
+                  {
+                    "valueInteger": 4
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              },
+              {
+                "linkId": "score",
+                "answer": [
+                  {
+                    "valueInteger": 9
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "repeat-context",
+          "path": "Questionnaire.item[0].enableWhen[0].question"
+        },
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "repeat-context",
+          "path": "Questionnaire.item[1].item[2].enableWhen[0].question"
+        },
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "repeat-context",
+          "path": "Questionnaire.item[1].item[4].item[1].enableWhen[0].question"
+        },
+        {
+          "severity": "warning",
+          "source": "trove",
+          "rule": "repeat-context",
+          "path": "Questionnaire.item[2].enableWhen[0].question"
+        }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "three rounds",
+        "complete": true,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]",
+            "instance": [],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueInteger": 8
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[2]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueBoolean": false
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[3]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[5]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[2]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueBoolean": false
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[3]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[5]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 1
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueBoolean": false
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[2]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "enabled",
+            "reason": "conditionsMet",
+            "conditions": [
+              {
+                "outcome": "met",
+                "answers": [
+                  {
+                    "valueBoolean": true
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[3]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[0]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueBoolean": false
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[4].item[1]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              },
+              {
+                "path": "Questionnaire.item[1].item[4]",
+                "index": 0
+              }
+            ],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [
+                  {
+                    "valueBoolean": false
+                  }
+                ],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "Questionnaire.item[1].item[5]",
+            "instance": [
+              {
+                "path": "Questionnaire.item[1]",
+                "index": 2
+              }
+            ],
+            "state": "enabled",
+            "reason": "unconditional"
+          },
+          {
+            "path": "Questionnaire.item[2]",
+            "instance": [],
+            "state": "disabled",
+            "reason": "conditionsNotMet",
+            "conditions": [
+              {
+                "outcome": "notMet",
+                "answers": [],
+                "questionInstance": [
+                  {
+                    "path": "Questionnaire.item[1]",
+                    "index": 2
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "response": [
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "score",
+                "answer": [
+                  {
+                    "valueInteger": 8
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "score",
+                "answer": [
+                  {
+                    "valueInteger": 4
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "linkId": "round",
+            "item": [
+              {
+                "linkId": "played",
+                "answer": [
+                  {
+                    "valueBoolean": false
+                  }
+                ]
+              },
+              {
+                "linkId": "next",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              },
+              {
+                "linkId": "late",
+                "answer": [
+                  {
+                    "valueBoolean": true
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "diagnostics": [
+          {
+            "severity": "information",
+            "source": "trove",
+            "rule": "answer-excluded",
+            "path": "QuestionnaireResponse.item[2].item[1].answer[0]"
+          }
+        ]
+      }
+    ]
+  }
+}

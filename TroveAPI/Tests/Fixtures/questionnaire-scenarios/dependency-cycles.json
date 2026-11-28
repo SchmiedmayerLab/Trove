@@ -1,0 +1,76 @@
+{
+  "evaluator": "trove-questionnaire-scenarios-1",
+  "description": "Mutual, self and ancestor dependency cycles are reported and not evaluated; a condition on a cyclic question is still decided when its outcome does not depend on the question's state.",
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://example.org/fhir/Questionnaire/scenario-cycles",
+    "version": "1.0.0",
+    "status": "active",
+    "language": "en-US",
+    "item": [
+      { "linkId": "a", "type": "boolean", "text": "A", "enableWhen": [{ "question": "b", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "b", "type": "boolean", "text": "B", "enableWhen": [{ "question": "a", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "self", "type": "boolean", "text": "Self", "enableWhen": [{ "question": "self", "operator": "=", "answerBoolean": true }] },
+      {
+        "linkId": "outer", "type": "group", "text": "Outer", "enableWhen": [{ "question": "inner", "operator": "=", "answerBoolean": true }],
+        "item": [{ "linkId": "inner", "type": "boolean", "text": "Inner" }]
+      },
+      { "linkId": "after-a", "type": "display", "text": "A was answered", "enableWhen": [{ "question": "a", "operator": "exists", "answerBoolean": true }] },
+      { "linkId": "after-a-false", "type": "display", "text": "A was not answered", "enableWhen": [{ "question": "a", "operator": "exists", "answerBoolean": false }] }
+    ]
+  },
+  "request": {
+    "scenarios": [
+      { "name": "unanswered", "item": [] },
+      { "name": "a answered", "item": [{ "linkId": "a", "answer": [{ "valueBoolean": true }] }] }
+    ]
+  },
+  "expected": {
+    "graph": {
+      "complete": false,
+      "diagnostics": [
+        { "severity": "error", "source": "trove", "rule": "dependency-cycle", "path": "Questionnaire.item[0]" },
+        { "severity": "error", "source": "trove", "rule": "dependency-cycle", "path": "Questionnaire.item[2]" },
+        { "severity": "error", "source": "trove", "rule": "dependency-cycle", "path": "Questionnaire.item[3]" }
+      ]
+    },
+    "scenarios": [
+      {
+        "name": "unanswered",
+        "complete": false,
+        "items": [
+          {
+            "path": "Questionnaire.item[0]", "state": "notEvaluated", "reason": "dependencyCycle",
+            "conditions": [{ "index": 0, "question": "b", "operator": "exists", "outcome": "notEvaluated", "answers": [] }]
+          },
+          { "path": "Questionnaire.item[1]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[2]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[3]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[3].item[0]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[4]", "state": "disabled", "reason": "conditionsNotMet", "conditions": [{ "outcome": "notMet", "answers": [] }] },
+          { "path": "Questionnaire.item[5]", "state": "enabled", "reason": "conditionsMet" }
+        ],
+        "response": [],
+        "diagnostics": []
+      },
+      {
+        "name": "a answered",
+        "complete": false,
+        "items": [
+          { "path": "Questionnaire.item[0]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[1]", "state": "notEvaluated", "reason": "dependencyCycle" },
+          { "path": "Questionnaire.item[2]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[3]", "state": "notEvaluated" },
+          { "path": "Questionnaire.item[3].item[0]", "state": "notEvaluated" },
+          {
+            "path": "Questionnaire.item[4]", "state": "notEvaluated", "reason": "conditionNotEvaluated",
+            "conditions": [{ "outcome": "notEvaluated", "answers": [{ "valueBoolean": true }] }]
+          },
+          { "path": "Questionnaire.item[5]", "state": "notEvaluated", "reason": "conditionNotEvaluated" }
+        ],
+        "response": [{ "linkId": "a", "answer": [{ "valueBoolean": true }] }],
+        "diagnostics": []
+      }
+    ]
+  }
+}

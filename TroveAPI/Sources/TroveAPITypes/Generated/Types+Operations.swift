@@ -5295,6 +5295,188 @@ public enum Operations {
             }
         }
     }
+    /// Evaluate named synthetic answer sets against a questionnaire component's stored resource
+    ///
+    /// Derives the branching graph of the exact stored Questionnaire and evaluates each named scenario's synthetic answers with the FHIR R4 `enableWhen` and `enableBehavior` rules, including `exists`, typed comparisons, multiple answers, ancestor gating and repeat instances. Every item ends `enabled`, `disabled` or `notEvaluated`; an item is `notEvaluated` when its state depends on an expression, a dependency cycle or a condition that cannot be evaluated. The result is not stored, creates no participant records and does not change the draft. Other component types return 422, and a request whose evaluation exceeds its bounds returns 422.
+    ///
+    ///
+    /// - Remark: HTTP `POST /studies/{studyId}/components/{componentId}/scenarios`.
+    /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)`.
+    public enum EvaluateQuestionnaireScenarios {
+        public static let id: Swift.String = "evaluateQuestionnaireScenarios"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/path/studyId`.
+                public var studyId: Components.Parameters.StudyId
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/path/componentId`.
+                public var componentId: Components.Parameters.ComponentId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - studyId:
+                ///   - componentId:
+                public init(
+                    studyId: Components.Parameters.StudyId,
+                    componentId: Components.Parameters.ComponentId
+                ) {
+                    self.studyId = studyId
+                    self.componentId = componentId
+                }
+            }
+            public var path: Operations.EvaluateQuestionnaireScenarios.Input.Path
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// Selects a server-side grant for a registered draft-only OAuth client. It cannot authorize a request by itself. Interactive clients must omit it.
+                ///
+                ///
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/header/Trove-Delegation-ID`.
+                public var troveDelegationID: Components.Parameters.DelegationId?
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EvaluateQuestionnaireScenarios.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - troveDelegationID: Selects a server-side grant for a registered draft-only OAuth client. It cannot authorize a request by itself. Interactive clients must omit it.
+                ///   - accept:
+                public init(
+                    troveDelegationID: Components.Parameters.DelegationId? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EvaluateQuestionnaireScenarios.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.troveDelegationID = troveDelegationID
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.EvaluateQuestionnaireScenarios.Input.Headers
+            /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.QuestionnaireScenarioInput)
+            }
+            public var body: Operations.EvaluateQuestionnaireScenarios.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.EvaluateQuestionnaireScenarios.Input.Path,
+                headers: Operations.EvaluateQuestionnaireScenarios.Input.Headers = .init(),
+                body: Operations.EvaluateQuestionnaireScenarios.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/studies/{studyId}/components/{componentId}/scenarios/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.QuestionnaireScenarioReport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.QuestionnaireScenarioReport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.EvaluateQuestionnaireScenarios.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.EvaluateQuestionnaireScenarios.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Graph and scenario results for the stored resource at the returned draft revision
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.EvaluateQuestionnaireScenarios.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.EvaluateQuestionnaireScenarios.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Operation denied or unavailable; no protected change or disclosure was accepted.
+            ///
+            /// - Remark: Generated from `#/paths//studies/{studyId}/components/{componentId}/scenarios/post(evaluateQuestionnaireScenarios)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Components.Responses.OperationFailure)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Components.Responses.OperationFailure {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Add an informational component to a study
     ///
     /// - Remark: HTTP `POST /studies/{studyId}/components/informational`.

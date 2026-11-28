@@ -31,7 +31,8 @@ struct KeycloakClientPolicy: Sendable {
              Operations.GetStudiesStudyIdComponentsQuestionnaireComponentId.id,
              Operations.GetStudiesStudyIdComponentsHealthDataComponentId.id,
              Operations.GetStudiesStudyIdComponentsComponentIdSchedules.id,
-             Operations.GetStudiesStudyIdComponentsComponentIdSchedulesScheduleId.id:
+             Operations.GetStudiesStudyIdComponentsComponentIdSchedulesScheduleId.id,
+             Operations.EvaluateQuestionnaireScenarios.id:
             .inspect
         case Operations.PatchStudiesStudyId.id, Operations.DeleteStudiesStudyIdComponentsComponentId.id,
              Operations.PostStudiesStudyIdComponentsInformational.id, Operations.PutStudiesStudyIdComponentsInformationalComponentId.id,

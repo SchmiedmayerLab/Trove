@@ -161,6 +161,21 @@ Both commands print their result before exiting with a status-specific code:
 | 4 | `unavailable` | The validator could not be reached; validate again later. |
 | 1 | none | The request failed; nothing is printed on standard output. |
 
+## Scenarios
+
+`trove questionnaire scenario --study <study-id> --component <component-id> --file scenarios.json`
+evaluates named synthetic answer sets against the stored resource and prints one
+`QuestionnaireScenarioReport` document: the branching graph, and for each scenario
+the state of every item instance, the outcome of each condition and the answers a
+completed response keeps. The file holds `{"scenarios": [...]}`; each scenario has a
+unique `name` and its answers in `item`, in the shape of `QuestionnaireResponse.item`.
+The command changes nothing, and a grant that permits inspection suffices with
+`--delegation`. It exits 0 when the graph and every scenario are fully evaluated and
+3 when a condition, expression, dependency cycle, answer or a warning in the graph
+leaves the analysis incomplete; a failed request exits 1 and prints nothing on
+standard output. The [study model](../docs/Study-Model-and-Research-Workflows.md#branching-scenarios)
+describes the evaluation rules.
+
 ## Exact Publication
 
 Run `trove study validate <study-id> --revision <draft-revision>`. Review the
